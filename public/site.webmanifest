@@ -1,0 +1,16 @@
+{
+  "name": "Sai Pallav - Full-Stack Developer Portfolio",
+  "short_name": "Sai Pallav",
+  "description": "Full-Stack Developer & CSE Student specializing in distributed systems and web applications",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#00e5a0",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

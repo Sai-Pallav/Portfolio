@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--bg-surface);
+  --color-raised: var(--bg-raised);
+  --color-border: var(--border);
+
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+
+  --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-success: var(--success);
+
+  --font-heading: var(--font-heading);
+  --font-body: var(--font-body);
+
+  --animate-fade-up: fadeUp 0.6s ease forwards;
+  --animate-fade-in: fadeIn 0.4s ease forwards;
+  --animate-slide-left: slideLeft 0.5s ease forwards;
+  --animate-pop-in: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  --animate-draw-line: drawLine 1.5s ease forwards;
+  --animate-spin-slow: spin 4s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-glow-pulse: glowPulse 3s ease-in-out infinite;
+
+  /* Keyframes fadeUp, fadeIn, slideLeft, float, glowPulse are defined in animations.css */
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes drawLine {
+    from { transform: scaleY(0); }
+    to { transform: scaleY(1); }
+  }
+
+
+  /* ── About section animations ── */
+  @keyframes floatCrystal {
+    0%,100% { transform: translateY(0px) rotate(0deg); }
+    33%      { transform: translateY(-16px) rotate(2deg); }
+    66%      { transform: translateY(-8px) rotate(-1.4deg); }
+  }
+  @keyframes crystalPulse {
+    0%,100% { opacity: 0.5; transform: scale(1); }
+    50%      { opacity: 1;   transform: scale(1.22); }
+  }
+  @keyframes crystalHalo {
+    0%,100% { opacity: 0.65; transform: scale(1); }
+    50%      { opacity: 1;   transform: scale(1.14); }
+  }
+  @keyframes titleShimmer {
+    0%   { filter: drop-shadow(0 0 35px rgba(168,85,247,0.5)); }
+    50%  { filter: drop-shadow(0 0 65px rgba(232,121,249,0.85)); }
+    100% { filter: drop-shadow(0 0 35px rgba(168,85,247,0.5)); }
+  }
+  @keyframes cardEdgeGlowLeft {
+    0%,100% { box-shadow: 4px 0 20px rgba(168,85,247,0.15), 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04); }
+    50%      { box-shadow: 4px 0 34px rgba(232,121,249,0.35), 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06); }
+  }
+  @keyframes cardEdgeGlowRight {
+    0%,100% { box-shadow: -4px 0 20px rgba(168,85,247,0.15), 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04); }
+    50%      { box-shadow: -4px 0 34px rgba(232,121,249,0.35), 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06); }
+  }
+  @keyframes cardEdgePulse {
+    0%,100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+  }
+  @keyframes statusBlink {
+    0%,100% { opacity: 0.7; transform: scale(1);    box-shadow: 0 0 10px rgba(74,222,128,0.9); }
+    50%      { opacity: 1;  transform: scale(1.35); box-shadow: 0 0 18px rgba(74,222,128,1.0); }
+  }
+  @keyframes shimmerSlide {
+    0%   { left: -60%; }
+    100% { left: 120%; }
+  }
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Lenis controls smooth scrolling — avoid native smooth-scroll conflicts */
+html {
+  scroll-behavior: auto;
+}
+
+main {
+  position: relative;
+  width: 100%;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-dim);
+  border-radius: 5px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+::-moz-selection {
+  background-color: var(--accent);
+  color: var(--accent-contrast);
+}

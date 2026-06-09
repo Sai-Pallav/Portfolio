@@ -1,0 +1,66 @@
+export const projects = [
+  {
+    id:          1,
+    title:       'Language-Agnostic Chatbot',
+    description: 'A real-time conversational agent supporting multi-lingual syntax translation, LLM streaming, and dynamic intent classification. Built with Ollama APIs, React, and WebSockets.',
+    tags:        ['React', 'Node.js', 'WebSockets', 'Ollama', 'Tailwind'],
+    category:    'fullstack',     // fullstack | ml | systems | devops
+    image:       '/images/projects/chatbot.webp',
+    github:      'https://github.com/Sai-Pallav/Language-Agnostic-Chatbot',
+    live:        'https://agnostic-chatbot.vercel.app',
+    featured:    true,
+    highlights:  [
+      'Supports 15+ coding languages',
+      'Zero-latency stream updates',
+      'Contextual parsing engine',
+    ],
+  },
+  {
+    id:          2,
+    title:       'BITS Campus Connect',
+    description: 'A unified student portal and peer-to-peer campus forum. Handles real-time messaging, events scheduling, and student verification. Used active-caching to accelerate dashboard queries.',
+    tags:        ['React', 'Node.js', 'PostgreSQL', 'Redis', 'Socket.IO'],
+    category:    'fullstack',
+    image:       '/images/projects/campus-connect.webp',
+    github:      'https://github.com/Sai-Pallav/campus-connect',
+    live:        'https://bits-connect.vercel.app',
+    featured:    true,
+    highlights:  [
+      '300+ active campus users',
+      '40% faster with Redis caching',
+      'Secure BITS login integration',
+    ],
+  },
+  {
+    id:          3,
+    title:       'Dijkstra Route Pathfinder',
+    description: 'An advanced route optimization tool implementing custom priority queues and Dijkstra’s algorithm to determine optimal logistics paths over real geographic coordinate feeds.',
+    tags:        ['TypeScript', 'React', 'Google Maps API', 'Algorithms'],
+    category:    'systems',
+    image:       '/images/projects/pathfinder.webp',
+    github:      'https://github.com/Sai-Pallav/route-optimizer',
+    live:        'https://route-pathfinder.vercel.app',
+    featured:    false,
+    highlights:  [
+      '23% route latency reduction',
+      'Dynamic obstacles recalculation',
+      'Custom Heap structures',
+    ],
+  },
+  {
+    id:          4,
+    title:       'DevClock CLI',
+    description: 'A rust-based command line utility that fetches Git commits history and constructs an interactive, beautiful ASCII clock representing coding patterns.',
+    tags:        ['Rust', 'Git API', 'CLI', 'ASCII Art'],
+    category:    'systems',
+    image:       '/images/projects/devclock.webp',
+    github:      'https://github.com/Sai-Pallav/devclock',
+    live:        'https://crates.io/crates/devclock',
+    featured:    false,
+    highlights:  [
+      'Published on crates.io',
+      '500+ downloads',
+      'Under 15ms latency execution',
+    ],
+  }
+]

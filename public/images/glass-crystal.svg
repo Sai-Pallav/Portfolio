@@ -1,0 +1,45 @@
+<svg width="400" height="500" viewBox="0 0 400 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="crystalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(138, 43, 226, 0.8);stop-opacity:1" />
+      <stop offset="50%" style="stop-color:rgba(147, 51, 234, 0.6);stop-opacity:1" />
+      <stop offset="100%" style="stop-color:rgba(126, 34, 206, 0.7);stop-opacity:1" />
+    </linearGradient>
+    <filter id="crystalGlow">
+      <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <radialGradient id="crystalHighlight" cx="50%" cy="35%">
+      <stop offset="0%" style="stop-color:rgba(138, 43, 226, 0.8);stop-opacity:1" />
+      <stop offset="100%" style="stop-color:rgba(138, 43, 226, 0);stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Crystal hexagon shape -->
+  <polygon 
+    points="200,50 320,150 320,350 200,450 80,350 80,150" 
+    fill="url(#crystalGradient)" 
+    filter="url(#crystalGlow)" 
+    opacity="0.85"
+    stroke="rgba(138, 43, 226, 0.9)" 
+    stroke-width="3"
+  />
+  
+  <!-- Inner highlight -->
+  <ellipse cx="200" cy="200" rx="100" ry="120" fill="url(#crystalHighlight)" opacity="0.6"/>
+  
+  <!-- Crystal facet lines -->
+  <line x1="200" y1="50" x2="200" y2="450" stroke="rgba(138, 43, 226, 0.5)" stroke-width="2"/>
+  <line x1="80" y1="250" x2="320" y2="250" stroke="rgba(138, 43, 226, 0.5)" stroke-width="2"/>
+  <line x1="140" y1="120" x2="260" y2="380" stroke="rgba(138, 43, 226, 0.4)" stroke-width="1.5"/>
+  <line x1="260" y1="120" x2="140" y2="380" stroke="rgba(138, 43, 226, 0.4)" stroke-width="1.5"/>
+  
+  <!-- Additional facets -->
+  <line x1="80" y1="150" x2="200" y2="250" stroke="rgba(138, 43, 226, 0.3)" stroke-width="1"/>
+  <line x1="320" y1="150" x2="200" y2="250" stroke="rgba(138, 43, 226, 0.3)" stroke-width="1"/>
+  <line x1="80" y1="350" x2="200" y2="250" stroke="rgba(138, 43, 226, 0.3)" stroke-width="1"/>
+  <line x1="320" y1="350" x2="200" y2="250" stroke="rgba(138, 43, 226, 0.3)" stroke-width="1"/>
+</svg>

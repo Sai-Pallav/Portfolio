@@ -1,0 +1,628 @@
+/* ========================================================
+   ADVANCED ANIMATIONS & MICRO-INTERACTIONS
+   Professional-grade animations for modern portfolio
+   ======================================================== */
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(5deg);
+  }
+  75% {
+    transform: rotate(-5deg);
+  }
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Magnetic Button Effect */
+.magnetic-button {
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.magnetic-button:hover {
+  transform: scale(1.05);
+}
+
+/* Shimmer Effect */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent-dim) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 3s infinite;
+}
+
+/* Gradient Animation */
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animated-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* Slide Up Fade */
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up-fade {
+  animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Glow Pulse */
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px var(--accent-dim), 0 0 40px var(--accent-dim);
+  }
+  50% {
+    box-shadow: 0 0 30px var(--accent), 0 0 60px var(--accent-dim);
+  }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* Float Animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Wiggle */
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-3deg);
+  }
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+/* Reveal from Bottom */
+@keyframes revealBottom {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-reveal-bottom {
+  animation: revealBottom 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Scale Fade */
+@keyframes scaleFade {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-fade {
+  animation: scaleFade 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Blur In */
+@keyframes blurIn {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.animate-blur-in {
+  animation: blurIn 0.8s ease-out;
+}
+
+/* Typewriter Cursor */
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.typewriter-cursor {
+  animation: blink 1s step-end infinite;
+}
+
+/* Slide In from Left */
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Slide In from Right */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Hover Effects */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.hover-glow {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 30px var(--accent-dim), 0 0 60px var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.hover-scale {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Stagger Animation Delays */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+.stagger-6 { animation-delay: 0.6s; }
+
+/* Loading Spinner */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* Heartbeat */
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  10%, 30% {
+    transform: scale(1.1);
+  }
+  20%, 40% {
+    transform: scale(1);
+  }
+}
+
+.animate-heartbeat {
+  animation: heartbeat 1.5s ease-in-out infinite;
+}
+
+/* ========================================================
+   CANONICAL ANIMATION KEYFRAMES
+   Single source of truth for all animation keyframes.
+   Used by [data-animate] system in themes.css and
+   Tailwind --animate-* utilities in index.css.
+   ======================================================== */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(45px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(45px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-45px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Smooth Transitions */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.transition-bounce {
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Glass Morphism with Animation */
+.glass-morph {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-morph:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================================
+   TIMELINE-SPECIFIC ANIMATIONS
+   Futuristic branching timeline effects
+   ======================================================== */
+
+/* Data stream animation for vertical line */
+@keyframes dataStream {
+  0% {
+    stroke-dashoffset: 1000;
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.8;
+  }
+}
+
+/* Node pulse animation */
+@keyframes nodePulse {
+  0%, 100% {
+    r: 4;
+    opacity: 0.8;
+    filter: drop-shadow(0 0 8px var(--accent));
+  }
+  50% {
+    r: 6;
+    opacity: 1;
+    filter: drop-shadow(0 0 16px var(--accent));
+  }
+}
+
+/* Branch glow animation */
+@keyframes branchGlow {
+  0%, 100% {
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 4px var(--accent));
+  }
+  50% {
+    stroke-width: 2;
+    filter: drop-shadow(0 0 8px var(--accent));
+  }
+}
+
+/* Card float animation */
+@keyframes cardFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Gradient shimmer for badges */
+@keyframes gradientShimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Ambient pulse for background orbs */
+@keyframes ambientPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.2;
+  }
+}
+
+/* Utility classes */
+.animate-data-stream {
+  animation: dataStream 2s ease forwards;
+}
+
+.animate-node-pulse {
+  animation: nodePulse 2s ease-in-out infinite;
+}
+
+.animate-branch-glow {
+  animation: branchGlow 3s ease-in-out infinite;
+}
+
+.animate-card-float {
+  animation: cardFloat 6s ease-in-out infinite;
+}
+
+.animate-gradient-shimmer {
+  background-size: 200% auto;
+  animation: gradientShimmer 3s linear infinite;
+}
+
+.animate-ambient-pulse {
+  animation: ambientPulse 8s ease-in-out infinite;
+}
+
+/* ========================================================
+   SKILLS KEYBOARD — HOLOGRAPHIC & HUD ANIMATIONS
+   Futuristic cinematic effects for the Skills section
+   ======================================================== */
+
+/* Holographic scan line (vertical sweep inside panel) */
+@keyframes holoScanLine {
+  0% {
+    top: -2px;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: calc(100% + 2px);
+    opacity: 0;
+  }
+}
+
+.holo-scan-line {
+  animation: holoScanLine 3s ease-in-out infinite;
+}
+
+/* HUD horizontal scan (sweeps top to bottom) */
+@keyframes hudScanHorizontal {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.hud-scan-horizontal {
+  animation: hudScanHorizontal 6s ease-in-out infinite;
+}
+
+/* Holographic flicker (panel entrance stabilization) */
+@keyframes holoFlicker {
+  0%, 100% { opacity: 1; }
+  3% { opacity: 0.4; }
+  6% { opacity: 1; }
+  8% { opacity: 0.7; }
+  10% { opacity: 1; }
+  50% { opacity: 1; }
+  52% { opacity: 0.85; }
+  54% { opacity: 1; }
+}
+
+.holo-flicker {
+  animation: holoFlicker 4s ease-in-out infinite;
+}
+
+/* Circuit flow animation */
+@keyframes circuitFlow {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-circuit-flow {
+  stroke-dasharray: 10 5;
+  animation: circuitFlow 3s linear infinite;
+}
+
+/* Energy pulse (radial burst) */
+@keyframes energyPulse {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+.animate-energy-pulse {
+  animation: energyPulse 0.8s ease-out forwards;
+}
+
+/* Data stream vertical (for HUD side panels) */
+@keyframes dataStreamVertical {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 100%;
+  }
+}
+
+.animate-data-stream-vertical {
+  background-size: 100% 200%;
+  animation: dataStreamVertical 2s linear infinite;
+}
+
+/* Subtle breathing glow for active elements */
+@keyframes breathingGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(0, 229, 160, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(0, 229, 160, 0.25);
+  }
+}
+
+.animate-breathing-glow {
+  animation: breathingGlow 3s ease-in-out infinite;
+}
+
+/* Shimmer sweep for premium card hover */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+
