@@ -53,14 +53,18 @@ export function CustomCursor() {
     enableCustomCursor()
 
     let rafId = 0
+    let detectId = 0
     let lastX = -200
     let lastY = -200
-    let lastDetect = 0
-    const DETECT_INTERVAL = 60 // ms between expensive DOM inspections
+    let lastDetectX = Number.NaN
+    let lastDetectY = Number.NaN
+    const DETECT_INTERVAL = 80 // ms between expensive DOM inspections
 
     // Cheap: only record the latest pointer position on every move.
-    // The expensive DOM inspection (hit testing, shape, color) is throttled
-    // and runs inside the RAF loop so it never blocks pointer tracking.
+    // The expensive DOM inspection (hit testing, shape, color) runs on a
+    // separate timer (see below) so its forced style/layout recalcs never
+    // block the RAF frame that paints the cursor position. This keeps the
+    // cursor smooth even over heavy sections like the animated skills marquee.
     const onPointerMove = (e) => {
       lastX = e.clientX
       lastY = e.clientY
@@ -69,6 +73,12 @@ export function CustomCursor() {
 
     // Expensive: hit-test, shape detection and color sampling.
     const detectHover = () => {
+      // Skip when the pointer hasn't moved since the last detection — avoids
+      // forcing needless style/layout recalcs while sections animate underneath.
+      if (lastX === lastDetectX && lastY === lastDetectY) return
+      lastDetectX = lastX
+      lastDetectY = lastY
+
       const hit = document.elementFromPoint(lastX, lastY)
       const isText = isTextHoverTarget(hit)
       updateCursorSize(isText)
@@ -98,13 +108,9 @@ export function CustomCursor() {
       enableCustomCursor()
     }
 
+    // Render loop: only reads cached state and writes style — no layout reads,
+    // so the cursor position stays smooth regardless of what else animates.
     const tick = () => {
-      const now = performance.now()
-      if (now - lastDetect > DETECT_INTERVAL) {
-        lastDetect = now
-        detectHover()
-      }
-
       const { x, y, width, height, opacity, borderRadius } = animate(reducedMotion)
 
       cursor.style.width = `${width}px`
@@ -123,9 +129,11 @@ export function CustomCursor() {
     window.addEventListener('pointerdown', onPointerDown, { passive: true })
 
     rafId = requestAnimationFrame(tick)
+    detectId = window.setInterval(detectHover, DETECT_INTERVAL)
 
     return () => {
       cancelAnimationFrame(rafId)
+      clearInterval(detectId)
       window.removeEventListener('pointermove', onPointerMove)
       document.documentElement.removeEventListener('mouseleave', onDocumentLeave)
       document.documentElement.removeEventListener('mouseenter', onDocumentEnter)
