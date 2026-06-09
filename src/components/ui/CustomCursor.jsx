@@ -53,11 +53,23 @@ export function CustomCursor() {
     enableCustomCursor()
 
     let rafId = 0
+    let lastX = -200
+    let lastY = -200
+    let lastDetect = 0
+    const DETECT_INTERVAL = 60 // ms between expensive DOM inspections
 
+    // Cheap: only record the latest pointer position on every move.
+    // The expensive DOM inspection (hit testing, shape, color) is throttled
+    // and runs inside the RAF loop so it never blocks pointer tracking.
     const onPointerMove = (e) => {
+      lastX = e.clientX
+      lastY = e.clientY
       updateCursorPosition(e)
+    }
 
-      const hit = document.elementFromPoint(e.clientX, e.clientY)
+    // Expensive: hit-test, shape detection and color sampling.
+    const detectHover = () => {
+      const hit = document.elementFromPoint(lastX, lastY)
       const isText = isTextHoverTarget(hit)
       updateCursorSize(isText)
 
@@ -67,7 +79,7 @@ export function CustomCursor() {
         updateCursorShape(shape)
       }
 
-      updateCursorColor(e.clientX, e.clientY)
+      updateCursorColor(lastX, lastY)
     }
 
     const onDocumentLeave = () => {
@@ -87,6 +99,12 @@ export function CustomCursor() {
     }
 
     const tick = () => {
+      const now = performance.now()
+      if (now - lastDetect > DETECT_INTERVAL) {
+        lastDetect = now
+        detectHover()
+      }
+
       const { x, y, width, height, opacity, borderRadius } = animate(reducedMotion)
 
       cursor.style.width = `${width}px`
