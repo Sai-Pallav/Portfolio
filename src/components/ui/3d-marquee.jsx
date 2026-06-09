@@ -237,7 +237,9 @@ const MarqueeColumn = ({
 
   const totalHeight = maxItems * SCROLL_CONFIG.ITEM_HEIGHT;
   const paddedArray = Array.from({ length: maxItems }, (_, i) => subarray[i % subarray.length]);
-  const duplicatedArray = [...paddedArray, ...paddedArray, ...paddedArray, ...paddedArray, ...paddedArray, ...paddedArray];
+  // 3 copies fully cover the scroll loop (wrap range 2×totalHeight + viewport ≈ 1912px < 1968px),
+  // so we render half as many backdrop-blur tiles as before with no visual difference.
+  const duplicatedArray = [...paddedArray, ...paddedArray, ...paddedArray];
 
   return (
     <div
@@ -276,7 +278,10 @@ const MarqueeColumn = ({
             style={{
               width: `${SCROLL_CONFIG.TILE_SIZE}px`,
               height: `${SCROLL_CONFIG.TILE_SIZE}px`,
-              willChange: prefersReducedMotion ? "auto" : "transform, opacity",
+              // Don't permanently promote every tile to its own compositor layer — the
+              // scrolling column wrapper already owns willChange:transform, and tiles only
+              // transform on hover (which the browser auto-optimizes). Permanent promotion
+              // here multiplied GPU layers/memory and starved the compositor, causing cursor lag.
             }}
             role="listitem"
             aria-label={skill ? `${skill.name} — click for details` : `Technology icon ${originalIndex + 1}`}
