@@ -237,7 +237,11 @@ const MarqueeColumn = ({
 
   const totalHeight = maxItems * SCROLL_CONFIG.ITEM_HEIGHT;
   const paddedArray = Array.from({ length: maxItems }, (_, i) => subarray[i % subarray.length]);
-  const duplicatedArray = [...paddedArray, ...paddedArray, ...paddedArray, ...paddedArray, ...paddedArray, ...paddedArray];
+  // The scroll position oscillates between 0 and -2*totalHeight, so three
+  // stacked copies fully cover the visible window at every wrap point.
+  // Six copies (the previous value) just doubled the tile/DOM count and the
+  // number of animated surfaces with no visual difference.
+  const duplicatedArray = [...paddedArray, ...paddedArray, ...paddedArray];
 
   return (
     <div
@@ -276,7 +280,10 @@ const MarqueeColumn = ({
             style={{
               width: `${SCROLL_CONFIG.TILE_SIZE}px`,
               height: `${SCROLL_CONFIG.TILE_SIZE}px`,
-              willChange: prefersReducedMotion ? "auto" : "transform, opacity",
+              // Don't permanently promote every tile to its own layer. Only the
+              // scrolling column needs `will-change: transform`; individual tiles
+              // animate only on hover/entrance, so a persistent hint here just
+              // created dozens of extra compositor layers.
             }}
             role="listitem"
             aria-label={skill ? `${skill.name} — click for details` : `Technology icon ${originalIndex + 1}`}
@@ -292,9 +299,13 @@ const MarqueeColumn = ({
               style={{
                 scale: 1,
                 boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-                backgroundColor: "rgba(255, 255, 255, 0.03)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
+                // Solid translucent fill instead of backdrop-filter: blur().
+                // A live backdrop blur on every tile forces the compositor to
+                // re-render each surface on every scroll frame — multiplied by
+                // dozens of tiles inside a 3D-rotated, masked container, that
+                // was the main cause of the dropped frames. The flat fill looks
+                // the same against the dark grid but is essentially free.
+                backgroundColor: "rgba(255, 255, 255, 0.06)",
               }}
               transition={{ duration: prefersReducedMotion ? 0 : SCROLL_CONFIG.HOVER_DURATION, ease: "easeOut" }}
               className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-3xl border border-white/10"
