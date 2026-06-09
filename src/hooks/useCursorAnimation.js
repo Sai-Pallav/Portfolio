@@ -22,6 +22,7 @@ export function useCursorAnimation(cursorRef) {
     snapped: false,
     keyboardMode: false,
     lastSample: 0,
+    lastFrame: 0,
     // Shape transformation properties
     targetWidth: SIZE_DEFAULT,
     targetHeight: SIZE_DEFAULT,
@@ -96,17 +97,34 @@ export function useCursorAnimation(cursorRef) {
 
   const animate = useCallback((reducedMotion) => {
     const s = state.current
-    const posLerp = reducedMotion ? 1 : LERP_POS
-    const sizeLerp = reducedMotion ? 1 : LERP_SIZE
+
+    // Frame-rate independent smoothing. A fixed per-frame lerp (e.g. *0.18)
+    // assumes 60fps; when heavy sections like the skills marquee drop the
+    // framerate, fewer frames run per second so the cursor crawls toward its
+    // target. Scaling by delta time keeps the perceived speed constant
+    // regardless of the actual frame rate.
+    const now = performance.now()
+    let dt = s.lastFrame ? (now - s.lastFrame) / 16.6667 : 1
+    s.lastFrame = now
+    // Clamp so a long stall (e.g. tab refocus) can't overshoot.
+    if (dt > 4) dt = 4
+
+    // Convert the per-frame retention factor into a delta-corrected one:
+    // factor^dt is the framerate-independent equivalent.
+    const posFactor = reducedMotion ? 1 : 1 - Math.pow(1 - LERP_POS, dt)
+    const sizeFactor = reducedMotion ? 1 : 1 - Math.pow(1 - LERP_SIZE, dt)
+    const shapeFactor = 1 - Math.pow(1 - LERP_SHAPE, dt)
+    const posLerp = posFactor
+    const sizeLerp = sizeFactor
 
     s.x += (s.tx - s.x) * posLerp
     s.y += (s.ty - s.y) * posLerp
     s.size += (s.targetSize - s.size) * sizeLerp
-    s.opacity += (s.targetOpacity - s.opacity) * 0.22
+    s.opacity += (s.targetOpacity - s.opacity) * (1 - Math.pow(1 - 0.22, dt))
 
     // Interpolate shape properties
-    s.currentWidth += (s.targetWidth - s.currentWidth) * LERP_SHAPE
-    s.currentHeight += (s.targetHeight - s.currentHeight) * LERP_SHAPE
+    s.currentWidth += (s.targetWidth - s.currentWidth) * shapeFactor
+    s.currentHeight += (s.targetHeight - s.currentHeight) * shapeFactor
 
     return {
       x: s.x,
