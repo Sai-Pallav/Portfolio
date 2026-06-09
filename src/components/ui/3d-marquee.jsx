@@ -211,9 +211,27 @@ const MarqueeColumn = ({
     const pixelsPerMs = totalHeight / (adjustedDuration * 1000);
 
     if (scrollPositionRef.current === null) {
-      scrollPositionRef.current = -totalHeight;
-      if (scrollRef.current) scrollRef.current.style.transform = `translate3d(0, ${-totalHeight}px, 0)`;
+      scrollPositionRef.current = 0;
     }
+
+    // Wrap the raw scroll position into a single tile-set period (-totalHeight, 0].
+    // Because the rendered tiles repeat exactly every `totalHeight`, drawing the
+    // column at a wrapped offset is visually identical to drawing it at the raw
+    // offset — so when a tile scrolls off one edge, the very same tile is already
+    // painted entering the opposite edge. The wrap therefore happens with no gap,
+    // jump, or flicker: the loop is perfectly continuous.
+    const wrap = (v) => {
+      let p = v % totalHeight;
+      if (p > 0) p -= totalHeight;
+      return p; // always within (-totalHeight, 0]
+    };
+
+    const apply = () => {
+      if (scrollRef.current) {
+        scrollRef.current.style.transform = `translate3d(0, ${wrap(scrollPositionRef.current)}px, 0)`;
+      }
+    };
+    apply();
 
     let rafId, lastTime;
     const animate = (time) => {
@@ -224,9 +242,7 @@ const MarqueeColumn = ({
       if (!isPausedRef.current) {
         const clampedDelta = Math.min(deltaTime, 50);
         scrollPositionRef.current += direction * pixelsPerMs * clampedDelta;
-        if (scrollPositionRef.current <= -2 * totalHeight) scrollPositionRef.current += totalHeight;
-        else if (scrollPositionRef.current >= 0) scrollPositionRef.current -= totalHeight;
-        if (scrollRef.current) scrollRef.current.style.transform = `translate3d(0, ${scrollPositionRef.current}px, 0)`;
+        apply();
       }
       rafId = requestAnimationFrame(animate);
     };
@@ -237,11 +253,14 @@ const MarqueeColumn = ({
 
   const totalHeight = maxItems * SCROLL_CONFIG.ITEM_HEIGHT;
   const paddedArray = Array.from({ length: maxItems }, (_, i) => subarray[i % subarray.length]);
-  // The scroll position oscillates between 0 and -2*totalHeight, so three
-  // stacked copies fully cover the visible window at every wrap point.
-  // Six copies (the previous value) just doubled the tile/DOM count and the
-  // number of animated surfaces with no visual difference.
-  const duplicatedArray = [...paddedArray, ...paddedArray, ...paddedArray];
+  // The wrapped offset lives in (-totalHeight, 0], so at the worst case the
+  // stack starts one full tile-set above the top edge. To always cover the
+  // visible window with no gap, we need at least one extra tile-set beyond the
+  // viewport height. Compute the copy count dynamically so even short columns
+  // (few skills) stay fully covered as they loop.
+  const VIEWPORT_HEIGHT = 600;
+  const copies = Math.max(3, Math.ceil(VIEWPORT_HEIGHT / totalHeight) + 2);
+  const duplicatedArray = Array.from({ length: copies }, () => paddedArray).flat();
 
   return (
     <div
