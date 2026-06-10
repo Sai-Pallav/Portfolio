@@ -5,6 +5,7 @@ import CareerCore from './experience/CareerCore'
 import OrbitRing from './experience/OrbitRing'
 import ExperienceNode from './experience/ExperienceNode'
 import ExperienceDetails from './experience/ExperienceDetails'
+import ExperienceCard from './experience/ExperienceCard'
 import EnergyBeam from './experience/EnergyBeam'
 import { useOrbitAnimation } from '@/hooks/useOrbitAnimation'
 
@@ -36,8 +37,8 @@ function Experience() {
   const orbitContainerRef = useRef(null)
   const detailsRef = useRef(null)
   const isInView = useInView(sectionRef, { once: true, margin: '-100px' })
-  const { scrollProgress, activeNodeIndex, orbitAngle, isMobile, isInView: orbitInView } = useOrbitAnimation(sectionRef)
   const [selectedNodeIndex, setSelectedNodeIndex] = useState(-1)
+  const { scrollProgress, orbitAngle, isMobile, isInView: orbitInView } = useOrbitAnimation(sectionRef, selectedNodeIndex !== -1)
   
   // Use only manually selected node (not scroll-based)
   const currentNodeIndex = selectedNodeIndex
@@ -135,7 +136,7 @@ function Experience() {
     <section
       id="experience"
       ref={sectionRef}
-      className="relative min-h-[180vh] py-16 md:py-20 px-4 sm:px-6 overflow-hidden"
+      className="relative min-h-screen lg:min-h-[120vh] py-16 md:py-20 px-4 sm:px-6 overflow-hidden"
       aria-label="Career Orbit Experience"
     >
       {/* Premium Animated Background */}
@@ -210,25 +211,17 @@ function Experience() {
 
           {/* Orbit System */}
           {isMobile ? (
-            // Mobile: Vertical stacked layout
-            <motion.div variants={itemVariants} className="flex flex-col gap-8 px-4">
+            // Mobile: Vertical stacked detailed cards
+            <motion.div variants={itemVariants} className="flex flex-col gap-6 px-4">
               {experience.map((exp, i) => (
                 <motion.div
                   key={exp.id}
-                  initial={{ opacity: 0, y: 50 }}
+                  initial={{ opacity: 0, y: 30 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.2 }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
                   viewport={{ once: true }}
                 >
-                  <ExperienceNode
-                    exp={exp}
-                    index={i}
-                    angle={nodeAngles[i]}
-                    radius={orbitRadii[i]}
-                    isActive={currentNodeIndex === i}
-                    orbitAngle={0}
-                    onSelect={handleNodeSelect}
-                  />
+                  <ExperienceCard exp={exp} index={i} total={experience.length} />
                 </motion.div>
               ))}
             </motion.div>

@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react'
-import { colorToCss, sampleColorsAt } from '@/utils/cursorColors'
+import { colorToCss, sampleColorsForElement } from '@/utils/cursorColors'
 
 const SIZE_DEFAULT = 16
 const SIZE_TEXT = 80
@@ -73,11 +73,11 @@ export function useCursorAnimation(cursorRef) {
     }
   }, [])
 
-  const updateCursorColor = useCallback((x, y) => {
+  const updateCursorColor = useCallback((target) => {
     const now = performance.now()
     if (now - state.current.lastSample > 32) {
       state.current.lastSample = now
-      const { fg } = sampleColorsAt(x, y)
+      const { fg } = sampleColorsForElement(target)
       state.current.fg = fg
       if (cursorRef.current) {
         cursorRef.current.style.backgroundColor = colorToCss(fg)

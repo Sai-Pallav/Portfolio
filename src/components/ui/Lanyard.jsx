@@ -5,6 +5,7 @@ import { Canvas, extend, useFrame } from '@react-three/fiber';
 import { useGLTF, useTexture, Environment, Lightformer } from '@react-three/drei';
 import { BallCollider, CuboidCollider, Physics, RigidBody, useRopeJoint, useSphericalJoint } from '@react-three/rapier';
 import { MeshLineGeometry, MeshLineMaterial } from 'meshline';
+import { useInView } from 'framer-motion';
 
 import cardGLB from '/card.glb';
 import lanyard from '/lanyard.png';
@@ -23,6 +24,8 @@ export default function Lanyard({ position = [0, 0, 30], gravity = [0, -40, 0], 
 
   // Store cleanup fn so we can remove the section listener on unmount
   const pointerCleanupRef = useRef(null);
+  const containerRef = useRef(null);
+  const isInView = useInView(containerRef, { margin: '200px' });
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -30,14 +33,22 @@ export default function Lanyard({ position = [0, 0, 30], gravity = [0, -40, 0], 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Cleanup section pointer listener on unmount
+  // Cleanup section pointer listener when Canvas unmounts or component unmounts
+  useEffect(() => {
+    if (!isInView) {
+      pointerCleanupRef.current?.();
+      pointerCleanupRef.current = null;
+    }
+  }, [isInView]);
+
   useEffect(() => {
     return () => pointerCleanupRef.current?.();
   }, []);
 
   return (
-    <div className="lanyard-wrapper">
-      <Canvas
+    <div ref={containerRef} className="lanyard-wrapper">
+      {isInView && (
+        <Canvas
         camera={{ position: position, fov: fov }}
         dpr={[1, isMobile ? 1.5 : 2]}
         gl={{ alpha: transparent }}
@@ -54,17 +65,28 @@ export default function Lanyard({ position = [0, 0, 30], gravity = [0, -40, 0], 
 
           if (!container) return;
 
+          let cachedRect = null;
+          const handleResize = () => {
+            cachedRect = null;
+          };
+          window.addEventListener('resize', handleResize);
+
           const onPointerMove = (e) => {
-            const rect = canvas.getBoundingClientRect();
+            if (!cachedRect) {
+              cachedRect = canvas.getBoundingClientRect();
+            }
             sectionPointerRef.current = {
-              x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
-              y: -((e.clientY - rect.top) / rect.height) * 2 + 1,
+              x: ((e.clientX - cachedRect.left) / cachedRect.width) * 2 - 1,
+              y: -((e.clientY - cachedRect.top) / cachedRect.height) * 2 + 1,
             };
           };
 
           container.addEventListener('pointermove', onPointerMove);
           // Store cleanup so useEffect above can remove it on unmount
-          pointerCleanupRef.current = () => container.removeEventListener('pointermove', onPointerMove);
+          pointerCleanupRef.current = () => {
+            container.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('resize', handleResize);
+          };
         }}
       >
         <ambientLight intensity={Math.PI} />
@@ -103,6 +125,7 @@ export default function Lanyard({ position = [0, 0, 30], gravity = [0, -40, 0], 
           />
         </Environment>
       </Canvas>
+      )}
     </div>
   );
 }

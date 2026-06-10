@@ -17,11 +17,67 @@ function getColorProbe() {
   return colorProbe
 }
 
+export function parseRgbaOrHex(input) {
+  if (!input) return null
+  const trimmed = input.trim()
+  
+  // Try matches for rgb/rgba
+  const rgbMatch = trimmed.match(
+    /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i
+  )
+  if (rgbMatch) {
+    return {
+      r: Math.round(Number(rgbMatch[1])),
+      g: Math.round(Number(rgbMatch[2])),
+      b: Math.round(Number(rgbMatch[3])),
+      a: rgbMatch[4] !== undefined ? Number(rgbMatch[4]) : 1,
+    }
+  }
+
+  // Try matches for Hex colors
+  if (trimmed.startsWith('#')) {
+    const hex = trimmed.substring(1)
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16)
+      const g = parseInt(hex[1] + hex[1], 16)
+      const b = parseInt(hex[2] + hex[2], 16)
+      return { r, g, b, a: 1 }
+    } else if (hex.length === 6) {
+      const r = parseInt(hex.substring(0, 2), 16)
+      const g = parseInt(hex.substring(2, 4), 16)
+      const b = parseInt(hex.substring(4, 6), 16)
+      return { r, g, b, a: 1 }
+    } else if (hex.length === 8) {
+      const r = parseInt(hex.substring(0, 2), 16)
+      const g = parseInt(hex.substring(2, 4), 16)
+      const b = parseInt(hex.substring(4, 6), 16)
+      const a = parseFloat((parseInt(hex.substring(6, 8), 16) / 255).toFixed(3))
+      return { r, g, b, a }
+    }
+  }
+
+  return null
+}
+
+const colorCache = new Map()
+
 /** @returns {{ r: number, g: number, b: number, a: number } | null} */
 export function parseColor(input) {
   if (!input || input === 'transparent' || input === 'inherit' || input === 'none') {
     return null
   }
+
+  if (colorCache.has(input)) {
+    return colorCache.get(input)
+  }
+
+  // Direct JS parsing for rgb, rgba, hex
+  const direct = parseRgbaOrHex(input)
+  if (direct) {
+    colorCache.set(input, direct)
+    return direct
+  }
+
   const probe = getColorProbe()
   if (!probe) return null
 
@@ -31,38 +87,24 @@ export function parseColor(input) {
   const match = computed.match(
     /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/,
   )
-  if (!match) return null
+  if (!match) {
+    colorCache.set(input, null)
+    return null
+  }
 
-  return {
+  const parsed = {
     r: Math.round(Number(match[1])),
     g: Math.round(Number(match[2])),
     b: Math.round(Number(match[3])),
     a: match[4] !== undefined ? Number(match[4]) : 1,
   }
+  colorCache.set(input, parsed)
+  return parsed
 }
 
 /** @returns {{ r: number, g: number, b: number, a: number } | null} */
 export function parseBackground(input) {
-  if (!input || input === 'transparent' || input === 'inherit' || input === 'none') {
-    return null
-  }
-  const probe = getColorProbe()
-  if (!probe) return null
-
-  probe.style.backgroundColor = input
-  const computed = getComputedStyle(probe).backgroundColor
-
-  const match = computed.match(
-    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/,
-  )
-  if (!match) return null
-
-  return {
-    r: Math.round(Number(match[1])),
-    g: Math.round(Number(match[2])),
-    b: Math.round(Number(match[3])),
-    a: match[4] !== undefined ? Number(match[4]) : 1,
-  }
+  return parseColor(input)
 }
 
 export function colorToCss({ r, g, b, a = 1 }) {
@@ -89,10 +131,9 @@ export function getThemeDefaults() {
   return { fg, bg }
 }
 
-/** @param {number} x @param {number} y */
-export function sampleColorsAt(x, y) {
+/** @param {Element | null} target */
+export function sampleColorsForElement(target) {
   const defaults = getThemeDefaults()
-  const target = document.elementFromPoint(x, y)
   if (!target || target.closest?.('[data-custom-cursor-ignore]')) {
     return defaults
   }
@@ -122,6 +163,15 @@ export function sampleColorsAt(x, y) {
     fg: fg || defaults.fg,
     bg: bg || defaults.bg,
   }
+}
+
+/** @param {number} x @param {number} y */
+export function sampleColorsAt(x, y) {
+  if (typeof document === 'undefined') {
+    return getThemeDefaults()
+  }
+  const target = document.elementFromPoint(x, y)
+  return sampleColorsForElement(target)
 }
 
 /** @param {Element | null} el */

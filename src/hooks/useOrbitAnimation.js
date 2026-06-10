@@ -14,9 +14,8 @@ import { useEffect, useState, useRef } from 'react'
  *   isInView: boolean
  * }}
  */
-export function useOrbitAnimation(sectionRef) {
+export function useOrbitAnimation(sectionRef, isNodeSelected = false) {
   const [scrollProgress, setScrollProgress] = useState(0)
-  const [activeNodeIndex, setActiveNodeIndex] = useState(-1)
   const [orbitAngle, setOrbitAngle] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
   const [isInView, setIsInView] = useState(false)
@@ -63,18 +62,6 @@ export function useOrbitAnimation(sectionRef) {
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
     setScrollProgress(latest)
     
-    // Determine active node based on scroll progress
-    // Each node activates at 33% intervals
-    if (latest < 0.1) {
-      setActiveNodeIndex(-1) // No node active yet
-    } else if (latest < 0.33) {
-      setActiveNodeIndex(0)
-    } else if (latest < 0.66) {
-      setActiveNodeIndex(1)
-    } else if (latest <= 1) {
-      setActiveNodeIndex(2)
-    }
-    
     // Check if section is in view
     setIsInView(latest > 0 && latest < 1)
   })
@@ -110,18 +97,17 @@ export function useOrbitAnimation(sectionRef) {
     }
   }, [isMobile, isInView])
   
-  // Slow down orbit when a node is active
+  // Slow down orbit when a node is selected
   useEffect(() => {
-    if (activeNodeIndex !== -1) {
-      orbitSpeedRef.current = 0.2 // Slow down
+    if (isNodeSelected) {
+      orbitSpeedRef.current = 0.15 // Slow down for comfortable reading
     } else {
       orbitSpeedRef.current = 0.5 // Normal speed
     }
-  }, [activeNodeIndex])
+  }, [isNodeSelected])
   
   return {
     scrollProgress,
-    activeNodeIndex,
     orbitAngle,
     isMobile,
     isInView

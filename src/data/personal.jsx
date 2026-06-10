@@ -19,6 +19,7 @@ export const personal = {
     linkedin:  'https://linkedin.com/in/sai-pallav',
     twitter:   'https://twitter.com/sai_pallav',
     leetcode:  'https://leetcode.com/sai_pallav',
+    instagram: 'https://instagram.com/sai_pallav',
     devto:     'https://dev.to/sai_pallav',
   },
   typewriterRoles: [

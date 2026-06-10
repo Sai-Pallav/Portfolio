@@ -46,7 +46,8 @@ const ExperienceDetails = forwardRef(function ExperienceDetails({ exp, position,
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
       className="absolute top-[5%] w-full max-w-md md:max-w-lg"
       style={{
-        left: position === 'right' ? '58%' : '5%',
+        left: position === 'right' ? 'auto' : '5%',
+        right: position === 'right' ? '5%' : 'auto',
         zIndex: 60
       }}
     >

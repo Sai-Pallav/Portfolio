@@ -53,21 +53,27 @@ export function CustomCursor() {
     enableCustomCursor()
 
     let rafId = 0
+    let lastHit = null
 
     const onPointerMove = (e) => {
       updateCursorPosition(e)
 
-      const hit = document.elementFromPoint(e.clientX, e.clientY)
-      const isText = isTextHoverTarget(hit)
-      updateCursorSize(isText)
+      const hit = e.target
+      if (!hit) return
 
-      // Get element shape for non-text elements
-      if (!isText) {
-        const shape = getElementShape(hit)
-        updateCursorShape(shape)
+      if (hit !== lastHit) {
+        lastHit = hit
+        const isText = isTextHoverTarget(hit)
+        updateCursorSize(isText)
+
+        // Get element shape for non-text elements
+        if (!isText) {
+          const shape = getElementShape(hit)
+          updateCursorShape(shape)
+        }
       }
 
-      updateCursorColor(e.clientX, e.clientY)
+      updateCursorColor(hit)
     }
 
     const onDocumentLeave = () => {
