@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, memo } from 'react'
 
 /**
  * Experience Node - Orbiting capsule representing a career milestone.
@@ -15,37 +15,30 @@ import { useState } from 'react'
  *   onSelect: (index: number) => void
  * }} props
  */
-export default function ExperienceNode({ 
+const ExperienceNode = memo(function ExperienceNode({ 
   exp, 
   index, 
   angle, 
   radius, 
   isActive, 
-  orbitAngle,
-  onSelect 
+  isDimmed = false,
+  onSelect,
+  nodeRef 
 }) {
-  // Calculate position on orbit
-  const currentAngle = angle + orbitAngle
-  const radians = (currentAngle * Math.PI) / 180
-  
   // Hover state for conditional scan line and scale interactions
   const [isHovered, setIsHovered] = useState(false)
   
-  // Convert to percentage-based positioning for responsive layout
-  // Center is 50%, radius is percentage of container
-  const x = 50 + (radius / 8) * Math.cos(radians)
-  const y = 50 + (radius / 8) * Math.sin(radians)
-  
   return (
     <motion.button
+      ref={nodeRef}
       onClick={() => onSelect(index)}
       onKeyDown={(e) => e.key === 'Enter' && onSelect(index)}
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => !isDimmed && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="w-48 md:w-56 group"
+      className={`w-48 md:w-56 group transition-opacity duration-300 ${isDimmed ? 'opacity-15 pointer-events-none' : ''}`}
       animate={{
-        scale: isActive ? 1.15 : 1,
-        opacity: isActive ? 1 : 0.7
+        scale: isDimmed ? 0.85 : (isActive ? 1.15 : 1),
+        opacity: isDimmed ? 0.15 : (isActive ? 1 : 0.7)
       }}
       transition={{
         scale: {
@@ -56,10 +49,11 @@ export default function ExperienceNode({
           duration: 0.4
         }
       }}
-      whileHover={{ scale: isActive ? 1.2 : 1.1, cursor: 'pointer' }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ scale: isDimmed ? 0.85 : (isActive ? 1.2 : 1.1), cursor: isDimmed ? 'default' : 'pointer' }}
+      whileTap={{ scale: isDimmed ? 0.85 : 0.98 }}
       aria-label={`View details for ${exp.role} at ${exp.company}`}
       aria-expanded={isActive}
+      disabled={isDimmed}
     >
       {/* Node card */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 shadow-2xl transition-all duration-300 group-hover:border-accent/60 group-hover:shadow-accent/30">
@@ -144,4 +138,6 @@ export default function ExperienceNode({
       </div>
     </motion.button>
   )
-}
+})
+
+export default ExperienceNode

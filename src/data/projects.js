@@ -9,6 +9,7 @@ export const projects = [
     github:      'https://github.com/Sai-Pallav/Language-Agnostic-Chatbot',
     live:        'https://agnostic-chatbot.vercel.app',
     featured:    true,
+    date:        'Jan 2025',
     highlights:  [
       'Supports 15+ coding languages',
       'Zero-latency stream updates',
@@ -25,6 +26,7 @@ export const projects = [
     github:      'https://github.com/Sai-Pallav/campus-connect',
     live:        'https://bits-connect.vercel.app',
     featured:    true,
+    date:        'Nov 2024',
     highlights:  [
       '300+ active campus users',
       '40% faster with Redis caching',
@@ -41,6 +43,7 @@ export const projects = [
     github:      'https://github.com/Sai-Pallav/route-optimizer',
     live:        'https://route-pathfinder.vercel.app',
     featured:    false,
+    date:        'Jun 2024',
     highlights:  [
       '23% route latency reduction',
       'Dynamic obstacles recalculation',
@@ -57,6 +60,7 @@ export const projects = [
     github:      'https://github.com/Sai-Pallav/devclock',
     live:        'https://crates.io/crates/devclock',
     featured:    false,
+    date:        'Feb 2024',
     highlights:  [
       'Published on crates.io',
       '500+ downloads',

@@ -1,13 +1,12 @@
-"use client";
 import { ThreeDMarquee } from "@/components/ui/3d-marquee";
 import { skills } from "@/data/skills";
 
 // Helper to build Devicon URLs
 const getDeviconUrl = (icon) => {
   if (icon === "framer") {
-    return "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/framermotion/framermotion-original.svg";
+    return "https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0/icons/framermotion/framermotion-original.svg";
   }
-  return `https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/${icon}/${icon}-original.svg`;
+  return `https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0/icons/${icon}/${icon}-original.svg`;
 };
 
 // Build the 5 columns from src/data/skills.js
@@ -41,9 +40,9 @@ const buildSkillGroups = () => {
   ];
 };
 
+const groupedSkillImages = buildSkillGroups();
+
 export default function ThreeDMarqueeDemo() {
-  const groupedSkillImages = buildSkillGroups();
-  
   return (
     <div className="mx-auto w-full max-w-7xl relative">
       <ThreeDMarquee images={groupedSkillImages} />

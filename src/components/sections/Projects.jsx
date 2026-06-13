@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState } from "react";
-import { motion, useInView, useReducedMotion } from "framer-motion";
+import { useRef, useEffect, useState, useMemo } from "react";
+import { motion, useReducedMotion, useScroll, useMotionValue, useInView, animate } from "framer-motion";
 import { projects } from "@/data/projects";
 import { personal } from "@/data/personal.jsx";
 import SocialIcon from "@/components/ui/SocialIcon";
@@ -11,24 +11,77 @@ import {
   TIMELINE_ANIM,
   getTimelineHeight,
 } from "./projects/timelineAnimation";
-import { useProjectTimelineAnimation } from "./projects/useProjectTimelineAnimation";
 
-const { HEADER_SPACING, ITEM_GAP, CARD_CENTER_Y } = TIMELINE_ANIM;
+const { HEADER_SPACING, ITEM_GAP } = TIMELINE_ANIM;
 
 /* ─────────────────────────────────────────────────────────────────
    MAIN PROJECTS SECTION
 ───────────────────────────────────────────────────────────────── */
+const CATEGORIES = [
+  { id: "all", label: "All Work" },
+  { id: "fullstack", label: "Full Stack" },
+  { id: "systems", label: "Systems" },
+];
+
 function Projects() {
   const sectionRef = useRef(null);
+  const containerRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false);
-  const isInView = useInView(sectionRef, { once: true, margin: "-80px" });
   const prefersReducedMotion = useReducedMotion();
-  const { lineProgress, branchRevealed, cardRevealed } = useProjectTimelineAnimation(
-    projects.length,
-    isInView,
-    prefersReducedMotion,
-    isMobile,
-  );
+  const timelineInView = useInView(containerRef, { once: true, margin: "-100px" });
+
+  const [activeCategory, setActiveCategory] = useState("all");
+
+  const filteredProjects = useMemo(() => {
+    if (activeCategory === "all") return projects;
+    return projects.filter((p) => p.category === activeCategory);
+  }, [activeCategory]);
+
+  const lineProgress = useMotionValue(0);
+  const mobileLineProgress = useMotionValue(0);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      lineProgress.set(1);
+      return;
+    }
+    if (timelineInView) {
+      lineProgress.set(0);
+      const controls = animate(lineProgress, 1, {
+        duration: 1.5,
+        delay: 0.5,
+        ease: "easeInOut",
+      });
+      return () => controls.stop();
+    } else {
+      lineProgress.set(0);
+    }
+  }, [timelineInView, lineProgress, prefersReducedMotion, activeCategory]);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      mobileLineProgress.set(1);
+      return;
+    }
+    if (timelineInView) {
+      mobileLineProgress.set(0);
+      const controls = animate(mobileLineProgress, 1, {
+        duration: 1.2,
+        delay: 0.5,
+        ease: "easeOut",
+      });
+      return () => controls.stop();
+    } else {
+      mobileLineProgress.set(0);
+    }
+  }, [timelineInView, mobileLineProgress, prefersReducedMotion, activeCategory]);
+
+
+  // Scroll tracking to drift background layers
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "end start"],
+  });
 
   useEffect(() => {
     let resizeTimer;
@@ -48,6 +101,12 @@ function Projects() {
 
   const timelineHeight = getTimelineHeight(projects.length);
 
+  const stats = useMemo(() => [
+    { value: projects.length, label: 'Projects' },
+    { value: projects.filter(p => p.featured).length, label: 'Featured' },
+    { value: new Set(projects.flatMap(p => p.tags)).size + '+', label: 'Technologies' },
+  ], []);
+
   return (
     <section
       id="projects"
@@ -56,29 +115,35 @@ function Projects() {
       aria-labelledby="projects-heading"
     >
       {/* ─── Background Layers ─── */}
-      <ProjectBackground />
+      <ProjectBackground scrollYProgress={scrollYProgress} activeCategory={activeCategory} />
 
       {/* ─── Section Header ─── */}
-      <div className="max-w-7xl mx-auto px-6 pt-28 md:pt-32 pb-8 text-center">
+      <div className="max-w-7xl mx-auto px-6 pt-28 md:pt-32 pb-8 text-center animate-fade-in">
         {/* Animated badge */}
-        <div className="inline-flex items-center gap-3 mb-6">
+        <div className="inline-flex items-center gap-3.5 mb-6">
           <div
-            className="h-[1px] rounded-full"
-            style={{ width: '32px', background: 'var(--accent)' }}
+            className="h-[1px] rounded-full opacity-40"
+            style={{ width: '40px', background: 'linear-gradient(90deg, transparent, var(--accent))' }}
           />
           <span
-            className="font-mono text-[10px] md:text-xs tracking-[0.3em] uppercase px-4 py-1.5 rounded-full border"
+            className="font-mono text-[10px] md:text-xs tracking-[0.25em] uppercase px-4.5 py-1.5 rounded-full border flex items-center gap-2"
             style={{
               color: "var(--accent)",
-              borderColor: 'var(--border)',
-              background: 'rgba(255,255,255,0.02)',
+              borderColor: 'rgba(255,255,255,0.06)',
+              background: 'rgba(255,255,255,0.01)',
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
             }}
           >
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[var(--accent)]"></span>
+            </span>
             Featured Work
           </span>
           <div
-            className="h-[1px] rounded-full"
-            style={{ width: '32px', background: 'var(--accent)' }}
+            className="h-[1px] rounded-full opacity-40"
+            style={{ width: '40px', background: 'linear-gradient(90deg, var(--accent), transparent)' }}
           />
         </div>
 
@@ -92,31 +157,50 @@ function Projects() {
           <span className="relative inline-block" style={{ color: "var(--accent)" }}>
             Timeline
             <span
-              className="absolute -bottom-1 left-0 h-[2px] rounded-full"
-              style={{ width: '100%', background: 'var(--accent)' }}
+              className="absolute -bottom-1 left-0 h-[3px] rounded-full"
+              style={{
+                width: '100%',
+                background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
+                filter: 'drop-shadow(0 0 4px var(--accent))',
+              }}
             />
           </span>
         </h2>
         <p
-          className="text-base md:text-lg max-w-xl mx-auto"
-          style={{ color: "var(--text-muted)" }}
+          className="text-base md:text-lg max-w-xl mx-auto leading-relaxed"
+          style={{ color: "var(--text-secondary)" }}
         >
           A cinematic journey through innovative solutions and technical
           challenges
         </p>
 
-        {/* Stats row */}
-        <div className="flex items-center justify-center gap-8 mt-8">
-          {[
-            { value: projects.length, label: 'Projects' },
-            { value: projects.filter(p => p.featured).length, label: 'Featured' },
-            { value: new Set(projects.flatMap(p => p.tags)).size + '+', label: 'Technologies' },
-          ].map((stat, i) => (
-            <div key={i} className="text-center">
-              <div className="font-heading text-2xl md:text-3xl font-bold" style={{ color: 'var(--accent)' }}>
+        {/* Stats Row Redesigned as Glassmorphic Cards */}
+        <div
+          className="flex flex-wrap items-center justify-center gap-4.5 mt-10"
+          role="group"
+          aria-label="Project statistics"
+        >
+          {stats.map((stat, i) => (
+            <div
+              key={i}
+              className="px-6 py-4.5 rounded-xl border border-white/[0.03] transition-all duration-300 hover:border-[var(--accent)]/30 hover:scale-105 min-w-[130px] text-center backdrop-blur-md"
+              style={{
+                background: 'rgba(255, 255, 255, 0.01)',
+              }}
+            >
+              <div
+                className="font-heading text-2xl md:text-3xl font-bold mb-0.5"
+                style={{
+                  color: 'var(--accent)',
+                  textShadow: '0 0 10px var(--accent-dim)',
+                }}
+              >
                 {stat.value}
               </div>
-              <div className="font-mono text-[9px] md:text-[10px] tracking-[0.2em] uppercase mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              <div
+                className="font-mono text-[9px] md:text-[10px] tracking-[0.2em] uppercase"
+                style={{ color: 'var(--text-secondary)' }}
+              >
                 {stat.label}
               </div>
             </div>
@@ -124,31 +208,70 @@ function Projects() {
         </div>
       </div>
 
+      {/* Category Filter Tabs */}
+      <div className="flex justify-center items-center mt-12 mb-8 animate-fade-in">
+        <div 
+          className="inline-flex p-1.5 rounded-full border border-white/[0.04] backdrop-blur-md relative"
+          style={{
+            background: "rgba(255, 255, 255, 0.01)",
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+          }}
+        >
+          {CATEGORIES.map((cat) => {
+            const isActive = activeCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className="relative px-5 py-2.5 font-mono text-[10px] md:text-xs tracking-wider uppercase rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:ring-offset-1 focus:ring-offset-black z-10"
+                style={{
+                  color: isActive ? "var(--accent-contrast)" : "var(--text-secondary)",
+                }}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="activeCategoryTab"
+                    className="absolute inset-0 rounded-full z-[-1]"
+                    style={{
+                      background: "var(--accent)",
+                      boxShadow: "0 0 12px var(--accent-dim)",
+                    }}
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ─── Timeline Container ─── */}
-      <div className="relative max-w-7xl mx-auto px-6">
+      <div className="relative max-w-7xl mx-auto px-6" ref={containerRef}>
         {isMobile ? (
           /* ─── Mobile: Single column with left spine ─── */
           <div className="relative">
-            {/* Mobile spine line — draws top to bottom on section visit */}
+            {/* Mobile spine line — draws top to bottom when container enters viewport */}
             <motion.div
               className="absolute left-[10px] top-0 bottom-0 w-[2px] z-0 origin-top"
               style={{
-                scaleY: lineProgress,
                 background:
                   "linear-gradient(to bottom, transparent, var(--accent) 10%, var(--accent) 90%, transparent)",
                 opacity: 0.2,
+                scaleY: mobileLineProgress,
               }}
+              aria-hidden="true"
             />
 
-            <div className="space-y-16 py-8">
-              {projects.map((project, i) => (
+            <div className="space-y-48 py-8">
+              {filteredProjects.map((project, i) => (
                 <MobileTimelineCard
                   key={project.id}
                   project={project}
                   index={i}
-                  prefersReducedMotion={prefersReducedMotion}
-                  branchRevealed={branchRevealed[i]}
-                  cardRevealed={cardRevealed[i]}
+                  totalProjects={filteredProjects.length}
+                  timelineInView={timelineInView}
+                  lineProgress={mobileLineProgress}
                 />
               ))}
             </div>
@@ -163,43 +286,29 @@ function Projects() {
             <motion.div
               className="absolute left-1/2 top-0 -translate-x-1/2 pointer-events-none z-0 origin-top"
               style={{
-                scaleY: lineProgress,
                 width: "1px",
                 height: `${timelineHeight}px`,
                 background: "linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.06) 5%, rgba(255,255,255,0.06) 95%, transparent 100%)",
+                scaleY: lineProgress,
               }}
+              aria-hidden="true"
             />
 
-            {/* Main energy beam — draws top to bottom on section visit */}
+            {/* Main energy beam — draws top to bottom when container enters viewport */}
             <motion.div
               className="absolute left-1/2 top-0 -translate-x-1/2 pointer-events-none z-0 origin-top"
               style={{
-                scaleY: lineProgress,
                 width: "2px",
                 height: `${timelineHeight}px`,
                 background: "linear-gradient(to bottom, var(--accent), var(--accent-hover), var(--accent))",
                 opacity: 0.9,
+                scaleY: lineProgress,
               }}
+              aria-hidden="true"
             />
 
-            {/* Horizontal dividers — centered between consecutive projects */}
-            {projects.map((project, index) =>
-              index < projects.length - 1 ? (
-                <div
-                  key={`divider-${project.id}`}
-                  className="absolute left-0 right-0 pointer-events-none z-[1]"
-                  style={{
-                    top: `${HEADER_SPACING + index * ITEM_GAP + CARD_CENTER_Y + ITEM_GAP / 2}px`,
-                    height: "1px",
-                    background: "var(--accent)",
-                    opacity: 0.35,
-                  }}
-                />
-              ) : null
-            )}
-
             {/* Project items */}
-            {projects.map((project, index) => {
+            {filteredProjects.map((project, index) => {
               const isLeft = index % 2 === 0;
               const topOffset = HEADER_SPACING + index * ITEM_GAP;
 
@@ -210,9 +319,9 @@ function Projects() {
                     index={index}
                     isLeft={isLeft}
                     topOffset={topOffset}
-                    prefersReducedMotion={prefersReducedMotion}
-                    branchRevealed={branchRevealed[index]}
-                    cardRevealed={cardRevealed[index]}
+                    totalProjects={filteredProjects.length}
+                    timelineInView={timelineInView}
+                    lineProgress={lineProgress}
                   />
                 </div>
               );
@@ -232,26 +341,29 @@ function Projects() {
       {/* ─── GitHub CTA ─── */}
       <div className="max-w-3xl mx-auto px-6 py-28 md:py-32 text-center">
         <div
-          className="relative rounded-2xl border p-8 md:p-12 overflow-hidden"
+          className="relative rounded-2xl border p-8 md:p-12 overflow-hidden group/cta transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--accent-dim)]"
           style={{
             background:
-              "linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
-            borderColor: "rgba(255,255,255,0.08)",
+              "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%)",
+            borderColor: "rgba(255,255,255,0.05)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
           }}
         >
           <SocialIcon
             platform="github"
-            className="w-14 h-14 mx-auto mb-5 text-[var(--accent)]"
+            className="w-14 h-14 mx-auto mb-5 text-[var(--accent)] relative z-10 transition-transform duration-300 group-hover/cta:scale-110"
+            style={{ filter: "drop-shadow(0 0 10px var(--accent-dim))" }}
           />
           <h3
-            className="font-heading text-2xl md:text-3xl font-bold mb-3"
+            className="font-heading text-2xl md:text-3xl font-bold mb-3 relative z-10"
             style={{ color: "var(--text-primary)" }}
           >
             More on GitHub
           </h3>
           <p
-            className="mb-6 max-w-lg mx-auto text-sm"
-            style={{ color: "var(--text-muted)" }}
+            className="mb-6 max-w-lg mx-auto text-sm relative z-10"
+            style={{ color: "var(--text-secondary)" }}
           >
             Explore additional projects, open-source contributions, and
             experimental work
@@ -260,7 +372,7 @@ function Projects() {
             href={personal.socials.github}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-transparent"
+            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm relative z-10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-transparent hover:scale-[1.03] hover:shadow-[0_0_20px_var(--accent-dim)]"
             style={{
               background: "var(--accent)",
               color: "var(--accent-contrast)",
@@ -271,7 +383,7 @@ function Projects() {
             <SocialIcon platform="github" className="w-4 h-4" aria-hidden="true" />
             Visit GitHub Profile
             <svg
-              className="w-4 h-4"
+              className="w-4 h-4 transition-transform duration-300 transform group-hover/cta:translate-x-1"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -280,7 +392,7 @@ function Projects() {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
+                strokeWidth={2.5}
                 d="M17 8l4 4m0 0l-4 4m4-4H3"
               />
             </svg>

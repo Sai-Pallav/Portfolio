@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useRef } from 'react'
+import { useRef, memo } from 'react'
 
 /**
  * Orbit Ring - Circular path with subtle glow and rotation animation.
@@ -12,10 +12,11 @@ import { useRef } from 'react'
  *   direction?: 'clockwise' | 'counter-clockwise'
  * }} props
  */
-export default function OrbitRing({ 
+const OrbitRing = memo(function OrbitRing({ 
   radius, 
   duration, 
   isActive, 
+  hasActiveSelection = false,
   direction = 'clockwise' 
 }) {
   // SVG viewBox is 800x800, center at 400,400
@@ -72,7 +73,7 @@ export default function OrbitRing({
           strokeWidth={isActive ? "2" : "1"}
           fill="none"
           initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: isActive ? 0.7 : 0.3 }}
+          animate={{ pathLength: 1, opacity: isActive ? 0.7 : (hasActiveSelection ? 0.05 : 0.3) }}
           transition={{
             pathLength: { duration: isActive ? 1.2 : 1.5, ease: [0.16, 1, 0.3, 1] },
             opacity: { duration: 0.4 }
@@ -118,7 +119,7 @@ export default function OrbitRing({
             />
             <animate
               attributeName="opacity"
-              values="0.2;0.7;0.2"
+              values={hasActiveSelection ? (isActive ? "0.2;0.6;0.2" : "0;0;0") : "0.2;0.7;0.2"}
               dur="2s"
               repeatCount="indefinite"
               begin={`${i * 0.5}s`}
@@ -135,4 +136,6 @@ export default function OrbitRing({
       </svg>
     </motion.div>
   )
-}
+})
+
+export default OrbitRing

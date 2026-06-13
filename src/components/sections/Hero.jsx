@@ -9,8 +9,26 @@ import { useRevealAnimation } from '@/hooks/useScrollTrigger'
  * Modern Futuristic Hero Section
  * Features: Particle background, gradient text, glassmorphism cards, smooth animations
  */
-function Hero() {
+// Isolated Typewriter component to prevent high-frequency text changes from re-rendering the entire Hero section
+function TypewriterRole() {
   const displayText = useTypewriter(personal.typewriterRoles)
+  return (
+    <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold" style={{ color: 'var(--text-secondary)' }}>
+      {displayText}
+      <motion.span
+        animate={{ opacity: [1, 0, 1] }}
+        transition={{ duration: 0.8, repeat: Infinity }}
+        className="inline-block w-1 h-8 md:h-10 ml-2 rounded-full"
+        style={{ 
+          background: 'var(--accent)',
+          boxShadow: '0 0 20px var(--accent)'
+        }}
+      />
+    </h2>
+  )
+}
+
+function Hero() {
   const { scrollY } = useScroll()
   const y = useTransform(scrollY, [0, 500], [0, 150])
   const opacity = useTransform(scrollY, [0, 600, 800], [1, 1, 0])
@@ -185,18 +203,7 @@ function Hero() {
                      borderColor: 'var(--border)',
                      opacity: 0.95
                    }}>
-                <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                  {displayText}
-                  <motion.span
-                    animate={{ opacity: [1, 0, 1] }}
-                    transition={{ duration: 0.8, repeat: Infinity }}
-                    className="inline-block w-1 h-8 md:h-10 ml-2 rounded-full"
-                    style={{ 
-                      background: 'var(--accent)',
-                      boxShadow: '0 0 20px var(--accent)'
-                    }}
-                  />
-                </h2>
+                <TypewriterRole />
               </div>
             </div>
           </motion.div>

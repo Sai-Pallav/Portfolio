@@ -1,5 +1,3 @@
-"use client";
-
 import { motion, useInView, useMotionValue, useSpring } from "motion/react";
 import { useRef, useState, useEffect, useCallback, useMemo, memo } from "react";
 import { cn } from "@/lib/utils";
@@ -16,6 +14,8 @@ const SCROLL_CONFIG = {
   ICON_HOVER_DURATION: 0.2,
 };
 
+
+const DEFAULT_DIRECTION_PATTERN = [-1, 1, -1, 1, -1];
 
 // ─── Single column: scrolls forever once isInView fires ──────────────────────
 const MarqueeColumn = memo(({
@@ -50,7 +50,7 @@ const MarqueeColumn = memo(({
     }
 
     const startScroll = () => {
-      const pattern = directionPattern || [-1, 1, -1, 1, -1];
+      const pattern = directionPattern || DEFAULT_DIRECTION_PATTERN;
       const direction = pattern[colIndex] ?? -1;
       const totalHeight = maxItems * SCROLL_CONFIG.ITEM_HEIGHT;
       const pixelsPerMs = (SCROLL_CONFIG.SPEED_PX_PER_S || 40) / 1000;
@@ -182,16 +182,16 @@ const MarqueeColumn = memo(({
                 // but just handling focus is enough for tooltip visibility.
               }
             }}
-            tabIndex={0}
+            tabIndex={copyIndex === 0 ? 0 : -1}
             className="relative cursor-default pointer-events-auto rounded-3xl focus-visible:outline-2 focus-visible:outline-[var(--accent)] focus-visible:outline-offset-4"
             style={{
               width: `${SCROLL_CONFIG.TILE_SIZE}px`,
               height: `${SCROLL_CONFIG.TILE_SIZE}px`,
               contain: "layout style",
-              willChange: prefersReducedMotion ? "auto" : "transform, opacity",
             }}
-            role="listitem"
-            aria-label={skill ? skill.name : `Technology icon ${slotIndex + 1}`}
+            role={copyIndex === 0 ? "listitem" : undefined}
+            aria-label={copyIndex === 0 ? (skill ? skill.name : `Technology icon ${slotIndex + 1}`) : undefined}
+            aria-hidden={copyIndex > 0 ? "true" : undefined}
           >
             <motion.div
               variants={{
@@ -199,84 +199,85 @@ const MarqueeColumn = memo(({
                   scale: 1.08,
                   z: 0,
                   boxShadow: "0 24px 48px -12px var(--border-glow)",
-                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  backgroundColor: "rgba(25, 25, 30, 0.7)",
                 },
                 active: {
                   scale: 1.02,
                   z: -20, // push down into the keyboard
                   boxShadow: "0 12px 24px -12px var(--border-glow)",
-                  backgroundColor: "rgba(255, 255, 255, 0.15)",
+                  backgroundColor: "rgba(30, 30, 35, 0.8)",
                 }
               }}
               style={{
                 scale: 1,
                 z: 0,
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.15), 0 4px 12px rgba(0,0,0,0.2)",
-                backgroundColor: "rgba(255, 255, 255, 0.03)",
+                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.05), 0 4px 12px rgba(0,0,0,0.4)",
+                backgroundColor: "rgba(15, 15, 18, 0.45)",
               }}
               transition={prefersReducedMotion ? { duration: 0 } : { type: "spring", mass: 0.8, stiffness: 250, damping: 22 }}
               whileHover="hover"
               whileTap="active"
-              className={`absolute inset-0 overflow-hidden rounded-3xl border border-white/5 ${skill?.label ? "flex flex-col items-center justify-center" : "flex items-center justify-center"}`}
+              className={`absolute inset-0 overflow-hidden rounded-3xl border border-white/[0.04] ${skill?.label ? "flex flex-col items-center justify-center" : "flex items-center justify-center"}`}
             >
               {/* Static Fallback Background for performance (no blur) */}
               <div
                 className="absolute inset-0 pointer-events-none bg-white/[0.02]"
               />
-              
+
               {/* Animated Blur - ONLY on hover to save GPU */}
               <motion.div
-                variants={{ 
-                  hover: { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", opacity: 1 } 
+                variants={{
+                  hover: { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", opacity: 1 }
                 }}
-                initial={{ backdropFilter: "blur(0px)", WebkitBackdropFilter: "blur(0px)", opacity: 0 }}
+                initial={{ backdropFilter: "none", WebkitBackdropFilter: "none", opacity: 0 }}
                 transition={{ duration: 0.2 }}
                 className="absolute inset-0 pointer-events-none"
                 style={{ transform: "translateZ(0)" }}
               />
 
               <motion.div
-                variants={{ hover: { scale: 1.15, filter: "drop-shadow(0 0 20px var(--border-glow))" } }}
+                variants={{
+                  hover: {
+                    scale: skill?.level === "primary" ? 1.15 : 1.05,
+                    filter: skill?.level === "primary"
+                      ? "drop-shadow(0 0 20px var(--border-glow))"
+                      : "drop-shadow(0 0 5px rgba(255,255,255,0.1))",
+                  }
+                }}
                 style={{ scale: 1, filter: "drop-shadow(0 0 0px var(--border-glow))" }}
-                className={`z-10 ${skill?.label ? "size-12" : "size-20"}`}
+                className={`z-10 ${skill?.label ? "size-12" : "size-20"} flex items-center justify-center`}
               >
-                <div className="relative size-full pointer-events-none">
+                <div className="relative size-full pointer-events-none flex items-center justify-center">
                   {/* Default (muted) icon */}
-                  <motion.div
+                  <motion.img
+                    src={image}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    initial={{ opacity: skill?.level === "primary" ? 0.45 : 0.2 }}
                     variants={{ hover: { opacity: 0 } }}
                     transition={{ duration: prefersReducedMotion ? 0 : SCROLL_CONFIG.ICON_HOVER_DURATION }}
-                    className="absolute inset-0 pointer-events-none"
+                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                     style={{
-                      opacity: 1,
-                      transform: "translateZ(0)",
-                      background: "var(--text-muted)",
-                      maskImage: `url(${image})`,
-                      maskSize: "contain",
-                      maskRepeat: "no-repeat",
-                      maskPosition: "center",
-                      WebkitMaskImage: `url(${image})`,
-                      WebkitMaskSize: "contain",
-                      WebkitMaskRepeat: "no-repeat",
-                      WebkitMaskPosition: "center",
+                      filter: ['express', 'nextjs'].includes(skill?.icon)
+                        ? "invert(1) grayscale(1)"
+                        : "grayscale(1)",
                     }}
                   />
                   {/* Hover (colored) icon */}
-                  <motion.div
-                    variants={{ hover: { opacity: 1 } }}
+                  <motion.img
+                    src={image}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    initial={{ opacity: 0 }}
+                    variants={{ hover: { opacity: skill?.level === "primary" ? 1 : 0.75 } }}
                     transition={{ duration: prefersReducedMotion ? 0 : SCROLL_CONFIG.ICON_HOVER_DURATION }}
-                    className="absolute inset-0 pointer-events-none"
+                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                     style={{
-                      opacity: 0,
-                      transform: "translateZ(0)",
-                      background: "linear-gradient(to right, var(--accent), var(--accent-hover))",
-                      maskImage: `url(${image})`,
-                      maskSize: "contain",
-                      maskRepeat: "no-repeat",
-                      maskPosition: "center",
-                      WebkitMaskImage: `url(${image})`,
-                      WebkitMaskSize: "contain",
-                      WebkitMaskRepeat: "no-repeat",
-                      WebkitMaskPosition: "center",
+                      filter: ['express', 'nextjs'].includes(skill?.icon)
+                        ? "invert(1)"
+                        : "none",
                     }}
                   />
                 </div>
@@ -322,7 +323,7 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  
+
   const springConfig = { type: "spring", mass: 0.8, stiffness: 250, damping: 22 };
   const cursorX = useSpring(mouseX, springConfig);
   const cursorY = useSpring(mouseY, springConfig);
@@ -373,8 +374,8 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
   const isInView = useInView(ref, { margin: "-60px 0px" });
 
   return (
-    <div 
-      ref={ref} 
+    <div
+      ref={ref}
       className={cn("relative w-full", className)}
       onPointerMove={handlePointerMove}
     >
@@ -388,32 +389,34 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
           translateY: focusSource === 'mouse' ? "-120%" : "0%", // Offset above cursor
         }}
         initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ 
-          opacity: hoveredSkill ? 1 : 0, 
+        animate={{
+          opacity: hoveredSkill ? 1 : 0,
           scale: hoveredSkill ? 1 : 0.9,
           filter: hoveredSkill ? "blur(0px)" : "blur(4px)"
         }}
         transition={{ duration: 0.2 }}
       >
-        <div 
-          className="px-3 py-2.5 rounded-[14px] min-w-[180px]"
-          style={{
-            background: "rgba(10, 10, 12, 0.85)",
-            backdropFilter: "blur(16px)",
-            WebkitBackdropFilter: "blur(16px)",
-            boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 20px 40px -10px rgba(0,0,0,0.6)"
-          }}
+        <div
+          className="px-4 py-3 rounded-2xl min-w-[200px] bg-[rgba(10,10,12,0.85)] border border-white/[0.08] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_24px_48px_-12px_rgba(0,0,0,0.7)]"
         >
           {hoveredSkill && (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between gap-4">
-                <span className="font-bold text-[15px] tracking-tight text-white/95">{hoveredSkill.name}</span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-white/10 uppercase tracking-widest text-white/50">
+            <div className="flex flex-col gap-2 font-body text-left">
+              <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-2">
+                <span className="font-bold text-sm tracking-tight text-white/95">{hoveredSkill.name}</span>
+                <span className="text-[9px] font-mono font-medium px-2 py-0.5 rounded-full bg-white/5 border border-white/10 uppercase tracking-widest text-[var(--text-secondary)]">
                   {hoveredSkill.years} {hoveredSkill.years === 1 ? 'yr' : 'yrs'}
                 </span>
               </div>
-              <div className="text-[11px] text-[var(--accent)] font-medium mt-0.5">#{hoveredSkill.tag}</div>
-              <div className="text-[11px] text-white/50 leading-tight mt-0.5">{hoveredSkill.project}</div>
+              <div className="flex flex-col gap-0.5">
+                <div className="text-[10px] text-[var(--accent)] font-semibold uppercase tracking-wider font-mono">
+                  #{hoveredSkill.tag.split(',')[0]}
+                </div>
+                {hoveredSkill.project && (
+                  <div className="text-[10px] text-white/45 leading-relaxed font-light mt-0.5">
+                    Focus: <span className="text-white/75 italic">{hoveredSkill.project}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -446,24 +449,39 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
         </div>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <div
-            style={{ 
-              transform: "rotateX(55deg) rotateY(0deg) rotateZ(-45deg) translateZ(30px)", 
-              gap: `${SCROLL_CONFIG.TILE_GAP}px` 
+            style={{
+              transform: "rotateX(55deg) rotateY(0deg) rotateZ(-45deg) translateZ(30px)",
+              gap: `${SCROLL_CONFIG.TILE_GAP}px`
             }}
             className="relative grid grid-cols-5 scale-75 sm:scale-90 lg:scale-100 transform-3d origin-center"
           >
-            {["Core", "OOP", "Web Dev", "Data & ML", "Tools"].map((header, i) => (
-              <div key={i} className="flex justify-center relative" style={{ width: SCROLL_CONFIG.TILE_SIZE }}>
-                <div 
-                  className="absolute transition-opacity duration-300"
-                  style={{ top: "-280px", opacity: hoveredSkill ? 0 : 1 }}
-                >
-                  <div className="bg-[rgba(15,15,20,0.8)] backdrop-blur-xl border border-white/20 px-4 py-1.5 rounded-full text-[10px] font-bold tracking-[0.2em] text-white/90 uppercase shadow-[0_16px_32px_rgba(0,0,0,0.8)] whitespace-nowrap">
-                    {header}
+            {["Languages", "CS Concepts", "Frontend", "Backend", "Tools & DBs"].map((header, i) => {
+              const topPos = -360 + i * 114;
+              return (
+                <div key={i} className="flex justify-center relative" style={{ width: SCROLL_CONFIG.TILE_SIZE }}>
+                  <div
+                    className="absolute transition-opacity duration-300"
+                    style={{ top: `${topPos}px`, opacity: hoveredSkill ? 0 : 1 }}
+                  >
+                    <div 
+                      className="flex items-center gap-2.5 px-5 py-2 rounded-full text-[10px] font-mono font-bold tracking-[0.2em] uppercase whitespace-nowrap border transition-all duration-300"
+                      style={{
+                        background: "rgba(12, 12, 16, 0.98)",
+                        color: "var(--text-primary)",
+                        borderColor: "color-mix(in srgb, var(--accent) 30%, rgba(255, 255, 255, 0.12))",
+                        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                        transform: "translate3d(0, 0, 0)",
+                        WebkitFontSmoothing: "antialiased",
+                        MozOsxFontSmoothing: "grayscale",
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]" />
+                      {header}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

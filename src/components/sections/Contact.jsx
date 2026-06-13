@@ -4,7 +4,6 @@ import { personal, contactMethods } from '@/data/personal'
 import SocialIcon from '@/components/ui/SocialIcon'
 import emailjs from '@emailjs/browser'
 import {
-  Sparkles,
   Send,
   Loader2,
   ShieldCheck,
@@ -25,10 +24,9 @@ function FloatingInput({ id, label, type, value, onChange, onBlur, error }) {
   return (
     <div className="relative w-full group">
       {/* Premium sub-pixel glow outline on focus */}
-      <div 
-        className={`absolute -inset-[1.5px] rounded-2xl transition-all duration-500 opacity-0 group-focus-within:opacity-100 blur-[2px] pointer-events-none -z-10 ${
-          error ? 'bg-gradient-to-r from-red-500/30 to-rose-600/30' : 'bg-gradient-to-r from-accent/30 to-indigo-500/30'
-        }`}
+      <div
+        className={`absolute -inset-[1.5px] rounded-2xl transition-all duration-500 opacity-0 group-focus-within:opacity-100 blur-[2px] pointer-events-none -z-10 ${error ? 'bg-gradient-to-r from-red-500/30 to-rose-600/30' : 'bg-gradient-to-r from-accent/30 to-indigo-500/30'
+          }`}
       />
       <input
         type={type}
@@ -42,27 +40,25 @@ function FloatingInput({ id, label, type, value, onChange, onBlur, error }) {
           if (onBlur) onBlur(e)
         }}
         placeholder=" "
-        className={`peer w-full rounded-2xl border bg-bg-surface/30 px-4 pt-6 pb-2 text-sm text-[var(--text-heading)] outline-none transition-all duration-300 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.02)] ${
-          error
+        className={`peer w-full rounded-2xl border bg-bg-surface/30 px-4 pt-6 pb-2 text-sm text-[var(--text-heading)] outline-none transition-all duration-300 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.02)] ${error
             ? 'border-red-500/30 focus:border-red-500 focus:shadow-[0_0_20px_rgba(239,68,68,0.08)]'
             : 'border-white/[0.06] focus:border-accent/50 focus:shadow-[0_0_20px_var(--accent-dim)]'
-        } focus:bg-bg-surface/50`}
+          } focus:bg-bg-surface/50`}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute left-4 top-4 origin-[0] -translate-y-3.5 scale-75 text-xs text-muted duration-300 transform pointer-events-none peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-focus:-translate-y-3.5 peer-focus:scale-75 ${
-          error ? 'peer-focus:text-red-500' : 'peer-focus:text-accent'
-        } ${focused || hasValue ? '-translate-y-3.5 scale-75' : ''} font-semibold tracking-wide`}
+        className={`absolute left-4 top-4 origin-[0] -translate-y-3.5 scale-75 text-xs text-muted duration-300 transform pointer-events-none peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-focus:-translate-y-3.5 peer-focus:scale-75 ${error ? 'peer-focus:text-red-500' : 'peer-focus:text-accent'
+          } ${focused || hasValue ? '-translate-y-3.5 scale-75' : ''} font-semibold tracking-wide`}
       >
         {label}
       </label>
       {error && (
-        <motion.span 
+        <motion.span
           initial={{ opacity: 0, y: -2 }}
           animate={{ opacity: 1, y: 0 }}
-          id={`${id}-error`} 
-          className="mt-1 block text-xs text-red-400 font-medium tracking-wide px-1" 
+          id={`${id}-error`}
+          className="mt-1 block text-xs text-red-400 font-medium tracking-wide px-1"
           role="alert"
         >
           {error}
@@ -80,10 +76,9 @@ function FloatingTextarea({ id, label, value, onChange, onBlur, error, rows = 5,
   return (
     <div className="relative w-full group">
       {/* Premium sub-pixel glow outline on focus */}
-      <div 
-        className={`absolute -inset-[1.5px] rounded-2xl transition-all duration-500 opacity-0 group-focus-within:opacity-100 blur-[2px] pointer-events-none -z-10 ${
-          error ? 'bg-gradient-to-r from-red-500/30 to-rose-600/30' : 'bg-gradient-to-r from-accent/30 to-indigo-500/30'
-        }`}
+      <div
+        className={`absolute -inset-[1.5px] rounded-2xl transition-all duration-500 opacity-0 group-focus-within:opacity-100 blur-[2px] pointer-events-none -z-10 ${error ? 'bg-gradient-to-r from-red-500/30 to-rose-600/30' : 'bg-gradient-to-r from-accent/30 to-indigo-500/30'
+          }`}
       />
       <textarea
         id={id}
@@ -97,28 +92,26 @@ function FloatingTextarea({ id, label, value, onChange, onBlur, error, rows = 5,
         }}
         placeholder=" "
         rows={rows}
-        className={`peer w-full rounded-2xl border bg-bg-surface/30 px-4 pt-6 pb-2 text-sm text-[var(--text-heading)] outline-none transition-all duration-300 backdrop-blur-md resize-none shadow-[inset_0_1px_2px_rgba(255,255,255,0.02)] ${
-          error
+        className={`peer w-full rounded-2xl border bg-bg-surface/30 px-4 pt-6 pb-2 text-sm text-[var(--text-heading)] outline-none transition-all duration-300 backdrop-blur-md resize-none shadow-[inset_0_1px_2px_rgba(255,255,255,0.02)] ${error
             ? 'border-red-500/30 focus:border-red-500 focus:shadow-[0_0_20px_rgba(239,68,68,0.08)]'
             : 'border-white/[0.06] focus:border-accent/50 focus:shadow-[0_0_20px_var(--accent-dim)]'
-        } focus:bg-bg-surface/50`}
+          } focus:bg-bg-surface/50`}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute left-4 top-4 origin-[0] -translate-y-3.5 scale-75 text-xs text-muted duration-300 transform pointer-events-none peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-focus:-translate-y-3.5 peer-focus:scale-75 ${
-          error ? 'peer-focus:text-red-500' : 'peer-focus:text-accent'
-        } ${focused || hasValue ? '-translate-y-3.5 scale-75' : ''} font-semibold tracking-wide`}
+        className={`absolute left-4 top-4 origin-[0] -translate-y-3.5 scale-75 text-xs text-muted duration-300 transform pointer-events-none peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-focus:-translate-y-3.5 peer-focus:scale-75 ${error ? 'peer-focus:text-red-500' : 'peer-focus:text-accent'
+          } ${focused || hasValue ? '-translate-y-3.5 scale-75' : ''} font-semibold tracking-wide`}
       >
         {label}
       </label>
       <div className="mt-1 flex items-center justify-between min-h-[16px] px-1">
         {error ? (
-          <motion.span 
+          <motion.span
             initial={{ opacity: 0, y: -2 }}
             animate={{ opacity: 1, y: 0 }}
-            id={`${id}-error`} 
-            className="block text-xs text-red-400 font-medium tracking-wide" 
+            id={`${id}-error`}
+            className="block text-xs text-red-400 font-medium tracking-wide"
             role="alert"
           >
             {error}
@@ -365,7 +358,7 @@ function Contact() {
       {/* Background Layer with Glow Mesh and Noise */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute inset-0 bg-bg transition-colors duration-500" />
-        
+
         {/* Animated Gradient Mesh Orbs */}
         {!shouldReduceMotion && (
           <>
@@ -428,16 +421,15 @@ function Contact() {
       </div>
 
       <div className="mx-auto max-w-7xl">
-        <motion.div 
-          variants={containerVariants} 
-          initial="hidden" 
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
           animate={isInView ? 'visible' : 'hidden'}
-          className="grid grid-cols-1 lg:grid-cols-10 gap-12 lg:gap-16 items-start"
           className="grid grid-cols-1 lg:grid-cols-10 gap-16 lg:gap-20 items-start"
         >
           {/* LEFT SIDE: Information (40% span on LG) */}
           <motion.div variants={itemVariants} className="lg:col-span-4 flex flex-col justify-center">
-            
+
             {/* Section Badge */}
             <div className="mb-6 self-start inline-flex items-center gap-2.5 rounded-full border border-accent/20 bg-accent-dim/30 px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-accent shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] backdrop-blur-md">
               <span className="relative flex h-2 w-2">
@@ -540,8 +532,8 @@ function Contact() {
           </motion.div>
 
           {/* RIGHT SIDE: Premium Form Card (60% span on LG) */}
-          <motion.div 
-            variants={itemVariants} 
+          <motion.div
+            variants={itemVariants}
             className="lg:col-span-6"
           >
             {/* Interactive Spotlight Glow Border Wrapper */}
@@ -564,7 +556,7 @@ function Contact() {
 
               {/* Inner Card Glass Container */}
               <div className="relative rounded-[23px] bg-bg-surface/85 backdrop-blur-2xl p-6 md:p-8 w-full h-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.04)]">
-                
+
                 <AnimatePresence mode="wait">
                   {!showSuccess ? (
                     <motion.div
@@ -635,11 +627,10 @@ function Contact() {
                           <motion.div
                             initial={{ opacity: 0, y: -5 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className={`rounded-xl border p-4 text-xs ${
-                              status.type === 'success'
+                            className={`rounded-xl border p-4 text-xs ${status.type === 'success'
                                 ? 'border-green-500/20 bg-green-500/5 text-green-400'
                                 : 'border-red-500/20 bg-red-500/5 text-red-400'
-                            }`}
+                              }`}
                           >
                             {status.message}
                           </motion.div>
@@ -649,11 +640,10 @@ function Contact() {
                         <MagneticButton
                           type="submit"
                           disabled={isSubmitting}
-                          className={`mt-4 flex w-full items-center justify-center gap-2.5 rounded-xl py-4 px-6 text-sm font-semibold transition-all duration-300 ${
-                            isSubmitting
+                          className={`mt-4 flex w-full items-center justify-center gap-2.5 rounded-xl py-4 px-6 text-sm font-semibold transition-all duration-300 ${isSubmitting
                               ? 'cursor-not-allowed bg-accent/50 text-accent-contrast'
                               : 'bg-accent text-accent-contrast shadow-[0_15px_35px_var(--accent-dim)] hover:bg-accent-hover hover:shadow-[0_20px_50px_rgba(37,99,235,0.35)]'
-                          }`}
+                            }`}
                         >
                           {isSubmitting ? (
                             <>
@@ -705,7 +695,7 @@ function Contact() {
                       <h3 className="text-2xl font-bold text-[var(--text-heading)] font-heading mb-3">
                         Message Sent Successfully!
                       </h3>
-                      
+
                       {/* Body */}
                       <p className="text-secondary max-w-sm mb-8 leading-relaxed text-sm">
                         Thank you for reaching out, <span className="font-semibold text-primary">{formData.name}</span>. I've received your brief and will review it carefully. You can expect a responsive follow-up within 24 hours.

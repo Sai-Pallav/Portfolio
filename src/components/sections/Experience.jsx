@@ -1,5 +1,5 @@
 import { motion, useInView, AnimatePresence } from 'framer-motion'
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { experience } from '@/data/experience'
 import CareerCore from './experience/CareerCore'
 import OrbitRing from './experience/OrbitRing'
@@ -32,29 +32,76 @@ const itemVariants = {
   },
 }
 
+// Orbit configuration defined statically at module level to prevent re-creation
+const ORBIT_RADII = [280, 350, 430]
+const ORBIT_DURATIONS = [25, 35, 45]
+const NODE_ANGLES = [0, 120, 240]
+
 function Experience() {
   const sectionRef = useRef(null)
   const orbitContainerRef = useRef(null)
   const detailsRef = useRef(null)
   const isInView = useInView(sectionRef, { once: true, margin: '-100px' })
   const [selectedNodeIndex, setSelectedNodeIndex] = useState(-1)
-  const { scrollProgress, orbitAngle, isMobile, isInView: orbitInView } = useOrbitAnimation(sectionRef, selectedNodeIndex !== -1)
+  const { orbitAngle, isMobile, isInView: orbitInView } = useOrbitAnimation(sectionRef, selectedNodeIndex !== -1)
   
   // Use only manually selected node (not scroll-based)
   const currentNodeIndex = selectedNodeIndex
   
-  const handleNodeSelect = (index) => {
-    setSelectedNodeIndex(selectedNodeIndex === index ? -1 : index)
-  }
+  const handleNodeSelect = useCallback((index) => {
+    setSelectedNodeIndex(prev => prev === index ? -1 : index)
+  }, [])
   
-  const handleCloseDetails = () => {
-    setSelectedNodeIndex(-1)
-  }
+  const handleCloseDetails = useCallback(() => {
+    setSelectedNodeIndex(prev => {
+      const prevIndex = prev
+      // Restore focus to the node button that opened the panel
+      if (prevIndex !== -1 && nodeRefs.current[prevIndex]) {
+        nodeRefs.current[prevIndex].focus()
+      }
+      return -1
+    })
+  }, [])
+
+  // Move focus into panel when it opens; restore on close via handleCloseDetails
+  useEffect(() => {
+    if (selectedNodeIndex !== -1 && detailsRef.current) {
+      // Small timeout to let the enter animation start before focusing
+      const t = setTimeout(() => detailsRef.current?.focus(), 50)
+      return () => clearTimeout(t)
+    }
+  }, [selectedNodeIndex])
+
+  // Escape key closes the details panel
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape' && selectedNodeIndex !== -1) handleCloseDetails()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [selectedNodeIndex, handleCloseDetails])
   
-  // Orbit configuration
-  const orbitRadii = [180, 260, 340]
-  const orbitDurations = [25, 35, 45]
-  const nodeAngles = [0, 120, 240]
+  // Refs to each orbit node button for focus restoration
+  const nodeRefs = useRef([])
+  
+  // Stable ref setters to prevent inline arrow functions breaking memoization
+  const nodeRefSetters = useMemo(() => {
+    return [0, 1, 2].map(i => (el) => {
+      nodeRefs.current[i] = el
+    })
+  }, [])
+  
+  // Calculate dynamic details panel position based on selected node's placement in viewport
+  const getDetailsPosition = useCallback(() => {
+    if (currentNodeIndex === -1) return 'left'
+    const angle = NODE_ANGLES[currentNodeIndex]
+    const radius = ORBIT_RADII[currentNodeIndex]
+    const currentAngle = angle + (orbitInView ? orbitAngle : 0)
+    const radians = (currentAngle * Math.PI) / 180
+    const x = 50 + (radius / 8) * Math.cos(radians)
+    // If node is on the right half of the screen (x >= 50), details should be on the left
+    return x >= 50 ? 'left' : 'right'
+  }, [currentNodeIndex, orbitAngle, orbitInView])
   
   // Orbit entrance animations
   const orbitSystemVariants = {
@@ -95,43 +142,7 @@ function Experience() {
     })
   }
   
-  const nodeVariants = {
-    hidden: (i) => {
-      // Start from center position (50%, 50%)
-      return {
-        scale: 0,
-        opacity: 0,
-        x: '-50%',
-        y: '-50%',
-        left: '50%',
-        top: '50%'
-      }
-    },
-    visible: (i) => {
-      // Calculate final position based on node's orbit
-      const angle = nodeAngles[i]
-      const radius = orbitRadii[i]
-      const radians = (angle * Math.PI) / 180
-      const x = 50 + (radius / 8) * Math.cos(radians)
-      const y = 50 + (radius / 8) * Math.sin(radians)
-      
-      return {
-        scale: 1,
-        opacity: 1,
-        x: '-50%',
-        y: '-50%',
-        left: `${x}%`,
-        top: `${y}%`,
-        transition: {
-          type: 'spring',
-          stiffness: 120,
-          damping: 18,
-          delay: 0.6 + i * 0.2
-        }
-      }
-    }
-  }
-  
+
   return (
     <section
       id="experience"
@@ -228,113 +239,120 @@ function Experience() {
           ) : (
             // Desktop: Immersive orbit system with entrance animations
             <motion.div 
-              ref={orbitContainerRef} 
               initial="hidden"
               animate="visible"
               variants={orbitSystemVariants}
-              className="relative w-full h-[100vh] flex items-center justify-center"
+              className="relative w-full h-[85vh] lg:h-[100vh] flex items-center justify-center overflow-visible"
             >
-              {/* Central Core with entrance animation */}
-              <motion.div 
-                variants={coreVariants}
-                className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"
+              {/* Centered Orbit Wrapper with aspect-square to guarantee perfect circular orbits */}
+              <div
+                ref={orbitContainerRef}
+                className="relative w-full max-w-[min(75vh,720px)] aspect-square flex items-center justify-center"
               >
-                <CareerCore isActive={currentNodeIndex !== -1} />
-              </motion.div>
-              
-              {/* Orbit Rings with staggered entrance */}
-              {orbitRadii.map((radius, i) => (
+                {/* Central Core with entrance animation */}
                 <motion.div 
-                  key={i}
-                  variants={ringVariants}
-                  custom={i}
-                  className="absolute inset-0 flex items-center justify-center"
+                  variants={coreVariants}
+                  className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"
                 >
-                  <OrbitRing
-                    radius={radius}
-                    duration={orbitDurations[i]}
-                    isActive={currentNodeIndex === i}
-                    direction={i % 2 === 0 ? 'clockwise' : 'counter-clockwise'}
-                  />
+                  <CareerCore isActive={currentNodeIndex !== -1} />
                 </motion.div>
-              ))}
-              
-              {/* Experience Nodes with pop-in animation and orbit rotation */}
-              {experience.map((exp, i) => {
-                // Calculate position based on node's orbit + current orbit rotation
-                const angle = nodeAngles[i]
-                const radius = orbitRadii[i]
-                const currentAngle = angle + (orbitInView ? orbitAngle : 0)
-                const radians = (currentAngle * Math.PI) / 180
-                const x = 50 + (radius / 8) * Math.cos(radians)
-                const y = 50 + (radius / 8) * Math.sin(radians)
                 
-                return (
-                  <motion.div
-                    key={exp.id}
-                    initial={{ 
-                      scale: 0, 
-                      opacity: 0
-                    }}
-                    animate={{ 
-                      scale: 1, 
-                      opacity: 1,
-                      left: `${x}%`,
-                      top: `${y}%`
-                    }}
-                    transition={{
-                      scale: {
-                        type: 'spring',
-                        stiffness: 120,
-                        damping: 18,
-                        delay: 0.8 + i * 0.2
-                      },
-                      opacity: {
-                        duration: 0.5,
-                        delay: 0.8 + i * 0.2
-                      },
-                      left: {
-                        type: 'tween',
-                        duration: 0.1,
-                        ease: 'linear'
-                      },
-                      top: {
-                        type: 'tween',
-                        duration: 0.1,
-                        ease: 'linear'
-                      }
-                    }}
-                    className="absolute"
-                    style={{
-                      transform: 'translate(-50%, -50%)',
-                      zIndex: currentNodeIndex === i ? 40 : 30
-                    }}
+                {/* Orbit Rings with staggered entrance */}
+                {ORBIT_RADII.map((radius, i) => (
+                  <motion.div 
+                    key={i}
+                    variants={ringVariants}
+                    custom={i}
+                    className="absolute inset-0 flex items-center justify-center"
                   >
-                    <ExperienceNode
-                      exp={exp}
-                      index={i}
-                      angle={nodeAngles[i]}
-                      radius={orbitRadii[i]}
+                    <OrbitRing
+                      radius={radius}
+                      duration={ORBIT_DURATIONS[i]}
                       isActive={currentNodeIndex === i}
-                      orbitAngle={orbitInView ? orbitAngle : 0}
-                      onSelect={handleNodeSelect}
+                      hasActiveSelection={currentNodeIndex !== -1}
+                      direction={i % 2 === 0 ? 'clockwise' : 'counter-clockwise'}
                     />
                   </motion.div>
-                )
-              })}
-              
-              {/* Energy Beam to active node */}
-              <AnimatePresence>
-                {currentNodeIndex !== -1 && (
-                  <EnergyBeam
-                    activeNodeIndex={currentNodeIndex}
-                    nodeAngles={nodeAngles}
-                    nodeRadii={orbitRadii}
-                    containerRef={orbitContainerRef}
-                    orbitAngle={orbitInView ? orbitAngle : 0}
-                  />
-                )}
-              </AnimatePresence>
+                ))}
+                
+                {/* Experience Nodes with pop-in animation and orbit rotation */}
+                {experience.map((exp, i) => {
+                  // Calculate position based on node's orbit + current orbit rotation
+                  const angle = NODE_ANGLES[i]
+                  const radius = ORBIT_RADII[i]
+                  const currentAngle = angle + (orbitInView ? orbitAngle : 0)
+                  const radians = (currentAngle * Math.PI) / 180
+                  const x = 50 + (radius / 8) * Math.cos(radians)
+                  const y = 50 + (radius / 8) * Math.sin(radians)
+                  
+                  return (
+                    <motion.div
+                      key={exp.id}
+                      initial={{ 
+                        scale: 0, 
+                        opacity: 0,
+                        x: '-50%',
+                        y: '-50%'
+                      }}
+                      animate={{ 
+                        scale: 1, 
+                        opacity: 1,
+                        left: `${x}%`,
+                        top: `${y}%`,
+                        x: '-50%',
+                        y: '-50%'
+                      }}
+                      transition={{
+                        scale: {
+                          type: 'spring',
+                          stiffness: 120,
+                          damping: 18,
+                          delay: 0.8 + i * 0.2
+                        },
+                        opacity: {
+                          duration: 0.5,
+                          delay: 0.8 + i * 0.2
+                        },
+                        left: {
+                          duration: 0
+                        },
+                        top: {
+                          duration: 0
+                        }
+                      }}
+                      className="absolute"
+                      style={{
+                        zIndex: currentNodeIndex === i ? 40 : 30,
+                        pointerEvents: currentNodeIndex !== -1 && currentNodeIndex !== i ? 'none' : 'auto'
+                      }}
+                    >
+                      <ExperienceNode
+                        exp={exp}
+                        index={i}
+                        angle={NODE_ANGLES[i]}
+                        radius={ORBIT_RADII[i]}
+                        isActive={currentNodeIndex === i}
+                        isDimmed={currentNodeIndex !== -1 && currentNodeIndex !== i}
+                        onSelect={handleNodeSelect}
+                        nodeRef={nodeRefSetters[i]}
+                      />
+                    </motion.div>
+                  )
+                })}
+                
+                {/* Energy Beam to active node */}
+                <AnimatePresence>
+                  {currentNodeIndex !== -1 && (
+                    <EnergyBeam
+                      activeNodeIndex={currentNodeIndex}
+                      nodeAngles={NODE_ANGLES}
+                      nodeRadii={ORBIT_RADII}
+                      containerRef={orbitContainerRef}
+                      orbitAngle={orbitInView ? orbitAngle : 0}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
               
               {/* Details Panel */}
               <AnimatePresence mode="wait">
@@ -343,7 +361,7 @@ function Experience() {
                     ref={detailsRef}
                     key={currentNodeIndex}
                     exp={experience[currentNodeIndex]}
-                    position={currentNodeIndex === 0 ? 'right' : 'left'}
+                    position={getDetailsPosition()}
                     onClose={handleCloseDetails}
                   />
                 )}

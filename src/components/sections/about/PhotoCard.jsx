@@ -13,7 +13,7 @@ export default function PhotoCard({ sectionRef }) {
     >
       {/* Full screen container with stacked layout */}
       <div className="relative">
-        
+
         {/* ID card - positioned above text */}
         <div className="relative z-20 mb-12 lg:mb-16 lg:absolute lg:right-0 lg:top-0 lg:w-1/2 lg:max-w-lg">
           {/* Liquid Glass Effect SVG Filter */}
@@ -59,7 +59,7 @@ export default function PhotoCard({ sectionRef }) {
           >
             {/* Gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-br from-accent/20 via-transparent to-accent-hover/20 opacity-0 transition-opacity duration-500" />
-            
+
             {/* Lanyard Component */}
             <div className="w-full h-full min-h-[400px]">
               <Lanyard position={[0, 0, 30]} gravity={[0, -40, 0]} fov={30} transparent={true} sectionRef={sectionRef} />

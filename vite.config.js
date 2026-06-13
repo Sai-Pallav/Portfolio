@@ -23,19 +23,33 @@ export default defineConfig({
         drop_debugger: true
       }
     },
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
-              return 'vendor'
+        codeSplitting: {
+          groups: [
+            {
+              name: 'react-vendor',
+              test: /node_modules[\\/](react|react-dom)/,
+              priority: 30,
+            },
+            {
+              name: 'motion-vendor',
+              test: /node_modules[\\/](framer-motion|motion)/,
+              priority: 25,
+            },
+            {
+              name: 'three-bundle',
+              test: /node_modules[\\/](three|@react-three|@dimforge|meshline|three-stdlib|hls\.js|stats-gl|fflate)/,
+              priority: 20,
+            },
+            {
+              name: 'vendor',
+              test: /node_modules/,
+              priority: 10,
             }
-            if (id.includes('framer-motion')) {
-              return 'motion'
-            }
-          }
-        },
-      },
+          ]
+        }
+      }
     },
   },
 })

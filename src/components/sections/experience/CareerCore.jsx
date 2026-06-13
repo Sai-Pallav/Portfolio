@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useRef } from 'react'
+import { useRef, memo } from 'react'
 
 /**
  * Central Career Core - A glowing energy source with rotating rings and pulsing effects.
@@ -7,7 +7,7 @@ import { useRef } from 'react'
  * 
  * @param {{ isActive: boolean }} props
  */
-export default function CareerCore({ isActive }) {
+const CareerCore = memo(function CareerCore({ isActive }) {
   const uid = useRef(`career-core-${Math.random().toString(36).slice(2)}`).current
   return (
     <div className="relative flex items-center justify-center">
@@ -212,4 +212,6 @@ export default function CareerCore({ isActive }) {
       </motion.div>
     </div>
   )
-}
+})
+
+export default CareerCore

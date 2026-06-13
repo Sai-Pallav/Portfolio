@@ -1,36 +1,110 @@
-function TimelineNode() {
+import { memo, useEffect } from "react";
+import { motion, useTransform, useMotionValue, animate } from "framer-motion";
+
+const TimelineNode = memo(function TimelineNode({ scrollYProgress, hasAwakened }) {
+  // Always call useMotionValue unconditionally to satisfy the Rules of Hooks
+  const fallback = useMotionValue(0.5);
+  const progress = scrollYProgress || fallback;
+
+  // Track the fade-in of the atmospheric glow upon awakening
+  const awakenedOpacity = useMotionValue(0);
+
+  useEffect(() => {
+    if (hasAwakened) {
+      const controls = animate(awakenedOpacity, 1, { duration: 0.5, ease: "easeOut" });
+      return () => controls.stop();
+    } else {
+      awakenedOpacity.set(0);
+    }
+  }, [hasAwakened, awakenedOpacity]);
+
+  // Advanced Scroll Enhancement: calculate focus strength based on viewport position
+  // Focus peaks exactly at 0.5 (when the item is in the center of the screen)
+  const focusStrength = useTransform(
+    progress,
+    [0.15, 0.5, 0.85],
+    [0.3, 1.0, 0.3]
+  );
+
+  // Dynamic atmospheric glow properties driven by viewport focus, masked by the awakening progress
+  const baseHaloOpacity = useTransform(focusStrength, v => v * 0.15);
+  const haloOpacity = useTransform(
+    [baseHaloOpacity, awakenedOpacity],
+    ([base, ao]) => base * ao
+  );
+  const haloScale = useTransform(focusStrength, v => 0.9 + v * 0.35);
+
   return (
-    <div className="relative w-5 h-5">
-      {/* Outer glow */}
-      <div
-        className="absolute -inset-1 rounded-full"
+    <div className="relative w-12 h-12 flex items-center justify-center select-none pointer-events-none" aria-hidden="true">
+      {/* 1. Multi-Layer Glow (Atmospheric blur halo linked to viewport center focus and masked until awakened) */}
+      <motion.div
+        className="absolute w-14 h-14 rounded-full bg-[var(--accent)] blur-[10px]"
         style={{
-          background: "var(--accent)",
-          filter: "blur(8px)",
-          opacity: 0.6,
+          opacity: haloOpacity,
+          scale: haloScale,
         }}
       />
 
-      {/* Main orb body */}
-      <div
-        className="relative w-5 h-5 rounded-full"
+      {/* 2. Outer Ring: Thin precision dashed ring */}
+      <motion.div
+        className="absolute inset-0 rounded-full"
+        initial={{ opacity: 0, scale: 0.85 }}
+        animate={hasAwakened ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.85 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        <div
+          className="w-full h-full rounded-full border border-dashed border-[var(--accent)]/30"
+        />
+      </motion.div>
+
+      {/* 3. Middle Ring: Soft translucent glass-like ring with slight blur */}
+      <motion.div
+        className="absolute inset-2 rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-[2px]"
+        initial={{ opacity: 0, scale: 0.85 }}
+        animate={hasAwakened ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.85 }}
+        transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
         style={{
-          background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%)",
-          border: "1px solid rgba(255, 255, 255, 0.3)",
-          boxShadow: "0 0 20px var(--accent-dim), 0 0 40px var(--accent-dim)",
+          boxShadow: "inset 0 1px 1px rgba(255, 255, 255, 0.08)",
         }}
       />
 
-      {/* Inner glowing core */}
-      <div
-        className="absolute inset-1.5 rounded-full"
+      {/* 4. Core: Bright violet center, sharp focus point, breathing idle state */}
+      <motion.div
+        className="relative w-5 h-5 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)]"
+        initial={{ scale: 0.85, opacity: 0 }}
+        animate={hasAwakened ? {
+          scale: [1, 1.03, 1],
+          opacity: 1,
+          boxShadow: [
+            "0 0 8px var(--accent-dim)",
+            "0 0 16px var(--accent)",
+            "0 0 8px var(--accent-dim)"
+          ]
+        } : { scale: 0.85, opacity: 0 }}
+        transition={hasAwakened ? {
+          scale: { duration: 3.5, repeat: Infinity, ease: "easeInOut" },
+          boxShadow: { duration: 3.5, repeat: Infinity, ease: "easeInOut" },
+          opacity: { duration: 0.3 }
+        } : {}}
         style={{
-          background: "radial-gradient(circle, #fff 0%, var(--accent) 100%)",
-          boxShadow: "0 0 10px var(--accent)",
+          border: "1.5px solid rgba(255, 255, 255, 0.45)",
         }}
-      />
+      >
+        {/* Specular high-contrast center pin dot */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white shadow-[0_0_4px_#ffffff]" />
+      </motion.div>
+
+      {/* 5. Energy Ripple (Single-shot wave expanding outward on wake-up) */}
+      {hasAwakened && (
+        <motion.div
+          className="absolute rounded-full border border-[var(--accent)]/50 pointer-events-none"
+          initial={{ width: 18, height: 18, opacity: 0.8 }}
+          animate={{ width: 44, height: 44, opacity: 0 }}
+          transition={{ duration: 1.0, ease: "easeOut" }}
+        />
+      )}
     </div>
   );
-}
+});
 
 export default TimelineNode;

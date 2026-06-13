@@ -68,8 +68,8 @@ export function useOrbitAnimation(sectionRef, isNodeSelected = false) {
   
   // Orbit rotation animation loop
   useEffect(() => {
-    if (isMobile || !isInView) {
-      // Stop rotation on mobile or when out of view
+    if (isMobile || !isInView || isNodeSelected) {
+      // Stop rotation on mobile, when out of view, or when a node is selected
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
@@ -95,12 +95,12 @@ export function useOrbitAnimation(sectionRef, isNodeSelected = false) {
         cancelAnimationFrame(animationFrameRef.current)
       }
     }
-  }, [isMobile, isInView])
+  }, [isMobile, isInView, isNodeSelected])
   
   // Slow down orbit when a node is selected
   useEffect(() => {
     if (isNodeSelected) {
-      orbitSpeedRef.current = 0.15 // Slow down for comfortable reading
+      orbitSpeedRef.current = 0 // Stop rotation completely for focused reading and clean layouts
     } else {
       orbitSpeedRef.current = 0.5 // Normal speed
     }

@@ -1,12 +1,14 @@
+export const BRANCH_WIDTH = 80;
+
 export const TIMELINE_ANIM = {
-  LINE_DRAW_DELAY: 0.8,
+  LINE_DRAW_DELAY: 0.5,
   LINE_DRAW_DURATION: 6.5,
   BRANCH_DRAW_DURATION: 1.1,
   CARD_REVEAL_DURATION: 0.85,
   CARD_GAP: 0.12,
   HEADER_SPACING: 150,
-  ITEM_GAP: 900,
-  CARD_CENTER_Y: 230,
+  ITEM_GAP: 1000,
+  CARD_CENTER_Y: 200,
   LINE_DRAW_EASE: [0.25, 0.1, 0.25, 1],
   BRANCH_EASE: [0.22, 1, 0.36, 1],
   CARD_EASE: [0.16, 1, 0.3, 1],
@@ -28,7 +30,7 @@ export function getDesktopJunctionProgress(index, totalProjects) {
 /** Estimated junction progress for mobile stacked layout */
 export function getMobileJunctionProgress(index, totalProjects) {
   const CARD_EST = 380;
-  const GAP = 64;
+  const GAP = 192;
   const PAD = 32;
   const totalHeight = PAD * 2 + totalProjects * CARD_EST + (totalProjects - 1) * GAP;
   const junctionY = PAD + index * (CARD_EST + GAP) + CARD_EST / 2;

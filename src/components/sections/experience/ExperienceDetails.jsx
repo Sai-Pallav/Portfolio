@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { forwardRef } from 'react'
+import { forwardRef, memo } from 'react'
 
 /**
  * Experience Details Panel - Expanded view with holographic effects.
@@ -12,7 +12,7 @@ import { forwardRef } from 'react'
  *   onClose: () => void
  * }} props
  */
-const ExperienceDetails = forwardRef(function ExperienceDetails({ exp, position, onClose }, ref) {
+const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, position, onClose }, ref) {
   const slideDirection = position === 'right' ? 60 : -60
   
   const containerVariants = {
@@ -52,7 +52,7 @@ const ExperienceDetails = forwardRef(function ExperienceDetails({ exp, position,
       }}
     >
       {/* Main panel */}
-      <div ref={ref} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 via-white/5 to-white/10 backdrop-blur-2xl border border-white/20 shadow-2xl shadow-accent/20">
+      <div ref={ref} tabIndex={-1} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 via-white/5 to-white/10 backdrop-blur-2xl border border-white/20 shadow-2xl shadow-accent/20 outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:border-accent/50 transition-all duration-300">
         
         {/* Animated border glow sweep */}
         <motion.div
@@ -260,6 +260,6 @@ const ExperienceDetails = forwardRef(function ExperienceDetails({ exp, position,
       </div>
     </motion.div>
   )
-})
+}))
 
 export default ExperienceDetails

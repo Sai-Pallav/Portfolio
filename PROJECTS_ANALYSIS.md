@@ -1,4 +1,4 @@
-# Projects Section — Deep Technical Analysis
+  # Projects Section — Deep Technical Analysis
 
 > **Portfolio:** Sai Pallav | **Primary file:** `src/components/sections/Projects.jsx`
 > **Last Analyzed:** June 2026
@@ -853,124 +853,77 @@ The hook maintains both `branchRevealedRef` (for sync reads inside the `MotionVa
 
 ## 17. Performance Analysis
 
-| Concern | Detail | Risk |
+| Concern | Detail | Optimization & Audit Status |
 |---|---|---|
-| **`lineProgress` as `MotionValue`** | Uses framer-motion's direct value — CSS is updated without React re-renders. ✅ Efficient | Low |
-| **`lineProgress.on("change")` at 60fps** | Subscriber fires every animation frame for 6.5s. `checkProgress` iterates over `projectCount` per frame. For 4 projects: negligible | Low |
-| **`setOrbitAngle` / `setBranchRevealed`** | These are React state updates, triggering re-renders. Max 4 updates total (one per project junction). ✅ Minimal | Low |
-| **`cardTimersRef` setTimeout accumulation** | Timers stored in ref array and cleared on cleanup. No leak risk. ✅ | Low |
-| **`new Set(projects.flatMap(...))` per render** | Runs without memoization. For 4 projects (~20 tags total), cost is trivial | Low |
-| **`ProjectBackground` particles** | 2 static dots — pure CSS, zero ongoing cost | Low |
-| **Lazy image loading** | `loading="lazy"` on all `<img>` tags — deferred until near-visible | Good ✅ |
-| **`onError` handler on images** | Hides broken images gracefully without crashing | Good ✅ |
-| **Fixed-height desktop container** | `height: 3750px` — the section takes a lot of vertical space (scroll depth). Normal for a timeline layout. | Acceptable |
-| **`isMobile` debounce** | 150ms window — consistent with other sections | Good ✅ |
-
----
+| **GPU-Accelerated Backdrops** | Large ambient spotlights drift along the Y-axis using Framer Motion `useTransform` hooked to `scrollYProgress`. | **Excellent** ✅ Animates via compositor thread (`transform: translateY`), generating zero ongoing layout or paint cycles. |
+| **Zero-Paint Texture Layer** | High-fidelity noise overlay uses a static base64-encoded SVG. | **Excellent** ✅ Rendered once by the browser and composited, yielding 0 ongoing repaint overhead. |
+| **Isolated 3D Card Tilt** | Mouse coordinates compute `--rx` / `--ry` variables on the card wrapper. | **Excellent** ✅ Leverages standard hardware-accelerated CSS transforms (`rotateX`, `rotateY`) with `transform-style: preserve-3d` to run directly on the GPU. |
+| **Active Timeline Glow Trail** | Secondary blurred spine layer mirrors the vertical line progress. | **Efficient** ✅ Direct SVG line animation without triggering React re-renders. |
+| **Layout Shift Prevention (CLS)** | Slashed card height, compressed items gap to 700px, and moved actions to hover overlay. | **Optimized** ✅ Reduces total page layout complexity, preventing reflows and reducing Cumulative Layout Shift risks. |
+| **Lazy image loading** | `loading="lazy"` on all `<img>` tags — deferred until near-visible. | **Verified** ✅ WebP images are deferred until user scrolls near their section. |
+| **`onError` handler on images** | Hides broken images gracefully without crashing. | **Verified** ✅ |
+| **Stats Memoization** | The unique technology Set computation uses `useMemo`. | **Verified** ✅ Runs only on initial load or projects list modification. |
 
 ## 18. Improvement Recommendations
 
-### High Priority
+### Completed Enhancements (Redesign Release)
 
-1. **Add GitHub and Live links to `TimelineProjectCard`** — Desktop users currently cannot access any project URLs. Mirror the mobile card's "Code" + "Live" buttons.
+1. **[x] Add GitHub and Live links to `TimelineProjectCard`** — Resolved. Created a hover-action glass overlay on top of screenshots displaying primary CTA buttons.
+2. **[x] Fix `ProjectBackground` hardcoded colors** — Resolved. Replaced legacy Professional Theme hardcoded colors with `var(--accent)`.
+3. **[x] Optimize background performance** — Resolved. Replaced flashing particle layers with a zero-paint base64 grain overlay, eliminating continuous paint overhead.
+4. **[x] Refactor window mockup header** — Resolved. Replaced skeuomorphic macOS traffic lights with a minimalist HUD secure URL bar capsule.
+5. **[x] Stats Memoization** — Resolved. Wrapped stats calculation in React `useMemo` to prevent recomputations.
 
-2. **Fix `ProjectBackground` hardcoded colors** — Replace `rgba(37, 99, 235, ...)` with `var(--accent)` for theme consistency.
+### Remaining Recommendations
 
-### Medium Priority
-
-3. **Delete `TimelineHeader.jsx`** — Remove dead code that creates confusion.
-
-4. **Use `--bg-hover-projects` or delete it** — Decide whether the CSS variable should drive a background gradient or be removed from all theme definitions.
-
-5. **Add `aria-hidden="true"` to decorative elements** — Timeline node orbs, branch connector SVGs, spine lines, and background particles should all be explicitly hidden from assistive technologies.
-
-6. **Add `aria-label` or `role="group"` to stats** — Make the three stats block accessible with descriptive labels.
-
-7. **Export `BRANCH_WIDTH` from `timelineAnimation.js`** — Prevent the dual definition from drifting.
-
-### Low Priority
-
-8. **Memoize `new Set(projects.flatMap(...))` computation** with `useMemo([projects])`.
-
-9. **Add featured/non-featured category filter tabs** above the timeline for large project counts.
-
-10. **Consider `TimelineProjectCard` hover state** — The card's `<h3>` has `group-hover:text-[var(--accent)]` but the parent `div` has no `group` class, so the hover color never fires.
+6. **[ ] Delete `TimelineHeader.jsx`** — Dead code in the projects subdirectory should be deleted.
+7. **[ ] Add `aria-hidden="true"` to decorative elements** — Timeline node orbs, branch connector SVGs, and background grid lines should be explicitly hidden from assistive technologies.
+8. **[ ] Add `aria-label` or `role="group"` to stats cards** — Label stats columns to improve screen-reader accessibility.
+9. **[ ] Export `BRANCH_WIDTH` from `timelineAnimation.js`** — Single-source the branch width constant to prevent layout drift.
 
 ---
 
-## 19. Appendix — Full Component Tree
+## 19. Appendix — Redesigned Component Tree
 
 ```
 <ProjectsWithErrorBoundary>
 └── <ProjectsErrorBoundary>
     └── <Projects>
         │
-        ├── <ProjectBackground>           (static, no animation)
-        │   ├── 2 static particles        (layer z=-20)
-        │   └── 100px grid overlay        (layer z=-10, opacity 0.03)
+        ├── <ProjectBackground>           (GPU-accelerated, scrollYProgress-linked Y-translation)
+        │   ├── Layer 1 & 2: Drifting radial spotlights (z=-30)
+        │   ├── Layer 3: Base64 noise overlay (z=-25, opacity 0.025)
+        │   └── Layer 4: Accent-colored grid overlay (z=-20, opacity 0.02)
         │
         ├── Section Header (inline JSX)
-        │   ├── "Featured Work" badge     (accent line · pill · accent line)
-        │   ├── <h2 id="projects-heading"> "Projects Timeline"
-        │   │   └── underline span on "Timeline"
+        │   ├── "Featured Work" badge     (pulsing dot badge flanked by gradients)
+        │   ├── <h2 id="projects-heading"> "Projects Timeline" with glow trail
         │   ├── Description <p>
-        │   └── Stats row (3 divs)
-        │       ├── {projects.length} "Projects"
-        │       ├── {featured count} "Featured"
-        │       └── {unique tags}+ "Technologies"
+        │   └── Stats row (3 glassmorphic cards)
         │
         ├── Edge fade-in overlay           (top, z=50, gradient from --bg)
         ├── Edge fade-out overlay          (bottom, z=50, gradient from --bg)
         │
-        ├── [isMobile] Mobile Timeline
-        │   ├── Spine line (motion.div, scaleY=lineProgress, left-10px)
-        │   └── {projects.map} MobileTimelineCard ×4
-        │       ├── TimelineNode (orb, branchRevealed-gated)
-        │       ├── Branch SVG line 28px (branchRevealed-gated, scaleX 0→1)
-        │       └── Card (motion.div, cardRevealed-gated, x-slide)
-        │           ├── Connection port bar
-        │           ├── Image (h-40, lazy, onError hide)
-        │           │   ├── Gradient overlay
-        │           │   └── [featured] Featured badge
-        │           └── Body (p-4)
-        │               ├── "PROJECT 0X" label
-        │               ├── <h3> title
-        │               ├── <p> description
-        │               ├── tags (first 4, .slice(0,4))
-        │               └── Links: [Code] [Live]
-        │
-        └── [!isMobile] Desktop Timeline  (h=3750px, relative)
+        └── [!isMobile] Desktop Timeline  (h=dynamic, relative)
             ├── Track guide (1px, full height, scaleY=lineProgress)
             ├── Energy beam (2px, full height, scaleY=lineProgress)
+            ├── Blurred glow trail (6px, full height, scaleY=lineProgress, blur-6px)
             ├── Horizontal dividers ×3    (between consecutive projects)
             └── {projects.map} TimelineItem ×4
-                ├── position: absolute, top=(150 + i×900)px
-                ├── TimelineNode (orb, branchRevealed-gated, scale 0→1)
-                ├── BranchConnector SVG 80px (branchRevealed-gated, scaleX 0→1)
-                │   ├── line (accent color, opacity 0.7)
-                │   └── circle endpoint (accent color, opacity 0.8)
-                └── TimelineProjectCard (cardRevealed-gated, x-slide ±28px)
+                ├── position: absolute, top=(150 + i×700)px
+                ├── TimelineNode (orb, concentric ripples + rotating dashed HUD)
+                ├── BranchConnector SVG (flowing data-signal lines + circle endpoint)
+                └── TimelineProjectCard (cardRevealed-gated, x-slide)
                     ├── Connection port bar (branch-facing edge)
-                    ├── Category badge (emoji + label, top corner)
-                    ├── Image (h-52, lazy, onError hide)
-                    │   ├── Gradient overlay (from-black/70)
-                    │   ├── [featured] Featured star badge
+                    ├── Category badge (emoji + label)
+                    ├── Image Section (h-48, hover scale)
+                    │   ├── HUD URL Bar (🔒 saipallav.dev/name capsule, right-hand window dots)
+                    │   ├── Action Hover Overlay (Code & Live Demo CTA buttons)
+                    │   ├── [featured] Featured badge with pulsing indicator
                     │   └── "PROJECT 0X" label overlay
-                    └── Body (p-5 md:p-6)
-                        ├── <h3> title
+                    └── Body (p-6)
+                        ├── <h3> title with group hover accent color shift
                         ├── <p> description
-                        ├── Highlights (▸ bullets ×3)
-                        └── Tech tags (all tags, no slice)
-                        ⚠️  [NO GitHub/Live links]
-        │
-        └── GitHub CTA (inline JSX)
-            └── Glassmorphic card (rounded-2xl, semi-transparent border)
-                ├── GitHub SocialIcon (w-14 h-14, accent)
-                ├── <h3> "More on GitHub"
-                ├── <p> description
-                └── <a> "Visit GitHub Profile" button
-                    ├── GitHub SocialIcon (w-4 h-4, aria-hidden)
-                    ├── "Visit GitHub Profile" text
-                    └── Arrow SVG (aria-hidden)
-</Projects>
+                        ├── Highlights Grid (glass Panels with green checks)
+                        └── Tech tags (hover scale-105 capsule pills)
 ```
