@@ -1,46 +1,18 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef } from "react";
 import { motion, useScroll } from "framer-motion";
 import TimelineNode from "./TimelineNode";
 import BranchConnector from "./BranchConnector";
 import TimelineProjectCard from "./TimelineProjectCard";
-import { BRANCH_WIDTH, getDesktopJunctionProgress } from "./timelineAnimation";
+import { BRANCH_WIDTH } from "./timelineAnimation";
 
 function TimelineItem({
   project,
   index,
   isLeft,
   topOffset,
-  totalProjects,
-  timelineInView,
-  lineProgress,
 }) {
   const itemRef = useRef(null);
-  const [hasAwakened, setHasAwakened] = useState(false);
-
-  // Trigger Orb and card activation exactly when the drawing spine line passes this junction
-  useEffect(() => {
-    if (!timelineInView) {
-      Promise.resolve().then(() => {
-        setHasAwakened((prev) => (prev ? false : prev));
-      });
-      return;
-    }
-    if (lineProgress) {
-      const junctionProgress = getDesktopJunctionProgress(index, totalProjects);
-      
-      const checkProgress = (latest) => {
-        if (latest >= junctionProgress) {
-          setHasAwakened(true);
-        }
-      };
-
-      // Check the initial progress value
-      checkProgress(lineProgress.get());
-
-      const unsubscribe = lineProgress.on("change", checkProgress);
-      return unsubscribe;
-    }
-  }, [timelineInView, lineProgress, index, totalProjects]);
+  const hasAwakened = true;
 
   // Track scroll position of this item relative to the viewport
   const { scrollYProgress } = useScroll({

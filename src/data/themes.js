@@ -3,7 +3,7 @@ export const themes = [
   {
     key:     'obsidian',
     label:   'Obsidian Terminal',
-    preview: '#00e5a0',           // Accent swatch shown in the picker
+    preview: '#2563eb',           // Accent swatch shown in the picker
     dark:    true,
   },
   {
@@ -22,6 +22,24 @@ export const themes = [
     key:     'steel-flame',
     label:   'Steel & Flame',
     preview: '#ff3c3c',
+    dark:    true,
+  },
+  {
+    key:     'emerald-noir',
+    label:   'Emerald Noir',
+    preview: '#10b981',
+    dark:    true,
+  },
+  {
+    key:     'cyberpunk-neon',
+    label:   'Cyberpunk Neon',
+    preview: '#06b6d4',
+    dark:    true,
+  },
+  {
+    key:     'nordic-frost',
+    label:   'Nordic Frost',
+    preview: '#3b82f6',
     dark:    true,
   },
 ]

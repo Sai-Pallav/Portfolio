@@ -1,4 +1,4 @@
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { skills } from "@/data/skills";
 
 const getDeviconUrl = (icon) => {
@@ -38,11 +38,19 @@ const categoryCardVariants = {
 const categories = Object.keys(skills);
 
 const handleMouseMove = (e) => {
-  const rect = e.currentTarget.getBoundingClientRect();
+  let rect = e.currentTarget._cachedRect;
+  if (!rect) {
+    rect = e.currentTarget.getBoundingClientRect();
+    e.currentTarget._cachedRect = rect;
+  }
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   e.currentTarget.style.setProperty("--mouse-x", `${x}px`);
   e.currentTarget.style.setProperty("--mouse-y", `${y}px`);
+};
+
+const handleMouseLeave = (e) => {
+  e.currentTarget._cachedRect = null;
 };
 
 export default function SkillsGrid() {
@@ -83,6 +91,7 @@ export default function SkillsGrid() {
                   <div
                     key={idx}
                     onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
                     className={`flex flex-col gap-2 p-3.5 rounded-2xl bg-[rgba(20,20,22,0.45)] border border-white/[0.04] transition-all duration-300 relative group/item overflow-hidden ${
                       !isPrimary ? "opacity-70 hover:opacity-100" : "opacity-100"
                     }`}

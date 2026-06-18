@@ -1,8 +1,122 @@
 /* ========================================================
-   PORTFOLIO THEME SYSTEM (PROFESSIONAL REDESIGN)
-   Design System: Space Grotesk + DM Sans | Monochrome + Blue
-   Default theme: professional (applied without attribute / fallback)
+   PORTFOLIO THEME SYSTEM (HOUDINI OPTIMIZED REDESIGN)
+   Design System: Space Grotesk + DM Sans | GPU-accelerated variable interpolation
    ======================================================== */
+
+/* CSS Houdini Custom Property Registrations */
+@property --bg {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0A0A0B;
+}
+@property --bg-surface {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #18181B;
+}
+@property --bg-raised {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #27272A;
+}
+@property --border {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.08);
+}
+@property --border-glow {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(37, 99, 235, 0.25);
+}
+@property --text-primary {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #FAFAFA;
+}
+@property --text-heading {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #EEF4FF;
+}
+@property --text-secondary {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #A1A1AA;
+}
+@property --text-muted {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #52525B;
+}
+@property --accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2563EB;
+}
+@property --accent-dim {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(37, 99, 235, 0.08);
+}
+@property --accent-hover {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #3B82F6;
+}
+@property --accent-contrast {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #FAFAFA;
+}
+@property --nav-bg {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(10, 10, 11, 0.85);
+}
+@property --shadow-color {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(0, 0, 0, 0.6);
+}
+@property --hover-color-about {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(37, 99, 235, 0.08);
+}
+@property --hover-color-skills {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(59, 130, 246, 0.08);
+}
+@property --hover-color-projects {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(37, 99, 235, 0.10);
+}
+@property --hover-color-contact {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(239, 68, 68, 0.06);
+}
+
+@property --hero-img-opacity {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.7;
+}
+
+@property --hero-noise-opacity {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.08;
+}
+
+@property --hero-shadow-opacity {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.8;
+}
 
 :root,
 [data-theme="professional"] {
@@ -24,7 +138,10 @@
   --accent-contrast: #FAFAFA;
 
   --nav-bg:          rgba(10, 10, 11, 0.85);
-  --card-shadow:     0 10px 40px 0 rgba(0, 0, 0, 0.6);
+  
+  /* Tokenized Shadow and Radial Hover colors */
+  --shadow-color:    rgba(0, 0, 0, 0.6);
+  --card-shadow:     0 10px 40px 0 var(--shadow-color);
 
   --danger:   #EF4444;
   --warning:  #F59E0B;
@@ -50,11 +167,23 @@
   --shadow-lg: 0 10px 15px rgba(0,0,0,0.15);
   --shadow-xl: 0 20px 25px rgba(0,0,0,0.2);
 
-  /* Section Hover Radial Gradients - Blue Theme */
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, rgba(37, 99, 235, 0.08) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
-  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, rgba(37, 99, 235, 0.10) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, rgba(239, 68, 68, 0.06) 0%, transparent 70%);
+  /* Hover Gradient Colors & Formulas */
+  --hover-color-about:    rgba(37, 99, 235, 0.08);
+  --hover-color-skills:   rgba(59, 130, 246, 0.08);
+  --hover-color-projects: rgba(37, 99, 235, 0.10);
+  --hover-color-contact:  rgba(239, 68, 68, 0.06);
+
+  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: luminosity;
+  --hero-img-opacity: 0.7;
+  --hero-noise-opacity: 0.08;
+  --hero-shadow-opacity: 0.8;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
 }
 
 [data-theme="obsidian"] {
@@ -75,20 +204,30 @@
   --accent-contrast: #FAFAFA;
 
   --nav-bg:          rgba(3, 3, 3, 0.75);
-  --card-shadow:     0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  
+  --shadow-color:    rgba(0, 0, 0, 0.8);
+  --card-shadow:     0 8px 32px 0 var(--shadow-color);
 
   --danger:   #ff4d4d;
   --warning:  #ffaa00;
   --success:  #10B981;
 
-  --font-heading:    'Space Grotesk', 'Inter', sans-serif;
-  --font-body:       'DM Sans', 'Inter', sans-serif;
+  --hover-color-about:    rgba(37, 99, 235, 0.05);
+  --hover-color-skills:   rgba(59, 130, 246, 0.05);
+  --hover-color-projects: rgba(37, 99, 235, 0.07);
+  --hover-color-contact:  rgba(239, 68, 68, 0.05);
 
-  /* Section Hover Radial Gradients */
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, rgba(37, 99, 235, 0.05) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
-  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, rgba(37, 99, 235, 0.07) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, rgba(239, 68, 68, 0.05) 0%, transparent 70%);
+  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: luminosity;
+  --hero-img-opacity: 0.65;
+  --hero-noise-opacity: 0.06;
+  --hero-shadow-opacity: 0.9;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 65%);
 }
 
 [data-theme="warm-slate"] {
@@ -109,21 +248,31 @@
   --accent-contrast: #050403;
 
   --nav-bg:          rgba(5, 4, 3, 0.75);
-  --card-shadow:     0 8px 32px 0 rgba(0, 0, 0, 0.85);
+  
+  --shadow-color:    rgba(0, 0, 0, 0.85);
+  --card-shadow:     0 8px 32px 0 var(--shadow-color);
 
   --danger:   #ef4444;
   --warning:  #eab308;
   --success:  #22c55e;
 
-  --font-heading:    'Space Grotesk', 'Inter', sans-serif;
-  --font-body:       'DM Sans', 'Inter', sans-serif;
+  --hover-color-about:    rgba(251, 191, 36, 0.05);
+  --hover-color-skills:   rgba(249, 115, 22, 0.05);
+  --hover-color-projects: rgba(249, 115, 22, 0.07);
+  --hover-color-contact:  rgba(239, 68, 68, 0.04);
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, rgba(251, 191, 36, 0.05) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, rgba(249, 115, 22, 0.05) 0%, transparent 70%);
-  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, rgba(249, 115, 22, 0.07) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, rgba(239, 68, 68, 0.04) 0%, transparent 70%);
+  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: luminosity;
+  --hero-img-opacity: 0.7;
+  --hero-noise-opacity: 0.08;
+  --hero-shadow-opacity: 0.9;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
 }
-
 
 [data-theme="arctic"] {
   --bg:              #f4f4f6;
@@ -143,22 +292,32 @@
   --accent-contrast: #FAFAFA;
 
   --nav-bg:          rgba(244, 244, 246, 0.80);
-  --card-shadow:     0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  
+  --shadow-color:    rgba(0, 0, 0, 0.05);
+  --card-shadow:     0 8px 32px 0 var(--shadow-color);
 
   --highlight:       #facc15;
   --danger:   #dc2626;
   --warning:  #d97706;
   --success:  #16a34a;
 
-  --font-heading:    'Space Grotesk', 'Inter', sans-serif;
-  --font-body:       'DM Sans', 'Inter', sans-serif;
+  --hover-color-about:    rgba(37, 99, 235, 0.06);
+  --hover-color-skills:   rgba(59, 130, 246, 0.05);
+  --hover-color-projects: rgba(37, 99, 235, 0.08);
+  --hover-color-contact:  rgba(220, 38, 38, 0.03);
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, rgba(37, 99, 235, 0.06) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
-  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, rgba(37, 99, 235, 0.08) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, rgba(220, 38, 38, 0.03) 0%, transparent 70%);
+  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: multiply;
+  --hero-img-opacity: 0.85;
+  --hero-noise-opacity: 0.03;
+  --hero-shadow-opacity: 0.2;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, rgba(37, 99, 235, 0.04) 0%, transparent 70%);
 }
-
 
 [data-theme="midnight-violet"] {
   --bg:              #040308;
@@ -178,21 +337,31 @@
   --accent-contrast: #040308;
 
   --nav-bg:          rgba(4, 3, 8, 0.75);
-  --card-shadow:     0 8px 32px 0 rgba(0, 0, 0, 0.85);
+  
+  --shadow-color:    rgba(0, 0, 0, 0.85);
+  --card-shadow:     0 8px 32px 0 var(--shadow-color);
 
   --danger:   #f87171;
   --warning:  #fbbf24;
   --success:  #34d399;
 
-  --font-heading:    'Space Grotesk', 'Inter', sans-serif;
-  --font-body:       'DM Sans', 'Inter', sans-serif;
+  --hover-color-about:    rgba(167, 139, 250, 0.05);
+  --hover-color-skills:   rgba(196, 181, 253, 0.04);
+  --hover-color-projects: rgba(167, 139, 250, 0.07);
+  --hover-color-contact:  rgba(248, 113, 113, 0.04);
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, rgba(167, 139, 250, 0.05) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, rgba(196, 181, 253, 0.04) 0%, transparent 70%);
-  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, rgba(167, 139, 250, 0.07) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, rgba(248, 113, 113, 0.04) 0%, transparent 70%);
+  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: luminosity;
+  --hero-img-opacity: 0.75;
+  --hero-noise-opacity: 0.08;
+  --hero-shadow-opacity: 0.85;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
 }
-
 
 [data-theme="steel-flame"] {
   --bg:              #050101;
@@ -212,37 +381,236 @@
   --accent-contrast: #050101;
 
   --nav-bg:          rgba(5, 1, 1, 0.75);
-  --card-shadow:     0 8px 32px 0 rgba(0, 0, 0, 0.85);
+  
+  --shadow-color:    rgba(0, 0, 0, 0.85);
+  --card-shadow:     0 8px 32px 0 var(--shadow-color);
 
   --danger:   #ff1a1a;
   --warning:  #ff9500;
   --success:  #00d67c;
 
-  --font-heading:    'Space Grotesk', 'Inter', sans-serif;
-  --font-body:       'DM Sans', 'Inter', sans-serif;
+  --hover-color-about:    rgba(255, 149, 0, 0.04);
+  --hover-color-skills:   rgba(255, 60, 60, 0.04);
+  --hover-color-projects: rgba(255, 60, 60, 0.07);
+  --hover-color-contact:  rgba(255, 60, 60, 0.05);
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, rgba(255, 149, 0, 0.04) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, rgba(255, 60, 60, 0.04) 0%, transparent 70%);
-  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, rgba(255, 60, 60, 0.07) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, rgba(255, 60, 60, 0.05) 0%, transparent 70%);
+  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: luminosity;
+  --hero-img-opacity: 0.7;
+  --hero-noise-opacity: 0.09;
+  --hero-shadow-opacity: 0.9;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+}
+
+[data-theme="emerald-noir"] {
+  --bg:              #020a06;
+  --bg-surface:      #061210;
+  --bg-raised:       #0c1e18;
+  --border:          rgba(255, 255, 255, 0.04);
+  --border-glow:     rgba(16, 185, 129, 0.18);
+
+  --text-primary:    #f0fdf8;
+  --text-heading:    #e6fff5;
+  --text-secondary:  #8fad9e;
+  --text-muted:      #4a6a5a;
+
+  --accent:          #10b981;
+  --accent-dim:      rgba(16, 185, 129, 0.06);
+  --accent-hover:    #34d399;
+  --accent-contrast: #020a06;
+
+  --nav-bg:          rgba(2, 10, 6, 0.78);
+  
+  --shadow-color:    rgba(0, 0, 0, 0.85);
+  --card-shadow:     0 8px 32px 0 var(--shadow-color);
+
+  --danger:   #f87171;
+  --warning:  #fbbf24;
+  --success:  #34d399;
+
+  --hover-color-about:    rgba(16, 185, 129, 0.05);
+  --hover-color-skills:   rgba(52, 211, 153, 0.04);
+  --hover-color-projects: rgba(16, 185, 129, 0.07);
+  --hover-color-contact:  rgba(248, 113, 113, 0.04);
+
+  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: luminosity;
+  --hero-img-opacity: 0.7;
+  --hero-noise-opacity: 0.07;
+  --hero-shadow-opacity: 0.9;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+}
+
+[data-theme="cyberpunk-neon"] {
+  --bg:              #030712;
+  --bg-surface:      #0b1329;
+  --bg-raised:       #111d3a;
+  --border:          rgba(255, 255, 255, 0.05);
+  --border-glow:     rgba(6, 182, 212, 0.20);
+
+  --text-primary:    #f0f9ff;
+  --text-heading:    #e0f7ff;
+  --text-secondary:  #8daac0;
+  --text-muted:      #4a6478;
+
+  --accent:          #06b6d4;
+  --accent-dim:      rgba(6, 182, 212, 0.07);
+  --accent-hover:    #22d3ee;
+  --accent-contrast: #030712;
+
+  --nav-bg:          rgba(3, 7, 18, 0.80);
+  
+  --shadow-color:    rgba(0, 0, 0, 0.85);
+  --card-shadow:     0 8px 32px 0 var(--shadow-color);
+
+  --danger:   #f87171;
+  --warning:  #fbbf24;
+  --success:  #34d399;
+
+  --hover-color-about:    rgba(6, 182, 212, 0.05);
+  --hover-color-skills:   rgba(34, 211, 238, 0.04);
+  --hover-color-projects: rgba(6, 182, 212, 0.07);
+  --hover-color-contact:  rgba(248, 113, 113, 0.04);
+
+  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: luminosity;
+  --hero-img-opacity: 0.75;
+  --hero-noise-opacity: 0.1;
+  --hero-shadow-opacity: 0.85;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+}
+
+[data-theme="nordic-frost"] {
+  --bg:              #050814;
+  --bg-surface:      #0c1122;
+  --bg-raised:       #172038;
+  --border:          rgba(255, 255, 255, 0.05);
+  --border-glow:     rgba(59, 130, 246, 0.20);
+
+  --text-primary:    #f1f5f9;
+  --text-heading:    #f8fafc;
+  --text-secondary:  #94a3b8;
+  --text-muted:      #475569;
+
+  --accent:          #3b82f6;
+  --accent-dim:      rgba(59, 130, 246, 0.08);
+  --accent-hover:    #60a5fa;
+  --accent-contrast: #050814;
+
+  --nav-bg:          rgba(5, 8, 20, 0.78);
+  
+  --shadow-color:    rgba(0, 0, 0, 0.85);
+  --card-shadow:     0 8px 32px 0 var(--shadow-color);
+
+  --danger:   #ef4444;
+  --warning:  #f59e0b;
+  --success:  #10b981;
+
+  --hover-color-about:    rgba(59, 130, 246, 0.06);
+  --hover-color-skills:   rgba(96, 165, 250, 0.05);
+  --hover-color-projects: rgba(59, 130, 246, 0.08);
+  --hover-color-contact:  rgba(239, 68, 68, 0.04);
+
+  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: luminosity;
+  --hero-img-opacity: 0.7;
+  --hero-noise-opacity: 0.07;
+  --hero-shadow-opacity: 0.85;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
 }
 
 /* ========================================================
    GLOBAL THEME TRANSITIONS
-   Applies smooth color swapping. Skips key components to
-   prevent performance drops or drawing flickers.
+   Applies smooth color swapping via Houdini custom variables.
+   Transitioning is handled natively at root.
    ======================================================== */
 
-*,
-*::before,
-*::after {
-  transition: background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+html {
+  transition: 
+    --bg 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --bg-surface 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --bg-raised 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --border 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --border-glow 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --text-primary 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --text-heading 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --text-secondary 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --text-muted 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --accent 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --accent-dim 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --accent-hover 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --accent-contrast 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --nav-bg 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --shadow-color 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --hover-color-about 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --hover-color-skills 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --hover-color-projects 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --hover-color-contact 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --hero-img-opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --hero-noise-opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --hero-shadow-opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.theme-transitioning,
+.theme-transitioning body,
+.theme-transitioning main,
+.theme-transitioning section,
+.theme-transitioning nav,
+.theme-transitioning footer,
+.theme-transitioning header,
+.theme-transitioning h1,
+.theme-transitioning h2,
+.theme-transitioning h3,
+.theme-transitioning h4,
+.theme-transitioning h5,
+.theme-transitioning h6,
+.theme-transitioning p,
+.theme-transitioning a,
+.theme-transitioning button,
+.theme-transitioning input,
+.theme-transitioning textarea,
+.theme-transitioning label {
+  /* Standard transition fallbacks for colors/shapes during theme switch to guarantee cross-browser compatibility */
+  transition: 
+    background-color 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.5s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* Only apply expensive box-shadow transitions to elements that actually have shadows */
+.theme-transitioning .premium-glass,
+.theme-transitioning button,
+.theme-transitioning [class*="shadow-"] {
+  transition: box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 /* Transitions Exclusions */
 [data-animate],
 .hero-blob,
 .timeline-line,
+.hero-background-env,
+.hero-noise-overlay,
+.hero-portrait-img,
 canvas {
   transition: none !important;
 }
@@ -331,7 +699,7 @@ canvas {
    ======================================================== */
 
 .premium-glass {
-  background: rgba(var(--bg-surface), 0.35);
+  background: color-mix(in srgb, var(--bg-surface) 35%, transparent);
   backdrop-filter: blur(16px) saturate(120%);
   -webkit-backdrop-filter: blur(16px) saturate(120%);
   border: 1px solid var(--border);

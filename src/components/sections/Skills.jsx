@@ -1,31 +1,60 @@
-import { motion, useInView } from "motion/react";
+import { motion, useInView } from "framer-motion";
 import { useRef, useState } from "react";
 import ThreeDMarqueeDemo from "../3d-marquee-demo";
 import SkillsGrid from "./skills/SkillsGrid";
 
-// ─── Stagger variants for the header text ────────────────────────────────────
-const containerVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.15 } },
-};
-const itemVariants = {
-  hidden: { opacity: 0, y: 32 },
+// ─── Premium Animation Variants ──────────────────────────────────────────────
+const badgeVariants = {
+  hidden: { opacity: 0, scale: 0.94, y: 20 },
   visible: {
-    opacity: 1, y: 0,
-    transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] },
-  },
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
+  }
 };
+
+const headingVariants = {
+  hidden: { opacity: 0, y: 25 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] }
+  }
+};
+
+const subtitleVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] }
+  }
+};
+
+const toggleVariants = {
+  hidden: { opacity: 0, scale: 0.96, y: 15 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] }
+  }
+};
+
 const marqueeVariants = {
-  hidden: { opacity: 0, scale: 0.94, y: 48 },
+  hidden: { opacity: 0, scale: 0.96, y: 30 },
   visible: {
-    opacity: 1, scale: 1, y: 0,
-    transition: { duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.45 },
-  },
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { duration: 1.2, ease: [0.16, 1, 0.3, 1] }
+  }
 };
 
 function Skills() {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-80px 0px" });
+  const isInView = useInView(ref, { once: true, margin: "-120px 0px" });
   const [view, setView] = useState("3d");
 
   return (
@@ -61,14 +90,19 @@ function Skills() {
       <div className="container mx-auto px-4 relative z-10 flex flex-col items-center">
         <motion.div
           ref={ref}
-          variants={containerVariants}
+          variants={{
+            hidden: {},
+            visible: {
+              transition: { staggerChildren: 0.12 }
+            }
+          }}
           initial="hidden"
           animate={isInView ? "visible" : "hidden"}
           className="flex flex-col items-center w-full"
         >
           {/* Badge */}
           <motion.div
-            variants={itemVariants}
+            variants={badgeVariants}
             className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_8px_30px_rgb(0,0,0,0.2)]"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)] animate-pulse" />
@@ -80,7 +114,7 @@ function Skills() {
           {/* Heading */}
           <motion.h2
             id="skills-heading"
-            variants={itemVariants}
+            variants={headingVariants}
             className="text-4xl md:text-6xl font-extrabold text-center mb-6 text-[var(--text-heading)] tracking-tighter"
           >
             Tools of the{" "}
@@ -91,7 +125,7 @@ function Skills() {
 
           {/* Subtitle */}
           <motion.p
-            variants={itemVariants}
+            variants={subtitleVariants}
             className="text-[var(--text-secondary)] text-center max-w-2xl mx-auto mb-10 text-lg md:text-xl font-light"
           >
             A comprehensive ecosystem of technologies I leverage to build
@@ -100,7 +134,7 @@ function Skills() {
 
           {/* View Toggle */}
           <motion.div
-            variants={itemVariants}
+            variants={toggleVariants}
             className="flex items-center relative bg-[rgba(20,20,22,0.6)] border border-white/[0.06] p-1 rounded-full backdrop-blur-xl mb-16 shadow-[inset_0_1px_1px_rgba(255,255,255,0.02),0_12px_40px_rgba(0,0,0,0.5)]"
           >
             <button

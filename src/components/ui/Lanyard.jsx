@@ -1,4 +1,3 @@
-/* eslint-disable react/no-unknown-property */
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Canvas, extend, useFrame } from '@react-three/fiber';
@@ -21,9 +20,6 @@ export default function Lanyard({ position = [0, 0, 30], gravity = [0, -40, 0], 
   // Shared ref: normalized pointer position relative to canvas bounds,
   // but tracked across the entire section so dragging works outside the canvas.
   const sectionPointerRef = useRef({ x: 0, y: 0 });
-
-  // Store cleanup fn so we can remove the section listener on unmount
-  const pointerCleanupRef = useRef(null);
   const containerRef = useRef(null);
   const isInView = useInView(containerRef, { margin: '200px' });
 
@@ -33,60 +29,52 @@ export default function Lanyard({ position = [0, 0, 30], gravity = [0, -40, 0], 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Cleanup section pointer listener when Canvas unmounts or component unmounts
+  // Standard React effect to handle section-wide pointer tracking
   useEffect(() => {
-    if (!isInView) {
-      pointerCleanupRef.current?.();
-      pointerCleanupRef.current = null;
-    }
-  }, [isInView]);
+    const container = sectionRef?.current
+      ?? containerRef.current?.closest('section')
+      ?? containerRef.current;
+    if (!container) return;
 
-  useEffect(() => {
-    return () => pointerCleanupRef.current?.();
-  }, []);
+    let canvas = containerRef.current?.querySelector('canvas');
+    let cachedRect = null;
+
+    const handleResize = () => {
+      cachedRect = null;
+    };
+    window.addEventListener('resize', handleResize);
+
+    const onPointerMove = (e) => {
+      if (!canvas) {
+        canvas = containerRef.current?.querySelector('canvas');
+      }
+      if (!canvas) return;
+      if (!cachedRect) {
+        cachedRect = canvas.getBoundingClientRect();
+      }
+      sectionPointerRef.current = {
+        x: ((e.clientX - cachedRect.left) / cachedRect.width) * 2 - 1,
+        y: -((e.clientY - cachedRect.top) / cachedRect.height) * 2 + 1,
+      };
+    };
+
+    container.addEventListener('pointermove', onPointerMove);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      container.removeEventListener('pointermove', onPointerMove);
+    };
+  }, [sectionRef]);
 
   return (
     <div ref={containerRef} className="lanyard-wrapper">
-      {isInView && (
-        <Canvas
+      <Canvas
+        frameloop={isInView ? 'always' : 'never'}
         camera={{ position: position, fov: fov }}
         dpr={[1, isMobile ? 1.5 : 2]}
         gl={{ alpha: transparent }}
         onCreated={({ gl }) => {
           gl.setClearColor(new THREE.Color(0x000000), transparent ? 0 : 1);
-
-          // Set up section-wide pointer tracking.
-          // We normalize clientX/Y against the CANVAS bounds — this is the key:
-          // canvas coordinates stay valid even when the mouse is over the bio text.
-          const canvas = gl.domElement;
-          const container = sectionRef?.current
-            ?? canvas.closest('section')
-            ?? canvas.parentElement;
-
-          if (!container) return;
-
-          let cachedRect = null;
-          const handleResize = () => {
-            cachedRect = null;
-          };
-          window.addEventListener('resize', handleResize);
-
-          const onPointerMove = (e) => {
-            if (!cachedRect) {
-              cachedRect = canvas.getBoundingClientRect();
-            }
-            sectionPointerRef.current = {
-              x: ((e.clientX - cachedRect.left) / cachedRect.width) * 2 - 1,
-              y: -((e.clientY - cachedRect.top) / cachedRect.height) * 2 + 1,
-            };
-          };
-
-          container.addEventListener('pointermove', onPointerMove);
-          // Store cleanup so useEffect above can remove it on unmount
-          pointerCleanupRef.current = () => {
-            container.removeEventListener('pointermove', onPointerMove);
-            window.removeEventListener('resize', handleResize);
-          };
         }}
       >
         <ambientLight intensity={Math.PI} />
@@ -125,7 +113,6 @@ export default function Lanyard({ position = [0, 0, 30], gravity = [0, -40, 0], 
           />
         </Environment>
       </Canvas>
-      )}
     </div>
   );
 }
@@ -144,10 +131,22 @@ function Band({ maxSpeed = 50, minSpeed = 0, isMobile = false, sectionPointerRef
   const segmentProps = { type: 'dynamic', canSleep: true, colliders: false, angularDamping: 4, linearDamping: 4 };
   const { nodes, materials } = useGLTF(cardGLB);
   const texture = useTexture(lanyard);
-  const [curve] = useState(
-    () =>
-      new THREE.CatmullRomCurve3([new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()])
-  );
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+  }, [texture]);
+
+  const [curve] = useState(() => {
+    const c = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+    ]);
+    c.curveType = 'chordal';
+    return c;
+  });
   const [dragged, drag] = useState(false);
   const [hovered, hover] = useState(false);
 
@@ -180,27 +179,43 @@ function Band({ maxSpeed = 50, minSpeed = 0, isMobile = false, sectionPointerRef
       card.current?.setNextKinematicTranslation({ x: vec.x - dragged.x, y: vec.y - dragged.y, z: vec.z - dragged.z });
     }
     if (fixed.current) {
-      [j1, j2].forEach(ref => {
-        if (!ref.current.lerped) ref.current.lerped = new THREE.Vector3().copy(ref.current.translation());
-        const clampedDistance = Math.max(0.1, Math.min(1, ref.current.lerped.distanceTo(ref.current.translation())));
-        ref.current.lerped.lerp(
-          ref.current.translation(),
-          delta * (minSpeed + clampedDistance * (maxSpeed - minSpeed))
-        );
-      });
-      curve.points[0].copy(j3.current.translation());
-      curve.points[1].copy(j2.current.lerped);
-      curve.points[2].copy(j1.current.lerped);
-      curve.points[3].copy(fixed.current.translation());
-      band.current.geometry.setPoints(curve.getPoints(isMobile ? 16 : 32));
-      ang.copy(card.current.angvel());
-      rot.copy(card.current.rotation());
-      card.current.setAngvel({ x: ang.x, y: ang.y - rot.y * 0.25, z: ang.z });
+      const tFixed = fixed.current.translation();
+      const tJ1 = j1.current?.translation();
+      const tJ2 = j2.current?.translation();
+      const tJ3 = j3.current?.translation();
+
+      const isValid = (t) => t && typeof t.x === 'number' && !isNaN(t.x) && !isNaN(t.y) && !isNaN(t.z);
+
+      if (isValid(tFixed) && isValid(tJ1) && isValid(tJ2) && isValid(tJ3)) {
+        [j1, j2].forEach(ref => {
+          const trans = ref.current.translation();
+          if (!ref.current.lerped) ref.current.lerped = new THREE.Vector3(trans.x, trans.y, trans.z);
+          const clampedDistance = Math.max(0.1, Math.min(1, ref.current.lerped.distanceTo(trans)));
+          ref.current.lerped.lerp(
+            new THREE.Vector3(trans.x, trans.y, trans.z),
+            delta * (minSpeed + clampedDistance * (maxSpeed - minSpeed))
+          );
+        });
+        curve.points[0].copy(tJ3);
+        curve.points[1].copy(j2.current.lerped);
+        curve.points[2].copy(j1.current.lerped);
+        curve.points[3].copy(tFixed);
+        
+        const curvePoints = curve.getPoints(isMobile ? 16 : 32);
+        if (curvePoints.every(isValid) && band.current?.geometry) {
+          band.current.geometry.setPoints(curvePoints);
+        }
+      }
+
+      const angvel = card.current?.angvel();
+      const rotation = card.current?.rotation();
+      if (isValid(angvel) && rotation && !isNaN(rotation.y)) {
+        ang.copy(angvel);
+        rot.copy(rotation);
+        card.current.setAngvel({ x: ang.x, y: ang.y - rot.y * 0.25, z: ang.z });
+      }
     }
   });
-
-  curve.curveType = 'chordal';
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
 
   return (
     <>
@@ -251,6 +266,7 @@ function Band({ maxSpeed = 50, minSpeed = 0, isMobile = false, sectionPointerRef
           resolution={isMobile ? [1000, 2000] : [1000, 1000]}
           useMap
           map={texture}
+          transparent={true}
           repeat={[-4, 1]}
           lineWidth={1}
         />

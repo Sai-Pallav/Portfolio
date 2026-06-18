@@ -1,265 +1,100 @@
-const TEXT_TAGS = new Set([
-  'P', 'SPAN', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'A', 'LI', 'LABEL',
-  'TD', 'TH', 'EM', 'STRONG', 'SMALL', 'B', 'I', 'U', 'BUTTON', 'FIGCAPTION',
-  'BLOCKQUOTE', 'CITE', 'CODE', 'PRE', 'KBD', 'DD', 'DT', 'HGROUP', 'LEGEND',
-  'CAPTION', 'MARK', 'DEL', 'INS', 'SUB', 'SUP', 'ABBR', 'Q', 'TIME',
-])
+/**
+ * Simplified cursor utility functions.
+ * Avoids any getComputedStyle or getBoundingClientRect calls on mouse movement
+ * to eliminate layout thrashing and ensure 60/120 FPS performance.
+ */
 
-let colorProbe = null
+let cachedContainer = null
+let cachedRects = null
+let cachedPortraitEl = null
+let cachedPortraitRect = null
 
-function getColorProbe() {
-  if (!colorProbe && typeof document !== 'undefined') {
-    colorProbe = document.createElement('div')
-    colorProbe.setAttribute('aria-hidden', 'true')
-    colorProbe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;top:-9999px;left:-9999px'
-    document.documentElement.appendChild(colorProbe)
-  }
-  return colorProbe
+export function clearCursorCache() {
+  cachedContainer = null
+  cachedRects = null
+  cachedPortraitEl = null
+  cachedPortraitRect = null
 }
 
-export function parseRgbaOrHex(input) {
-  if (!input) return null
-  const trimmed = input.trim()
-  
-  // Try matches for rgb/rgba
-  const rgbMatch = trimmed.match(
-    /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i
-  )
-  if (rgbMatch) {
-    return {
-      r: Math.round(Number(rgbMatch[1])),
-      g: Math.round(Number(rgbMatch[2])),
-      b: Math.round(Number(rgbMatch[3])),
-      a: rgbMatch[4] !== undefined ? Number(rgbMatch[4]) : 1,
+/**
+ * Retrieves the bounding rect of the portrait element, caching it to
+ * avoid layout thrashing during mouse movements.
+ * @param {Element | null} el
+ * @returns {DOMRect | null}
+ */
+export function getPortraitRect(el) {
+  if (!el) return null
+  if (el !== cachedPortraitEl) {
+    cachedPortraitEl = el
+    cachedPortraitRect = el.getBoundingClientRect()
+  }
+  return cachedPortraitRect
+}
+
+/**
+ * Checks if the cursor is exactly over text lines.
+ * Uses getClientRects() on the text container to get precise bounding boxes for each
+ * line of text, preventing cursor flickering/shrinking in the spaces between words.
+ * Caches client rects to prevent layout thrashing and maintain 120 FPS performance.
+ * @param {PointerEvent} e
+ * @returns {boolean}
+ */
+export function isCursorOverText(e) {
+  const hit = e.target
+  if (!hit || !hit.closest || hit.closest('[data-custom-cursor-ignore]')) {
+    return false
+  }
+
+  // Prioritize interactive elements for the interactive cursor shape
+  if (hit.closest('a, button, [role="button"], input, textarea, select')) {
+    return false
+  }
+
+  // Find the closest text container element
+  const container = hit.closest('p, span, h1, h2, h3, h4, h5, h6, li, label, code, pre, blockquote')
+  if (!container || !container.textContent.trim()) {
+    cachedContainer = null
+    cachedRects = null
+    return false
+  }
+
+  // Retrieve or compute precise inline bounding boxes of the text content
+  let rects = cachedRects
+  if (container !== cachedContainer) {
+    cachedContainer = container
+    const range = document.createRange()
+    range.selectNodeContents(container)
+    rects = range.getClientRects()
+    cachedRects = rects
+  }
+
+  if (rects && rects.length > 0) {
+    const padY = 5 // 5px vertical padding tolerance
+    const padX = 5 // 5px horizontal padding tolerance
+    for (let i = 0; i < rects.length; i++) {
+      const rect = rects[i]
+      if (
+        e.clientX >= rect.left - padX &&
+        e.clientX <= rect.right + padX &&
+        e.clientY >= rect.top - padY &&
+        e.clientY <= rect.bottom + padY
+      ) {
+        return true
+      }
     }
-  }
-
-  // Try matches for Hex colors
-  if (trimmed.startsWith('#')) {
-    const hex = trimmed.substring(1)
-    if (hex.length === 3) {
-      const r = parseInt(hex[0] + hex[0], 16)
-      const g = parseInt(hex[1] + hex[1], 16)
-      const b = parseInt(hex[2] + hex[2], 16)
-      return { r, g, b, a: 1 }
-    } else if (hex.length === 6) {
-      const r = parseInt(hex.substring(0, 2), 16)
-      const g = parseInt(hex.substring(2, 4), 16)
-      const b = parseInt(hex.substring(4, 6), 16)
-      return { r, g, b, a: 1 }
-    } else if (hex.length === 8) {
-      const r = parseInt(hex.substring(0, 2), 16)
-      const g = parseInt(hex.substring(2, 4), 16)
-      const b = parseInt(hex.substring(4, 6), 16)
-      const a = parseFloat((parseInt(hex.substring(6, 8), 16) / 255).toFixed(3))
-      return { r, g, b, a }
-    }
-  }
-
-  return null
-}
-
-const colorCache = new Map()
-
-/** @returns {{ r: number, g: number, b: number, a: number } | null} */
-export function parseColor(input) {
-  if (!input || input === 'transparent' || input === 'inherit' || input === 'none') {
-    return null
-  }
-
-  if (colorCache.has(input)) {
-    return colorCache.get(input)
-  }
-
-  // Direct JS parsing for rgb, rgba, hex
-  const direct = parseRgbaOrHex(input)
-  if (direct) {
-    colorCache.set(input, direct)
-    return direct
-  }
-
-  const probe = getColorProbe()
-  if (!probe) return null
-
-  probe.style.color = input
-  const computed = getComputedStyle(probe).color
-
-  const match = computed.match(
-    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/,
-  )
-  if (!match) {
-    colorCache.set(input, null)
-    return null
-  }
-
-  const parsed = {
-    r: Math.round(Number(match[1])),
-    g: Math.round(Number(match[2])),
-    b: Math.round(Number(match[3])),
-    a: match[4] !== undefined ? Number(match[4]) : 1,
-  }
-  colorCache.set(input, parsed)
-  return parsed
-}
-
-/** @returns {{ r: number, g: number, b: number, a: number } | null} */
-export function parseBackground(input) {
-  return parseColor(input)
-}
-
-export function colorToCss({ r, g, b, a = 1 }) {
-  if (a < 1) return `rgba(${r}, ${g}, ${b}, ${a})`
-  return `rgb(${r}, ${g}, ${b})`
-}
-
-export function getThemeDefaults() {
-  if (typeof document === 'undefined') {
-    return {
-      fg: { r: 250, g: 250, b: 250, a: 1 },
-      bg: { r: 10, g: 10, b: 11, a: 1 },
-    }
-  }
-  const root = getComputedStyle(document.documentElement)
-  const fg =
-    parseColor(root.getPropertyValue('--text-primary').trim()) ||
-    parseColor(root.color) ||
-    { r: 250, g: 250, b: 250, a: 1 }
-  const bg =
-    parseBackground(root.getPropertyValue('--bg').trim()) ||
-    parseBackground(root.backgroundColor) ||
-    { r: 10, g: 10, b: 11, a: 1 }
-  return { fg, bg }
-}
-
-/** @param {Element | null} target */
-export function sampleColorsForElement(target) {
-  const defaults = getThemeDefaults()
-  if (!target || target.closest?.('[data-custom-cursor-ignore]')) {
-    return defaults
-  }
-
-  let fg = null
-  let bg = null
-  let el = target
-
-  while (el && el !== document.documentElement) {
-    const style = getComputedStyle(el)
-
-    if (!fg) {
-      const c = parseColor(style.color)
-      if (c && c.a > 0.08) fg = c
-    }
-
-    if (!bg) {
-      const c = parseBackground(style.backgroundColor)
-      if (c && c.a > 0.04) bg = c
-    }
-
-    if (fg && bg) break
-    el = el.parentElement
-  }
-
-  return {
-    fg: fg || defaults.fg,
-    bg: bg || defaults.bg,
-  }
-}
-
-/** @param {number} x @param {number} y */
-export function sampleColorsAt(x, y) {
-  if (typeof document === 'undefined') {
-    return getThemeDefaults()
-  }
-  const target = document.elementFromPoint(x, y)
-  return sampleColorsForElement(target)
-}
-
-/** @param {Element | null} el */
-export function isTextHoverTarget(el) {
-  if (!el || el.closest?.('[data-custom-cursor-ignore]')) return false
-
-  let node = el
-  while (node && node !== document.body) {
-    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
-      return true
-    }
-
-    const tag = node.tagName
-    if (tag && TEXT_TAGS.has(tag) && node.textContent?.trim()) {
-      return true
-    }
-
-    node = node.parentElement
   }
 
   return false
 }
 
 /**
- * Extracts the shape and size information from a hovered element
+ * Checks if the element or any of its parents is interactive.
  * @param {Element | null} el
- * @returns {{ width: number, height: number, borderRadius: string, isInteractive: boolean } | null}
+ * @returns {boolean}
  */
-export function getElementShape(el) {
-  if (!el || el.closest?.('[data-custom-cursor-ignore]')) return null
-
-  // Find the closest interactive element with defined dimensions
-  let target = el
-  let depth = 0
-  const maxDepth = 5
-
-  while (target && target !== document.body && depth < maxDepth) {
-    // Skip elements marked as cursor-ignore (also catches ancestors)
-    if (target.hasAttribute?.('data-custom-cursor-ignore')) return null
-
-    const rect = target.getBoundingClientRect()
-    const style = window.getComputedStyle(target)
-    const display = style.display
-    const visibility = style.visibility
-    const opacity = style.opacity
-
-    // Skip hidden or non-interactive elements
-    if (visibility === 'hidden' || opacity === '0' || display === 'none') {
-      target = target.parentElement
-      depth++
-      continue
-    }
-
-    // Check if element has meaningful dimensions
-    if (rect.width > 0 && rect.height > 0) {
-      // Extract border-radius values - simplify to single value if it's a shorthand
-      let borderRadius = style.borderRadius || '0px'
-      // If border-radius has multiple values (e.g., "12px 12px 12px 12px"), use the first one
-      const radiusValues = borderRadius.split(' ').filter(v => v.trim())
-      if (radiusValues.length > 1) {
-        borderRadius = radiusValues[0]
-      }
-
-      // Check if this is an interactive element (button, a, etc.)
-      // Only transform for buttons and symbols/icons
-      const isInteractive = 
-        target.tagName === 'BUTTON' ||
-        target.tagName === 'A' ||
-        target.getAttribute('role') === 'button' ||
-        target.tagName === 'SVG' ||
-        target.closest('button') !== null ||
-        target.closest('a') !== null ||
-        (target.closest('svg') !== null && target.closest('[class*="icon"]') !== null)
-
-      // Use exact size for transformation (100% of element size)
-      const scaleFactor = 1.0
-
-      return {
-        width: rect.width * scaleFactor,
-        height: rect.height * scaleFactor,
-        borderRadius,
-        isInteractive
-      }
-    }
-
-    target = target.parentElement
-    depth++
+export function isInteractiveHoverTarget(el) {
+  if (!el || !el.closest || el.closest('[data-custom-cursor-ignore]')) {
+    return false
   }
-
-  return null
+  return el.closest('a, button, [role="button"], input, textarea, select, svg, [class*="icon"]') !== null
 }

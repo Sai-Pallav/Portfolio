@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo, useRef } from "react";
-import { motion, useTransform, useMotionValue, useVelocity, useSpring, useReducedMotion, useMotionTemplate, animate } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
+import { motion, useTransform, useVelocity, useSpring, useReducedMotion, useMotionTemplate, animate, motionValue, useMotionValue } from "framer-motion";
 
 function ProjectBackground({ scrollYProgress, activeCategory }) {
   const isReducedMotion = useReducedMotion();
@@ -8,72 +8,7 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
   const [isMobileView, setIsMobileView] = useState(false);
   const cardsRef = useRef([]);
 
-  // Hook compliance: Declare 6 motion values for card focus states
-  const focus0 = useMotionValue(0);
-  const focus1 = useMotionValue(0);
-  const focus2 = useMotionValue(0);
-  const focus3 = useMotionValue(0);
-  const focus4 = useMotionValue(0);
-  const focus5 = useMotionValue(0);
-  const focusValues = useMemo(() => [focus0, focus1, focus2, focus3, focus4, focus5], [focus0, focus1, focus2, focus3, focus4, focus5]);
-
-  // Top-level transforms for Hook compliance
-  const opacity0_line = useTransform(focus0, (f) => 0.04 + f * 0.15);
-  const opacity0_pulse = useTransform(focus0, (f) => 0.08 + f * 0.35);
-  const opacity0_volume = useTransform(focus0, (f) => 0.012 + f * 0.035);
-  const scale0_volume = useTransform(focus0, (f) => 0.9 + f * 0.15);
-  const opacity0_node1 = useTransform(focus0, (f) => 0.15 + f * 0.55);
-  const opacity0_node2 = useTransform(focus0, (f) => 0.05 + f * 0.25);
-  const scale0_node2 = useTransform(focus0, (f) => 0.9 + f * 0.3);
-
-  const opacity1_line = useTransform(focus1, (f) => 0.04 + f * 0.15);
-  const opacity1_pulse = useTransform(focus1, (f) => 0.08 + f * 0.35);
-  const opacity1_volume = useTransform(focus1, (f) => 0.012 + f * 0.035);
-  const scale1_volume = useTransform(focus1, (f) => 0.9 + f * 0.15);
-  const opacity1_node1 = useTransform(focus1, (f) => 0.15 + f * 0.55);
-  const opacity1_node2 = useTransform(focus1, (f) => 0.05 + f * 0.25);
-  const scale1_node2 = useTransform(focus1, (f) => 0.9 + f * 0.3);
-
-  const opacity2_line = useTransform(focus2, (f) => 0.04 + f * 0.15);
-  const opacity2_pulse = useTransform(focus2, (f) => 0.08 + f * 0.35);
-  const opacity2_volume = useTransform(focus2, (f) => 0.012 + f * 0.035);
-  const scale2_volume = useTransform(focus2, (f) => 0.9 + f * 0.15);
-  const opacity2_node1 = useTransform(focus2, (f) => 0.15 + f * 0.55);
-  const opacity2_node2 = useTransform(focus2, (f) => 0.05 + f * 0.25);
-  const scale2_node2 = useTransform(focus2, (f) => 0.9 + f * 0.3);
-
-  const opacity3_line = useTransform(focus3, (f) => 0.04 + f * 0.15);
-  const opacity3_pulse = useTransform(focus3, (f) => 0.08 + f * 0.35);
-  const opacity3_volume = useTransform(focus3, (f) => 0.012 + f * 0.035);
-  const scale3_volume = useTransform(focus3, (f) => 0.9 + f * 0.15);
-  const opacity3_node1 = useTransform(focus3, (f) => 0.15 + f * 0.55);
-  const opacity3_node2 = useTransform(focus3, (f) => 0.05 + f * 0.25);
-  const scale3_node2 = useTransform(focus3, (f) => 0.9 + f * 0.3);
-
-  const opacity4_line = useTransform(focus4, (f) => 0.04 + f * 0.15);
-  const opacity4_pulse = useTransform(focus4, (f) => 0.08 + f * 0.35);
-  const opacity4_volume = useTransform(focus4, (f) => 0.012 + f * 0.035);
-  const scale4_volume = useTransform(focus4, (f) => 0.9 + f * 0.15);
-  const opacity4_node1 = useTransform(focus4, (f) => 0.15 + f * 0.55);
-  const opacity4_node2 = useTransform(focus4, (f) => 0.05 + f * 0.25);
-  const scale4_node2 = useTransform(focus4, (f) => 0.9 + f * 0.3);
-
-  const opacity5_line = useTransform(focus5, (f) => 0.04 + f * 0.15);
-  const opacity5_pulse = useTransform(focus5, (f) => 0.08 + f * 0.35);
-  const opacity5_volume = useTransform(focus5, (f) => 0.012 + f * 0.035);
-  const scale5_volume = useTransform(focus5, (f) => 0.9 + f * 0.15);
-  const opacity5_node1 = useTransform(focus5, (f) => 0.15 + f * 0.55);
-  const opacity5_node2 = useTransform(focus5, (f) => 0.05 + f * 0.25);
-  const scale5_node2 = useTransform(focus5, (f) => 0.9 + f * 0.3);
-
-  const transformGroups = [
-    { opacity_line: opacity0_line, opacity_pulse: opacity0_pulse, opacity_volume: opacity0_volume, scale_volume: scale0_volume, opacity_node1: opacity0_node1, opacity_node2: opacity0_node2, scale_node2: scale0_node2 },
-    { opacity_line: opacity1_line, opacity_pulse: opacity1_pulse, opacity_volume: opacity1_volume, scale_volume: scale1_volume, opacity_node1: opacity1_node1, opacity_node2: opacity1_node2, scale_node2: scale1_node2 },
-    { opacity_line: opacity2_line, opacity_pulse: opacity2_pulse, opacity_volume: opacity2_volume, scale_volume: scale2_volume, opacity_node1: opacity2_node1, opacity_node2: opacity2_node2, scale_node2: scale2_node2 },
-    { opacity_line: opacity3_line, opacity_pulse: opacity3_pulse, opacity_volume: opacity3_volume, scale_volume: scale3_volume, opacity_node1: opacity3_node1, opacity_node2: opacity3_node2, scale_node2: scale3_node2 },
-    { opacity_line: opacity4_line, opacity_pulse: opacity4_pulse, opacity_volume: opacity4_volume, scale_volume: scale4_volume, opacity_node1: opacity4_node1, opacity_node2: opacity4_node2, scale_node2: scale4_node2 },
-    { opacity_line: opacity5_line, opacity_pulse: opacity5_pulse, opacity_volume: opacity5_volume, scale_volume: scale5_volume, opacity_node1: opacity5_node1, opacity_node2: opacity5_node2, scale_node2: scale5_node2 },
-  ];
+  const [focusValues, setFocusValues] = useState([]);
 
   // Track scroll velocity to dynamically illuminate the network
   const scrollVelocity = useVelocity(scrollYProgress || { get: () => 0 });
@@ -100,17 +35,23 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
     const section = document.getElementById("projects");
     if (!section) return;
 
+    let rect = null;
+
     const handleMouseMove = (e) => {
-      const rect = section.getBoundingClientRect();
+      if (!rect) {
+        rect = section.getBoundingClientRect();
+      }
       mouseX.set(e.clientX - rect.left);
       mouseY.set(e.clientY - rect.top);
     };
 
     const handleMouseEnter = () => {
+      rect = section.getBoundingClientRect();
       animate(hoverOpacity, 1, { duration: 0.3 });
     };
 
     const handleMouseLeave = () => {
+      rect = null;
       animate(hoverOpacity, 0, { duration: 0.4 });
     };
 
@@ -159,6 +100,13 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
       });
 
       setItemPositions(positions);
+      setFocusValues((prev) => {
+        const next = [...prev];
+        while (next.length < positions.length) {
+          next.push(motionValue(0));
+        }
+        return next.slice(0, positions.length);
+      });
     };
 
     updatePositions();
@@ -166,12 +114,10 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
     // Periodically re-measure to handle images loading in or layout adjustments
     const timer = setTimeout(updatePositions, 300);
     window.addEventListener("resize", updatePositions);
-    window.addEventListener("scroll", updatePositions, { passive: true });
 
     return () => {
       clearTimeout(timer);
       window.removeEventListener("resize", updatePositions);
-      window.removeEventListener("scroll", updatePositions);
     };
   }, [activeCategory, isMobileView]);
 
@@ -180,32 +126,35 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
     let ticking = false;
 
     const checkProximity = () => {
-      let cards = cardsRef.current;
-      if (!cards || !cards.length) {
-        cards = Array.from(document.querySelectorAll(".group\\/item"));
-        cardsRef.current = cards;
-      }
-      if (!cards.length) {
+      const section = document.getElementById("projects");
+      if (!section) {
         ticking = false;
         return;
       }
-
+      
       const centerY = window.innerHeight / 2;
 
-      cards.forEach((card, index) => {
-        if (index >= focusValues.length) return;
-        const rect = card.getBoundingClientRect();
-        const cardCenter = rect.top + rect.height / 2;
-        
-        // Target vertical falloff range (focused within 55% of viewport height)
-        const falloffRange = window.innerHeight * 0.55;
-        const distance = Math.abs(cardCenter - centerY);
-        const focusFactor = Math.max(0, 1 - distance / falloffRange);
-        
-        // Sharp cubic curve for selective lighting
-        const easedFocus = Math.pow(focusFactor, 2.5);
-        focusValues[index].set(isReducedMotion ? 1 : easedFocus);
-      });
+      // Use pre-measured itemPositions to calculate vertical centers to avoid card getBoundingClientRect calls
+      if (itemPositions && itemPositions.length > 0) {
+        const sectionRect = section.getBoundingClientRect();
+
+        itemPositions.forEach((pos, index) => {
+          const focusVal = focusValues[index];
+          if (!focusVal) return;
+          
+          // Math-based card center: section top + static vertical offset + half height
+          const cardCenter = sectionRect.top + pos.top + pos.height / 2;
+          
+          // Target vertical falloff range (focused within 55% of viewport height)
+          const falloffRange = window.innerHeight * 0.55;
+          const distance = Math.abs(cardCenter - centerY);
+          const focusFactor = Math.max(0, 1 - distance / falloffRange);
+          
+          // Sharp cubic curve for selective lighting
+          const easedFocus = Math.pow(focusFactor, 2.5);
+          focusVal.set(isReducedMotion ? 1 : easedFocus);
+        });
+      }
 
       ticking = false;
     };
@@ -391,75 +340,18 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
           }}
         >
           {itemPositions.map((pos, index) => {
-            if (index >= transformGroups.length) return null;
-            
-            const centerY = pos.centerY;
-            const pathData = isMobileView
-              ? `M ${spineX} ${centerY} L ${pos.left} ${centerY}`
-              : pos.isLeft
-                ? `M ${spineX} ${centerY} L ${spineX - 15} ${centerY} L ${spineX - 35} ${centerY - 15} L ${pos.left + pos.width} ${centerY - 15}`
-                : `M ${spineX} ${centerY} L ${spineX + 15} ${centerY} L ${spineX + 35} ${centerY + 15} L ${pos.left} ${centerY + 15}`;
-
-            const nodeX = isMobileView ? 0 : pos.isLeft ? spineX - 35 : spineX + 35;
-            const nodeY = isMobileView ? 0 : pos.isLeft ? centerY - 15 : centerY + 15;
-            const tg = transformGroups[index];
-
+            const focusVal = focusValues[index];
+            if (!focusVal) return null;
             return (
-              <g key={`network-group-${index}`}>
-                {/* Thin connection path */}
-                <motion.path
-                  d={pathData}
-                  stroke="var(--accent)"
-                  strokeWidth="1"
-                  fill="none"
-                  style={{
-                    opacity: tg.opacity_line,
-                  }}
-                />
-
-                {/* Animated data pulse dash flowing along path */}
-                {!isReducedMotion && (
-                  <motion.path
-                    d={pathData}
-                    stroke="var(--accent)"
-                    strokeWidth="1.5"
-                    fill="none"
-                    strokeDasharray="6 45"
-                    style={{
-                      opacity: tg.opacity_pulse,
-                      animation: `data-flow-forward ${6 + index * 1.5}s linear infinite`,
-                      animationDelay: `${index * 0.4}s`,
-                    }}
-                  />
-                )}
-
-                {/* Micro-nodes (connection junctions) */}
-                {!isMobileView && (
-                  <>
-                    <motion.circle
-                      cx={nodeX}
-                      cy={nodeY}
-                      r="2"
-                      fill="var(--accent)"
-                      style={{
-                        opacity: tg.opacity_node1,
-                      }}
-                    />
-                    <motion.circle
-                      cx={nodeX}
-                      cy={nodeY}
-                      r="4.5"
-                      stroke="var(--accent)"
-                      strokeWidth="1"
-                      fill="none"
-                      style={{
-                        opacity: tg.opacity_node2,
-                        scale: tg.scale_node2,
-                      }}
-                    />
-                  </>
-                )}
-              </g>
+              <ProjectConnectionLine
+                key={`network-group-${index}`}
+                focusVal={focusVal}
+                pos={pos}
+                index={index}
+                spineX={spineX}
+                isMobileView={isMobileView}
+                isReducedMotion={isReducedMotion}
+              />
             );
           })}
         </motion.svg>
@@ -468,28 +360,14 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
       {/* ─── Layer 4 & 6: Atmospheric Light Volumes & Focus Zone ─── */}
       <div className="absolute inset-0 -z-25 pointer-events-none overflow-hidden select-none">
         {itemPositions.map((pos, index) => {
-          if (index >= transformGroups.length) return null;
-          
-          const tg = transformGroups[index];
-          const size = isMobileView ? 280 : 520;
-          
-          // Position atmospheric volume directly behind the center of the card
-          const left = pos.centerX - size / 2;
-          const top = pos.centerY - size / 2;
-
+          const focusVal = focusValues[index];
+          if (!focusVal) return null;
           return (
-            <motion.div
+            <ProjectLightVolume
               key={`light-volume-${index}`}
-              className="absolute rounded-full pointer-events-none blur-[120px] will-change-transform"
-              style={{
-                left,
-                top,
-                width: `${size}px`,
-                height: `${size}px`,
-                background: `radial-gradient(circle, color-mix(in srgb, var(--accent) 14%, transparent) 0%, transparent 70%)`,
-                opacity: tg.opacity_volume,
-                scale: tg.scale_volume,
-              }}
+              focusVal={focusVal}
+              pos={pos}
+              isMobileView={isMobileView}
             />
           );
         })}
@@ -551,6 +429,106 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
         />
       </div>
     </>
+  );
+}
+
+function ProjectConnectionLine({ focusVal, pos, index, spineX, isMobileView, isReducedMotion }) {
+  const opacity_line = useTransform(focusVal, (f) => 0.04 + f * 0.15);
+  const opacity_pulse = useTransform(focusVal, (f) => 0.08 + f * 0.35);
+  const opacity_node1 = useTransform(focusVal, (f) => 0.15 + f * 0.55);
+  const opacity_node2 = useTransform(focusVal, (f) => 0.05 + f * 0.25);
+  const scale_node2 = useTransform(focusVal, (f) => 0.9 + f * 0.3);
+
+  const centerY = pos.centerY;
+  const pathData = isMobileView
+    ? `M ${spineX} ${centerY} L ${pos.left} ${centerY}`
+    : pos.isLeft
+      ? `M ${spineX} ${centerY} L ${spineX - 15} ${centerY} L ${spineX - 35} ${centerY - 15} L ${pos.left + pos.width} ${centerY - 15}`
+      : `M ${spineX} ${centerY} L ${spineX + 15} ${centerY} L ${spineX + 35} ${centerY + 15} L ${pos.left} ${centerY + 15}`;
+
+  const nodeX = isMobileView ? 0 : pos.isLeft ? spineX - 35 : spineX + 35;
+  const nodeY = isMobileView ? 0 : pos.isLeft ? centerY - 15 : centerY + 15;
+
+  return (
+    <g>
+      {/* Thin connection path */}
+      <motion.path
+        d={pathData}
+        stroke="var(--accent)"
+        strokeWidth="1"
+        fill="none"
+        style={{
+          opacity: opacity_line,
+        }}
+      />
+
+      {/* Animated data pulse dash flowing along path */}
+      {!isReducedMotion && (
+        <motion.path
+          d={pathData}
+          stroke="var(--accent)"
+          strokeWidth="1.5"
+          fill="none"
+          strokeDasharray="6 45"
+          style={{
+            opacity: opacity_pulse,
+            animation: `data-flow-forward ${6 + index * 1.5}s linear infinite`,
+            animationDelay: `${index * 0.4}s`,
+          }}
+        />
+      )}
+
+      {/* Micro-nodes (connection junctions) */}
+      {!isMobileView && (
+        <>
+          <motion.circle
+            cx={nodeX}
+            cy={nodeY}
+            r="2"
+            fill="var(--accent)"
+            style={{
+              opacity: opacity_node1,
+            }}
+          />
+          <motion.circle
+            cx={nodeX}
+            cy={nodeY}
+            r="4.5"
+            stroke="var(--accent)"
+            strokeWidth="1"
+            fill="none"
+            style={{
+              opacity: opacity_node2,
+              scale: scale_node2,
+            }}
+          />
+        </>
+      )}
+    </g>
+  );
+}
+
+function ProjectLightVolume({ focusVal, pos, isMobileView }) {
+  const opacity_volume = useTransform(focusVal, (f) => 0.012 + f * 0.035);
+  const scale_volume = useTransform(focusVal, (f) => 0.9 + f * 0.15);
+
+  const size = isMobileView ? 280 : 520;
+  const left = pos.centerX - size / 2;
+  const top = pos.centerY - size / 2;
+
+  return (
+    <motion.div
+      className="absolute rounded-full pointer-events-none blur-[120px] will-change-transform"
+      style={{
+        left,
+        top,
+        width: `${size}px`,
+        height: `${size}px`,
+        background: `radial-gradient(circle, color-mix(in srgb, var(--accent) 14%, transparent) 0%, transparent 70%)`,
+        opacity: opacity_volume,
+        scale: scale_volume,
+      }}
+    />
   );
 }
 

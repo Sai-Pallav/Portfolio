@@ -1,5 +1,14 @@
 import { motion } from 'framer-motion'
-import { useRef, memo } from 'react'
+import { memo, useId } from 'react'
+
+// Pre-calculate energy particle coordinates statically to prevent trigonometry overhead during render
+const CORE_PARTICLES = Array.from({ length: 8 }).map((_, i) => {
+  const angleRad = (i * 45 * Math.PI) / 180
+  return {
+    cx: 112 + Math.cos(angleRad) * 80,
+    cy: 112 + Math.sin(angleRad) * 80,
+  }
+})
 
 /**
  * Central Career Core - A glowing energy source with rotating rings and pulsing effects.
@@ -8,7 +17,8 @@ import { useRef, memo } from 'react'
  * @param {{ isActive: boolean }} props
  */
 const CareerCore = memo(function CareerCore({ isActive }) {
-  const uid = useRef(`career-core-${Math.random().toString(36).slice(2)}`).current
+  const idSuffix = useId().replace(/:/g, '')
+  const uid = `career-core-${idSuffix}`
   return (
     <div className="relative flex items-center justify-center">
       {/* Outer glow effect */}
@@ -176,11 +186,11 @@ const CareerCore = memo(function CareerCore({ isActive }) {
         
         {/* Energy particles */}
         <svg className="absolute inset-0 pointer-events-none" viewBox="0 0 224 224" aria-hidden="true">
-          {[...Array(8)].map((_, i) => (
+          {CORE_PARTICLES.map((particle, i) => (
             <motion.circle
               key={i}
-              cx={112 + Math.cos((i * 45) * Math.PI / 180) * 80}
-              cy={112 + Math.sin((i * 45) * Math.PI / 180) * 80}
+              cx={particle.cx}
+              cy={particle.cy}
               r="2"
               fill="var(--accent)"
               animate={{

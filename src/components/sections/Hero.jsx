@@ -1,407 +1,232 @@
-import { useRef } from 'react'
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { useRef, memo, useMemo } from 'react'
+import { motion, useScroll, useTransform, useReducedMotion, useInView } from 'framer-motion'
 import { personal } from '@/data/personal'
-import SocialIcon from '@/components/ui/SocialIcon'
-import useTypewriter from '@/hooks/useTypewriter'
-import { useRevealAnimation } from '@/hooks/useScrollTrigger'
+
+// Static absolute paths matching index.html preloads to prevent hashing and enable parallel fetching
+const heroPortrait = '/hero-portrait.webp'
+const heroPortraitMobile = '/hero-portrait-mobile.webp'
+const heroPortraitAlternate = '/hero-portrait-alternate.webp'
 
 /**
- * Modern Futuristic Hero Section
- * Features: Particle background, gradient text, glassmorphism cards, smooth animations
+ * Ultra-Optimized Cinematic Premium Hero Section
+ * 
+ * Performance & Rendering Tuning:
+ * - Suspends floats, sweeps, and active animations when scrolled out of view using useInView.
+ * - Extracts and memoizes all inline style objects to guarantee referential stability and prevent GC pressure.
+ * - Promotes portrait and parallax elements to GPU hardware-accelerated layers (will-change).
+ * - Implements responsive WebP loading via standard HTML5 <picture> serving static, preloaded assets.
+ * - Full prefers-reduced-motion accessibility integration.
+ * - Wrapped in React.memo() to insulate the Hero from parent layout updates.
  */
-// Isolated Typewriter component to prevent high-frequency text changes from re-rendering the entire Hero section
-function TypewriterRole() {
-  const displayText = useTypewriter(personal.typewriterRoles)
-  return (
-    <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold" style={{ color: 'var(--text-secondary)' }}>
-      {displayText}
-      <motion.span
-        animate={{ opacity: [1, 0, 1] }}
-        transition={{ duration: 0.8, repeat: Infinity }}
-        className="inline-block w-1 h-8 md:h-10 ml-2 rounded-full"
-        style={{ 
-          background: 'var(--accent)',
-          boxShadow: '0 0 20px var(--accent)'
-        }}
-      />
-    </h2>
-  )
-}
-
 function Hero() {
+  const containerRef = useRef(null)
   const { scrollY } = useScroll()
-  const y = useTransform(scrollY, [0, 500], [0, 150])
-  const opacity = useTransform(scrollY, [0, 600, 800], [1, 1, 0])
-  const contentRef = useRef(null)
+  const shouldReduceMotion = useReducedMotion()
 
-  useRevealAnimation(contentRef, { delay: 0.2, duration: 1 })
+  // Track if the Hero is in the active viewport (suspends loops when off-screen)
+  const isInView = useInView(containerRef, { amount: 0.05 })
+
+  // Parallax translation (suspended/static if OS prefers reduced motion)
+  const yTransform = useTransform(scrollY, [0, 800], [0, shouldReduceMotion ? 0 : -100])
+  const opacityTransform = useTransform(scrollY, [0, 600], [1, 0])
+
+  // Memoized referentially-stable style structures to avoid object recreation on render passes
+  const backgroundStyle = useMemo(() => ({
+    background: 'radial-gradient(circle at center, transparent 40%, var(--bg) 100%), var(--hero-ambient-glow), var(--bg)',
+    willChange: 'transform, opacity',
+    transform: 'translate3d(0, 0, 0)',
+  }), [])
+
+  const noiseStyle = useMemo(() => ({
+    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+    opacity: 'var(--hero-noise-opacity)',
+    willChange: 'opacity, transform',
+    transform: 'translate3d(0, 0, 0)',
+  }), [])
+
+  const bottomGradientStyle = useMemo(() => ({
+    background: 'linear-gradient(to top, var(--bg) 0%, transparent 100%)',
+    willChange: 'transform',
+    transform: 'translate3d(0, 0, 0)',
+  }), [])
+
+  const imageStyle = useMemo(() => ({
+    mixBlendMode: 'var(--hero-img-blend)',
+    opacity: 'var(--hero-img-opacity)',
+    WebkitMaskImage: 'radial-gradient(ellipse at 50% 45%, black 20%, transparent 75%)',
+    maskImage: 'radial-gradient(ellipse at 50% 45%, black 20%, transparent 75%)',
+    willChange: 'transform, opacity',
+    backfaceVisibility: 'hidden',
+    transform: 'translate3d(0, 0, 0)',
+  }), [])
 
   return (
     <section
       id="hero"
-      className="relative min-h-screen flex items-center justify-center overflow-hidden bg-bg"
+      ref={containerRef}
+      className="relative min-h-screen w-full flex items-center justify-start overflow-hidden bg-bg"
     >
-      {/* Animated Background */}
-      <div className="absolute inset-0 -z-10">
-        {/* Base gradient uses theme background */}
-        <div className="absolute inset-0" style={{ background: 'var(--bg)' }} />
-        
-        {/* Animated grid */}
-        <motion.div
-          animate={{
-            backgroundPosition: ['0% 0%', '100% 100%'],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            repeatType: 'reverse',
-            ease: 'linear',
-          }}
-          className="absolute inset-0 opacity-20"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, var(--accent) 1px, transparent 1px),
-              linear-gradient(to bottom, var(--accent) 1px, transparent 1px)
-            `,
-            backgroundSize: '100px 100px',
-            opacity: 0.1,
-          }}
+      {/* Background Environment Layers (Consolidated to 2 layers for compositing efficiency) */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        {/* Layer 1: Consolidated Background (Base + Theme Accent Glow + Vignette) */}
+        <div 
+          className="absolute inset-0 hero-background-env"
+          style={backgroundStyle} 
         />
-        
-        {/* Floating orbs using theme accent color */}
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            x: [0, 100, 0],
-            y: [0, -50, 0],
-          }}
-          transition={{
-            duration: 15,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-          className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl"
-          style={{ background: 'var(--accent)', opacity: 0.15 }}
-        />
-        <motion.div
-          animate={{
-            scale: [1.2, 1, 1.2],
-            x: [0, -80, 0],
-            y: [0, 80, 0],
-          }}
-          transition={{
-            duration: 18,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 2,
-          }}
-          className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-3xl"
-          style={{ background: 'var(--accent-hover)', opacity: 0.12 }}
-        />
-        <motion.div
-          animate={{
-            scale: [1, 1.3, 1],
-            x: [0, -60, 0],
-            y: [0, -80, 0],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 4,
-          }}
-          className="absolute top-1/2 right-1/3 w-80 h-80 rounded-full blur-3xl"
-          style={{ background: 'var(--accent)', opacity: 0.1 }}
+
+        {/* Layer 2: Film Grain Noise Overlay */}
+        <div 
+          className="absolute inset-0 pointer-events-none hero-noise-overlay"
+          style={noiseStyle}
         />
       </div>
 
-      {/* Main Content */}
-      <motion.div
-        ref={contentRef}
-        style={{ y, opacity }}
-        className="relative z-10 max-w-7xl mx-auto px-6 py-20"
-      >
-        <div className="text-center space-y-8">
-          {/* Available Badge */}
+      {/* Primary Layer: Masked Portrait Image (Responsive WebP, Eager Loading, Stable Dimensions) */}
+      <div className="absolute right-0 bottom-0 top-0 w-full md:w-[60%] h-full z-10 pointer-events-none flex items-end justify-center md:justify-end overflow-hidden">
+        <motion.div
+          style={{ y: yTransform, opacity: opacityTransform, willChange: 'transform, opacity' }}
+          className="relative w-[90%] md:w-[85%] h-[75vh] md:h-[90vh] flex items-end justify-center"
+        >
+          {/* Nested Motion Div to prevent transform conflicts between Parallax scroll and Floating animations */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
-            className="flex justify-center"
+            animate={isInView && !shouldReduceMotion ? {
+              y: [0, -8, 0],
+            } : {}}
+            transition={isInView && !shouldReduceMotion ? {
+              y: {
+                duration: 8,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }
+            } : {}}
+            style={{ willChange: 'transform' }}
+            className="w-full h-full flex items-end justify-center"
           >
-            <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full border shadow-lg"
-                 style={{ 
-                   background: 'var(--bg-surface)', 
-                   borderColor: 'var(--border-glow)',
-                   boxShadow: '0 4px 20px var(--accent-dim)'
-                 }}>
-              <motion.div
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [1, 0.5, 1],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-                className="relative"
-              >
-                <div className="w-3 h-3 rounded-full" style={{ background: 'var(--success)' }} />
-                <div className="absolute inset-0 w-3 h-3 rounded-full animate-ping" style={{ background: 'var(--success)' }} />
-              </motion.div>
-              <span className="font-medium text-sm tracking-wider" style={{ color: 'var(--accent)' }}>
-                AVAILABLE FOR OPPORTUNITIES
-              </span>
-            </div>
+            <picture className="w-full h-full object-cover">
+              <source srcSet={heroPortraitMobile} media="(max-width: 768px)" type="image/webp" />
+              <source srcSet={heroPortrait} type="image/webp" />
+              <motion.img
+                src={heroPortrait}
+                alt={personal.name}
+                width={1024}
+                height={1024}
+                loading="eager"
+                decoding="async"
+                data-portal-portrait="true"
+                data-portal-image={heroPortraitAlternate}
+                initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 1.05 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 1.8, ease: [0.16, 1, 0.3, 1] }}
+                className="w-full h-full object-cover object-center hero-portrait-img pointer-events-auto"
+                style={imageStyle}
+              />
+            </picture>
           </motion.div>
+          
+          {/* Subtle bottom gradient to blend image edge into background */}
+          <div 
+            className="absolute inset-x-0 bottom-0 h-32 pointer-events-none z-20"
+            style={bottomGradientStyle}
+          />
+        </motion.div>
+      </div>
 
-          {/* Main Heading */}
+      {/* Secondary Layer: Personal Branding Content */}
+      <div className="relative z-20 max-w-7xl w-full mx-auto px-6 md:px-12 lg:px-20 py-20 flex items-center justify-start pointer-events-none">
+        <div className="flex flex-col justify-center h-full max-w-xl md:max-w-2xl relative pointer-events-none">
+          
+          {/* Top Branding / Logo */}
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
-            className="space-y-4"
+            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+            className="mb-6 font-mono text-xs tracking-[0.2em] font-bold uppercase pointer-events-auto"
+            style={{ color: 'var(--accent)' }}
           >
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold">
-              <motion.span
-                className="block"
-                style={{ color: 'var(--text-heading)' }}
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3, duration: 0.8 }}
-              >
-                Hi, I'm
-              </motion.span>
-              <motion.span
-                className="block bg-gradient-to-r bg-clip-text text-transparent"
-                style={{ 
-                  backgroundImage: `linear-gradient(to right, var(--accent), var(--accent-hover))`,
-                  filter: `drop-shadow(0 0 30px var(--accent-dim))`
-                }}
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4, duration: 0.8 }}
-              >
-                {personal.name}
-              </motion.span>
-            </h1>
+            {personal.firstName} // Portfolio 2026
           </motion.div>
 
-          {/* Typewriter Role */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="flex justify-center"
+          {/* Name - Elegant Big Typography */}
+          <motion.h1
+            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl font-bold font-heading leading-[0.95] tracking-tighter pointer-events-auto"
+            style={{ color: 'var(--text-heading)' }}
           >
-            <div className="relative inline-block">
-              <div className="absolute inset-0 blur-2xl" style={{ background: 'var(--accent-dim)' }} />
-              <div className="relative px-8 py-4 rounded-2xl border"
-                   style={{ 
-                     background: 'var(--bg-surface)', 
-                     borderColor: 'var(--border)',
-                     opacity: 0.95
-                   }}>
-                <TypewriterRole />
-              </div>
-            </div>
-          </motion.div>
+            {personal.name}
+          </motion.h1>
 
-          {/* Tagline */}
+          {/* Role */}
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.8 }}
-            className="text-lg md:text-xl max-w-3xl mx-auto leading-relaxed"
-            style={{ color: 'var(--text-muted)' }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
+            className="text-lg sm:text-xl md:text-2xl font-medium mt-6 mb-3 tracking-wide pointer-events-auto"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {personal.role}
+          </motion.p>
+
+          {/* Short Positioning Statement */}
+          <motion.p
+            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}
+            className="text-sm sm:text-base md:text-lg leading-relaxed max-w-md font-body pointer-events-auto"
+            style={{ color: 'var(--text-secondary)' }}
           >
             {personal.tagline}
           </motion.p>
-
-          {/* Info Cards */}
+          
+          {/* Subtle CTA link */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.8 }}
-            className="flex flex-wrap justify-center gap-4 pt-4"
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.65 }}
+            className="mt-10 flex items-center gap-4 pointer-events-auto"
           >
-            <InfoCard
-              icon={
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              }
-              text={personal.location}
-            />
-            <InfoCard
-              icon={
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                </svg>
-              }
-              text={personal.university}
-            />
-            <InfoCard
-              icon={
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                </svg>
-              }
-              text={`CGPA: ${personal.cgpa}`}
-            />
-          </motion.div>
-
-          {/* CTA Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.8 }}
-            className="flex flex-wrap justify-center gap-4 pt-8"
-          >
-            <motion.a
-              href="#projects"
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-              className="group relative px-8 py-4 rounded-xl overflow-hidden cursor-pointer"
-              style={{ background: 'var(--accent)' }}
+            <a 
+              href="#about"
+              className="group flex items-center gap-3 text-xs uppercase tracking-[0.25em] font-semibold font-mono hover:text-[var(--accent)] transition-colors duration-300"
+              style={{ color: 'var(--text-secondary)' }}
             >
-              <motion.div
-                className="absolute inset-0"
-                style={{ background: 'var(--accent-hover)' }}
-                initial={{ x: '-100%' }}
-                whileHover={{ x: 0 }}
-                transition={{ duration: 0.3 }}
+              <span>Explore Identity</span>
+              <span 
+                className="w-8 h-[1px] group-hover:w-12 transition-all duration-300" 
+                style={{ background: 'var(--text-muted)' }}
               />
-              <span className="relative z-10 flex items-center gap-2 font-semibold text-lg"
-                    style={{ color: 'var(--accent-contrast)' }}>
-                View My Work
-                <motion.svg
-                  className="w-5 h-5"
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </motion.svg>
-              </span>
-            </motion.a>
-
-            <motion.a
-              href="#contact"
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-              className="group relative px-8 py-4 rounded-xl border-2 transition-colors cursor-pointer overflow-hidden"
-              style={{ 
-                borderColor: 'var(--border-glow)',
-                background: 'var(--bg-surface)'
-              }}
-            >
-              <motion.div
-                className="absolute inset-0"
-                style={{ background: 'var(--accent-dim)' }}
-                initial={{ scale: 0, opacity: 0 }}
-                whileHover={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              />
-              <span className="relative z-10 font-semibold text-lg"
-                    style={{ color: 'var(--accent)' }}>
-                Get In Touch
-              </span>
-            </motion.a>
-          </motion.div>
-
-          {/* Social Links */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.9, duration: 0.8 }}
-            className="flex justify-center items-center gap-4 pt-8"
-          >
-            {Object.entries(personal.socials).map(([platform, url], index) => (
-              <motion.a
-                key={platform}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{
-                  delay: 0.9 + index * 0.1,
-                  type: 'spring',
-                  stiffness: 200,
-                }}
-                whileHover={{ scale: 1.2, rotate: 5, y: -5 }}
-                whileTap={{ scale: 0.9 }}
-                className="relative p-4 rounded-xl border transition-all duration-300 group cursor-pointer"
-                style={{
-                  background: 'var(--bg-surface)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--text-secondary)'
-                }}
-                aria-label={`Visit ${platform} profile`}
-              >
-                <SocialIcon platform={platform} className="w-6 h-6 relative z-10" />
-                <motion.div
-                  className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ background: 'var(--accent-dim)' }}
-                  initial={{ scale: 0 }}
-                  whileHover={{ scale: 1 }}
-                />
-              </motion.a>
-            ))}
+            </a>
           </motion.div>
         </div>
+      </div>
 
-        {/* Scroll Indicator */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2, duration: 0.8 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2"
-        >
-          <motion.div
-            animate={{ y: [0, 10, 0] }}
-            transition={{
+      {/* Minimal Scroll-Down Indicator */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8, duration: 1.2 }}
+        className="absolute bottom-12 left-6 md:left-12 lg:left-20 z-20 flex items-center gap-4 text-[10px] font-mono tracking-[0.3em] uppercase select-none pointer-events-none"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        <span>Scroll</span>
+        <div className="w-[1px] h-12 bg-white/10 relative overflow-hidden">
+          <motion.div 
+            animate={isInView && !shouldReduceMotion ? {
+              y: [-48, 48]
+            } : {}}
+            transition={isInView && !shouldReduceMotion ? {
               duration: 2,
               repeat: Infinity,
-              ease: 'easeInOut',
-            }}
-            className="flex flex-col items-center gap-2"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <span className="text-xs font-medium tracking-widest uppercase">Scroll Down</span>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-            </svg>
-          </motion.div>
-        </motion.div>
+              ease: "easeInOut"
+            } : {}}
+            className="absolute top-0 left-0 w-full h-1/2"
+            style={{ background: 'var(--accent)' }}
+          />
+        </div>
       </motion.div>
     </section>
   )
 }
 
-/**
- * Info Card Component
- */
-function InfoCard({ icon, text }) {
-  return (
-    <motion.div
-      whileHover={{ scale: 1.05, y: -2 }}
-      className="flex items-center gap-3 px-5 py-3 rounded-xl border transition-all cursor-default"
-      style={{
-        background: 'var(--bg-surface)',
-        borderColor: 'var(--border)'
-      }}
-    >
-      <div style={{ color: 'var(--accent)' }}>{icon}</div>
-      <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{text}</span>
-    </motion.div>
-  )
-}
-
-export default Hero
+export default memo(Hero)

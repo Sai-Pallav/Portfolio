@@ -8,18 +8,15 @@ import { useState, memo } from 'react'
  * @param {{
  *   exp: Object,
  *   index: number,
- *   angle: number,
- *   radius: number,
  *   isActive: boolean,
- *   orbitAngle: number,
- *   onSelect: (index: number) => void
+ *   isDimmed: boolean,
+ *   onSelect: (index: number) => void,
+ *   nodeRef: React.Ref
  * }} props
  */
 const ExperienceNode = memo(function ExperienceNode({ 
   exp, 
   index, 
-  angle, 
-  radius, 
   isActive, 
   isDimmed = false,
   onSelect,
@@ -134,7 +131,7 @@ const ExperienceNode = memo(function ExperienceNode({
         )}
         
         {/* Focus indicator */}
-        <div className="absolute inset-0 rounded-2xl opacity-0 group-focus:opacity-100 focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg transition-opacity" />
+        <div className="absolute inset-0 rounded-2xl opacity-0 group-focus-visible:opacity-100 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-bg transition-opacity pointer-events-none" />
       </div>
     </motion.button>
   )

@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import BackToTop from '@/components/ui/BackToTop'
+import SectionIndicator from '@/components/ui/SectionIndicator'
 import CustomCursor from '@/components/ui/CustomCursor'
 import SmoothScroll from '@/components/layout/SmoothScroll'
 import Hero from '@/components/sections/Hero'
@@ -16,6 +17,7 @@ import { useScrollTrigger } from '@/hooks/useScrollTrigger'
 function App() {
   const sectionIds = useMemo(() => ['hero', 'about', 'skills', 'projects', 'experience', 'contact'], [])
   const activeSection = useScrollTrigger(sectionIds)
+  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false)
 
   return (
     <div className="relative">
@@ -27,8 +29,9 @@ function App() {
       </a>
 
       <Navbar activeSection={activeSection} />
-      <ThemeToggle />
-      <BackToTop />
+      <ThemeToggle showPicker={isThemePickerOpen} setShowPicker={setIsThemePickerOpen} />
+      <BackToTop isThemePickerOpen={isThemePickerOpen} />
+      <SectionIndicator activeSection={activeSection} />
       <CustomCursor />
 
       <SmoothScroll>

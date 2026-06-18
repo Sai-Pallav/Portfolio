@@ -15,7 +15,8 @@ function useTypewriter(roles) {
           setDisplayText(currentRole.substring(0, displayText.length + 1))
           setTypingSpeed(150)
         } else {
-          setTimeout(() => setIsDeleting(true), 2000)
+          setIsDeleting(true)
+          setTypingSpeed(2000) // Pause for 2s at the end of the word
         }
       } else {
         if (displayText.length > 0) {
@@ -24,6 +25,7 @@ function useTypewriter(roles) {
         } else {
           setIsDeleting(false)
           setRoleIndex((prev) => (prev + 1) % roles.length)
+          setTypingSpeed(500) // Pause for 0.5s before typing the next word
         }
       }
     }

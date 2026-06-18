@@ -8,11 +8,17 @@ gsap.registerPlugin(ScrollTrigger)
 
 /**
  * Smooth scroll wrapper using Lenis.
- * Syncs with GSAP ScrollTrigger so scroll-driven animations stay accurate.
+ *
+ * - Single Lenis instance, exposed globally as `window.lenis`
+ * - GSAP drives the RAF loop (autoRaf: false) so Lenis and
+ *   ScrollTrigger stay perfectly synchronized on every frame.
+ * - Lenis scroll events feed ScrollTrigger.update for accurate
+ *   trigger position tracking.
  */
 function SmoothScroll({ children }) {
   useEffect(() => {
     const lenis = new Lenis({
+      autoRaf: false,
       lerp: 0.1,
       smoothWheel: true,
       wheelMultiplier: 1,
@@ -20,11 +26,16 @@ function SmoothScroll({ children }) {
       infinite: false,
     })
 
+    // Expose globally so other modules (useCinematicNav, BackToTop, etc.)
+    // can call lenis.scrollTo / lenis.stop / lenis.start directly.
     window.lenis = lenis
 
+    // Pipe every Lenis scroll frame into ScrollTrigger
     lenis.on('scroll', ScrollTrigger.update)
     ScrollTrigger.refresh()
 
+    // Let GSAP's ticker drive Lenis instead of a separate rAF loop.
+    // This guarantees both systems read the same timestamp.
     const tickerCallback = (time) => {
       lenis.raf(time * 1000)
     }

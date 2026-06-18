@@ -23,31 +23,21 @@ export default defineConfig({
         drop_debugger: true
       }
     },
-    rolldownOptions: {
+    rollupOptions: {
       output: {
-        codeSplitting: {
-          groups: [
-            {
-              name: 'react-vendor',
-              test: /node_modules[\\/](react|react-dom)/,
-              priority: 30,
-            },
-            {
-              name: 'motion-vendor',
-              test: /node_modules[\\/](framer-motion|motion)/,
-              priority: 25,
-            },
-            {
-              name: 'three-bundle',
-              test: /node_modules[\\/](three|@react-three|@dimforge|meshline|three-stdlib|hls\.js|stats-gl|fflate)/,
-              priority: 20,
-            },
-            {
-              name: 'vendor',
-              test: /node_modules/,
-              priority: 10,
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('three') || id.includes('@react-three') || id.includes('meshline') || id.includes('@dimforge') || id.includes('three-stdlib')) {
+              return 'three-bundle';
             }
-          ]
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+              return 'react-vendor';
+            }
+            if (id.includes('framer-motion') || id.includes('motion') || id.includes('gsap') || id.includes('lenis')) {
+              return 'motion-vendor';
+            }
+            return 'vendor';
+          }
         }
       }
     },

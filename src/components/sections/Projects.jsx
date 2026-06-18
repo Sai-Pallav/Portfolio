@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useMemo } from "react";
-import { motion, useReducedMotion, useScroll, useMotionValue, useInView, animate } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useMotionValue, animate } from "framer-motion";
 import { projects } from "@/data/projects";
 import { personal } from "@/data/personal.jsx";
 import SocialIcon from "@/components/ui/SocialIcon";
@@ -28,7 +28,7 @@ function Projects() {
   const containerRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false);
   const prefersReducedMotion = useReducedMotion();
-  const timelineInView = useInView(containerRef, { once: true, margin: "-100px" });
+  const timelineInView = true;
 
   const [activeCategory, setActiveCategory] = useState("all");
 
@@ -120,19 +120,18 @@ function Projects() {
       {/* ─── Section Header ─── */}
       <div className="max-w-7xl mx-auto px-6 pt-28 md:pt-32 pb-8 text-center animate-fade-in">
         {/* Animated badge */}
-        <div className="inline-flex items-center gap-3.5 mb-6">
+        <div className="inline-flex items-center gap-2.5 mb-6">
           <div
-            className="h-[1px] rounded-full opacity-40"
-            style={{ width: '40px', background: 'linear-gradient(90deg, transparent, var(--accent))' }}
+            className="h-[1px] rounded-full opacity-20"
+            style={{ width: '30px', background: 'linear-gradient(90deg, transparent, var(--accent))' }}
           />
           <span
-            className="font-mono text-[10px] md:text-xs tracking-[0.25em] uppercase px-4.5 py-1.5 rounded-full border flex items-center gap-2"
+            className="font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase px-4 py-1.5 rounded-full border flex items-center gap-2"
             style={{
               color: "var(--accent)",
               borderColor: 'rgba(255,255,255,0.06)',
               background: 'rgba(255,255,255,0.01)',
               backdropFilter: 'blur(8px)',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
             }}
           >
             <span className="relative flex h-1.5 w-1.5">
@@ -142,8 +141,8 @@ function Projects() {
             Featured Work
           </span>
           <div
-            className="h-[1px] rounded-full opacity-40"
-            style={{ width: '40px', background: 'linear-gradient(90deg, var(--accent), transparent)' }}
+            className="h-[1px] rounded-full opacity-20"
+            style={{ width: '30px', background: 'linear-gradient(90deg, var(--accent), transparent)' }}
           />
         </div>
 
@@ -157,17 +156,16 @@ function Projects() {
           <span className="relative inline-block" style={{ color: "var(--accent)" }}>
             Timeline
             <span
-              className="absolute -bottom-1 left-0 h-[3px] rounded-full"
+              className="absolute -bottom-1 left-0 h-[1px] rounded-full"
               style={{
                 width: '100%',
                 background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
-                filter: 'drop-shadow(0 0 4px var(--accent))',
               }}
             />
           </span>
         </h2>
         <p
-          className="text-base md:text-lg max-w-xl mx-auto leading-relaxed"
+          className="text-base md:text-lg max-w-xl mx-auto leading-relaxed opacity-80"
           style={{ color: "var(--text-secondary)" }}
         >
           A cinematic journey through innovative solutions and technical
@@ -176,29 +174,28 @@ function Projects() {
 
         {/* Stats Row Redesigned as Glassmorphic Cards */}
         <div
-          className="flex flex-wrap items-center justify-center gap-4.5 mt-10"
+          className="flex flex-wrap items-center justify-center gap-4 mt-10"
           role="group"
           aria-label="Project statistics"
         >
           {stats.map((stat, i) => (
             <div
               key={i}
-              className="px-6 py-4.5 rounded-xl border border-white/[0.03] transition-all duration-300 hover:border-[var(--accent)]/30 hover:scale-105 min-w-[130px] text-center backdrop-blur-md"
+              className="px-6 py-4 rounded-xl border border-white/[0.04] transition-all duration-300 hover:border-[var(--accent)]/30 hover:bg-white/[0.02] min-w-[130px] text-center backdrop-blur-md"
               style={{
-                background: 'rgba(255, 255, 255, 0.01)',
+                background: 'rgba(24, 24, 27, 0.15)',
               }}
             >
               <div
                 className="font-heading text-2xl md:text-3xl font-bold mb-0.5"
                 style={{
                   color: 'var(--accent)',
-                  textShadow: '0 0 10px var(--accent-dim)',
                 }}
               >
                 {stat.value}
               </div>
               <div
-                className="font-mono text-[9px] md:text-[10px] tracking-[0.2em] uppercase"
+                className="font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase"
                 style={{ color: 'var(--text-secondary)' }}
               >
                 {stat.label}
@@ -211,10 +208,9 @@ function Projects() {
       {/* Category Filter Tabs */}
       <div className="flex justify-center items-center mt-12 mb-8 animate-fade-in">
         <div 
-          className="inline-flex p-1.5 rounded-full border border-white/[0.04] backdrop-blur-md relative"
+          className="inline-flex p-1 rounded-full border border-white/[0.05] backdrop-blur-md relative"
           style={{
-            background: "rgba(255, 255, 255, 0.01)",
-            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+            background: "rgba(10, 10, 11, 0.4)",
           }}
         >
           {CATEGORIES.map((cat) => {
@@ -223,7 +219,7 @@ function Projects() {
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className="relative px-5 py-2.5 font-mono text-[10px] md:text-xs tracking-wider uppercase rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:ring-offset-1 focus:ring-offset-black z-10"
+                className="relative px-4 py-2 font-mono text-[9px] md:text-[10px] tracking-[0.12em] uppercase rounded-full transition-colors duration-300 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30 focus:ring-offset-1 focus:ring-offset-black z-10"
                 style={{
                   color: isActive ? "var(--accent-contrast)" : "var(--text-secondary)",
                 }}
@@ -234,7 +230,6 @@ function Projects() {
                     className="absolute inset-0 rounded-full z-[-1]"
                     style={{
                       background: "var(--accent)",
-                      boxShadow: "0 0 12px var(--accent-dim)",
                     }}
                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                   />
@@ -341,10 +336,10 @@ function Projects() {
       {/* ─── GitHub CTA ─── */}
       <div className="max-w-3xl mx-auto px-6 py-28 md:py-32 text-center">
         <div
-          className="relative rounded-2xl border p-8 md:p-12 overflow-hidden group/cta transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--accent-dim)]"
+          className="relative rounded-2xl border p-8 md:p-12 overflow-hidden group/cta transition-all duration-500 hover:border-white/10"
           style={{
             background:
-              "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%)",
+              "linear-gradient(135deg, rgba(24, 24, 27, 0.4) 0%, rgba(24, 24, 27, 0.1) 100%)",
             borderColor: "rgba(255,255,255,0.05)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
@@ -352,8 +347,7 @@ function Projects() {
         >
           <SocialIcon
             platform="github"
-            className="w-14 h-14 mx-auto mb-5 text-[var(--accent)] relative z-10 transition-transform duration-300 group-hover/cta:scale-110"
-            style={{ filter: "drop-shadow(0 0 10px var(--accent-dim))" }}
+            className="w-14 h-14 mx-auto mb-5 text-[var(--accent)] relative z-10 transition-transform duration-300 group-hover/cta:scale-105"
           />
           <h3
             className="font-heading text-2xl md:text-3xl font-bold mb-3 relative z-10"
@@ -362,7 +356,7 @@ function Projects() {
             More on GitHub
           </h3>
           <p
-            className="mb-6 max-w-lg mx-auto text-sm relative z-10"
+            className="mb-6 max-w-lg mx-auto text-sm relative z-10 opacity-75"
             style={{ color: "var(--text-secondary)" }}
           >
             Explore additional projects, open-source contributions, and
@@ -372,10 +366,11 @@ function Projects() {
             href={personal.socials.github}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm relative z-10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-transparent hover:scale-[1.03] hover:shadow-[0_0_20px_var(--accent-dim)]"
+            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm relative z-10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-transparent hover:bg-[var(--accent-hover)]"
             style={{
               background: "var(--accent)",
               color: "var(--accent-contrast)",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
             }}
             data-custom-cursor-ignore
             aria-label="Visit GitHub profile to see more projects"

@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { personal } from '@/data/personal'
+import { useCinematicNav } from '@/hooks/useCinematicNav'
+
 
 const navItems = [
   { label: 'Home',       href: '#hero'       },
@@ -97,38 +99,11 @@ function FloatingNavTrigger({ isOpen, onClick }) {
 /* ─────────────────────────────────────────────
    HORIZONTAL NAVBAR  (expands from button)
 ───────────────────────────────────────────── */
-function FloatingNavbar({ activeSection, isOpen, onClose }) {
-  const lenisRef = useRef(null)
+function FloatingNavbar({ activeSection, isOpen, onClose, onNavClick }) {
 
-  const handleNavClick = (e, href) => {
-    e.preventDefault()
-    onClose()
-
-    // Get Lenis instance from window (set by SmoothScroll component)
-    const lenis = window.lenis
-    if (lenis) {
-      const target = document.querySelector(href)
-      if (target) {
-        lenis.scrollTo(target, {
-          offset: 0,
-          duration: 2.5,
-          easing: (t) => {
-            // Cinematic cubic ease-in-out
-            return t < 0.5
-              ? 4 * t * t * t
-              : 1 - Math.pow(-2 * t + 2, 3) / 2
-          },
-        })
-      }
-    } else {
-      // Fallback to native smooth scroll
-      setTimeout(() => {
-        const target = document.querySelector(href)
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth' })
-        }
-      }, 100)
-    }
+  const handleClick = (e, href) => {
+    onClose()          // Close the navbar panel first
+    onNavClick(e, href) // Then trigger scroll/warp navigation
   }
 
   return (
@@ -161,16 +136,6 @@ function FloatingNavbar({ activeSection, isOpen, onClose }) {
           >
             <div className="px-5 py-3 flex items-center gap-1 whitespace-nowrap relative">
 
-              {/* Active indicator background */}
-              <motion.div
-                layoutId="activeIndicator"
-                className="absolute rounded-xl pointer-events-none"
-                style={{
-                  background: 'var(--accent-dim)',
-                }}
-                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-              />
-
               {/* Nav links */}
               {navItems.map((item, index) => {
                 const isActive = activeSection === item.href.slice(1)
@@ -178,7 +143,7 @@ function FloatingNavbar({ activeSection, isOpen, onClose }) {
                   <motion.a
                     key={item.label}
                     href={item.href}
-                    onClick={(e) => handleNavClick(e, item.href)}
+                    onClick={(e) => handleClick(e, item.href)}
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
@@ -190,6 +155,16 @@ function FloatingNavbar({ activeSection, isOpen, onClose }) {
                       color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                     }}
                   >
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeIndicator"
+                        className="absolute inset-0 rounded-xl -z-10"
+                        style={{
+                          background: 'var(--accent-dim)',
+                        }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      />
+                    )}
                     <span className="relative z-10">{item.label}</span>
                   </motion.a>
                 )
@@ -256,11 +231,17 @@ function FloatingNavbar({ activeSection, isOpen, onClose }) {
 ───────────────────────────────────────────── */
 function Navbar({ activeSection }) {
   const [isOpen, setIsOpen] = useState(false)
+  const handleNavClick = useCinematicNav(navItems)
 
   return (
     <>
       <FloatingNavTrigger isOpen={isOpen} onClick={() => setIsOpen(o => !o)} />
-      <FloatingNavbar activeSection={activeSection} isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      <FloatingNavbar
+        activeSection={activeSection}
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        onNavClick={handleNavClick}
+      />
     </>
   )
 }

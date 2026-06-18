@@ -1,20 +1,13 @@
 import { useRef } from 'react'
-import { motion, useInView, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import PhotoCard from './PhotoCard'
 import { staggerContainer } from './aboutVariants'
-import { useCinematicSectionAnimation } from '@/hooks/useScrollTrigger'
 
 export default function About() {
   const sectionRef = useRef(null)
   const contentRef = useRef(null)
   const reduceMotion = useReducedMotion()
-  const isInView = useInView(sectionRef, {
-    once: true,
-    amount: 0.22,
-    margin: '-72px 0px -72px 0px',
-  })
-
-  useCinematicSectionAnimation(contentRef, { duration: 1.8 })
+  const isInView = true
 
   return (
     <section

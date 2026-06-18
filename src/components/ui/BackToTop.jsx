@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-function BackToTop() {
+function BackToTop({ isThemePickerOpen }) {
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
@@ -22,12 +22,14 @@ function BackToTop() {
       return true
     }
 
+    // Lenis may not be initialized yet — poll briefly until it is
     if (!bindLenis()) {
       waitId = setInterval(() => {
         if (bindLenis()) clearInterval(waitId)
       }, 32)
     }
 
+    // Native scroll listener as fallback
     window.addEventListener('scroll', toggleVisibility, { passive: true })
 
     return () => {
@@ -42,13 +44,12 @@ function BackToTop() {
       window.lenis.scrollTo(0, { duration: 1.2 })
       return
     }
-
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
     <AnimatePresence>
-      {isVisible && (
+      {isVisible && !isThemePickerOpen && (
         <motion.button
           onClick={scrollToTop}
           initial={{ opacity: 0, scale: 0.8, y: 20 }}

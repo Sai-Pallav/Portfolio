@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { isTextHoverTarget, getElementShape } from '@/utils/cursorColors'
+import { isCursorOverText, isInteractiveHoverTarget, getPortraitRect, clearCursorCache } from '@/utils/cursorColors'
 import { useCursorAnimation } from '@/hooks/useCursorAnimation'
 
 function prefersFinePointer() {
@@ -16,15 +16,15 @@ function prefersFinePointer() {
 export function CustomCursor() {
   const [enabled] = useState(prefersFinePointer())
   const cursorRef = useRef(null)
+  const portalWrapperRef = useRef(null)
+  const portalImgRef = useRef(null)
   const {
     updateCursorPosition,
-    updateCursorShape,
-    updateCursorSize,
-    updateCursorColor,
+    updateCursorState,
     setKeyboardMode,
     setOpacity,
     animate,
-  } = useCursorAnimation(cursorRef)
+  } = useCursorAnimation()
 
   useEffect(() => {
     if (!enabled) return undefined
@@ -53,53 +53,120 @@ export function CustomCursor() {
     enableCustomCursor()
 
     let rafId = 0
+    let isTicking = false
     let lastHit = null
+    let lastIsText = false
+    let lastIsInteractive = false
+
+    const startTick = () => {
+      if (!isTicking) {
+        isTicking = true
+        rafId = requestAnimationFrame(tick)
+      }
+    }
 
     const onPointerMove = (e) => {
       updateCursorPosition(e)
+      startTick()
 
       const hit = e.target
       if (!hit) return
 
-      if (hit !== lastHit) {
-        lastHit = hit
-        const isText = isTextHoverTarget(hit)
-        updateCursorSize(isText)
+      const isText = isCursorOverText(e)
+      const isInteractive = !isText && isInteractiveHoverTarget(hit)
+      const portraitEl = hit.closest('[data-portal-portrait]')
 
-        // Get element shape for non-text elements
-        if (!isText) {
-          const shape = getElementShape(hit)
-          updateCursorShape(shape)
+      let portalData = null
+      if (portraitEl) {
+        const rect = getPortraitRect(portraitEl)
+        if (rect) {
+          portalData = {
+            img: portraitEl.getAttribute('data-portal-image') || '/hero-portrait-alternate.webp',
+            rect,
+          }
         }
       }
 
-      updateCursorColor(hit)
+      if (
+        hit !== lastHit ||
+        isText !== lastIsText ||
+        isInteractive !== lastIsInteractive ||
+        (portalData !== null) !== (lastHit && !!lastHit.closest('[data-portal-portrait]'))
+      ) {
+        lastHit = hit
+        lastIsText = isText
+        lastIsInteractive = isInteractive
+        updateCursorState(isText, isInteractive, portalData)
+        startTick()
+      }
     }
 
     const onDocumentLeave = () => {
       setOpacity(0)
+      startTick()
     }
 
     const onDocumentEnter = () => {
       setOpacity(1)
+      startTick()
     }
 
     const onKeyDown = (e) => {
-      if (e.key === 'Tab') enableNativeCursor()
+      if (e.key === 'Tab') {
+        enableNativeCursor()
+        startTick()
+      }
     }
 
     const onPointerDown = () => {
       enableCustomCursor()
+      startTick()
     }
 
-    const tick = () => {
-      const { x, y, width, height, opacity, borderRadius } = animate(reducedMotion)
-
+    const updateDOMStyles = (x, y, width, height, opacity, borderRadius, portalMode, portalImg, portalRect) => {
       cursor.style.width = `${width}px`
       cursor.style.height = `${height}px`
       cursor.style.opacity = String(opacity)
       cursor.style.borderRadius = borderRadius
       cursor.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`
+
+      const wrapper = portalWrapperRef.current
+      const img = portalImgRef.current
+
+      if (wrapper && img) {
+        if (portalMode && portalRect && portalImg) {
+          cursor.style.mixBlendMode = 'normal'
+          cursor.style.backgroundColor = 'transparent'
+
+          wrapper.style.display = 'block'
+          if (img.src !== portalImg) {
+            img.src = portalImg
+          }
+
+          img.style.width = `${portalRect.width}px`
+          img.style.height = `${portalRect.height}px`
+
+          const imgX = portalRect.left - x
+          const imgY = portalRect.top - y
+          img.style.transform = `translate3d(${imgX}px, ${imgY}px, 0)`
+        } else {
+          cursor.style.mixBlendMode = 'difference'
+          cursor.style.backgroundColor = 'rgb(250, 250, 250)'
+          cursor.style.border = 'none'
+          wrapper.style.display = 'none'
+        }
+      }
+    }
+
+    const tick = () => {
+      const { x, y, width, height, opacity, borderRadius, portalMode, portalImg, portalRect, isIdle } = animate(reducedMotion)
+
+      updateDOMStyles(x, y, width, height, opacity, borderRadius, portalMode, portalImg, portalRect)
+
+      if (isIdle) {
+        isTicking = false
+        return
+      }
 
       rafId = requestAnimationFrame(tick)
     }
@@ -109,8 +176,10 @@ export function CustomCursor() {
     document.documentElement.addEventListener('mouseenter', onDocumentEnter)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('pointerdown', onPointerDown, { passive: true })
+    window.addEventListener('scroll', clearCursorCache, { passive: true })
+    window.addEventListener('resize', clearCursorCache, { passive: true })
 
-    rafId = requestAnimationFrame(tick)
+    startTick()
 
     return () => {
       cancelAnimationFrame(rafId)
@@ -119,10 +188,12 @@ export function CustomCursor() {
       document.documentElement.removeEventListener('mouseenter', onDocumentEnter)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('scroll', clearCursorCache)
+      window.removeEventListener('resize', clearCursorCache)
       document.documentElement.classList.remove('custom-cursor-active')
       styleEl.remove()
     }
-  }, [enabled, updateCursorPosition, updateCursorShape, updateCursorSize, updateCursorColor, setKeyboardMode, setOpacity, animate])
+  }, [enabled, updateCursorPosition, updateCursorState, setKeyboardMode, setOpacity, animate])
 
   if (!enabled) return null
 
@@ -131,7 +202,7 @@ export function CustomCursor() {
       ref={cursorRef}
       aria-hidden
       data-custom-cursor-ignore
-      className="fixed left-0 top-0 pointer-events-none"
+      className="fixed left-0 top-0 pointer-events-none overflow-hidden"
       style={{
         zIndex: 99999,
         mixBlendMode: 'difference',
@@ -140,7 +211,37 @@ export function CustomCursor() {
         willChange: 'transform, width, height, opacity, border-radius',
         borderRadius: '50%',
       }}
-    />,
+    >
+      <div
+        ref={portalWrapperRef}
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          width: 0,
+          height: 0,
+          pointerEvents: 'none',
+          display: 'none',
+        }}
+      >
+        <img
+          ref={portalImgRef}
+          alt=""
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            pointerEvents: 'none',
+            maxWidth: 'none',
+            objectFit: 'cover',
+            objectPosition: 'center',
+            WebkitMaskImage: 'radial-gradient(ellipse at 50% 45%, black 20%, transparent 75%)',
+            maskImage: 'radial-gradient(ellipse at 50% 45%, black 20%, transparent 75%)',
+            willChange: 'transform',
+          }}
+        />
+      </div>
+    </div>,
     document.body,
   )
 }

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useRef, memo } from 'react'
+import { memo, useId, useRef, useEffect } from 'react'
 
 /**
  * Orbit Ring - Circular path with subtle glow and rotation animation.
@@ -9,22 +9,35 @@ import { useRef, memo } from 'react'
  *   radius: number,
  *   duration: number,
  *   isActive: boolean,
- *   direction?: 'clockwise' | 'counter-clockwise'
+ *   hasActiveSelection?: boolean
  * }} props
  */
 const OrbitRing = memo(function OrbitRing({ 
   radius, 
   duration, 
   isActive, 
-  hasActiveSelection = false,
-  direction = 'clockwise' 
+  hasActiveSelection = false
 }) {
   // SVG viewBox is 800x800, center at 400,400
   const center = 400
-  const uid = useRef(`orbit-${radius}-${Math.random().toString(36).slice(2)}`).current
+  const idSuffix = useId().replace(/:/g, '')
+  const uid = `orbit-${radius}-${idSuffix}`
   
   // SVG path for a full circle orbit (used by animateMotion particles)
   const orbitPath = `M ${center - radius} ${center} a ${radius} ${radius} 0 1 0 ${2 * radius} 0 a ${radius} ${radius} 0 1 0 -${2 * radius} 0`
+  
+  const svgRef = useRef(null)
+  
+  // Pause SVG SMIL animations when a node is selected
+  useEffect(() => {
+    if (svgRef.current) {
+      if (hasActiveSelection) {
+        svgRef.current.pauseAnimations()
+      } else {
+        svgRef.current.unpauseAnimations()
+      }
+    }
+  }, [hasActiveSelection])
   
   return (
     <motion.div
@@ -36,6 +49,7 @@ const OrbitRing = memo(function OrbitRing({
       aria-hidden="true"
     >
       <svg
+        ref={svgRef}
         viewBox="0 0 800 800"
         className="absolute"
         style={{
@@ -43,6 +57,7 @@ const OrbitRing = memo(function OrbitRing({
           height: '100%',
           maxWidth: '800px',
           maxHeight: '800px',
+          overflow: 'visible'
         }}
       >
         <defs>
@@ -91,12 +106,6 @@ const OrbitRing = memo(function OrbitRing({
             strokeOpacity="0.6"
             fill="none"
             strokeDasharray="20 10"
-            animate={{ rotate: direction === 'clockwise' ? 360 : -360 }}
-            transition={{ 
-              duration: duration / 3, 
-              repeat: Infinity,
-              ease: "linear"
-            }}
             filter={`url(#glow-${uid})`}
             style={{
               transformOrigin: `${center}px ${center}px`
@@ -105,7 +114,7 @@ const OrbitRing = memo(function OrbitRing({
         )}
         
         {/* Ambient particles that actually travel along the orbit */}
-        {[...Array(4)].map((_, i) => (
+        {[0, 1, 2, 3].map((i) => (
           <circle
             key={i}
             r={isActive ? '2.5' : '1.8'}

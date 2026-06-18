@@ -1,35 +1,39 @@
 import { useRef, useCallback } from 'react'
-import { colorToCss, sampleColorsForElement } from '@/utils/cursorColors'
 
-const SIZE_DEFAULT = 16
-const SIZE_TEXT = 80
-const SIZE_INTERACTIVE = 48
-const LERP_POS = 0.18
-const LERP_SIZE = 0.14
-const LERP_SHAPE = 0.35
+const CURSOR_CONFIG = {
+  sizes: {
+    default: 16,
+    text: 80,
+    interactive: 48,
+    portal: 180,
+  },
+  lerp: {
+    pos: 0.18,
+    size: 0.14,
+    opacity: 0.22,
+  },
+  thresholds: {
+    pos: 0.05,
+    size: 0.05,
+    opacity: 0.005,
+  }
+}
 
-export function useCursorAnimation(cursorRef) {
+export function useCursorAnimation() {
   const state = useRef({
     tx: -200,
     ty: -200,
     x: -200,
     y: -200,
-    size: SIZE_DEFAULT,
-    targetSize: SIZE_DEFAULT,
+    size: CURSOR_CONFIG.sizes.default,
+    targetSize: CURSOR_CONFIG.sizes.default,
     opacity: 0,
     targetOpacity: 0,
-    fg: { r: 250, g: 250, b: 250, a: 1 },
     snapped: false,
     keyboardMode: false,
-    lastSample: 0,
-    // Shape transformation properties
-    targetWidth: SIZE_DEFAULT,
-    targetHeight: SIZE_DEFAULT,
-    targetBorderRadius: '50%',
-    currentWidth: SIZE_DEFAULT,
-    currentHeight: SIZE_DEFAULT,
-    currentBorderRadius: '50%',
-    isShapeMode: false,
+    portalMode: false,
+    portalImg: null,
+    portalRect: null,
   })
 
   const updateCursorPosition = useCallback((e) => {
@@ -46,44 +50,26 @@ export function useCursorAnimation(cursorRef) {
     }
   }, [])
 
-  const updateCursorShape = useCallback((shape) => {
-    if (shape && shape.isInteractive) {
-      // Expand cursor size for interactive elements, but keep it circular
-      state.current.targetSize = SIZE_INTERACTIVE
-      state.current.targetWidth = SIZE_INTERACTIVE
-      state.current.targetHeight = SIZE_INTERACTIVE
-      state.current.targetBorderRadius = '50%'
-      state.current.isShapeMode = false
+  const updateCursorState = useCallback((isText, isInteractive, portalData = null) => {
+    const s = state.current
+    if (portalData) {
+      s.portalMode = true
+      s.portalImg = portalData.img
+      s.portalRect = portalData.rect
+      s.targetSize = CURSOR_CONFIG.sizes.portal
     } else {
-      state.current.targetSize = SIZE_DEFAULT
-      state.current.targetWidth = SIZE_DEFAULT
-      state.current.targetHeight = SIZE_DEFAULT
-      state.current.targetBorderRadius = '50%'
-      state.current.isShapeMode = false
-    }
-  }, [])
-
-  const updateCursorSize = useCallback((isText) => {
-    state.current.targetSize = isText ? SIZE_TEXT : SIZE_DEFAULT
-    if (isText) {
-      state.current.targetWidth = SIZE_TEXT
-      state.current.targetHeight = SIZE_TEXT
-      state.current.targetBorderRadius = '50%'
-      state.current.isShapeMode = false
-    }
-  }, [])
-
-  const updateCursorColor = useCallback((target) => {
-    const now = performance.now()
-    if (now - state.current.lastSample > 32) {
-      state.current.lastSample = now
-      const { fg } = sampleColorsForElement(target)
-      state.current.fg = fg
-      if (cursorRef.current) {
-        cursorRef.current.style.backgroundColor = colorToCss(fg)
+      s.portalMode = false
+      s.portalImg = null
+      s.portalRect = null
+      if (isText) {
+        s.targetSize = CURSOR_CONFIG.sizes.text
+      } else if (isInteractive) {
+        s.targetSize = CURSOR_CONFIG.sizes.interactive
+      } else {
+        s.targetSize = CURSOR_CONFIG.sizes.default
       }
     }
-  }, [cursorRef])
+  }, [])
 
   const setKeyboardMode = useCallback((enabled) => {
     state.current.keyboardMode = enabled
@@ -92,37 +78,57 @@ export function useCursorAnimation(cursorRef) {
 
   const setOpacity = useCallback((opacity) => {
     state.current.targetOpacity = opacity
+    if (opacity === 0) {
+      state.current.snapped = false
+    }
   }, [])
 
   const animate = useCallback((reducedMotion) => {
     const s = state.current
-    const posLerp = reducedMotion ? 1 : LERP_POS
-    const sizeLerp = reducedMotion ? 1 : LERP_SIZE
+    const posLerp = reducedMotion ? 1 : CURSOR_CONFIG.lerp.pos
+    const sizeLerp = reducedMotion ? 1 : CURSOR_CONFIG.lerp.size
 
-    s.x += (s.tx - s.x) * posLerp
-    s.y += (s.ty - s.y) * posLerp
-    s.size += (s.targetSize - s.size) * sizeLerp
-    s.opacity += (s.targetOpacity - s.opacity) * 0.22
+    const dx = s.tx - s.x
+    const dy = s.ty - s.y
+    const ds = s.targetSize - s.size
+    const do_ = s.targetOpacity - s.opacity
 
-    // Interpolate shape properties
-    s.currentWidth += (s.targetWidth - s.currentWidth) * LERP_SHAPE
-    s.currentHeight += (s.targetHeight - s.currentHeight) * LERP_SHAPE
+    // Check if the values have virtually settled (sub-pixel thresholds)
+    const isIdle =
+      Math.abs(dx) < CURSOR_CONFIG.thresholds.pos &&
+      Math.abs(dy) < CURSOR_CONFIG.thresholds.pos &&
+      Math.abs(ds) < CURSOR_CONFIG.thresholds.size &&
+      Math.abs(do_) < CURSOR_CONFIG.thresholds.opacity
+
+    if (isIdle) {
+      s.x = s.tx
+      s.y = s.ty
+      s.size = s.targetSize
+      s.opacity = s.targetOpacity
+    } else {
+      s.x += dx * posLerp
+      s.y += dy * posLerp
+      s.size += ds * sizeLerp
+      s.opacity += do_ * CURSOR_CONFIG.lerp.opacity
+    }
 
     return {
       x: s.x,
       y: s.y,
-      width: s.isShapeMode ? s.currentWidth : s.size,
-      height: s.isShapeMode ? s.currentHeight : s.size,
+      width: s.size,
+      height: s.size,
       opacity: s.opacity,
-      borderRadius: s.isShapeMode ? s.targetBorderRadius : '50%',
+      borderRadius: '50%',
+      portalMode: s.portalMode,
+      portalImg: s.portalImg,
+      portalRect: s.portalRect,
+      isIdle,
     }
   }, [])
 
   return {
     updateCursorPosition,
-    updateCursorShape,
-    updateCursorSize,
-    updateCursorColor,
+    updateCursorState,
     setKeyboardMode,
     setOpacity,
     animate,

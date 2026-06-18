@@ -38,63 +38,6 @@
     to { transform: scaleY(1); }
   }
 
-
-  /* ── About section animations ── */
-  @keyframes floatCrystal {
-    0%,100% { transform: translateY(0px) rotate(0deg); }
-    33%      { transform: translateY(-16px) rotate(2deg); }
-    66%      { transform: translateY(-8px) rotate(-1.4deg); }
-  }
-  @keyframes crystalPulse {
-    0%,100% { opacity: 0.5; transform: scale(1); }
-    50%      { opacity: 1;   transform: scale(1.22); }
-  }
-  @keyframes crystalHalo {
-    0%,100% { opacity: 0.65; transform: scale(1); }
-    50%      { opacity: 1;   transform: scale(1.14); }
-  }
-  @keyframes titleShimmer {
-    0%   { filter: drop-shadow(0 0 35px rgba(168,85,247,0.5)); }
-    50%  { filter: drop-shadow(0 0 65px rgba(232,121,249,0.85)); }
-    100% { filter: drop-shadow(0 0 35px rgba(168,85,247,0.5)); }
-  }
-  @keyframes cardEdgeGlowLeft {
-    0%,100% { box-shadow: 4px 0 20px rgba(168,85,247,0.15), 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04); }
-    50%      { box-shadow: 4px 0 34px rgba(232,121,249,0.35), 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06); }
-  }
-  @keyframes cardEdgeGlowRight {
-    0%,100% { box-shadow: -4px 0 20px rgba(168,85,247,0.15), 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04); }
-    50%      { box-shadow: -4px 0 34px rgba(232,121,249,0.35), 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06); }
-  }
-  @keyframes cardEdgePulse {
-    0%,100% { opacity: 0.55; }
-    50%      { opacity: 1; }
-  }
-  @keyframes statusBlink {
-    0%,100% { opacity: 0.7; transform: scale(1);    box-shadow: 0 0 10px rgba(74,222,128,0.9); }
-    50%      { opacity: 1;  transform: scale(1.35); box-shadow: 0 0 18px rgba(74,222,128,1.0); }
-  }
-  @keyframes shimmerSlide {
-    0%   { left: -60%; }
-    100% { left: 120%; }
-  }
-  @keyframes wiggle {
-    0%, 100% { transform: rotate(0deg); }
-    15% { transform: rotate(-12deg); }
-    30% { transform: rotate(10deg); }
-    45% { transform: rotate(-8deg); }
-    60% { transform: rotate(6deg); }
-    75% { transform: rotate(-4deg); }
-  }
-  @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.6); }
-    to { opacity: 1; transform: scale(1); }
-  }
-  @keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
 }
 
 * {
@@ -158,4 +101,11 @@ main {
 
 .transform-3d {
   transform-style: preserve-3d;
+}
+
+/* Mobile adjustments for cinematic hero portrait blending */
+@media (max-width: 768px) {
+  .hero-portrait-img {
+    opacity: calc(var(--hero-img-opacity) * 0.4) !important;
+  }
 }

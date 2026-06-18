@@ -1,4 +1,4 @@
-import { motion, useInView, useReducedMotion, AnimatePresence } from 'framer-motion'
+import { motion, useReducedMotion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { personal, contactMethods } from '@/data/personal'
 import SocialIcon from '@/components/ui/SocialIcon'
@@ -131,8 +131,13 @@ function FloatingTextarea({ id, label, value, onChange, onBlur, error, rows = 5,
 function MagneticButton({ children, disabled, className, type = 'submit' }) {
   const ref = useRef(null)
   const rectRef = useRef(null)
-  const [position, setPosition] = useState({ x: 0, y: 0 })
   const shouldReduceMotion = useReducedMotion()
+
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  
+  const springX = useSpring(x, { stiffness: 150, damping: 15, mass: 0.1 })
+  const springY = useSpring(y, { stiffness: 150, damping: 15, mass: 0.1 })
 
   const handleMouseMove = (e) => {
     if (disabled || shouldReduceMotion) return
@@ -142,15 +147,16 @@ function MagneticButton({ children, disabled, className, type = 'submit' }) {
     const rect = rectRef.current
     if (!rect) return
     const { clientX, clientY } = e
-    const x = clientX - (rect.left + rect.width / 2)
-    const y = clientY - (rect.top + rect.height / 2)
-    // Subtle magnetic attraction pull
-    setPosition({ x: x / 4, y: y / 4 })
+    const offsetX = clientX - (rect.left + rect.width / 2)
+    const offsetY = clientY - (rect.top + rect.height / 2)
+    x.set(offsetX / 4)
+    y.set(offsetY / 4)
   }
 
   const handleMouseLeave = () => {
     rectRef.current = null
-    setPosition({ x: 0, y: 0 })
+    x.set(0)
+    y.set(0)
   }
 
   return (
@@ -160,8 +166,7 @@ function MagneticButton({ children, disabled, className, type = 'submit' }) {
       disabled={disabled}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      animate={{ x: position.x, y: position.y }}
-      transition={shouldReduceMotion ? {} : { type: 'spring', stiffness: 150, damping: 15, mass: 0.1 }}
+      style={{ x: shouldReduceMotion ? 0 : springX, y: shouldReduceMotion ? 0 : springY }}
       whileHover={shouldReduceMotion ? {} : { scale: 1.02 }}
       whileTap={shouldReduceMotion ? {} : { scale: 0.96 }}
       className={`${className} relative overflow-hidden`}
@@ -189,7 +194,7 @@ function MagneticButton({ children, disabled, className, type = 'submit' }) {
 
 function Contact() {
   const sectionRef = useRef(null)
-  const isInView = useInView(sectionRef, { once: true, margin: '-100px' })
+  const isInView = true
   const shouldReduceMotion = useReducedMotion()
 
   // Form State
@@ -199,11 +204,9 @@ function Contact() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
 
-  // Spotlight border mouse position state
+  // Spotlight border mouse position ref and handlers (Zero React re-renders on mousemove!)
   const formCardRef = useRef(null)
   const formCardRectRef = useRef(null)
-  const [coords, setCoords] = useState({ x: 0, y: 0 })
-  const [isHovered, setIsHovered] = useState(false)
 
   const handleMouseMoveCard = (e) => {
     if (!formCardRef.current || shouldReduceMotion) return
@@ -211,22 +214,20 @@ function Contact() {
       formCardRectRef.current = formCardRef.current.getBoundingClientRect()
     }
     const rect = formCardRectRef.current
-    setCoords({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    })
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    formCardRef.current.style.setProperty('--mouse-x', `${x}px`)
+    formCardRef.current.style.setProperty('--mouse-y', `${y}px`)
   }
 
   const handleMouseEnterCard = () => {
     if (formCardRef.current) {
       formCardRectRef.current = formCardRef.current.getBoundingClientRect()
     }
-    setIsHovered(true)
   }
 
   const handleMouseLeaveCard = () => {
     formCardRectRef.current = null
-    setIsHovered(false)
   }
 
   useEffect(() => {
@@ -542,14 +543,14 @@ function Contact() {
               onMouseMove={handleMouseMoveCard}
               onMouseEnter={handleMouseEnterCard}
               onMouseLeave={handleMouseLeaveCard}
-              className="relative p-[1px] overflow-hidden rounded-3xl bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.6)] transition-all duration-500"
+              className="relative p-[1px] overflow-hidden rounded-3xl bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.6)] transition-all duration-500 group/card"
             >
               {/* Spotlight Glow Shader */}
-              {isHovered && !shouldReduceMotion && (
+              {!shouldReduceMotion && (
                 <div
-                  className="pointer-events-none absolute inset-0 transition duration-300"
+                  className="pointer-events-none absolute inset-0 transition duration-300 opacity-0 group-hover/card:opacity-100"
                   style={{
-                    background: `radial-gradient(350px circle at ${coords.x}px ${coords.y}px, var(--accent), transparent 80%)`,
+                    background: `radial-gradient(350px circle at var(--mouse-x, 0px) var(--mouse-y, 0px), var(--accent), transparent 80%)`,
                   }}
                 />
               )}

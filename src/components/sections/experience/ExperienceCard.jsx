@@ -1,17 +1,29 @@
-export default function ExperienceCard({ exp, index, total }) {
-  const getBadgeColor = (badge) => {
-    switch (badge) {
-      case 'Current':
-        return 'from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-400'
-      case 'Active':
-        return 'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-400'
-      case 'Leadership':
-        return 'from-purple-500/20 to-pink-500/20 border-purple-500/30 text-purple-400'
-      default:
-        return 'from-accent/20 to-accent-hover/20 border-accent/30 text-accent'
-    }
-  }
+import { memo } from 'react'
 
+const getBadgeColor = (badge) => {
+  switch (badge) {
+    case 'Current':
+      return 'from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-400'
+    case 'Active':
+      return 'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-400'
+    case 'Leadership':
+      return 'from-purple-500/20 to-pink-500/20 border-purple-500/30 text-purple-400'
+    default:
+      return 'from-accent/20 to-accent-hover/20 border-accent/30 text-accent'
+  }
+}
+
+/**
+ * Experience Card - Vertical cards displayed on mobile viewport.
+ * Represents a single career milestone.
+ * 
+ * @param {{
+ *   exp: Object,
+ *   index: number,
+ *   total: number
+ * }} props
+ */
+const ExperienceCard = memo(function ExperienceCard({ exp, index, total }) {
   return (
     <article
       className="group relative rounded-3xl p-8 md:p-10 bg-gradient-to-br from-surface/80 via-raised/60 to-surface/80 backdrop-blur-2xl border border-white/10 overflow-hidden shadow-2xl shadow-black/40"
@@ -24,7 +36,8 @@ export default function ExperienceCard({ exp, index, total }) {
       <div
         className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
         style={{
-          background: 'linear-gradient(45deg, var(--accent), var(--accent-hover), var(--accent))',
+          background: 'gradientShift 3s linear infinite',
+          backgroundImage: 'linear-gradient(45deg, var(--accent), var(--accent-hover), var(--accent))',
           backgroundSize: '200% 200%',
           animation: 'gradientShift 3s linear infinite',
         }}
@@ -82,7 +95,7 @@ export default function ExperienceCard({ exp, index, total }) {
         {/* Bullet points */}
         <ul className="space-y-4 mb-8" role="list">
           {exp.bullets.map((bullet, idx) => (
-            <li key={idx} className="flex items-start gap-4 text-secondary text-base md:text-lg leading-relaxed">
+            <li key={bullet} className="flex items-start gap-4 text-secondary text-base md:text-lg leading-relaxed">
               <div
                 className="flex-shrink-0 mt-1"
                 style={{ animationDelay: `${idx * 0.1 + 0.3}s` }}
@@ -114,4 +127,6 @@ export default function ExperienceCard({ exp, index, total }) {
       </div>
     </article>
   )
-}
+})
+
+export default ExperienceCard

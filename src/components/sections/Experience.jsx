@@ -1,4 +1,4 @@
-import { motion, useInView, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { experience } from '@/data/experience'
 import CareerCore from './experience/CareerCore'
@@ -7,7 +7,6 @@ import ExperienceNode from './experience/ExperienceNode'
 import ExperienceDetails from './experience/ExperienceDetails'
 import ExperienceCard from './experience/ExperienceCard'
 import EnergyBeam from './experience/EnergyBeam'
-import { useOrbitAnimation } from '@/hooks/useOrbitAnimation'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -34,16 +33,26 @@ const itemVariants = {
 
 // Orbit configuration defined statically at module level to prevent re-creation
 const ORBIT_RADII = [280, 350, 430]
-const ORBIT_DURATIONS = [25, 35, 45]
+const ORBIT_DURATIONS = [35, 35, 35]
 const NODE_ANGLES = [0, 120, 240]
+const BEAM_NODE_RADII = [ORBIT_RADII[1], ORBIT_RADII[1], ORBIT_RADII[1]]
 
 function Experience() {
   const sectionRef = useRef(null)
   const orbitContainerRef = useRef(null)
   const detailsRef = useRef(null)
-  const isInView = useInView(sectionRef, { once: true, margin: '-100px' })
+  const nodeRefs = useRef([])
+  const isInView = true
   const [selectedNodeIndex, setSelectedNodeIndex] = useState(-1)
-  const { orbitAngle, isMobile, isInView: orbitInView } = useOrbitAnimation(sectionRef, selectedNodeIndex !== -1)
+  const [isMobile, setIsMobile] = useState(false)
+  const [detailsPosition, setDetailsPosition] = useState('left')
+  
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
   
   // Use only manually selected node (not scroll-based)
   const currentNodeIndex = selectedNodeIndex
@@ -81,27 +90,76 @@ function Experience() {
     return () => document.removeEventListener('keydown', handler)
   }, [selectedNodeIndex, handleCloseDetails])
   
-  // Refs to each orbit node button for focus restoration
-  const nodeRefs = useRef([])
-  
-  // Stable ref setters to prevent inline arrow functions breaking memoization
-  const nodeRefSetters = useMemo(() => {
-    return [0, 1, 2].map(i => (el) => {
+  // Keep wrapper and node animations perfectly synchronized and controlled
+  useEffect(() => {
+    const syncAndControlAnimations = () => {
+      const container = orbitContainerRef.current
+      if (!container) return
+
+      const anims = container.getAnimations({ subtree: true })
+      const parentAnim = anims.find(a => a.animationName === 'orbit-cw')
+      const nodeAnims = anims.filter(a => a.animationName === 'orbit-ccw')
+
+      if (parentAnim) {
+        if (currentNodeIndex !== -1) {
+          // Pause parent and all node animations
+          parentAnim.pause()
+          nodeAnims.forEach(nAnim => {
+            nAnim.pause()
+            nAnim.currentTime = parentAnim.currentTime
+          })
+        } else {
+          // Play parent and all node animations
+          parentAnim.play()
+          nodeAnims.forEach(nAnim => {
+            nAnim.play()
+            if (parentAnim.startTime !== null) {
+              nAnim.startTime = parentAnim.startTime
+            } else {
+              nAnim.currentTime = parentAnim.currentTime
+            }
+          })
+        }
+      }
+    }
+
+    // Run immediately and after a short timeout to catch mounting animations
+    syncAndControlAnimations()
+    const timer = setTimeout(syncAndControlAnimations, 50)
+
+    // Synchronize when tab becomes visible (browser may throttle backgrounded animations differently)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncAndControlAnimations()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [currentNodeIndex])
+
+  // Create stable ref callback handlers for the orbit nodes to prevent memoized child re-renders
+  const nodeRefCallbacks = useMemo(() => {
+    return Array.from({ length: experience.length }).map((_, i) => (el) => {
+      // eslint-disable-next-line react-hooks/refs
       nodeRefs.current[i] = el
     })
   }, [])
   
   // Calculate dynamic details panel position based on selected node's placement in viewport
-  const getDetailsPosition = useCallback(() => {
-    if (currentNodeIndex === -1) return 'left'
-    const angle = NODE_ANGLES[currentNodeIndex]
-    const radius = ORBIT_RADII[currentNodeIndex]
-    const currentAngle = angle + (orbitInView ? orbitAngle : 0)
-    const radians = (currentAngle * Math.PI) / 180
-    const x = 50 + (radius / 8) * Math.cos(radians)
-    // If node is on the right half of the screen (x >= 50), details should be on the left
-    return x >= 50 ? 'left' : 'right'
-  }, [currentNodeIndex, orbitAngle, orbitInView])
+  useEffect(() => {
+    if (currentNodeIndex === -1) return
+    const nodeEl = nodeRefs.current[currentNodeIndex]
+    if (nodeEl) {
+      const rect = nodeEl.getBoundingClientRect()
+      const centerX = window.innerWidth / 2
+      const nodeCenterX = rect.left + rect.width / 2
+      setDetailsPosition(nodeCenterX >= centerX ? 'left' : 'right')
+    }
+  }, [currentNodeIndex])
   
   // Orbit entrance animations
   const orbitSystemVariants = {
@@ -141,7 +199,6 @@ function Experience() {
       }
     })
   }
-  
 
   return (
     <section
@@ -249,6 +306,32 @@ function Experience() {
                 ref={orbitContainerRef}
                 className="relative w-full max-w-[min(75vh,720px)] aspect-square flex items-center justify-center"
               >
+                {/* CSS Keyframes for Orbit Rotation */}
+                <style>{`
+                  @keyframes orbit-cw {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                  }
+                  @keyframes orbit-ccw {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(-360deg); }
+                  }
+
+                  .orbit-rotating-parent {
+                    position: absolute;
+                    inset: 0;
+                    pointer-events: none;
+                    animation: orbit-cw 35s linear infinite;
+                    transform-origin: center;
+                    overflow: visible;
+                  }
+
+                  .orbit-node-counter {
+                    animation: orbit-ccw 35s linear infinite;
+                    transform-origin: center;
+                  }
+                `}</style>
+
                 {/* Central Core with entrance animation */}
                 <motion.div 
                   variants={coreVariants}
@@ -270,88 +353,72 @@ function Experience() {
                       duration={ORBIT_DURATIONS[i]}
                       isActive={currentNodeIndex === i}
                       hasActiveSelection={currentNodeIndex !== -1}
-                      direction={i % 2 === 0 ? 'clockwise' : 'counter-clockwise'}
+                      direction="clockwise"
                     />
                   </motion.div>
                 ))}
                 
-                {/* Experience Nodes with pop-in animation and orbit rotation */}
-                {experience.map((exp, i) => {
-                  // Calculate position based on node's orbit + current orbit rotation
-                  const angle = NODE_ANGLES[i]
-                  const radius = ORBIT_RADII[i]
-                  const currentAngle = angle + (orbitInView ? orbitAngle : 0)
-                  const radians = (currentAngle * Math.PI) / 180
-                  const x = 50 + (radius / 8) * Math.cos(radians)
-                  const y = 50 + (radius / 8) * Math.sin(radians)
-                  
-                  return (
-                    <motion.div
-                      key={exp.id}
-                      initial={{ 
-                        scale: 0, 
-                        opacity: 0,
-                        x: '-50%',
-                        y: '-50%'
-                      }}
-                      animate={{ 
-                        scale: 1, 
-                        opacity: 1,
-                        left: `${x}%`,
-                        top: `${y}%`,
-                        x: '-50%',
-                        y: '-50%'
-                      }}
-                      transition={{
-                        scale: {
-                          type: 'spring',
-                          stiffness: 120,
-                          damping: 18,
-                          delay: 0.8 + i * 0.2
-                        },
-                        opacity: {
-                          duration: 0.5,
-                          delay: 0.8 + i * 0.2
-                        },
-                        left: {
-                          duration: 0
-                        },
-                        top: {
-                          duration: 0
-                        }
-                      }}
-                      className="absolute"
-                      style={{
-                        zIndex: currentNodeIndex === i ? 40 : 30,
-                        pointerEvents: currentNodeIndex !== -1 && currentNodeIndex !== i ? 'none' : 'auto'
-                      }}
-                    >
-                      <ExperienceNode
-                        exp={exp}
-                        index={i}
-                        angle={NODE_ANGLES[i]}
-                        radius={ORBIT_RADII[i]}
-                        isActive={currentNodeIndex === i}
-                        isDimmed={currentNodeIndex !== -1 && currentNodeIndex !== i}
-                        onSelect={handleNodeSelect}
-                        nodeRef={nodeRefSetters[i]}
-                      />
-                    </motion.div>
-                  )
-                })}
-                
-                {/* Energy Beam to active node */}
-                <AnimatePresence>
-                  {currentNodeIndex !== -1 && (
-                    <EnergyBeam
-                      activeNodeIndex={currentNodeIndex}
-                      nodeAngles={NODE_ANGLES}
-                      nodeRadii={ORBIT_RADII}
-                      containerRef={orbitContainerRef}
-                      orbitAngle={orbitInView ? orbitAngle : 0}
-                    />
-                  )}
-                </AnimatePresence>
+                {/* Rotating Parent Container */}
+                <div
+                  className="orbit-rotating-parent"
+                >
+                  {/* Experience Nodes with CSS-based orbit rotation */}
+                  {experience.map((exp, i) => {
+                    const staticAngle = NODE_ANGLES[i];
+                    return (
+                      <div
+                        key={exp.id}
+                        className={`orbit-wrapper-${i}`}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          transform: `rotate(${staticAngle}deg)`,
+                          transformOrigin: 'center',
+                          zIndex: currentNodeIndex === i ? 40 : 30,
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <div
+                          className={`orbit-node-${i}`}
+                          style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '93.75%', /* 350px radius on 800px box */
+                            transform: `translate(-50%, -50%) rotate(${-staticAngle}deg)`,
+                            transformOrigin: 'center',
+                            pointerEvents: currentNodeIndex !== -1 && currentNodeIndex !== i ? 'none' : 'auto'
+                          }}
+                        >
+                          <div
+                            className="orbit-node-counter"
+                            style={{
+                              transformOrigin: 'center'
+                            }}
+                          >
+                            <ExperienceNode
+                              exp={exp}
+                              index={i}
+                              isActive={currentNodeIndex === i}
+                              isDimmed={currentNodeIndex !== -1 && currentNodeIndex !== i}
+                              onSelect={handleNodeSelect}
+                              nodeRef={nodeRefCallbacks[i]}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Energy Beam - rendered inside the statically rotated wrapper to automatically stay aligned */}
+                        <AnimatePresence>
+                          {currentNodeIndex === i && (
+                            <EnergyBeam
+                              activeNodeIndex={currentNodeIndex}
+                              nodeRadii={BEAM_NODE_RADII}
+                            />
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               
               {/* Details Panel */}
@@ -361,7 +428,7 @@ function Experience() {
                     ref={detailsRef}
                     key={currentNodeIndex}
                     exp={experience[currentNodeIndex]}
-                    position={getDetailsPosition()}
+                    position={detailsPosition}
                     onClose={handleCloseDetails}
                   />
                 )}

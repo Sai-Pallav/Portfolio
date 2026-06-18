@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { forwardRef, memo } from 'react'
+import { forwardRef, memo, useCallback } from 'react'
 
 /**
  * Experience Details Panel - Expanded view with holographic effects.
@@ -37,6 +37,12 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
       }
     }
   }
+
+  // Memoize the close click handler to prevent inline recreation
+  const handleCloseClick = useCallback((e) => {
+    e.stopPropagation()
+    onClose()
+  }, [onClose])
   
   return (
     <motion.div
@@ -65,6 +71,8 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
             opacity: 0.1,
             mask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
             maskComposite: 'exclude',
+            WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+            WebkitMaskComposite: 'xor',
             padding: '1px'
           }}
           aria-hidden="true"
@@ -92,10 +100,7 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
         
         {/* Close button */}
         <motion.button
-          onClick={(e) => {
-            e.stopPropagation()
-            onClose()
-          }}
+          onClick={handleCloseClick}
           whileHover={{ scale: 1.1, rotate: 90 }}
           whileTap={{ scale: 0.9 }}
           className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center transition-colors z-20"
@@ -208,7 +213,7 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
               <div className="flex flex-wrap gap-2">
                 {exp.tech.map((tech, i) => (
                   <motion.span
-                    key={i}
+                    key={tech}
                     initial={{ opacity: 0, scale: 0.5, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     transition={{ delay: 0.7 + i * 0.08, type: 'spring', stiffness: 300, damping: 20 }}
@@ -228,12 +233,12 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
                 Project Impact
               </h4>
               <div className="space-y-2">
-                {exp.projects.map((project, i) => (
+                {exp.projects.map((project) => (
                   <motion.div
-                    key={i}
+                    key={project.name}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 + i * 0.1 }}
+                    transition={{ delay: 0.6, type: 'spring', stiffness: 300, damping: 20 }}
                     className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10"
                   >
                     <span className="text-sm text-[var(--text-heading)] font-medium">
