@@ -114,34 +114,45 @@ const OrbitRing = memo(function OrbitRing({
         )}
         
         {/* Ambient particles that actually travel along the orbit */}
-        {[0, 1, 2, 3].map((i) => (
-          <circle
-            key={i}
-            r={isActive ? '2.5' : '1.8'}
-            fill="var(--accent)"
-          >
-            <animateMotion
-              dur={`${duration}s`}
-              repeatCount="indefinite"
-              begin={`-${(i / 4) * duration}s`}
-              path={orbitPath}
-            />
-            <animate
-              attributeName="opacity"
-              values={hasActiveSelection ? (isActive ? "0.2;0.6;0.2" : "0;0;0") : "0.2;0.7;0.2"}
-              dur="2s"
-              repeatCount="indefinite"
-              begin={`${i * 0.5}s`}
-            />
-            <animate
-              attributeName="r"
-              values={isActive ? '2;3.5;2' : '1.5;2.5;1.5'}
-              dur="2s"
-              repeatCount="indefinite"
-              begin={`${i * 0.5}s`}
-            />
-          </circle>
-        ))}
+        {[0, 1, 2, 3].map((i) => {
+          const isParticleVisible = !hasActiveSelection || isActive;
+          return (
+            <motion.circle
+              key={i}
+              fill="var(--accent)"
+              animate={isParticleVisible ? {
+                opacity: isActive ? [0.2, 0.6, 0.2] : [0.2, 0.7, 0.2],
+                r: isActive ? [2, 3.5, 2] : [1.5, 2.5, 1.5]
+              } : {
+                opacity: 0,
+                r: 0
+              }}
+              transition={isParticleVisible ? {
+                opacity: {
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: i * 0.5
+                },
+                r: {
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: i * 0.5
+                }
+              } : {
+                duration: 0.2
+              }}
+            >
+              <animateMotion
+                dur={`${duration}s`}
+                repeatCount="indefinite"
+                begin={`-${(i / 4) * duration}s`}
+                path={orbitPath}
+              />
+            </motion.circle>
+          );
+        })}
       </svg>
     </motion.div>
   )

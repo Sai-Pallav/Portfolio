@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { skills } from "@/data/skills";
 
@@ -53,7 +54,7 @@ const handleMouseLeave = (e) => {
   e.currentTarget._cachedRect = null;
 };
 
-export default function SkillsGrid() {
+const SkillsGrid = memo(function SkillsGrid() {
   return (
     <motion.div
       variants={gridVariants}
@@ -171,4 +172,6 @@ export default function SkillsGrid() {
       })}
     </motion.div>
   );
-}
+});
+
+export default SkillsGrid;

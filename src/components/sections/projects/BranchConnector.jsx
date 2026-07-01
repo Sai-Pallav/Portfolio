@@ -58,7 +58,7 @@ const BranchConnector = memo(function BranchConnector({ isLeft }) {
 
         {/* Layer 3: Connection Endpoint Circle at Card Edge */}
         <circle
-          cx={isLeft ? BRANCH_WIDTH : 0}
+          cx={isLeft ? 0 : BRANCH_WIDTH}
           cy="3"
           r="2.5"
           fill="var(--accent)"

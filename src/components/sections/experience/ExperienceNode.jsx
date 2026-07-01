@@ -29,7 +29,6 @@ const ExperienceNode = memo(function ExperienceNode({
     <motion.button
       ref={nodeRef}
       onClick={() => onSelect(index)}
-      onKeyDown={(e) => e.key === 'Enter' && onSelect(index)}
       onMouseEnter={() => !isDimmed && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`w-48 md:w-56 group transition-opacity duration-300 ${isDimmed ? 'opacity-15 pointer-events-none' : ''}`}

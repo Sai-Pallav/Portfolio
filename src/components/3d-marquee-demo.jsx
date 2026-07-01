@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ThreeDMarquee } from "@/components/ui/3d-marquee";
 import { skills } from "@/data/skills";
 
@@ -42,10 +43,12 @@ const buildSkillGroups = () => {
 
 const groupedSkillImages = buildSkillGroups();
 
-export default function ThreeDMarqueeDemo() {
+const ThreeDMarqueeDemo = memo(function ThreeDMarqueeDemo() {
   return (
     <div className="mx-auto w-full max-w-7xl relative">
       <ThreeDMarquee images={groupedSkillImages} />
     </div>
   );
-}
+});
+
+export default ThreeDMarqueeDemo;

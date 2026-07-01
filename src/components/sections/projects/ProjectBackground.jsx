@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from "react";
-import { motion, useTransform, useVelocity, useSpring, useReducedMotion, useMotionTemplate, animate, motionValue, useMotionValue } from "framer-motion";
+import { useEffect, useState, useRef, memo } from "react";
+import { motion, useTransform, useVelocity, useSpring, useReducedMotion, motionValue, useInView } from "framer-motion";
 
 function ProjectBackground({ scrollYProgress, activeCategory }) {
   const isReducedMotion = useReducedMotion();
@@ -7,8 +7,164 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
   const [dimensions, setDimensions] = useState({ width: 1200, height: 2000 });
   const [isMobileView, setIsMobileView] = useState(false);
   const cardsRef = useRef([]);
+  const canvasRef = useRef(null);
 
   const [focusValues, setFocusValues] = useState([]);
+  const isCanvasInView = useInView(canvasRef, { margin: "200px 0px" });
+
+  // WebGL Procedural Background Shader (High-End Shifting Energy)
+  useEffect(() => {
+    if (isReducedMotion || !isCanvasInView) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    if (!gl) return;
+
+    let animationFrameId;
+
+    const syncSize = () => {
+      const w = canvas.clientWidth || 1280;
+      const h = canvas.clientHeight || 720;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+    };
+
+    const resizeObserver = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(syncSize)
+      : null;
+
+    if (resizeObserver) {
+      resizeObserver.observe(canvas);
+    }
+    syncSize();
+
+    const vs = `attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+
+    const fs = `precision highp float;
+varying vec2 v_texCoord;
+uniform float u_time;
+uniform vec2 u_resolution;
+
+vec3 palette(float t) {
+    vec3 a = vec3(0.07, 0.07, 0.07);
+    vec3 b = vec3(0.1, 0.2, 0.4);
+    vec3 c = vec3(0.2, 0.1, 0.3);
+    vec3 d = vec3(0.0, 0.0, 0.0);
+    return a + b*cos(6.28318*(c*t+d));
+}
+
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f*f*(3.0-2.0*f);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    vec2 shift = vec2(100.0);
+    // Pre-calculated cos(0.5) = 0.87758, sin(0.5) = 0.47942
+    mat2 rot = mat2(0.87758, 0.47942, -0.47942, 0.87758);
+    for (int i = 0; i < 5; ++i) {
+        v += a * noise(p);
+        p = rot * p * 2.0 + shift;
+        a *= 0.5;
+    }
+    return v;
+}
+
+void main() {
+    vec2 uv = v_texCoord;
+    vec2 p = (uv - 0.5) * u_resolution.xy / min(u_resolution.x, u_resolution.y);
+    
+    float t = u_time * 0.1;
+    
+    float n1 = fbm(p * 0.8 + t);
+    float n2 = fbm(p * 1.5 - t * 0.5 + n1);
+    
+    vec3 baseColor = vec3(0.05, 0.05, 0.05);
+    vec3 accent1 = vec3(0.23, 0.51, 0.96) * n1;
+    vec3 accent2 = vec3(0.5, 0.2, 0.8) * n2 * 0.5;
+    
+    vec3 finalColor = baseColor + accent1 * 0.2 + accent2 * 0.15;
+    
+    float vignette = 1.0 - smoothstep(0.3, 1.5, length(p));
+    finalColor *= vignette;
+
+    gl_FragColor = vec4(finalColor, 1.0);
+}`;
+
+    const compileShader = (type, src) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      return s;
+    };
+
+    const prog = gl.createProgram();
+    const vsShader = compileShader(gl.VERTEX_SHADER, vs);
+    const fsShader = compileShader(gl.FRAGMENT_SHADER, fs);
+    gl.attachShader(prog, vsShader);
+    gl.attachShader(prog, fsShader);
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+
+    const pos = gl.getAttribLocation(prog, "a_position");
+    gl.enableVertexAttribArray(pos);
+    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+
+    const uTime = gl.getUniformLocation(prog, "u_time");
+    const uRes = gl.getUniformLocation(prog, "u_resolution");
+
+    const render = (t) => {
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      if (uTime) gl.uniform1f(uTime, t * 0.001);
+      if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    animationFrameId = requestAnimationFrame(render);
+
+    return () => {
+      if (resizeObserver) resizeObserver.disconnect();
+      cancelAnimationFrame(animationFrameId);
+      
+      // Clean up GPU resources to prevent VRAM leaks
+      gl.useProgram(null);
+      if (prog) {
+        gl.detachShader(prog, vsShader);
+        gl.deleteShader(vsShader);
+        gl.detachShader(prog, fsShader);
+        gl.deleteShader(fsShader);
+        gl.deleteProgram(prog);
+      }
+      if (buf) {
+        gl.deleteBuffer(buf);
+      }
+    };
+  }, [isReducedMotion, isCanvasInView]);
 
   // Track scroll velocity to dynamically illuminate the network
   const scrollVelocity = useVelocity(scrollYProgress || { get: () => 0 });
@@ -25,46 +181,7 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
   // Map scroll progress directly to the center coordinates of the moving energy corridor pulse
   const energyGlowY = useTransform(scrollYProgress || { get: () => 0 }, [0, 1], ["0%", "100%"]);
 
-  // Motion values to track pointer location for premium interactive spotlight glow
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  const hoverOpacity = useMotionValue(0);
 
-  // Track cursor position on parent section container
-  useEffect(() => {
-    const section = document.getElementById("projects");
-    if (!section) return;
-
-    let rect = null;
-
-    const handleMouseMove = (e) => {
-      if (!rect) {
-        rect = section.getBoundingClientRect();
-      }
-      mouseX.set(e.clientX - rect.left);
-      mouseY.set(e.clientY - rect.top);
-    };
-
-    const handleMouseEnter = () => {
-      rect = section.getBoundingClientRect();
-      animate(hoverOpacity, 1, { duration: 0.3 });
-    };
-
-    const handleMouseLeave = () => {
-      rect = null;
-      animate(hoverOpacity, 0, { duration: 0.4 });
-    };
-
-    section.addEventListener("mousemove", handleMouseMove);
-    section.addEventListener("mouseenter", handleMouseEnter);
-    section.addEventListener("mouseleave", handleMouseLeave);
-
-    return () => {
-      section.removeEventListener("mousemove", handleMouseMove);
-      section.removeEventListener("mouseenter", handleMouseEnter);
-      section.removeEventListener("mouseleave", handleMouseLeave);
-    };
-  }, [mouseX, mouseY, hoverOpacity]);
 
   // Detect card positions in DOM relative to our parent section container
   useEffect(() => {
@@ -136,14 +253,16 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
 
       // Use pre-measured itemPositions to calculate vertical centers to avoid card getBoundingClientRect calls
       if (itemPositions && itemPositions.length > 0) {
-        const sectionRect = section.getBoundingClientRect();
+        const sectionTop = section.offsetTop;
+        const scrollTop = window.scrollY;
+        const currentSectionRelativeTop = sectionTop - scrollTop;
 
         itemPositions.forEach((pos, index) => {
           const focusVal = focusValues[index];
           if (!focusVal) return;
           
           // Math-based card center: section top + static vertical offset + half height
-          const cardCenter = sectionRect.top + pos.top + pos.height / 2;
+          const cardCenter = currentSectionRelativeTop + pos.top + pos.height / 2;
           
           // Target vertical falloff range (focused within 55% of viewport height)
           const falloffRange = window.innerHeight * 0.55;
@@ -176,11 +295,83 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
     };
   }, [isReducedMotion, itemPositions, focusValues]);
 
+  // Viewport height tracking
+  const [vh, setVh] = useState(800);
+  useEffect(() => {
+    const handleResize = () => setVh(window.innerHeight);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const canvasY = useTransform(
+    scrollYProgress || { get: () => 0 },
+    [0, 1],
+    [-vh, dimensions.height]
+  );
+
+  // Generate a set of stable, out-of-phase floating particles distributed along the entire section height
+  const [particles, setParticles] = useState([]);
+  useEffect(() => {
+    const arr = [];
+    const count = 35;
+    for (let i = 0; i < count; i++) {
+      const rand = Math.random();
+      let color, shadow;
+      if (rand < 0.4) {
+        color = "var(--accent)";
+        shadow = "0 0 6px var(--accent)";
+      } else if (rand < 0.7) {
+        color = "var(--accent-hover)";
+        shadow = "0 0 6px var(--accent-hover)";
+      } else {
+        color = "color-mix(in srgb, var(--accent) 35%, #ffffff)";
+        shadow = "0 0 6px color-mix(in srgb, var(--accent) 30%, #ffffff)";
+      }
+      const size = (1.5 + Math.random() * 2.0).toFixed(1);
+      const animNum = Math.floor(Math.random() * 3) + 1;
+      const animName = `particle-float-${animNum}`;
+      const duration = (8 + Math.random() * 10).toFixed(1);
+      const delay = (-Math.random() * 15).toFixed(1);
+
+      arr.push({
+        id: i,
+        left: `${(5 + Math.random() * 90).toFixed(1)}%`,
+        top: `${(2 + Math.random() * 96).toFixed(1)}%`,
+        size: `${size}px`,
+        color,
+        shadow,
+        animName,
+        duration: `${duration}s`,
+        delay: `${delay}s`,
+      });
+    }
+    const timer = setTimeout(() => {
+      setParticles(arr);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Coordinates for the timeline spine axis
   const spineX = isMobileView ? 20 : dimensions.width / 2;
 
   return (
     <>
+      {/* ─── Layer -1: WebGL Procedural Background Shader ─── */}
+      {!isReducedMotion && (
+        <motion.div 
+          className="absolute left-0 right-0 pointer-events-none overflow-hidden select-none"
+          style={{
+            top: 0,
+            y: canvasY,
+            height: vh,
+            zIndex: -50
+          }}
+        >
+          <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
+        </motion.div>
+      )}
+
       {/* isolated CSS Keyframes for GPU-driven flow & particles */}
       <style>{`
         @keyframes data-flow-forward {
@@ -188,20 +379,16 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
           100% { stroke-dashoffset: 0; }
         }
         @keyframes particle-float-1 {
-          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.15; }
-          50% { transform: translate(15px, -35px) scale(1.3); opacity: 0.35; }
+          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+          50% { transform: translate(15px, -35px) scale(1.3); opacity: 0.85; }
         }
         @keyframes particle-float-2 {
-          0%, 100% { transform: translate(0, 0) scale(1.1); opacity: 0.1; }
-          50% { transform: translate(-25px, 20px) scale(0.85); opacity: 0.3; }
+          0%, 100% { transform: translate(0, 0) scale(1.1); opacity: 0.35; }
+          50% { transform: translate(-25px, 20px) scale(0.85); opacity: 0.8; }
         }
         @keyframes particle-float-3 {
-          0%, 100% { transform: translate(0, 0) scale(0.9); opacity: 0.2; }
-          50% { transform: translate(30px, 15px) scale(1.2); opacity: 0.4; }
-        }
-        @keyframes grid-glow-breath {
-          0%, 100% { opacity: 0.08; }
-          50% { opacity: 0.15; }
+          0%, 100% { transform: translate(0, 0) scale(0.9); opacity: 0.45; }
+          50% { transform: translate(30px, 15px) scale(1.2); opacity: 0.9; }
         }
         @keyframes float-orb-1 {
           0%, 100% { transform: translate(0, 0) scale(1); }
@@ -264,42 +451,9 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
         </div>
       )}
 
-      {/* ─── Layer 1: Depth-Varied Ultra-Subtle Grid ─── */}
-      <div 
-        className="absolute inset-0 -z-30 pointer-events-none overflow-hidden select-none bg-transparent"
-        style={{
-          backgroundImage: `
-            linear-gradient(color-mix(in srgb, var(--accent) 1.2%, transparent) 1px, transparent 1px),
-            linear-gradient(90deg, color-mix(in srgb, var(--accent) 1.2%, transparent) 1px, transparent 1px)
-          `,
-          backgroundSize: isMobileView ? "60px 60px" : "100px 100px",
-          maskImage: "linear-gradient(to bottom, transparent, black 150px, black calc(100% - 150px), transparent)",
-          WebkitMaskImage: "linear-gradient(to bottom, transparent, black 150px, black calc(100% - 150px), transparent)",
-        }}
-      />
-      <div 
-        className="absolute inset-0 -z-30 pointer-events-none overflow-hidden select-none bg-transparent"
-        style={{
-          backgroundImage: `
-            linear-gradient(color-mix(in srgb, var(--accent) 0.4%, transparent) 1px, transparent 1px),
-            linear-gradient(90deg, color-mix(in srgb, var(--accent) 0.4%, transparent) 1px, transparent 1px)
-          `,
-          backgroundSize: isMobileView ? "15px 15px" : "25px 25px",
-          maskImage: "linear-gradient(to bottom, transparent, black 150px, black calc(100% - 150px), transparent)",
-          WebkitMaskImage: "linear-gradient(to bottom, transparent, black 150px, black calc(100% - 150px), transparent)",
-        }}
-      />
 
-      {/* ─── Layer 1.5: Interactive Cursor Spotlight Glow ─── */}
-      {!isReducedMotion && (
-        <motion.div
-          className="absolute inset-0 -z-28 pointer-events-none select-none"
-          style={{
-            opacity: hoverOpacity,
-            background: useMotionTemplate`radial-gradient(450px circle at ${mouseX}px ${mouseY}px, color-mix(in srgb, var(--accent) 7.5%, transparent) 0%, transparent 80%)`,
-          }}
-        />
-      )}
+
+
 
       {/* ─── Layer 2: Timeline Energy Field ─── */}
       <div 
@@ -375,64 +529,28 @@ function ProjectBackground({ scrollYProgress, activeCategory }) {
 
       {/* ─── Layer 5: Slow-Moving Floating Data Particles ─── */}
       <div className="absolute inset-0 -z-20 pointer-events-none overflow-hidden select-none bg-transparent">
-        {/* Floating Particle 1 */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            left: "15%",
-            top: "20%",
-            width: "3px",
-            height: "3px",
-            background: "var(--accent)",
-            animation: isReducedMotion ? "none" : "particle-float-1 9s ease-in-out infinite",
-          }}
-        />
-
-        {/* Floating Particle 2 */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            right: "20%",
-            top: "45%",
-            width: "2.5px",
-            height: "2.5px",
-            background: "rgba(255, 255, 255, 0.4)",
-            animation: isReducedMotion ? "none" : "particle-float-2 12s ease-in-out infinite",
-          }}
-        />
-
-        {/* Floating Particle 3 */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            left: "25%",
-            top: "70%",
-            width: "3px",
-            height: "3px",
-            background: "var(--accent)",
-            animation: isReducedMotion ? "none" : "particle-float-3 10s ease-in-out infinite",
-          }}
-        />
-
-        {/* Floating Particle 4 */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            right: "15%",
-            top: "85%",
-            width: "2px",
-            height: "2px",
-            background: "rgba(255, 255, 255, 0.3)",
-            animation: isReducedMotion ? "none" : "particle-float-1 11s ease-in-out infinite",
-            animationDelay: "-3s",
-          }}
-        />
+        {particles.map((p) => (
+          <div
+            key={p.id}
+            className="absolute rounded-full"
+            style={{
+              left: p.left,
+              top: p.top,
+              width: p.size,
+              height: p.size,
+              background: p.color,
+              boxShadow: p.shadow,
+              animation: isReducedMotion ? "none" : `${p.animName} ${p.duration} ease-in-out infinite`,
+              animationDelay: p.delay,
+            }}
+          />
+        ))}
       </div>
     </>
   );
 }
 
-function ProjectConnectionLine({ focusVal, pos, index, spineX, isMobileView, isReducedMotion }) {
+const ProjectConnectionLine = memo(function ProjectConnectionLine({ focusVal, pos, index, spineX, isMobileView, isReducedMotion }) {
   const opacity_line = useTransform(focusVal, (f) => 0.04 + f * 0.15);
   const opacity_pulse = useTransform(focusVal, (f) => 0.08 + f * 0.35);
   const opacity_node1 = useTransform(focusVal, (f) => 0.15 + f * 0.55);
@@ -506,9 +624,9 @@ function ProjectConnectionLine({ focusVal, pos, index, spineX, isMobileView, isR
       )}
     </g>
   );
-}
+});
 
-function ProjectLightVolume({ focusVal, pos, isMobileView }) {
+const ProjectLightVolume = memo(function ProjectLightVolume({ focusVal, pos, isMobileView }) {
   const opacity_volume = useTransform(focusVal, (f) => 0.012 + f * 0.035);
   const scale_volume = useTransform(focusVal, (f) => 0.9 + f * 0.15);
 
@@ -530,6 +648,6 @@ function ProjectLightVolume({ focusVal, pos, isMobileView }) {
       }}
     />
   );
-}
+});
 
 export default ProjectBackground;

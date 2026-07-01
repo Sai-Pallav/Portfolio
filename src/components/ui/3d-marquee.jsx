@@ -343,7 +343,6 @@ const MarqueeColumn = memo(({
 // ─── Main Marquee ─────────────────────────────────────────────────────────────
 export const ThreeDMarquee = ({ images, className, directionPattern }) => {
   const [hoveredSkill, setHoveredSkill] = useState(null);
-  const [focusSource, setFocusSource] = useState('mouse');
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -354,7 +353,6 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
 
   const handlePointerMove = useCallback((e) => {
     if (!hoveredSkill) return;
-    setFocusSource('mouse');
     mouseX.set(e.clientX);
     mouseY.set(e.clientY);
   }, [mouseX, mouseY, hoveredSkill]);
@@ -370,7 +368,6 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
         mouseY.set(rect.top);
       }
       setHoveredSkill(skillData);
-      setFocusSource(source);
     } else {
       setHoveredSkill(null);
     }

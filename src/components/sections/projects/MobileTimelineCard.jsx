@@ -1,6 +1,7 @@
-import { useRef, memo } from "react";
-import { motion, useScroll } from "framer-motion";
+import { useRef, useState, useEffect, memo } from "react";
+import { motion, useScroll, useInView } from "framer-motion";
 import TimelineNode from "./TimelineNode";
+import { getMobileJunctionProgress } from "./timelineAnimation";
 
 const CATEGORY_LABELS = {
   fullstack: {
@@ -42,9 +43,32 @@ const CATEGORY_LABELS = {
 const MobileTimelineCard = memo(function MobileTimelineCard({
   project,
   index,
+  totalProjects,
+  lineProgress,
 }) {
   const cardRef = useRef(null);
-  const hasAwakened = true;
+  const isInView = useInView(cardRef, { once: true, margin: "-100px 0px" });
+  const junctionProgress = getMobileJunctionProgress(index, totalProjects);
+  const [timelineReached, setTimelineReached] = useState(false);
+
+  useEffect(() => {
+    if (!lineProgress) {
+      setTimelineReached(true);
+      return;
+    }
+    if (lineProgress.get() >= junctionProgress) {
+      setTimelineReached(true);
+      return;
+    }
+    const unsubscribe = lineProgress.on("change", (latest) => {
+      if (latest >= junctionProgress) {
+        setTimelineReached(true);
+      }
+    });
+    return () => unsubscribe();
+  }, [lineProgress, junctionProgress]);
+
+  const hasAwakened = isInView && timelineReached;
   const catInfo = CATEGORY_LABELS[project.category] || { label: 'Project', icon: null };
 
   // Track scroll position of this item relative to the viewport
@@ -78,7 +102,7 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
         animate={hasAwakened ? { scaleX: 1, opacity: 1 } : { scaleX: 0, opacity: 0 }}
         transition={{
           duration: hasAwakened ? 0.4 : 0,
-          delay: hasAwakened ? 0.05 : 0,
+          delay: hasAwakened ? 0.5 : 0,
           ease: [0.22, 1, 0.36, 1],
         }}
         aria-hidden="true"
@@ -108,12 +132,12 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
         animate={hasAwakened ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: 20, scale: 0.96 }}
         transition={{
           duration: hasAwakened ? 0.5 : 0,
-          delay: hasAwakened ? 0.2 : 0,
+          delay: hasAwakened ? 0.9 : 0,
           ease: [0.16, 1, 0.3, 1],
         }}
       >
         <div
-          className="relative rounded-xl border overflow-hidden transition-all duration-500"
+          className="relative rounded-2xl border overflow-hidden transition-all duration-500"
           style={{
             background: "linear-gradient(135deg, rgba(24, 24, 27, 0.35) 0%, rgba(24, 24, 27, 0.05) 100%)",
             borderColor: "rgba(255, 255, 255, 0.05)",
@@ -177,6 +201,7 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
               alt={`Screenshot of ${project.title}`}
               className="w-full h-full object-cover"
               loading="lazy"
+              decoding="async"
               onError={(e) => {
                 e.target.style.display = "none";
               }}
@@ -212,9 +237,16 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
             >
               {project.title}
             </h3>
+
+            {/* Mobile Case-Study Outcome Pill */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5 mb-3">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[var(--accent)]/20 bg-[var(--accent-dim)] text-[8px] font-mono font-bold uppercase tracking-wider text-[var(--accent)]">
+                Outcome: {project.highlights[0]}
+              </span>
+            </div>
+
             <p
-              className="text-xs leading-relaxed mb-3.5 opacity-90"
-              style={{ color: "var(--text-secondary)" }}
+              className="text-xs leading-relaxed mb-3.5 opacity-90 text-[var(--text-secondary)]"
             >
               {project.description}
             </p>

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
+import { useRef, useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { experience } from '@/data/experience'
 import CareerCore from './experience/CareerCore'
 import OrbitRing from './experience/OrbitRing'
@@ -35,7 +35,6 @@ const itemVariants = {
 const ORBIT_RADII = [280, 350, 430]
 const ORBIT_DURATIONS = [35, 35, 35]
 const NODE_ANGLES = [0, 120, 240]
-const BEAM_NODE_RADII = [ORBIT_RADII[1], ORBIT_RADII[1], ORBIT_RADII[1]]
 
 function Experience() {
   const sectionRef = useRef(null)
@@ -160,6 +159,49 @@ function Experience() {
       setDetailsPosition(nodeCenterX >= centerX ? 'left' : 'right')
     }
   }, [currentNodeIndex])
+
+  const [beamCoords, setBeamCoords] = useState(null)
+
+  useEffect(() => {
+    if (selectedNodeIndex === -1 || isMobile) {
+      const timer = setTimeout(() => {
+        setBeamCoords(null)
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+
+    const updateCoords = () => {
+      const container = orbitContainerRef.current
+      const activeNode = nodeRefs.current[selectedNodeIndex]
+      if (!container || !activeNode) return
+
+      const containerRect = container.getBoundingClientRect()
+      const nodeRect = activeNode.getBoundingClientRect()
+
+      // Top-left corner of the node button relative to the container, offset inwards
+      const offset = 10
+      const x = nodeRect.left - containerRect.left + offset
+      const y = nodeRect.top - containerRect.top + offset
+
+      setBeamCoords({
+        startX: containerRect.width / 2,
+        startY: containerRect.height / 2,
+        endX: x,
+        endY: y,
+        width: containerRect.width,
+        height: containerRect.height
+      })
+    }
+
+    // Run immediately after layout is stable
+    const timer = setTimeout(updateCoords, 50)
+
+    window.addEventListener('resize', updateCoords)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', updateCoords)
+    }
+  }, [selectedNodeIndex, isMobile])
   
   // Orbit entrance animations
   const orbitSystemVariants = {
@@ -358,7 +400,7 @@ function Experience() {
                   </motion.div>
                 ))}
                 
-                {/* Rotating Parent Container */}
+                 {/* Rotating Parent Container */}
                 <div
                   className="orbit-rotating-parent"
                 >
@@ -405,20 +447,23 @@ function Experience() {
                             />
                           </div>
                         </div>
-                        
-                        {/* Energy Beam - rendered inside the statically rotated wrapper to automatically stay aligned */}
-                        <AnimatePresence>
-                          {currentNodeIndex === i && (
-                            <EnergyBeam
-                              activeNodeIndex={currentNodeIndex}
-                              nodeRadii={BEAM_NODE_RADII}
-                            />
-                          )}
-                        </AnimatePresence>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Energy Beam - rendered globally in unrotated container coordinate space */}
+                {selectedNodeIndex !== -1 && beamCoords && (
+                  <EnergyBeam
+                    key={selectedNodeIndex}
+                    startX={beamCoords.startX}
+                    startY={beamCoords.startY}
+                    endX={beamCoords.endX}
+                    endY={beamCoords.endY}
+                    width={beamCoords.width}
+                    height={beamCoords.height}
+                  />
+                )}
               </div>
               
               {/* Details Panel */}
@@ -439,7 +484,7 @@ function Experience() {
           {/* Premium CTA */}
           <motion.div variants={itemVariants} className="text-center mt-20 md:mt-24">
             <motion.a
-              href="#contact"
+              href="mailto:sai.pallav@bits-pilani.ac.in"
               whileHover={{ scale: 1.05, y: -4 }}
               whileTap={{ scale: 0.98 }}
               className="inline-flex items-center gap-4 px-10 py-5 bg-gradient-to-r from-accent to-accent-hover text-accent-contrast font-bold text-lg rounded-2xl shadow-2xl shadow-accent/30 transition-all duration-300 hover:shadow-accent/50 group relative overflow-hidden"
@@ -461,4 +506,4 @@ function Experience() {
   )
 }
 
-export default Experience
+export default memo(Experience)

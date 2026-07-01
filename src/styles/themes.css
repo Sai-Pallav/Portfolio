@@ -274,51 +274,6 @@
   --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
 }
 
-[data-theme="arctic"] {
-  --bg:              #f4f4f6;
-  --bg-surface:      #eaeaea;
-  --bg-raised:       #ffffff;
-  --border:          rgba(0, 0, 0, 0.06);
-  --border-glow:     rgba(37, 99, 235, 0.15);
-
-  --text-primary:    #121214;
-  --text-heading:    #172033;
-  --text-secondary:  #5e5e64;
-  --text-muted:      #9a9a9f;
-
-  --accent:          #2563EB;
-  --accent-dim:      rgba(37, 99, 235, 0.08);
-  --accent-hover:    #3B82F6;
-  --accent-contrast: #FAFAFA;
-
-  --nav-bg:          rgba(244, 244, 246, 0.80);
-  
-  --shadow-color:    rgba(0, 0, 0, 0.05);
-  --card-shadow:     0 8px 32px 0 var(--shadow-color);
-
-  --highlight:       #facc15;
-  --danger:   #dc2626;
-  --warning:  #d97706;
-  --success:  #16a34a;
-
-  --hover-color-about:    rgba(37, 99, 235, 0.06);
-  --hover-color-skills:   rgba(59, 130, 246, 0.05);
-  --hover-color-projects: rgba(37, 99, 235, 0.08);
-  --hover-color-contact:  rgba(220, 38, 38, 0.03);
-
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
-  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
-
-  /* Hero Redesign Variables */
-  --hero-img-blend: multiply;
-  --hero-img-opacity: 0.85;
-  --hero-noise-opacity: 0.03;
-  --hero-shadow-opacity: 0.2;
-  --hero-ambient-glow: radial-gradient(circle at 60% 50%, rgba(37, 99, 235, 0.04) 0%, transparent 70%);
-}
-
 [data-theme="midnight-violet"] {
   --bg:              #040308;
   --bg-surface:      #090712;
@@ -598,77 +553,18 @@ html {
 }
 
 /* Only apply expensive box-shadow transitions to elements that actually have shadows */
-.theme-transitioning .premium-glass,
 .theme-transitioning button,
 .theme-transitioning [class*="shadow-"] {
   transition: box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 /* Transitions Exclusions */
-[data-animate],
-.hero-blob,
-.timeline-line,
 .hero-background-env,
 .hero-noise-overlay,
 .hero-portrait-img,
 canvas {
   transition: none !important;
 }
-
-/* ========================================================
-   SCROLL ANIMATION UTILITIES
-   Applied via useScrollAnimation hook
-   Optimized with Apple-like slick cubic-bezier curve
-   ======================================================== */
-
-/* Base state - elements start hidden */
-[data-animate] {
-  opacity: 0;
-  will-change: transform, opacity;
-}
-
-/* Fade Up Animation */
-[data-animate="fade-up"] {
-  transform: translateY(45px);
-}
-
-[data-animate="fade-up"].animate-in {
-  animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Fade In Animation */
-[data-animate="fade-in"].animate-in {
-  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Slide Left Animation */
-[data-animate="slide-left"] {
-  transform: translateX(45px);
-}
-
-[data-animate="slide-left"].animate-in {
-  animation: slideLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Slide Right Animation */
-[data-animate="slide-right"] {
-  transform: translateX(-45px);
-}
-
-[data-animate="slide-right"].animate-in {
-  animation: slideRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Scale Up Animation */
-[data-animate="scale-up"] {
-  transform: scale(0.92);
-}
-
-[data-animate="scale-up"].animate-in {
-  animation: scaleUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Keyframes are defined in animations.css — single source of truth */
 
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
@@ -681,32 +577,10 @@ canvas {
     scroll-behavior: auto !important;
   }
 
-  [data-animate] {
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
   .animate-ping,
   .animate-pulse,
   .animate-spin,
   .animate-bounce {
     animation: none !important;
   }
-}
-
-/* ========================================================
-   PREMIUM GLASSMORPHISM & UTILITIES
-   ======================================================== */
-
-.premium-glass {
-  background: color-mix(in srgb, var(--bg-surface) 35%, transparent);
-  backdrop-filter: blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
-  border: 1px solid var(--border);
-  box-shadow: var(--card-shadow);
-}
-
-.premium-glass:hover {
-  border-color: var(--border-glow);
-  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.9), 0 0 15px 0 var(--border-glow);
 }

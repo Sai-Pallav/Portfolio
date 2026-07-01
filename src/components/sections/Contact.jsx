@@ -1,8 +1,8 @@
-import { motion, useReducedMotion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion'
+import { motion, useReducedMotion, AnimatePresence, useMotionValue, useSpring, useInView } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { personal, contactMethods } from '@/data/personal'
-import SocialIcon from '@/components/ui/SocialIcon'
 import emailjs from '@emailjs/browser'
+import Contact3DObject from './Contact3DObject'
 import {
   Send,
   Loader2,
@@ -14,7 +14,11 @@ import {
 const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID
 const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
 const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-const isConfigured = !!(serviceId && templateId && publicKey)
+const isConfigured = !!(serviceId && templateId && publicKey && 
+  !serviceId.includes('your_') && 
+  !templateId.includes('your_') && 
+  !publicKey.includes('your_')
+)
 
 // Custom Floating Input Component for Premium Feel
 function FloatingInput({ id, label, type, value, onChange, onBlur, error }) {
@@ -25,8 +29,9 @@ function FloatingInput({ id, label, type, value, onChange, onBlur, error }) {
     <div className="relative w-full group">
       {/* Premium sub-pixel glow outline on focus */}
       <div
-        className={`absolute -inset-[1.5px] rounded-2xl transition-all duration-500 opacity-0 group-focus-within:opacity-100 blur-[2px] pointer-events-none -z-10 ${error ? 'bg-gradient-to-r from-red-500/30 to-rose-600/30' : 'bg-gradient-to-r from-accent/30 to-indigo-500/30'
-          }`}
+        className={`absolute -inset-[1.5px] rounded-2xl transition-all duration-500 opacity-0 group-focus-within:opacity-100 blur-[2px] pointer-events-none -z-10 ${
+          error ? 'bg-gradient-to-r from-red-500/30 to-rose-600/30' : 'bg-gradient-to-r from-accent/30 to-indigo-500/30'
+        }`}
       />
       <input
         type={type}
@@ -40,16 +45,18 @@ function FloatingInput({ id, label, type, value, onChange, onBlur, error }) {
           if (onBlur) onBlur(e)
         }}
         placeholder=" "
-        className={`peer w-full rounded-2xl border bg-bg-surface/30 px-4 pt-6 pb-2 text-sm text-[var(--text-heading)] outline-none transition-all duration-300 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.02)] ${error
+        className={`peer w-full rounded-2xl border bg-bg-surface/30 px-4 pt-6 pb-2 text-sm text-[var(--text-heading)] outline-none transition-all duration-300 backdrop-blur-md shadow-[inset_0_1px_2px_rgba(255,255,255,0.02)] ${
+          error
             ? 'border-red-500/30 focus:border-red-500 focus:shadow-[0_0_20px_rgba(239,68,68,0.08)]'
             : 'border-white/[0.06] focus:border-accent/50 focus:shadow-[0_0_20px_var(--accent-dim)]'
-          } focus:bg-bg-surface/50`}
+        } focus:bg-bg-surface/50`}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute left-4 top-4 origin-[0] -translate-y-3.5 scale-75 text-xs text-muted duration-300 transform pointer-events-none peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-focus:-translate-y-3.5 peer-focus:scale-75 ${error ? 'peer-focus:text-red-500' : 'peer-focus:text-accent'
-          } ${focused || hasValue ? '-translate-y-3.5 scale-75' : ''} font-semibold tracking-wide`}
+        className={`absolute left-4 top-4 origin-[0] -translate-y-3.5 scale-75 text-xs text-muted duration-300 transform pointer-events-none peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-focus:-translate-y-3.5 peer-focus:scale-75 ${
+          error ? 'peer-focus:text-red-500' : 'peer-focus:text-accent'
+        } ${focused || hasValue ? '-translate-y-3.5 scale-75' : ''} font-semibold tracking-wide`}
       >
         {label}
       </label>
@@ -77,8 +84,9 @@ function FloatingTextarea({ id, label, value, onChange, onBlur, error, rows = 5,
     <div className="relative w-full group">
       {/* Premium sub-pixel glow outline on focus */}
       <div
-        className={`absolute -inset-[1.5px] rounded-2xl transition-all duration-500 opacity-0 group-focus-within:opacity-100 blur-[2px] pointer-events-none -z-10 ${error ? 'bg-gradient-to-r from-red-500/30 to-rose-600/30' : 'bg-gradient-to-r from-accent/30 to-indigo-500/30'
-          }`}
+        className={`absolute -inset-[1.5px] rounded-2xl transition-all duration-500 opacity-0 group-focus-within:opacity-100 blur-[2px] pointer-events-none -z-10 ${
+          error ? 'bg-gradient-to-r from-red-500/30 to-rose-600/30' : 'bg-gradient-to-r from-accent/30 to-indigo-500/30'
+        }`}
       />
       <textarea
         id={id}
@@ -92,16 +100,18 @@ function FloatingTextarea({ id, label, value, onChange, onBlur, error, rows = 5,
         }}
         placeholder=" "
         rows={rows}
-        className={`peer w-full rounded-2xl border bg-bg-surface/30 px-4 pt-6 pb-2 text-sm text-[var(--text-heading)] outline-none transition-all duration-300 backdrop-blur-md resize-none shadow-[inset_0_1px_2px_rgba(255,255,255,0.02)] ${error
+        className={`peer w-full rounded-2xl border bg-bg-surface/30 px-4 pt-6 pb-2 text-sm text-[var(--text-heading)] outline-none transition-all duration-300 backdrop-blur-md resize-none shadow-[inset_0_1px_2px_rgba(255,255,255,0.02)] ${
+          error
             ? 'border-red-500/30 focus:border-red-500 focus:shadow-[0_0_20px_rgba(239,68,68,0.08)]'
             : 'border-white/[0.06] focus:border-accent/50 focus:shadow-[0_0_20px_var(--accent-dim)]'
-          } focus:bg-bg-surface/50`}
+        } focus:bg-bg-surface/50`}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute left-4 top-4 origin-[0] -translate-y-3.5 scale-75 text-xs text-muted duration-300 transform pointer-events-none peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-focus:-translate-y-3.5 peer-focus:scale-75 ${error ? 'peer-focus:text-red-500' : 'peer-focus:text-accent'
-          } ${focused || hasValue ? '-translate-y-3.5 scale-75' : ''} font-semibold tracking-wide`}
+        className={`absolute left-4 top-4 origin-[0] -translate-y-3.5 scale-75 text-xs text-muted duration-300 transform pointer-events-none peer-placeholder-shown:translate-y-0 peer-placeholder-shown:scale-100 peer-placeholder-shown:text-sm peer-focus:-translate-y-3.5 peer-focus:scale-75 ${
+          error ? 'peer-focus:text-red-500' : 'peer-focus:text-accent'
+        } ${focused || hasValue ? '-translate-y-3.5 scale-75' : ''} font-semibold tracking-wide`}
       >
         {label}
       </label>
@@ -194,7 +204,7 @@ function MagneticButton({ children, disabled, className, type = 'submit' }) {
 
 function Contact() {
   const sectionRef = useRef(null)
-  const isInView = true
+  const isInView = useInView(sectionRef, { once: true, margin: '-100px 0px' })
   const shouldReduceMotion = useReducedMotion()
 
   // Form State
@@ -346,14 +356,6 @@ function Contact() {
     },
   }
 
-  // Pre-filter social configurations to only render GitHub, LinkedIn, Instagram, LeetCode
-  const socialsToRender = [
-    { platform: 'github', url: personal.socials.github },
-    { platform: 'linkedin', url: personal.socials.linkedin },
-    { platform: 'instagram', url: personal.socials.instagram },
-    { platform: 'leetcode', url: personal.socials.leetcode }
-  ].filter(s => s.url)
-
   return (
     <section id="contact" ref={sectionRef} className="relative min-h-screen overflow-hidden px-6 py-24 md:py-32">
       {/* Background Layer with Glow Mesh and Noise */}
@@ -374,7 +376,7 @@ function Contact() {
                 repeat: Infinity,
                 ease: 'easeInOut'
               }}
-              className="absolute -top-[10%] left-[10%] h-[450px] w-[450px] rounded-full bg-accent/10 blur-[130px] pointer-events-none"
+              className="absolute -top-[10%] left-[10%] h-[450px] w-[450px] rounded-full bg-accent/10 blur-[130px] pointer-events-none transform-gpu will-change-transform"
             />
             <motion.div
               animate={{
@@ -387,7 +389,7 @@ function Contact() {
                 repeat: Infinity,
                 ease: 'easeInOut'
               }}
-              className="absolute top-[35%] -right-[10%] h-[500px] w-[500px] rounded-full bg-indigo-500/8 blur-[140px] pointer-events-none"
+              className="absolute top-[35%] -right-[10%] h-[500px] w-[500px] rounded-full bg-indigo-500/8 blur-[140px] pointer-events-none transform-gpu will-change-transform"
             />
             <motion.div
               animate={{
@@ -400,7 +402,7 @@ function Contact() {
                 repeat: Infinity,
                 ease: 'easeInOut'
               }}
-              className="absolute -bottom-[10%] left-[15%] h-[480px] w-[480px] rounded-full bg-purple-500/8 blur-[130px] pointer-events-none"
+              className="absolute -bottom-[10%] left-[15%] h-[480px] w-[480px] rounded-full bg-purple-500/8 blur-[130px] pointer-events-none transform-gpu will-change-transform"
             />
           </>
         )}
@@ -426,12 +428,14 @@ function Contact() {
           variants={containerVariants}
           initial="hidden"
           animate={isInView ? 'visible' : 'hidden'}
-          className="grid grid-cols-1 lg:grid-cols-10 gap-16 lg:gap-20 items-start"
+          className="grid grid-cols-1 lg:grid-cols-10 gap-16 lg:gap-20 items-center"
         >
-          {/* LEFT SIDE: Information (40% span on LG) */}
-          <motion.div variants={itemVariants} className="lg:col-span-4 flex flex-col justify-center">
-
-            {/* Section Badge */}
+          {/* LEFT SIDE: Information & Form Card (50% split on LG) */}
+          <motion.div
+            variants={itemVariants}
+            className="lg:col-span-5 w-full relative z-20"
+          >
+            {/* Badge & Heading text */}
             <div className="mb-6 self-start inline-flex items-center gap-2.5 rounded-full border border-accent/20 bg-accent-dim/30 px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-accent shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] backdrop-blur-md">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
@@ -440,110 +444,21 @@ function Contact() {
               <span>Get in touch</span>
             </div>
 
-            {/* Typography Heading */}
             <h2 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.15] tracking-tight text-[var(--text-heading)]">
               Let's craft the <span className="bg-gradient-to-r from-accent via-indigo-400 to-accent-hover bg-clip-text text-transparent filter drop-shadow-[0_0_20px_var(--accent-dim)]">next thing</span> together.
             </h2>
 
-            {/* Description */}
-            <p className="mt-6 text-base leading-relaxed text-secondary/80 md:text-lg font-medium">
+            <p className="mt-6 text-base leading-relaxed text-secondary/80 md:text-lg font-medium mb-8">
               Have an engineering brief, a system architecture hurdle, or an open engineering role? Pitch it to me. I bring clear engineering judgment, swift responses, and a passion for crafting robust code.
             </p>
 
-            {/* Availability Indicator Badge */}
-            <div className="mt-8 flex items-start gap-3.5 rounded-2xl border border-white/[0.06] bg-white/[0.01] p-5 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.03)] hover:border-white/10 transition-all duration-300">
-              <span className="relative mt-1.5 flex h-2.5 w-2.5 flex-shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-[var(--text-heading)] tracking-wide">{personal.availability}</p>
-                <p className="mt-1.5 text-xs leading-relaxed text-secondary/70">
-                  Open to full-stack, systems development, developer toolings, or backend roles.
-                </p>
-              </div>
-            </div>
-
-            {/* Contact Methods Stack */}
-            <div className="mt-8 space-y-4">
-              {contactMethods.map((method, index) => (
-                <motion.div
-                  key={method.label}
-                  variants={itemVariants}
-                  whileHover={shouldReduceMotion ? {} : { y: -3, scale: 1.01 }}
-                  className="group relative overflow-hidden rounded-2xl border border-white/[0.05] bg-white/[0.01] p-5 transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) hover:border-accent/30 hover:bg-white/[0.03] hover:shadow-[0_20px_50px_rgba(0,0,0,0.3)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.02)]"
-                >
-                  {/* Premium top border light sweep on hover */}
-                  <div className="absolute inset-x-0 top-0 h-[1px] translate-x-[-100%] bg-gradient-to-r from-transparent via-accent/50 to-transparent transition-transform duration-1000 cubic-bezier(0.16, 1, 0.3, 1) group-hover:translate-x-[100%]" />
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.02] text-secondary transition-all duration-500 group-hover:border-accent/40 group-hover:bg-accent-dim/50 group-hover:text-accent shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
-                      {method.icon}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-secondary/50">{method.label}</p>
-                        <span className="font-mono text-[9px] text-secondary/30">0{index + 1}</span>
-                      </div>
-                      {method.href ? (
-                        <a
-                          href={method.href}
-                          target={method.href.startsWith('http') ? '_blank' : undefined}
-                          rel={method.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                          className="flex items-center justify-between gap-1 text-sm font-bold text-[var(--text-heading)] transition-colors duration-300 hover:text-accent mt-1"
-                        >
-                          <span className="truncate">{method.value}</span>
-                          <ArrowUpRight className="h-4 w-4 flex-shrink-0 opacity-0 transition-all duration-300 -translate-x-1 translate-y-1 group-hover:translate-x-0 group-hover:translate-y-0 group-hover:opacity-100 text-accent" />
-                        </a>
-                      ) : (
-                        <p className="text-sm font-bold text-[var(--text-heading)] mt-1">{method.value}</p>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Social Buttons Section */}
-            <div className="mt-10">
-              <p className="text-xs font-bold uppercase tracking-[0.15em] text-secondary/50 mb-4">Connect on Socials</p>
-              <div className="flex gap-4 flex-wrap">
-                {socialsToRender.map(({ platform, url }) => (
-                  <motion.a
-                    key={platform}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    whileHover={shouldReduceMotion ? {} : { y: -5, rotate: 4, scale: 1.05 }}
-                    whileTap={shouldReduceMotion ? {} : { scale: 0.95 }}
-                    className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.01] border border-white/10 text-secondary hover:text-accent hover:border-accent/40 hover:shadow-[0_15px_30px_rgba(0,0,0,0.2),0_0_20px_var(--accent-dim)] transition-all duration-300 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.03)]"
-                    aria-label={`Visit ${platform} profile`}
-                  >
-                    <SocialIcon platform={platform} className="h-5.5 w-5.5" />
-                  </motion.a>
-                ))}
-              </div>
-            </div>
-
-            {/* Promise Banner */}
-            <div className="mt-8 flex items-center gap-2.5 text-xs text-secondary/65 font-medium">
-              <ShieldCheck className="h-4.5 w-4.5 text-accent/80" />
-              <span>Response promise: I typically reply within 24 hours.</span>
-            </div>
-
-          </motion.div>
-
-          {/* RIGHT SIDE: Premium Form Card (60% span on LG) */}
-          <motion.div
-            variants={itemVariants}
-            className="lg:col-span-6"
-          >
-            {/* Interactive Spotlight Glow Border Wrapper */}
+            {/* Interactive Spotlight Glow Border Wrapper containing Form Card */}
             <div
               ref={formCardRef}
               onMouseMove={handleMouseMoveCard}
               onMouseEnter={handleMouseEnterCard}
               onMouseLeave={handleMouseLeaveCard}
-              className="relative p-[1px] overflow-hidden rounded-3xl bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.6)] transition-all duration-500 group/card"
+              className="relative p-[1px] overflow-hidden rounded-3xl bg-white/[0.06] shadow-[0_30px_90px_rgba(0,0,0,0.6)] transition-all duration-500 group/card w-full"
             >
               {/* Spotlight Glow Shader */}
               {!shouldReduceMotion && (
@@ -556,7 +471,7 @@ function Contact() {
               )}
 
               {/* Inner Card Glass Container */}
-              <div className="relative rounded-[23px] bg-bg-surface/85 backdrop-blur-2xl p-6 md:p-8 w-full h-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.04)]">
+              <div className="relative rounded-[23px] bg-bg-surface/35 backdrop-blur-3xl p-6 md:p-8 w-full h-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.02)]">
 
                 <AnimatePresence mode="wait">
                   {!showSuccess ? (
@@ -643,7 +558,7 @@ function Contact() {
                           disabled={isSubmitting}
                           className={`mt-4 flex w-full items-center justify-center gap-2.5 rounded-xl py-4 px-6 text-sm font-semibold transition-all duration-300 ${isSubmitting
                               ? 'cursor-not-allowed bg-accent/50 text-accent-contrast'
-                              : 'bg-accent text-accent-contrast shadow-[0_15px_35px_var(--accent-dim)] hover:bg-accent-hover hover:shadow-[0_20px_50px_rgba(37,99,235,0.35)]'
+                              : 'bg-accent text-accent-contrast shadow-[0_15px_35px_var(--accent-dim)] hover:bg-accent-hover hover:shadow-[0_20px_50px_var(--border-glow)]'
                             }`}
                         >
                           {isSubmitting ? (
@@ -721,6 +636,79 @@ function Contact() {
 
               </div>
             </div>
+          </motion.div>
+
+          {/* RIGHT SIDE: 3D Globe & Supporting Cards (50% split on LG) */}
+          <motion.div
+            variants={itemVariants}
+            className="lg:col-span-5 flex flex-col justify-center w-full relative z-20"
+          >
+            {/* 3D Globe Projection nested at the top of the Right Column */}
+            <div className="relative w-full h-[260px] md:h-[320px] overflow-visible mb-8 flex items-center justify-center pointer-events-none z-10">
+              <Contact3DObject />
+            </div>
+
+            {/* Availability Indicator Badge */}
+            <div className="mt-4 flex items-start gap-3.5 rounded-2xl border border-white/[0.04] bg-bg-surface/30 backdrop-blur-xl p-5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.02)] hover:border-white/10 hover:bg-bg-surface/50 transition-all duration-300">
+              <span className="relative mt-1.5 flex h-2.5 w-2.5 flex-shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-[var(--text-heading)] tracking-wide">{personal.availability}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-secondary/70">
+                  Open to full-stack, systems development, developer toolings, or backend roles.
+                </p>
+              </div>
+            </div>
+
+            {/* Contact Methods Stack - Balanced 2-Column Grid Layout */}
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {contactMethods.map((method, index) => (
+                <motion.div
+                  key={method.label}
+                  variants={itemVariants}
+                  whileHover={shouldReduceMotion ? {} : { y: -3, scale: 1.01 }}
+                  className={`group relative overflow-hidden rounded-2xl border border-white/[0.04] bg-bg-surface/30 backdrop-blur-xl p-5 transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) hover:border-accent/30 hover:bg-bg-surface/50 hover:shadow-[0_20px_50px_var(--border-glow)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.02)] ${
+                    index === 0 ? 'sm:col-span-2' : 'col-span-1'
+                  }`}
+                >
+                  {/* Premium top border light sweep on hover */}
+                  <div className="absolute inset-x-0 top-0 h-[1px] translate-x-[-100%] bg-gradient-to-r from-transparent via-accent/50 to-transparent transition-transform duration-1000 cubic-bezier(0.16, 1, 0.3, 1) group-hover:translate-x-[100%]" />
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.02] text-secondary transition-all duration-500 group-hover:border-accent/40 group-hover:bg-accent-dim/50 group-hover:text-accent shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
+                      {method.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-secondary/50">{method.label}</p>
+                        <span className="font-mono text-[9px] text-secondary/30">0{index + 1}</span>
+                      </div>
+                      {method.href ? (
+                        <a
+                          href={method.href}
+                          target={method.href.startsWith('http') ? '_blank' : undefined}
+                          rel={method.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                          className="flex items-center justify-between gap-1 text-sm font-bold text-[var(--text-heading)] transition-colors duration-300 hover:text-accent mt-1"
+                        >
+                          <span className="truncate">{method.value}</span>
+                          <ArrowUpRight className="h-4 w-4 flex-shrink-0 opacity-0 transition-all duration-300 -translate-x-1 translate-y-1 group-hover:translate-x-0 group-hover:translate-y-0 group-hover:opacity-100 text-accent" />
+                        </a>
+                      ) : (
+                        <p className="text-sm font-bold text-[var(--text-heading)] mt-1">{method.value}</p>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Promise Banner */}
+            <div className="mt-6 flex items-center gap-2.5 text-xs text-secondary/65 font-medium">
+              <ShieldCheck className="h-4.5 w-4.5 text-accent/80" />
+              <span>Response promise: I typically reply within 24 hours.</span>
+            </div>
+
           </motion.div>
 
         </motion.div>

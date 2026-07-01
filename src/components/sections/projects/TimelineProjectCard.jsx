@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 
 const CATEGORY_LABELS = {
   fullstack: {
@@ -38,36 +38,22 @@ const CATEGORY_LABELS = {
 };
 
 const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, isLeft }) {
-  const [isHovered, setIsHovered] = useState(false);
   const catInfo = CATEGORY_LABELS[project.category] || { label: 'Project', icon: null };
 
   return (
-    <div 
-      className="relative"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <div className="relative group/card">
       {/* Card container */}
       <div
-        className="relative rounded-2xl border overflow-hidden transition-all duration-500"
+        className="relative rounded-2xl border overflow-hidden transition-all duration-500 bg-gradient-to-br from-zinc-900/[0.35] to-zinc-950/[0.05] hover:from-zinc-900/[0.45] hover:to-zinc-950/[0.15] border-white/[0.05] hover:border-white/[0.12] shadow-[0_4px_20px_-5px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7),0_0_20px_-5px_var(--accent-dim)]"
         style={{
-          background: isHovered
-            ? "linear-gradient(135deg, rgba(24, 24, 27, 0.45) 0%, rgba(24, 24, 27, 0.15) 100%)"
-            : "linear-gradient(135deg, rgba(24, 24, 27, 0.35) 0%, rgba(24, 24, 27, 0.05) 100%)",
-          borderColor: isHovered ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.05)",
-          boxShadow: isHovered
-            ? "0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 20px -5px var(--accent-dim)"
-            : "0 4px 20px -5px rgba(0, 0, 0, 0.3)",
           backdropFilter: "blur(12px)",
         }}
       >
         {/* Connection port indicator on the branch-facing edge */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-full z-10 transition-all duration-500 ${isLeft ? "-right-0.75" : "-left-0.75"}`}
+          className={`absolute top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-full z-10 transition-all duration-500 opacity-50 group-hover/card:opacity-90 group-hover/card:shadow-[0_0_10px_var(--accent)] ${isLeft ? "-right-0.75" : "-left-0.75"}`}
           style={{
             background: "var(--accent)",
-            opacity: isHovered ? 0.9 : 0.5,
-            boxShadow: isHovered ? "0 0 10px var(--accent)" : "none",
           }}
           aria-hidden="true"
         />
@@ -120,11 +106,9 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
           <img
             src={project.image}
             alt={`Screenshot of ${project.title}`}
-            className="w-full h-full object-cover transition-transform duration-1000 ease-out"
-            style={{
-              transform: isHovered ? "scale(1.02)" : "scale(1)",
-            }}
+            className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover/card:scale-102"
             loading="lazy"
+            decoding="async"
             onError={(e) => {
               e.target.style.display = "none";
             }}
@@ -161,27 +145,39 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
         <div className="p-6">
           {/* Title with hover color shift */}
           <h3
-            className="font-heading text-xl md:text-2xl font-bold mb-2.5 transition-colors duration-300"
-            style={{ color: isHovered ? "var(--accent)" : "var(--text-primary)" }}
+            className="font-heading text-xl md:text-2xl font-bold mb-2 transition-colors duration-300 text-[var(--text-primary)] group-hover/card:text-[var(--accent)]"
           >
             {project.title}
           </h3>
 
+          {/* Date & Core Case-Study Outcome Badge */}
+          <div className="flex flex-wrap items-center gap-2.5 mb-4">
+            <span className="text-[10px] font-mono tracking-widest uppercase text-white/40">
+              Released: {project.date}
+            </span>
+            <span className="text-white/20 select-none">•</span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase border border-[var(--accent)]/20 bg-[var(--accent-dim)] text-[var(--accent)] shadow-[0_0_8px_var(--accent-dim)]">
+              <svg className="w-2.5 h-2.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Outcome: {project.highlights[0]}
+            </span>
+          </div>
+
           {/* Description */}
           <p
-            className="text-sm leading-relaxed mb-4 opacity-90"
-            style={{ color: "var(--text-secondary)" }}
+            className="text-sm leading-relaxed mb-4 text-[var(--text-secondary)] opacity-90"
           >
             {project.description}
           </p>
 
-          {/* Highlights Grid */}
-          {project.highlights?.length > 0 && (
+          {/* Secondary Highlights list */}
+          {project.highlights?.length > 1 && (
             <div className="grid grid-cols-1 gap-2 mb-5">
-              {project.highlights.map((h, i) => (
+              {project.highlights.slice(1).map((h, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-2.5 p-2 rounded-lg border border-white/[0.03]"
+                  className="flex items-start gap-2.5 p-2 rounded-lg border border-white/[0.03] transition-all duration-300 hover:border-white/[0.06] hover:bg-white/[0.005]"
                   style={{
                     background: 'rgba(255, 255, 255, 0.005)',
                   }}

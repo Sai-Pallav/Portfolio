@@ -3,34 +3,33 @@ import { memo, useId } from 'react'
 
 /**
  * Energy Beam - Animated laser connection from core to the experience node.
- * Uses a static curved bezier path and scales natively via SVG.
+ * Uses a straight path and scales dynamically via SVG.
  * 
  * @param {{
- *   activeNodeIndex: number,
- *   nodeRadii: number[]
+ *   startX: number,
+ *   startY: number,
+ *   endX: number,
+ *   endY: number,
+ *   width: number,
+ *   height: number
  * }} props
  */
-const EnergyBeam = memo(function EnergyBeam({ activeNodeIndex, nodeRadii }) {
+const EnergyBeam = memo(function EnergyBeam({ startX, startY, endX, endY, width, height }) {
   const idSuffix = useId().replace(/:/g, '')
   const uid = `energy-beam-${idSuffix}`
   
-  // Center is 400, 400 inside the static 800x800 SVG canvas
-  const centerX = 400
-  const centerY = 400
+  const centerX = startX
+  const centerY = startY
+  const targetX = endX
+  const targetY = endY
   
-  const radius = nodeRadii[activeNodeIndex]
-  const targetX = centerX + radius
-  const targetY = centerY
-  
-  // Curved bezier path: starts at center, curves slightly upward, ends at the node
-  const midX = centerX + radius * 0.5
-  const midY = centerY - 35
-  const beamPath = `M ${centerX} ${centerY} Q ${midX} ${midY} ${targetX} ${targetY}`
+  // Straight path: starts at center, ends at the node
+  const beamPath = `M ${centerX} ${centerY} L ${targetX} ${targetY}`
   
   return (
-    <svg
+    <motion.svg
       className="absolute inset-0 pointer-events-none"
-      viewBox="0 0 800 800"
+      viewBox={`0 0 ${width} ${height}`}
       style={{
         width: '100%',
         height: '100%',
@@ -38,17 +37,27 @@ const EnergyBeam = memo(function EnergyBeam({ activeNodeIndex, nodeRadii }) {
         overflow: 'visible'
       }}
       aria-hidden="true"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
     >
       <defs>
         {/* Beam gradient - stronger at core, fading at node */}
-        <linearGradient id={`beamGradient-${uid}`} x1="0%" y1="0%" x2="100%" y2="0%">
+        <linearGradient
+          id={`beamGradient-${uid}`}
+          gradientUnits="userSpaceOnUse"
+          x1={centerX}
+          y1={centerY}
+          x2={targetX}
+          y2={targetY}
+        >
           <stop offset="0%" stopColor="var(--accent)" stopOpacity="1" />
           <stop offset="40%" stopColor="var(--accent)" stopOpacity="0.9" />
           <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.3" />
         </linearGradient>
         
         {/* Glow filter */}
-        <filter id={`beamGlow-${uid}`}>
+        <filter id={`beamGlow-${uid}`} filterUnits="userSpaceOnUse">
           <feGaussianBlur stdDeviation="3" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
@@ -63,84 +72,174 @@ const EnergyBeam = memo(function EnergyBeam({ activeNodeIndex, nodeRadii }) {
         </radialGradient>
       </defs>
       
-      {/* Main beam path */}
-      <motion.path
-        d={beamPath}
-        stroke={`url(#beamGradient-${uid})`}
-        strokeWidth="2.5"
-        fill="none"
-        strokeLinecap="round"
-        initial={{ pathLength: 0, opacity: 0 }}
-        animate={{ pathLength: 1, opacity: 0.8 }}
-        exit={{ pathLength: 0, opacity: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        filter={`url(#beamGlow-${uid})`}
-      />
-      
-      {/* Glow layer */}
+      {/* Outer glow layer (diffuse blur) */}
       <motion.path
         d={beamPath}
         stroke="var(--accent)"
-        strokeWidth="5"
-        strokeOpacity="0.3"
+        strokeWidth="7"
+        strokeOpacity="0.15"
         fill="none"
         strokeLinecap="round"
-        initial={{ pathLength: 0, opacity: 0 }}
-        animate={{ pathLength: 1, opacity: 0.4 }}
-        exit={{ pathLength: 0, opacity: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut", delay: 0.03 }}
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
         filter={`url(#beamGlow-${uid})`}
       />
       
-      {/* Energy pulse traveling along beam */}
+      {/* Mid glow layer (ambient laser color) */}
+      <motion.path
+        d={beamPath}
+        stroke={`url(#beamGradient-${uid})`}
+        strokeWidth="3.5"
+        strokeOpacity="0.65"
+        fill="none"
+        strokeLinecap="round"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut", delay: 0.02 }}
+      />
+
+      {/* Inner hot core (high intensity laser center) */}
+      <motion.path
+        d={beamPath}
+        stroke="#ffffff"
+        strokeWidth="1.2"
+        strokeOpacity="0.95"
+        fill="none"
+        strokeLinecap="round"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
+      />
+      
+      {/* Energy pulse 1 traveling along beam */}
       <motion.circle
-        r="5.5"
-        fill={`url(#pulseGradient-${uid})`}
+        r="3"
+        fill="#ffffff"
         initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 1, 0] }}
+        animate={{ opacity: [0, 1, 1, 0] }}
         transition={{
-          duration: 1.5,
+          duration: 1.8,
           repeat: Infinity,
-          repeatDelay: 0.5,
-          delay: 0.5
+          ease: "linear"
         }}
+        filter={`url(#beamGlow-${uid})`}
       >
         <animateMotion
-          dur="1.5s"
+          dur="1.8s"
           repeatCount="indefinite"
           path={beamPath}
         />
       </motion.circle>
       
-      {/* Node endpoint glow */}
+      {/* Energy pulse 2 (staggered delay) */}
+      <motion.circle
+        r="2.5"
+        fill="var(--accent)"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.8, 0.8, 0] }}
+        transition={{
+          duration: 1.8,
+          repeat: Infinity,
+          ease: "linear"
+        }}
+      >
+        <animateMotion
+          dur="1.8s"
+          begin="0.9s"
+          repeatCount="indefinite"
+          path={beamPath}
+        />
+      </motion.circle>
+      
+      {/* Node endpoint - rotating tech reticle */}
       <motion.circle
         cx={targetX}
         cy={targetY}
-        r="4.5"
-        fill="var(--accent)"
-        initial={{ opacity: 0 }}
-        animate={{ 
-          opacity: [0.4, 0.8, 0.4],
-          scale: [1, 1.5, 1]
-        }}
+        r="9"
+        stroke="var(--accent)"
+        strokeWidth="1"
+        strokeDasharray="4 2"
+        strokeOpacity="0.8"
+        fill="none"
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1, rotate: 360 }}
+        style={{ transformOrigin: `${targetX}px ${targetY}px` }}
         transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut",
-          delay: 0.5
+          scale: { duration: 0.4 },
+          opacity: { duration: 0.4 },
+          rotate: { duration: 8, repeat: Infinity, ease: "linear" }
+        }}
+      />
+      
+      {/* Node endpoint - diamond bracket */}
+      <motion.rect
+        x={targetX - 6.5}
+        y={targetY - 6.5}
+        width="13"
+        height="13"
+        rx="1"
+        stroke="var(--accent-hover)"
+        strokeWidth="0.8"
+        strokeOpacity="0.5"
+        fill="none"
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: [0.3, 0.7, 0.3], rotate: 45 }}
+        style={{ transformOrigin: `${targetX}px ${targetY}px` }}
+        transition={{
+          scale: { duration: 0.4 },
+          rotate: { duration: 0 },
+          opacity: { duration: 2.5, repeat: Infinity, ease: "easeInOut" }
+        }}
+      />
+
+      {/* Node endpoint - center micro target dot */}
+      <motion.circle
+        cx={targetX}
+        cy={targetY}
+        r="3"
+        fill="#ffffff"
+        stroke="var(--accent)"
+        strokeWidth="1.2"
+        initial={{ scale: 0 }}
+        animate={{ scale: [1, 1.25, 1] }}
+
+        transition={{
+          scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }
         }}
         filter={`url(#beamGlow-${uid})`}
       />
       
-      {/* Core emission point */}
+      {/* Core emission - outer energy ring */}
       <motion.circle
         cx={centerX}
         cy={centerY}
-        r="6.5"
-        fill="var(--accent)"
+        r="12"
+        stroke="var(--accent)"
+        strokeWidth="1"
+        strokeOpacity="0.4"
+        fill="none"
         animate={{
-          scale: [1, 1.3, 1],
-          opacity: [0.6, 1, 0.6]
+          scale: [1, 1.35, 1],
+          opacity: [0.1, 0.5, 0.1]
+        }}
+        transition={{
+          duration: 2.2,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+      />
+
+      {/* Core emission - center pulsing dot */}
+      <motion.circle
+        cx={centerX}
+        cy={centerY}
+        r="5"
+        fill="#ffffff"
+        stroke="var(--accent)"
+        strokeWidth="1.8"
+        animate={{
+          scale: [1, 1.2, 1]
         }}
         transition={{
           duration: 2,
@@ -149,7 +248,7 @@ const EnergyBeam = memo(function EnergyBeam({ activeNodeIndex, nodeRadii }) {
         }}
         filter={`url(#beamGlow-${uid})`}
       />
-    </svg>
+    </motion.svg>
   )
 })
 

@@ -1,18 +1,41 @@
-import { useRef } from "react";
-import { motion, useScroll } from "framer-motion";
+import { useRef, useState, useEffect, memo } from "react";
+import { motion, useScroll, useInView } from "framer-motion";
 import TimelineNode from "./TimelineNode";
 import BranchConnector from "./BranchConnector";
 import TimelineProjectCard from "./TimelineProjectCard";
-import { BRANCH_WIDTH } from "./timelineAnimation";
+import { BRANCH_WIDTH, getDesktopJunctionProgress } from "./timelineAnimation";
 
-function TimelineItem({
+const TimelineItem = memo(function TimelineItem({
   project,
   index,
   isLeft,
   topOffset,
+  totalProjects,
+  lineProgress,
 }) {
   const itemRef = useRef(null);
-  const hasAwakened = true;
+  const isInView = useInView(itemRef, { once: true, margin: "-100px 0px" });
+  const junctionProgress = getDesktopJunctionProgress(index, totalProjects);
+  const [timelineReached, setTimelineReached] = useState(false);
+
+  useEffect(() => {
+    if (!lineProgress) {
+      setTimelineReached(true);
+      return;
+    }
+    if (lineProgress.get() >= junctionProgress) {
+      setTimelineReached(true);
+      return;
+    }
+    const unsubscribe = lineProgress.on("change", (latest) => {
+      if (latest >= junctionProgress) {
+        setTimelineReached(true);
+      }
+    });
+    return () => unsubscribe();
+  }, [lineProgress, junctionProgress]);
+
+  const hasAwakened = isInView && timelineReached;
 
   // Track scroll position of this item relative to the viewport
   const { scrollYProgress } = useScroll({
@@ -80,8 +103,8 @@ function TimelineItem({
           initial={{ scaleX: 0, opacity: 0 }}
           animate={hasAwakened ? { scaleX: 1, opacity: 1 } : { scaleX: 0, opacity: 0 }}
           transition={{
-            duration: hasAwakened ? 0.5 : 0,
-            delay: hasAwakened ? 0.1 : 0,
+            duration: hasAwakened ? 0.4 : 0,
+            delay: hasAwakened ? 0.5 : 0,
             ease: [0.22, 1, 0.36, 1],
           }}
           aria-hidden="true"
@@ -96,7 +119,7 @@ function TimelineItem({
           animate={hasAwakened ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 30, scale: 0.96 }}
           transition={{
             duration: hasAwakened ? 0.6 : 0,
-            delay: hasAwakened ? 0.35 : 0,
+            delay: hasAwakened ? 0.9 : 0,
             ease: [0.16, 1, 0.3, 1],
           }}
         >
@@ -109,6 +132,6 @@ function TimelineItem({
       </div>
     </div>
   );
-}
+});
 
 export default TimelineItem;

@@ -22,7 +22,8 @@ function ThemeToggle({ showPicker, setShowPicker }) {
       const timer = setTimeout(() => setIsFullyOpen(true), 500)
       return () => clearTimeout(timer)
     } else {
-      setIsFullyOpen(false)
+      const timer = setTimeout(() => setIsFullyOpen(false), 0)
+      return () => clearTimeout(timer)
     }
   }, [showPicker])
 

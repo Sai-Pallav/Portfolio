@@ -1,5 +1,5 @@
 import { motion, useInView } from "framer-motion";
-import { useRef, useState } from "react";
+import { useRef, useState, memo } from "react";
 import ThreeDMarqueeDemo from "../3d-marquee-demo";
 import SkillsGrid from "./skills/SkillsGrid";
 
@@ -190,4 +190,4 @@ function Skills() {
   );
 }
 
-export default Skills;
+export default memo(Skills);

@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState, useMemo } from "react";
-import { motion, useReducedMotion, useScroll, useMotionValue, animate } from "framer-motion";
+import { useRef, useEffect, useState, useMemo, memo } from "react";
+import { motion, useReducedMotion, useScroll, useMotionValue, animate, useInView } from "framer-motion";
 import { projects } from "@/data/projects";
 import { personal } from "@/data/personal.jsx";
 import SocialIcon from "@/components/ui/SocialIcon";
@@ -23,12 +23,12 @@ const CATEGORIES = [
   { id: "systems", label: "Systems" },
 ];
 
-function Projects() {
+const Projects = memo(function Projects() {
   const sectionRef = useRef(null);
   const containerRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false);
   const prefersReducedMotion = useReducedMotion();
-  const timelineInView = true;
+  const timelineInView = useInView(sectionRef, { once: true, margin: "-100px 0px" });
 
   const [activeCategory, setActiveCategory] = useState("all");
 
@@ -49,7 +49,7 @@ function Projects() {
       lineProgress.set(0);
       const controls = animate(lineProgress, 1, {
         duration: 1.5,
-        delay: 0.5,
+        delay: 0.8,
         ease: "easeInOut",
       });
       return () => controls.stop();
@@ -67,7 +67,7 @@ function Projects() {
       mobileLineProgress.set(0);
       const controls = animate(mobileLineProgress, 1, {
         duration: 1.2,
-        delay: 0.5,
+        delay: 0.8,
         ease: "easeOut",
       });
       return () => controls.stop();
@@ -261,7 +261,7 @@ function Projects() {
             <div className="space-y-48 py-8">
               {filteredProjects.map((project, i) => (
                 <MobileTimelineCard
-                  key={project.id}
+                  key={`${activeCategory}-${project.id}`}
                   project={project}
                   index={i}
                   totalProjects={filteredProjects.length}
@@ -308,7 +308,7 @@ function Projects() {
               const topOffset = HEADER_SPACING + index * ITEM_GAP;
 
               return (
-                <div key={`item-${project.id}`}>
+                <div key={`${activeCategory}-${project.id}`}>
                   <TimelineItem
                     project={project}
                     index={index}
@@ -396,12 +396,14 @@ function Projects() {
       </div>
     </section>
   );
-}
+});
 
-export default function ProjectsWithErrorBoundary() {
+const ProjectsWithErrorBoundary = memo(function ProjectsWithErrorBoundary() {
   return (
     <ProjectsErrorBoundary>
       <Projects />
     </ProjectsErrorBoundary>
   );
-}
+});
+
+export default ProjectsWithErrorBoundary;

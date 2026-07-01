@@ -69,30 +69,42 @@ const TimelineNode = memo(function TimelineNode({ scrollYProgress, hasAwakened }
       />
 
       {/* 4. Core: Bright violet center, sharp focus point, breathing idle state */}
-      <motion.div
-        className="relative w-5 h-5 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)]"
-        initial={{ scale: 0.85, opacity: 0 }}
-        animate={hasAwakened ? {
-          scale: [1, 1.03, 1],
-          opacity: 1,
-          boxShadow: [
-            "0 0 8px var(--accent-dim)",
-            "0 0 16px var(--accent)",
-            "0 0 8px var(--accent-dim)"
-          ]
-        } : { scale: 0.85, opacity: 0 }}
-        transition={hasAwakened ? {
-          scale: { duration: 3.5, repeat: Infinity, ease: "easeInOut" },
-          boxShadow: { duration: 3.5, repeat: Infinity, ease: "easeInOut" },
-          opacity: { duration: 0.3 }
-        } : {}}
-        style={{
-          border: "1.5px solid rgba(255, 255, 255, 0.45)",
-        }}
-      >
-        {/* Specular high-contrast center pin dot */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white shadow-[0_0_4px_#ffffff]" />
-      </motion.div>
+      <div className="relative w-5 h-5">
+        {/* Breathing glow overlay behind the core (GPU-composited blur) */}
+        <motion.div
+          className="absolute inset-0 rounded-full bg-[var(--accent)] blur-[4px]"
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={hasAwakened ? {
+            opacity: [0.25, 0.7, 0.25],
+            scale: [1, 1.3, 1],
+          } : { opacity: 0, scale: 0.85 }}
+          transition={hasAwakened ? {
+            opacity: { duration: 3.5, repeat: Infinity, ease: "easeInOut" },
+            scale: { duration: 3.5, repeat: Infinity, ease: "easeInOut" }
+          } : {}}
+          style={{ pointerEvents: "none" }}
+        />
+
+        <motion.div
+          className="relative w-full h-full rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)]"
+          initial={{ scale: 0.85, opacity: 0 }}
+          animate={hasAwakened ? {
+            scale: [1, 1.03, 1],
+            opacity: 1,
+          } : { scale: 0.85, opacity: 0 }}
+          transition={hasAwakened ? {
+            scale: { duration: 3.5, repeat: Infinity, ease: "easeInOut" },
+            opacity: { duration: 0.3 }
+          } : {}}
+          style={{
+            border: "1.5px solid rgba(255, 255, 255, 0.45)",
+            boxShadow: "0 0 8px var(--accent-dim)",
+          }}
+        >
+          {/* Specular high-contrast center pin dot */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white shadow-[0_0_4px_#ffffff]" />
+        </motion.div>
+      </div>
 
       {/* 5. Energy Ripple (Single-shot wave expanding outward on wake-up) */}
       {hasAwakened && (

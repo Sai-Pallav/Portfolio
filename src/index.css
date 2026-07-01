@@ -106,6 +106,6 @@ main {
 /* Mobile adjustments for cinematic hero portrait blending */
 @media (max-width: 768px) {
   .hero-portrait-img {
-    opacity: calc(var(--hero-img-opacity) * 0.4) !important;
+    opacity: calc(var(--hero-img-opacity) * 0.6) !important;
   }
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { personal } from '@/data/personal'
 import { useCinematicNav } from '@/hooks/useCinematicNav'
@@ -15,8 +15,8 @@ const navItems = [
 
 /* ─────────────────────────────────────────────
    TRIGGER BUTTON  (top-center, slim pill)
-───────────────────────────────────────────── */
-function FloatingNavTrigger({ isOpen, onClick }) {
+   ───────────────────────────────────────────── */
+const FloatingNavTrigger = memo(function FloatingNavTrigger({ isOpen, onClick }) {
   const [isHovered, setIsHovered] = useState(false)
 
   return (
@@ -94,12 +94,13 @@ function FloatingNavTrigger({ isOpen, onClick }) {
       )}
     </AnimatePresence>
   )
-}
+})
+
 
 /* ─────────────────────────────────────────────
    HORIZONTAL NAVBAR  (expands from button)
 ───────────────────────────────────────────── */
-function FloatingNavbar({ activeSection, isOpen, onClose, onNavClick }) {
+const FloatingNavbar = memo(function FloatingNavbar({ activeSection, isOpen, onClose, onNavClick }) {
 
   const handleClick = (e, href) => {
     onClose()          // Close the navbar panel first
@@ -224,12 +225,12 @@ function FloatingNavbar({ activeSection, isOpen, onClose, onNavClick }) {
       )}
     </AnimatePresence>
   )
-}
+})
 
 /* ─────────────────────────────────────────────
    ROOT EXPORT
 ───────────────────────────────────────────── */
-function Navbar({ activeSection }) {
+const Navbar = memo(function Navbar({ activeSection }) {
   const [isOpen, setIsOpen] = useState(false)
   const handleNavClick = useCinematicNav(navItems)
 
@@ -244,6 +245,7 @@ function Navbar({ activeSection }) {
       />
     </>
   )
-}
+})
 
 export default Navbar
+
