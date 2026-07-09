@@ -1,187 +1,47 @@
-import { useEffect, useState, useRef, memo } from "react";
-import { motion, useTransform, useVelocity, useSpring, useReducedMotion, motionValue, useInView } from "framer-motion";
+import { useEffect, useState, useRef, useMemo, memo } from "react";
+import { motion, useTransform, motionValue } from "framer-motion";
+import PcbFragment from "./pcbFragments/PcbFragment";
 
-function ProjectBackground({ scrollYProgress, activeCategory }) {
-  const isReducedMotion = useReducedMotion();
+/* ─────────────────────────────────────────────────────────────
+   DOT GRID LAYER
+   Uniform 28px-spaced dot grid. Opacity: ~5%. Atmospheric only.
+───────────────────────────────────────────────────────────── */
+const DotGridLayer = memo(function DotGridLayer() {
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none select-none"
+      style={{ zIndex: -35 }}
+      aria-hidden="true"
+    >
+      <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern
+            id="pcb-dot-grid"
+            x="0"
+            y="0"
+            width="28"
+            height="28"
+            patternUnits="userSpaceOnUse"
+          >
+            <circle cx="1.5" cy="1.5" r="0.75" fill="var(--accent)" opacity="0.05" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#pcb-dot-grid)" />
+      </svg>
+    </div>
+  );
+});
+
+/* ─────────────────────────────────────────────────────────────
+   MAIN COMPONENT
+───────────────────────────────────────────────────────────── */
+function ProjectBackground({ activeCategory }) {
   const [itemPositions, setItemPositions] = useState([]);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 2000 });
   const [isMobileView, setIsMobileView] = useState(false);
   const cardsRef = useRef([]);
-  const canvasRef = useRef(null);
 
   const [focusValues, setFocusValues] = useState([]);
-  const isCanvasInView = useInView(canvasRef, { margin: "200px 0px" });
-
-  // WebGL Procedural Background Shader (High-End Shifting Energy)
-  useEffect(() => {
-    if (isReducedMotion || !isCanvasInView) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    if (!gl) return;
-
-    let animationFrameId;
-
-    const syncSize = () => {
-      const w = canvas.clientWidth || 1280;
-      const h = canvas.clientHeight || 720;
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-      }
-    };
-
-    const resizeObserver = typeof ResizeObserver !== "undefined"
-      ? new ResizeObserver(syncSize)
-      : null;
-
-    if (resizeObserver) {
-      resizeObserver.observe(canvas);
-    }
-    syncSize();
-
-    const vs = `attribute vec2 a_position;
-varying vec2 v_texCoord;
-void main() {
-  v_texCoord = a_position * 0.5 + 0.5;
-  gl_Position = vec4(a_position, 0.0, 1.0);
-}`;
-
-    const fs = `precision highp float;
-varying vec2 v_texCoord;
-uniform float u_time;
-uniform vec2 u_resolution;
-
-vec3 palette(float t) {
-    vec3 a = vec3(0.07, 0.07, 0.07);
-    vec3 b = vec3(0.1, 0.2, 0.4);
-    vec3 c = vec3(0.2, 0.1, 0.3);
-    vec3 d = vec3(0.0, 0.0, 0.0);
-    return a + b*cos(6.28318*(c*t+d));
-}
-
-float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-}
-
-float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    f = f*f*(3.0-2.0*f);
-    float a = hash(i);
-    float b = hash(i + vec2(1.0, 0.0));
-    float c = hash(i + vec2(0.0, 1.0));
-    float d = hash(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-float fbm(vec2 p) {
-    float v = 0.0;
-    float a = 0.5;
-    vec2 shift = vec2(100.0);
-    // Pre-calculated cos(0.5) = 0.87758, sin(0.5) = 0.47942
-    mat2 rot = mat2(0.87758, 0.47942, -0.47942, 0.87758);
-    for (int i = 0; i < 5; ++i) {
-        v += a * noise(p);
-        p = rot * p * 2.0 + shift;
-        a *= 0.5;
-    }
-    return v;
-}
-
-void main() {
-    vec2 uv = v_texCoord;
-    vec2 p = (uv - 0.5) * u_resolution.xy / min(u_resolution.x, u_resolution.y);
-    
-    float t = u_time * 0.1;
-    
-    float n1 = fbm(p * 0.8 + t);
-    float n2 = fbm(p * 1.5 - t * 0.5 + n1);
-    
-    vec3 baseColor = vec3(0.05, 0.05, 0.05);
-    vec3 accent1 = vec3(0.23, 0.51, 0.96) * n1;
-    vec3 accent2 = vec3(0.5, 0.2, 0.8) * n2 * 0.5;
-    
-    vec3 finalColor = baseColor + accent1 * 0.2 + accent2 * 0.15;
-    
-    float vignette = 1.0 - smoothstep(0.3, 1.5, length(p));
-    finalColor *= vignette;
-
-    gl_FragColor = vec4(finalColor, 1.0);
-}`;
-
-    const compileShader = (type, src) => {
-      const s = gl.createShader(type);
-      gl.shaderSource(s, src);
-      gl.compileShader(s);
-      return s;
-    };
-
-    const prog = gl.createProgram();
-    const vsShader = compileShader(gl.VERTEX_SHADER, vs);
-    const fsShader = compileShader(gl.FRAGMENT_SHADER, fs);
-    gl.attachShader(prog, vsShader);
-    gl.attachShader(prog, fsShader);
-    gl.linkProgram(prog);
-    gl.useProgram(prog);
-
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-
-    const pos = gl.getAttribLocation(prog, "a_position");
-    gl.enableVertexAttribArray(pos);
-    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
-
-    const uTime = gl.getUniformLocation(prog, "u_time");
-    const uRes = gl.getUniformLocation(prog, "u_resolution");
-
-    const render = (t) => {
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      if (uTime) gl.uniform1f(uTime, t * 0.001);
-      if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    animationFrameId = requestAnimationFrame(render);
-
-    return () => {
-      if (resizeObserver) resizeObserver.disconnect();
-      cancelAnimationFrame(animationFrameId);
-      
-      // Clean up GPU resources to prevent VRAM leaks
-      gl.useProgram(null);
-      if (prog) {
-        gl.detachShader(prog, vsShader);
-        gl.deleteShader(vsShader);
-        gl.detachShader(prog, fsShader);
-        gl.deleteShader(fsShader);
-        gl.deleteProgram(prog);
-      }
-      if (buf) {
-        gl.deleteBuffer(buf);
-      }
-    };
-  }, [isReducedMotion, isCanvasInView]);
-
-  // Track scroll velocity to dynamically illuminate the network
-  const scrollVelocity = useVelocity(scrollYProgress || { get: () => 0 });
-  const absVelocity = useTransform(scrollVelocity, (v) => Math.abs(v));
-  
-  // Resting opacity is very low (0.15), scaling up to 0.85 during fast scrolls for a premium shimmer
-  const networkOpacityRaw = useTransform(
-    absVelocity,
-    [0, 0.002, 0.015],
-    [0.15, 0.45, 0.85]
-  );
-  const networkOpacity = useSpring(networkOpacityRaw, { stiffness: 100, damping: 20 });
-
-  // Map scroll progress directly to the center coordinates of the moving energy corridor pulse
-  const energyGlowY = useTransform(scrollYProgress || { get: () => 0 }, [0, 1], ["0%", "100%"]);
-
-
 
   // Detect card positions in DOM relative to our parent section container
   useEffect(() => {
@@ -238,7 +98,7 @@ void main() {
     };
   }, [activeCategory, isMobileView]);
 
-  // Compute card proximity focus values at 60fps using requestAnimationFrame (No React re-renders!)
+  // Compute card proximity focus values on scroll (Selective static illumination)
   useEffect(() => {
     let ticking = false;
 
@@ -251,7 +111,7 @@ void main() {
       
       const centerY = window.innerHeight / 2;
 
-      // Use pre-measured itemPositions to calculate vertical centers to avoid card getBoundingClientRect calls
+      // Use pre-measured itemPositions to calculate vertical centers
       if (itemPositions && itemPositions.length > 0) {
         const sectionTop = section.offsetTop;
         const scrollTop = window.scrollY;
@@ -261,17 +121,12 @@ void main() {
           const focusVal = focusValues[index];
           if (!focusVal) return;
           
-          // Math-based card center: section top + static vertical offset + half height
           const cardCenter = currentSectionRelativeTop + pos.top + pos.height / 2;
-          
-          // Target vertical falloff range (focused within 55% of viewport height)
           const falloffRange = window.innerHeight * 0.55;
           const distance = Math.abs(cardCenter - centerY);
           const focusFactor = Math.max(0, 1 - distance / falloffRange);
-          
-          // Sharp cubic curve for selective lighting
           const easedFocus = Math.pow(focusFactor, 2.5);
-          focusVal.set(isReducedMotion ? 1 : easedFocus);
+          focusVal.set(easedFocus);
         });
       }
 
@@ -293,117 +148,103 @@ void main() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [isReducedMotion, itemPositions, focusValues]);
-
-  // Viewport height tracking
-  const [vh, setVh] = useState(800);
-  useEffect(() => {
-    const handleResize = () => setVh(window.innerHeight);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const canvasY = useTransform(
-    scrollYProgress || { get: () => 0 },
-    [0, 1],
-    [-vh, dimensions.height]
-  );
-
-  // Generate a set of stable, out-of-phase floating particles distributed along the entire section height
-  const [particles, setParticles] = useState([]);
-  useEffect(() => {
-    const arr = [];
-    const count = 35;
-    for (let i = 0; i < count; i++) {
-      const rand = Math.random();
-      let color, shadow;
-      if (rand < 0.4) {
-        color = "var(--accent)";
-        shadow = "0 0 6px var(--accent)";
-      } else if (rand < 0.7) {
-        color = "var(--accent-hover)";
-        shadow = "0 0 6px var(--accent-hover)";
-      } else {
-        color = "color-mix(in srgb, var(--accent) 35%, #ffffff)";
-        shadow = "0 0 6px color-mix(in srgb, var(--accent) 30%, #ffffff)";
-      }
-      const size = (1.5 + Math.random() * 2.0).toFixed(1);
-      const animNum = Math.floor(Math.random() * 3) + 1;
-      const animName = `particle-float-${animNum}`;
-      const duration = (8 + Math.random() * 10).toFixed(1);
-      const delay = (-Math.random() * 15).toFixed(1);
-
-      arr.push({
-        id: i,
-        left: `${(5 + Math.random() * 90).toFixed(1)}%`,
-        top: `${(2 + Math.random() * 96).toFixed(1)}%`,
-        size: `${size}px`,
-        color,
-        shadow,
-        animName,
-        duration: `${duration}s`,
-        delay: `${delay}s`,
-      });
-    }
-    const timer = setTimeout(() => {
-      setParticles(arr);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+  }, [itemPositions, focusValues]);
 
   // Coordinates for the timeline spine axis
   const spineX = isMobileView ? 20 : dimensions.width / 2;
 
+  const CARD_KEEP_OUT_PX = 110; // within 90–120 spec
+  const SPINE_KEEP_OUT_PX = 150; // per spec
+
+  const pcbKeepOutRects = useMemo(() => {
+    const keep = [];
+    // Card halos
+    for (const pos of itemPositions) {
+      keep.push({
+        x: Math.max(0, pos.left - CARD_KEEP_OUT_PX),
+        y: Math.max(0, pos.top - CARD_KEEP_OUT_PX),
+        w: Math.min(dimensions.width, pos.left + pos.width + CARD_KEEP_OUT_PX) - Math.max(0, pos.left - CARD_KEEP_OUT_PX),
+        h: Math.min(dimensions.height, pos.top + pos.height + CARD_KEEP_OUT_PX) - Math.max(0, pos.top - CARD_KEEP_OUT_PX),
+      });
+    }
+    // Timeline corridor keep-out (full height)
+    keep.push({
+      x: Math.max(0, spineX - SPINE_KEEP_OUT_PX),
+      y: 0,
+      w: Math.min(dimensions.width, spineX + SPINE_KEEP_OUT_PX) - Math.max(0, spineX - SPINE_KEEP_OUT_PX),
+      h: dimensions.height,
+    });
+    return keep;
+  }, [itemPositions, dimensions.width, dimensions.height, spineX]);
+
+  const pcbFragments = useMemo(() => {
+    if (dimensions.width <= 0 || dimensions.height <= 0) return [];
+
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const overlapsAny = (box) =>
+      pcbKeepOutRects.some((r) => {
+        const x1 = Math.max(box.x, r.x);
+        const y1 = Math.max(box.y, r.y);
+        const x2 = Math.min(box.x + box.w, r.x + r.w);
+        const y2 = Math.min(box.y + box.h, r.y + r.h);
+        return x2 > x1 && y2 > y1;
+      });
+
+    const leftLimit = isMobileView ? Math.max(0, spineX + SPINE_KEEP_OUT_PX) : Math.max(0, spineX - SPINE_KEEP_OUT_PX);
+    const rightStart = Math.max(0, spineX + SPINE_KEEP_OUT_PX);
+
+    const leftMaxW = isMobileView ? Math.max(0, dimensions.width - rightStart) : Math.max(0, leftLimit);
+    const rightMaxW = Math.max(0, dimensions.width - rightStart);
+
+    const base = [
+      { side: "left", edge: "left", density: "medium", yT: 0.13, wT: 0.28, hT: 0.18, opacity: 0.95 },
+      { side: "left", edge: "left", density: "light", yT: 0.40, wT: 0.22, hT: 0.16, opacity: 0.85 },
+      { side: "left", edge: "left", density: "dense", yT: 0.72, wT: 0.26, hT: 0.20, opacity: 0.95 },
+      { side: "right", edge: "right", density: "light", yT: 0.18, wT: 0.22, hT: 0.16, opacity: 0.85 },
+      { side: "right", edge: "right", density: "medium", yT: 0.52, wT: 0.26, hT: 0.19, opacity: 0.92 },
+      { side: "right", edge: "right", density: "light", yT: 0.84, wT: 0.20, hT: 0.15, opacity: 0.82 },
+    ];
+
+    // Mobile: only show subtle right-side fragments (avoid left spine).
+    const templates = isMobileView ? base.filter((t) => t.side === "right").map((t) => ({ ...t, density: "light", opacity: 0.75 })) : base;
+
+    const out = [];
+    for (let i = 0; i < templates.length; i++) {
+      const t = templates[i];
+      const maxW = t.side === "left" ? leftMaxW : rightMaxW;
+      if (maxW < 140) continue;
+
+      const w = clamp(Math.round(dimensions.width * t.wT), 180, Math.min(420, Math.round(maxW - 18)));
+      const h = clamp(Math.round(dimensions.height * t.hT), 160, 340);
+
+      const x = t.side === "left" ? 0 : rightStart;
+      let y = clamp(Math.round(dimensions.height * t.yT - h / 2), 0, Math.max(0, dimensions.height - h));
+
+      // Nudge down until we find negative space not colliding with keep-out.
+      let tries = 0;
+      while (tries < 10 && overlapsAny({ x, y, w, h })) {
+        y = clamp(y + 80, 0, Math.max(0, dimensions.height - h));
+        tries++;
+      }
+      if (overlapsAny({ x, y, w, h })) continue;
+
+      out.push({
+        id: `${activeCategory}-frag-${i}`,
+        x,
+        y,
+        w,
+        h,
+        edge: t.edge,
+        density: t.density,
+        opacity: t.opacity,
+        seedKey: `${activeCategory}-${i}-${t.side}-${t.density}`,
+      });
+    }
+    return out;
+  }, [dimensions.width, dimensions.height, pcbKeepOutRects, spineX, SPINE_KEEP_OUT_PX, isMobileView, activeCategory]);
+
   return (
     <>
-      {/* ─── Layer -1: WebGL Procedural Background Shader ─── */}
-      {!isReducedMotion && (
-        <motion.div 
-          className="absolute left-0 right-0 pointer-events-none overflow-hidden select-none"
-          style={{
-            top: 0,
-            y: canvasY,
-            height: vh,
-            zIndex: -50
-          }}
-        >
-          <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
-        </motion.div>
-      )}
-
-      {/* isolated CSS Keyframes for GPU-driven flow & particles */}
-      <style>{`
-        @keyframes data-flow-forward {
-          0% { stroke-dashoffset: 240; }
-          100% { stroke-dashoffset: 0; }
-        }
-        @keyframes particle-float-1 {
-          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
-          50% { transform: translate(15px, -35px) scale(1.3); opacity: 0.85; }
-        }
-        @keyframes particle-float-2 {
-          0%, 100% { transform: translate(0, 0) scale(1.1); opacity: 0.35; }
-          50% { transform: translate(-25px, 20px) scale(0.85); opacity: 0.8; }
-        }
-        @keyframes particle-float-3 {
-          0%, 100% { transform: translate(0, 0) scale(0.9); opacity: 0.45; }
-          50% { transform: translate(30px, 15px) scale(1.2); opacity: 0.9; }
-        }
-        @keyframes float-orb-1 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(30px, -45px) scale(1.05); }
-        }
-        @keyframes float-orb-2 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(-40px, 30px) scale(0.95); }
-        }
-        @keyframes float-orb-3 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(25px, 40px) scale(1.03); }
-        }
-      `}</style>
-
       {/* ─── Layer 0: Film Grain Noise Texture (Premium Matte Effect) ─── */}
       <div 
         className="absolute inset-0 -z-45 pointer-events-none opacity-[0.012] mix-blend-overlay select-none"
@@ -412,50 +253,61 @@ void main() {
         }}
       />
 
-      {/* ─── Layer 0.5: Elegant Slow-Drifting Ambient Mesh Orbs ─── */}
-      {!isReducedMotion && (
-        <div className="absolute inset-0 -z-40 pointer-events-none overflow-hidden select-none opacity-40">
-          <div 
-            className="absolute rounded-full blur-[150px]"
-            style={{
-              width: "600px",
-              height: "600px",
-              left: "-10%",
-              top: "15%",
-              background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 6%, transparent) 0%, transparent 70%)",
-              animation: "float-orb-1 25s ease-in-out infinite",
-            }}
-          />
-          <div 
-            className="absolute rounded-full blur-[180px]"
-            style={{
-              width: "700px",
-              height: "700px",
-              right: "-15%",
-              top: "55%",
-              background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 4.5%, transparent) 0%, transparent 70%)",
-              animation: "float-orb-2 32s ease-in-out infinite",
-            }}
-          />
-          <div 
-            className="absolute rounded-full blur-[150px]"
-            style={{
-              width: "500px",
-              height: "500px",
-              left: "20%",
-              bottom: "10%",
-              background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 70%)",
-              animation: "float-orb-3 28s ease-in-out infinite",
-            }}
-          />
-        </div>
-      )}
+      {/* ─── Layer 0.5: Elegant Static Ambient Mesh Orbs ─── */}
+      <div className="absolute inset-0 -z-40 pointer-events-none overflow-hidden select-none opacity-40">
+        <div 
+          className="absolute rounded-full blur-[150px]"
+          style={{
+            width: "600px",
+            height: "600px",
+            left: "-10%",
+            top: "15%",
+            background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 6%, transparent) 0%, transparent 70%)",
+          }}
+        />
+        <div 
+          className="absolute rounded-full blur-[180px]"
+          style={{
+            width: "700px",
+            height: "700px",
+            right: "-15%",
+            top: "55%",
+            background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 4.5%, transparent) 0%, transparent 70%)",
+          }}
+        />
+        <div 
+          className="absolute rounded-full blur-[150px]"
+          style={{
+            width: "500px",
+            height: "500px",
+            left: "20%",
+            bottom: "10%",
+            background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 70%)",
+          }}
+        />
+      </div>
 
+      {/* ─── Layer 1: Atmospheric Dot Grid ─── */}
+      <DotGridLayer />
 
+      {/* ─── Layer 1.5: Independent PCB fragments (positioned in negative space) ─── */}
+      {pcbFragments.map((f) => (
+        <PcbFragment
+          key={f.id}
+          id={f.id}
+          x={f.x}
+          y={f.y}
+          w={f.w}
+          h={f.h}
+          edge={f.edge}
+          density={f.density}
+          keepOutRects={pcbKeepOutRects}
+          opacity={f.opacity}
+          seedKey={f.seedKey}
+        />
+      ))}
 
-
-
-      {/* ─── Layer 2: Timeline Energy Field ─── */}
+      {/* ─── Layer 2: Timeline Spine Corridor ─── */}
       <div 
         className="absolute inset-y-0 -z-20 pointer-events-none overflow-hidden select-none bg-transparent"
         style={{
@@ -471,26 +323,14 @@ void main() {
             background: `linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 4.5%, transparent) 50%, transparent)`,
           }}
         />
-
-        {/* Traveling energy node following viewport center */}
-        {!isReducedMotion && (
-          <motion.div
-            className="absolute left-1/2 -translate-x-1/2 w-48 h-96 pointer-events-none blur-[45px]"
-            style={{
-              top: energyGlowY,
-              transform: "translate(-50%, -50%)",
-              background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 14%, transparent) 0%, transparent 70%)",
-            }}
-          />
-        )}
       </div>
 
-      {/* ─── Layer 3 & 5: Connection Network & Dynamic Data Flow Pipelines ─── */}
+      {/* ─── Layer 3: Connection Network (Static connections) ─── */}
       <div className="absolute inset-0 -z-15 pointer-events-none overflow-hidden select-none">
         <motion.svg
           className="w-full h-full"
           style={{
-            opacity: isReducedMotion ? 0.3 : networkOpacity,
+            opacity: 0.25,
           }}
         >
           {itemPositions.map((pos, index) => {
@@ -504,14 +344,13 @@ void main() {
                 index={index}
                 spineX={spineX}
                 isMobileView={isMobileView}
-                isReducedMotion={isReducedMotion}
               />
             );
           })}
         </motion.svg>
       </div>
 
-      {/* ─── Layer 4 & 6: Atmospheric Light Volumes & Focus Zone ─── */}
+      {/* ─── Layer 4: Static Focus Zone Lights ─── */}
       <div className="absolute inset-0 -z-25 pointer-events-none overflow-hidden select-none">
         {itemPositions.map((pos, index) => {
           const focusVal = focusValues[index];
@@ -526,33 +365,12 @@ void main() {
           );
         })}
       </div>
-
-      {/* ─── Layer 5: Slow-Moving Floating Data Particles ─── */}
-      <div className="absolute inset-0 -z-20 pointer-events-none overflow-hidden select-none bg-transparent">
-        {particles.map((p) => (
-          <div
-            key={p.id}
-            className="absolute rounded-full"
-            style={{
-              left: p.left,
-              top: p.top,
-              width: p.size,
-              height: p.size,
-              background: p.color,
-              boxShadow: p.shadow,
-              animation: isReducedMotion ? "none" : `${p.animName} ${p.duration} ease-in-out infinite`,
-              animationDelay: p.delay,
-            }}
-          />
-        ))}
-      </div>
     </>
   );
 }
 
-const ProjectConnectionLine = memo(function ProjectConnectionLine({ focusVal, pos, index, spineX, isMobileView, isReducedMotion }) {
+const ProjectConnectionLine = memo(function ProjectConnectionLine({ focusVal, pos, index, spineX, isMobileView }) {
   const opacity_line = useTransform(focusVal, (f) => 0.04 + f * 0.15);
-  const opacity_pulse = useTransform(focusVal, (f) => 0.08 + f * 0.35);
   const opacity_node1 = useTransform(focusVal, (f) => 0.15 + f * 0.55);
   const opacity_node2 = useTransform(focusVal, (f) => 0.05 + f * 0.25);
   const scale_node2 = useTransform(focusVal, (f) => 0.9 + f * 0.3);
@@ -579,22 +397,6 @@ const ProjectConnectionLine = memo(function ProjectConnectionLine({ focusVal, po
           opacity: opacity_line,
         }}
       />
-
-      {/* Animated data pulse dash flowing along path */}
-      {!isReducedMotion && (
-        <motion.path
-          d={pathData}
-          stroke="var(--accent)"
-          strokeWidth="1.5"
-          fill="none"
-          strokeDasharray="6 45"
-          style={{
-            opacity: opacity_pulse,
-            animation: `data-flow-forward ${6 + index * 1.5}s linear infinite`,
-            animationDelay: `${index * 0.4}s`,
-          }}
-        />
-      )}
 
       {/* Micro-nodes (connection junctions) */}
       {!isMobileView && (
@@ -650,4 +452,4 @@ const ProjectLightVolume = memo(function ProjectLightVolume({ focusVal, pos, isM
   );
 });
 
-export default ProjectBackground;
+export default memo(ProjectBackground);

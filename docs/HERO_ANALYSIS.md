@@ -73,7 +73,7 @@ To ensure theme switching transitions are GPU-accelerated and mathematically smo
 * **Midnight Violet (`midnight-violet`)**: `luminosity` blend, `0.75` opacity, violet glow.
 * **Steel & Flame (`steel-flame`)**: `luminosity` blend, `0.70` opacity, red/crimson glow.
 * **Emerald Noir (`emerald-noir`)**: `luminosity` blend, `0.70` opacity, emerald glow.
-* **Cyberpunk Neon (`cyberpunk-neon`)**: `luminosity` blend, `0.75` opacity, cyan glow.
+* **Graphite (`graphite`)**: `luminosity` blend, `0.75` opacity, muted gray glow.
 * **Nordic Frost (`nordic-frost`)**: `luminosity` blend, `0.70` opacity, ice-blue glow.
 
 ---

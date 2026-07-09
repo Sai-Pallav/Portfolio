@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import BackToTop from '@/components/ui/BackToTop'
@@ -28,7 +27,6 @@ function App() {
         Skip to main content
       </a>
 
-      <Navbar activeSection={activeSection} />
       <ThemeToggle showPicker={isThemePickerOpen} setShowPicker={setIsThemePickerOpen} />
       <BackToTop isThemePickerOpen={isThemePickerOpen} />
       <SectionIndicator activeSection={activeSection} />

@@ -109,3 +109,31 @@ main {
     opacity: calc(var(--hero-img-opacity) * 0.6) !important;
   }
 }
+
+/* Click Ripple Animation */
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.animate-ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  animation: ripple 600ms ease-out;
+  background-color: rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+}
+
+/* Button Sheen/Shine Animation */
+@keyframes sheen {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+

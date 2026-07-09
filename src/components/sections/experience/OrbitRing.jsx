@@ -120,21 +120,14 @@ const OrbitRing = memo(function OrbitRing({
             <motion.circle
               key={i}
               fill="var(--accent)"
+              r={isActive ? 2.2 : 1.6}
               animate={isParticleVisible ? {
                 opacity: isActive ? [0.2, 0.6, 0.2] : [0.2, 0.7, 0.2],
-                r: isActive ? [2, 3.5, 2] : [1.5, 2.5, 1.5]
               } : {
                 opacity: 0,
-                r: 0
               }}
               transition={isParticleVisible ? {
                 opacity: {
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: i * 0.5
-                },
-                r: {
                   duration: 2,
                   repeat: Infinity,
                   ease: "easeInOut",

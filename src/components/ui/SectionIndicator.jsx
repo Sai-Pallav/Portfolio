@@ -63,7 +63,7 @@ export default function SectionIndicator({ activeSection }) {
                 width: isActive ? 28 : isHovered ? 20 : 14,
                 height: 2,
               }}
-              transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
               style={{ background: 'rgba(255,255,255,0.1)' }}
             >
               {/* Accent fill — only for active */}
@@ -74,7 +74,7 @@ export default function SectionIndicator({ activeSection }) {
                   background: 'var(--accent)',
                 }}
                 initial={false}
-                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.25, ease: 'easeInOut' }}
                 style={{ transformOrigin: 'left' }}
               />
               {/* Hover highlight — only for inactive hovered */}
