@@ -5,7 +5,15 @@ function Footer() {
   const currentYear = new Date().getFullYear()
 
   const handleStartConversation = useCallback(() => {
-    window.location.href = `mailto:${personal.email}`
+    const contactSection = document.getElementById('contact')
+    if (contactSection) {
+      contactSection.scrollIntoView({ behavior: 'smooth' })
+      // Focus on the name input field after the scroll animation
+      setTimeout(() => {
+        const nameInput = document.getElementById('name')
+        if (nameInput) nameInput.focus()
+      }, 800)
+    }
   }, [])
 
   return (
