@@ -4,7 +4,8 @@ import ContactHero from './ContactHero'
 import ContactForm from './ContactForm'
 import ContactCards from './ContactCards'
 import Contact3DObject from './Contact3DObject'
-import PCBConnection from './PCBConnection'
+import LeftPCB from './LeftPCB'
+import RightPCB from './RightPCB'
 
 export default memo(function ContactSection() {
   const sectionRef = useRef(null)
@@ -187,7 +188,8 @@ export default memo(function ContactSection() {
       {/* Zone 2: Interaction Area — 12-col grid, form at col 2-6, globe at col 7-12 */}
       <div className="relative w-full mt-8 lg:mt-10">
         <div className="relative grid grid-cols-1 lg:grid-cols-12 lg:gap-x-6 items-center">
-          <PCBConnection formRef={formContainerRef} globeRef={globeContainerRef} />
+          <LeftPCB formRef={formContainerRef} />
+          <RightPCB formRef={formContainerRef} globeRef={globeContainerRef} />
           {/* Form: col-start-2 leaves col-1 as left PCB breathing room */}
           <div id="contact-form-container" ref={formContainerRef} className="lg:col-start-2 lg:col-span-5 w-full relative z-20 flex flex-col items-start lg:items-center">
             <div className="w-full max-w-[474px]">
