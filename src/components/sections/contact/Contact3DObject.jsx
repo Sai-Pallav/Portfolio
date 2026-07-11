@@ -1163,10 +1163,11 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
   const burstTimerRef = useRef(0)
 
   // Issue #7: Continuous linear interpolation scaling instead of discrete pop-jumps
+  // Scale reduced to 0.78 max so globe+orbits fit within 420px container without visual bleed
   const scale = useMemo(() => {
-    if (width < 300) return 0.7
-    if (width > 380) return 1.0
-    return 0.7 + ((width - 300) / 80) * 0.3
+    if (width < 300) return 0.55
+    if (width > 380) return 0.78
+    return 0.55 + ((width - 300) / 80) * 0.23
   }, [width])
 
   // Imperative scene color update on theme state transitions
@@ -1437,7 +1438,7 @@ export default function Contact3DObject() {
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full aspect-square max-w-[400px] lg:max-w-[500px] z-10 pointer-events-none hidden md:flex items-center justify-center"
+        className="relative w-full aspect-square max-w-[380px] lg:max-w-[420px] z-10 pointer-events-none hidden md:flex items-center justify-center"
       >
         <div
           className="absolute w-[60%] h-[60%] rounded-full blur-[100px] pointer-events-none -z-10 transition-colors duration-500"
