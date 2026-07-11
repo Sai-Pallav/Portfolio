@@ -200,12 +200,14 @@ export default memo(function ContactSection() {
           <div className="relative flex flex-col lg:flex-row items-center justify-evenly w-full gap-12 lg:gap-0">
             {/* Form Container */}
             <div id="contact-form-container" ref={formContainerRef} className="w-full max-w-[474px] relative z-20 flex flex-col items-start lg:items-center">
-              <ContactForm />
+              <div className="w-full max-w-[474px]">
+                <ContactForm />
+              </div>
             </div>
             {/* Globe Container */}
             <div className="hidden md:flex items-center justify-center relative z-20">
-              <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-[300px] h-[300px] md:w-[400px] md:h-[400px] lg:w-[500px] lg:h-[500px] overflow-visible flex items-center justify-center pointer-events-none z-10">
-                <div className="absolute w-[300px] h-[300px] md:w-[400px] md:h-[400px] lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.10 * var(--ambient-intensity))' }} />
+              <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[420px] lg:h-[420px] overflow-visible flex items-center justify-center pointer-events-none z-10">
+                <div className="absolute w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[420px] lg:h-[420px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.10 * var(--ambient-intensity))' }} />
                 <Contact3DObject isInView={isInViewRepeat} />
               </div>
             </div>
