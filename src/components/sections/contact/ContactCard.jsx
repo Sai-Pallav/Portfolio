@@ -108,6 +108,7 @@ export default memo(function ContactCard({
             {...props}
             className="inline-flex items-center text-xs font-semibold transition-all duration-300 group/cta mt-4 cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none rounded px-1"
             style={{ color: copied ? 'var(--accent)' : 'var(--text-heading)' }}
+            aria-label={copied ? 'Email copied to clipboard' : 'Copy email address'}
           >
             <AnimatePresence mode="wait" initial={false}>
               {copied ? (
@@ -191,10 +192,10 @@ export default memo(function ContactCard({
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-surface/80 via-raised/60 to-surface/80 backdrop-blur-2xl p-6 md:p-8 min-h-[240px] h-full flex flex-col justify-between transition-all duration-200 ease-out select-none shadow-[0_16px_36px_-8px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.02)] ${
+      className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-surface/80 via-raised/60 to-surface/80 backdrop-blur-2xl p-6 md:p-8 min-h-[240px] h-full flex flex-col justify-between transition-all duration-200 ease-out select-none shadow-[0_4px_20px_-8px_rgba(0,0,0,0.3),0_1px_2px_rgba(168,85,247,0.08)] ${
         effectiveHovered
           ? hasAction
-            ? 'border-[var(--accent)]/40 -translate-y-[2px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.45)]'
+            ? 'border-[var(--accent)]/40 -translate-y-[2px] shadow-[0_8px_28px_-8px_rgba(0,0,0,0.4),0_1px_2px_rgba(168,85,247,0.12)]'
             : 'border-white/20'
           : 'border-white/10'
       }`}

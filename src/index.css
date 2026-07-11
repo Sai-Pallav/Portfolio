@@ -27,6 +27,7 @@
   --animate-spin-slow: spin 4s linear infinite;
   --animate-float: float 6s ease-in-out infinite;
   --animate-glow-pulse: glowPulse 3s ease-in-out infinite;
+  --animate-pcb-travel: pcbTravel 4s linear infinite;
 
   /* Keyframes fadeUp, fadeIn, slideLeft, float, glowPulse are defined in animations.css */
   @keyframes popIn {
@@ -36,6 +37,10 @@
   @keyframes drawLine {
     from { transform: scaleY(0); }
     to { transform: scaleY(1); }
+  }
+  @keyframes pcbTravel {
+    0% { offset-distance: 0%; }
+    100% { offset-distance: 100%; }
   }
 
 }

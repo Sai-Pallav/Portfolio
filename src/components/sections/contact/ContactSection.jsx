@@ -3,8 +3,8 @@ import { useReducedMotion, useInView, motion } from 'framer-motion'
 import ContactHero from './ContactHero'
 import ContactForm from './ContactForm'
 import ContactCards from './ContactCards'
-
-const GlobeContainer = lazy(() => import('./GlobeContainer'))
+import Contact3DObject from './Contact3DObject'
+import PCBConnection from './PCBConnection'
 
 export default memo(function ContactSection() {
   const sectionRef = useRef(null)
@@ -97,7 +97,7 @@ export default memo(function ContactSection() {
                 ease: 'easeInOut'
               }}
               className="absolute top-1/4 left-1/4 w-[400px] h-[300px] rounded-full blur-[100px] will-change-transform"
-              style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.15 * var(--ambient-intensity))' }}
+              style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.2 * var(--ambient-intensity))' }}
             />
             <motion.div
               animate={{
@@ -111,7 +111,7 @@ export default memo(function ContactSection() {
                 delay: -5
               }}
               className="absolute top-1/2 right-1/3 w-[450px] h-[320px] rounded-full blur-[110px] will-change-transform"
-              style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.15 * var(--ambient-intensity))' }}
+              style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.2 * var(--ambient-intensity))' }}
             />
           </div>
         )}
@@ -131,7 +131,7 @@ export default memo(function ContactSection() {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_at_center,black_70%,transparent_100%)] pointer-events-none" />
 
         {/* Subconscious connecting flow lines SVG (Percentage-based, fully responsive) */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 opacity-25" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 opacity-35" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="flowGrad1" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.01" />
@@ -176,39 +176,34 @@ export default memo(function ContactSection() {
         <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
       </div>
 
-      <div className="mx-auto max-w-6xl relative z-10">
-        <div className="flex flex-col space-y-8 lg:space-y-10">
-          {/* Zone 1: Hero Area */}
-          <ContactHero />
+      {/* Zone 1: Hero — stays in max-w-7xl */}
+      <div className="mx-auto max-w-7xl px-6 md:px-12 relative z-10">
+        <ContactHero />
+      </div>
 
-          {/* Zone 2: Interaction Area */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-            {/* LEFT COLUMN: Contact Form */}
-            <div className="lg:col-span-6 w-full relative z-20 flex flex-col items-start order-1">
-              <div className="w-full max-w-[520px]">
-                <ContactForm />
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN: Globe Container */}
-            <div className="hidden md:flex lg:col-span-6 items-center justify-center w-full relative z-20 order-2">
-              <div className="relative w-full h-[450px] lg:h-[520px] overflow-visible flex items-center justify-center pointer-events-none z-10">
-                <div className="absolute w-[300px] h-[300px] md:w-[400px] md:h-[400px] lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.10 * var(--ambient-intensity))' }} />
-                <Suspense fallback={
-                  <div className="relative w-full h-[450px] lg:h-[520px] flex items-center justify-center pointer-events-none select-none">
-                    <div className="absolute w-[180px] h-[180px] rounded-full border border-dashed border-white/[0.03] animate-spin duration-[15s] pointer-events-none" />
-                    <div className="text-[9px] font-mono tracking-[0.25em] text-secondary/30 pointer-events-none">LOADING DIGITAL HUB...</div>
-                  </div>
-                }>
-                  <GlobeContainer isInView={isInViewRepeat} />
-                </Suspense>
-              </div>
+      {/* Zone 2: Interaction Area — 12-col grid, form at col 2-6, globe at col 7-12 */}
+      <div className="relative w-full mt-8 lg:mt-10">
+        <div className="relative grid grid-cols-1 lg:grid-cols-12 lg:gap-x-6 items-center">
+          <PCBConnection />
+          {/* Form: col-start-2 leaves col-1 as left PCB breathing room */}
+          <div id="contact-form-container" className="lg:col-start-2 lg:col-span-5 w-full relative z-20 flex flex-col items-start lg:items-center">
+            <div className="w-full max-w-[474px]">
+              <ContactForm />
             </div>
           </div>
-
-          {/* Zone 3: Information Area (Cards) */}
-          <ContactCards />
+          {/* Globe: col-span-6, pushed to right edge with justify-end */}
+          <div className="hidden md:flex lg:col-span-6 items-center justify-center lg:justify-end w-full relative z-20">
+            <div id="contact-globe-inner" className="relative w-full h-[450px] lg:h-[520px] overflow-visible flex items-center justify-center lg:justify-end pointer-events-none z-10">
+              <div className="absolute w-[300px] h-[300px] md:w-[400px] md:h-[400px] lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.10 * var(--ambient-intensity))' }} />
+              <Contact3DObject isInView={isInViewRepeat} />
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* Zone 3: Cards — stays in max-w-7xl */}
+      <div className="mx-auto max-w-7xl px-6 md:px-12 relative z-10 mt-8 lg:mt-10">
+        <ContactCards />
       </div>
     </section>
   )

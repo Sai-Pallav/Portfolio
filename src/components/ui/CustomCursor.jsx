@@ -14,7 +14,7 @@ function prefersFinePointer() {
  * Transforms into the shape of hovered buttons and symbols.
  */
 export function CustomCursor() {
-  const [enabled] = useState(prefersFinePointer())
+  const [enabled] = useState(false) // Temporarily stop cursor animation
   const cursorRef = useRef(null)
   const portalWrapperRef = useRef(null)
   const portalImgRef = useRef(null)

@@ -1,7 +1,7 @@
 # Contact Section — Deep Technical Analysis
 
-> **Portfolio:** Sai Pallav | **Architecture:** Modular Component System with 3D WebGL Globe
-> **Last Analyzed:** July 2026
+> **Portfolio:** Sai Pallav | **Architecture:** Modular Component System with 3D WebGL Orbital System and PCB Connections
+> **Last Analyzed:** July 11, 2026
 
 ---
 
@@ -13,8 +13,8 @@
 4. [ContactHero Component](#4-contacthero-component)
 5. [ContactForm Component](#5-contactform-component)
 6. [ContactCards & ContactCard Components](#6-contactcards--contactcard-components)
-7. [3D Globe System (GlobeContainer & GlobeScene)](#7-3d-globe-system-globecontainer--globescene)
-8. [Globe Sub-Components](#8-globe-sub-components)
+7. [3D Orbital System (Contact3DObject)](#7-3d-orbital-system-contact3dobject)
+8. [Motherboard Connectivity (PCBConnection)](#8-motherboard-connectivity-pcbconnection)
 9. [State Management & Data Flow](#9-state-management--data-flow)
 10. [EmailJS Integration](#10-emailjs-integration)
 11. [Animation System](#11-animation-system)
@@ -28,26 +28,26 @@
 
 ## 1. Architecture Overview
 
-The contact section is now a **fully modular, multi-file architecture** with separation of concerns:
+The contact section features a **fully modular, multi-file architecture** with separation of concerns. The old 3D globe has been replaced with a premium physics-based three-tier orbital system and an interactive SVG PCB connectivity motherboard.
 
 ```
 src/components/sections/contact/
-├── ContactSection.jsx         — Main orchestrator, layout, backgrounds
+├── ContactSection.jsx         — Main orchestrator, layout, backgrounds, grid lines
 ├── ContactHero.jsx            — Hero heading + description text
 ├── ContactForm.jsx            — Form with validation + EmailJS integration
-│   ├── FloatingInput          — Animated floating label input
-│   ├── FloatingTextarea       — Textarea with character counter
+│   ├── FloatingInput          — Animated floating label input with icon
+│   ├── FloatingTextarea       — Textarea with character counter and icon
 │   └── Form State Management  — Validation, submission, inquiry types
-├── ContactCards.jsx           — Grid container for info cards
+├── ContactCards.jsx           — Grid container for 4 info cards
 ├── ContactCard.jsx            — Individual info card (status, email, LinkedIn, location)
-├── GlobeContainer.jsx         — 3D canvas wrapper + fallback
-└── GlobeScene.jsx             — R3F scene with globe + orbiting socials
-    ├── Globe                  — Main 3D globe mesh (wireframe + glass + particles)
-    ├── CameraRig              — Floating camera animation
-    ├── Lighting.jsx           — Scene lighting (ambient + directional + point)
-    ├── ParticleLayer.jsx      — Distributed particle cloud
-    ├── OrbitingIcon.jsx       — Social icon orbiting around globe (×4)
-    └── InteractionManager.jsx — WebGL context loss handler
+├── PCBConnection.jsx          — Dynamically rendered SVG PCB motherboard trace paths with glowing signal packets
+└── Contact3DObject.jsx        — R3F 3D Canvas rendering a wireframe globe and a three-tier hierarchical orbital system with 6 orbiting icons
+    ├── Lights                 — Hemispherical + directional + point light source
+    ├── CameraRig              — Micro-drift camera movement linked to mouse distance factor
+    ├── Globe                  — Central globe structure (glass core + wireframe + surface points + fresnel glow)
+    ├── MicroParticles         — Seeding-based background particle point cloud
+    ├── OrbitalRing            — 3D Torus ring representing an orbit path with comets and local segments
+    └── OrbitingIcon           — Orbiting HTML social element with depth-based scaling/brightness/saturation and copy-to-clipboard/download link action
 ```
 
 ### Three Zones Layout
@@ -60,15 +60,18 @@ Zone 1: HERO AREA
 └─────────────────────────────────────────────┘
 
 Zone 2: INTERACTION AREA
-┌──────────────────┬──────────────────────────┐
-│  Contact Form    │   3D Globe + Socials     │
-│  (Left Column)   │   (Right Column)         │
-│  • Inquiry Type  │   • Interactive globe    │
-│  • Name, Email   │   • Orbiting social icons│
-│  • Subject       │   • Mouse proximity anim │
-│  • Message       │   • Theme-synced colors  │
-│  • Submit Button │                          │
-└──────────────────┴──────────────────────────┘
+┌─────────────────────────────────────────────┐
+│               PCB CONNECTION                │
+│            (Spans entire width)             │
+│  ┌──────────────────┐   ┌─────────────────┐ │
+│  │   Contact Form   │   │ 3D Orbital Sys  │ │
+│  │  (Cols 2-6 Area) │   │ (Cols 7-12 Area)│ │
+│  │                  │   │ • 3 Tiers       │ │
+│  │ • Inquiry Type   │   │ • 6 Social Icons│ │
+│  │ • Floating Input │   │ • Rare Bursts   │ │
+│  │ • submit Sheen   │   │ • 2D Fallback   │ │
+│  └──────────────────┘   └─────────────────┘ │
+└─────────────────────────────────────────────┘
 
 Zone 3: INFORMATION AREA
 ┌────────┬────────┬────────┬────────┐
@@ -87,79 +90,45 @@ All contact components live in `src/components/sections/contact/`:
 
 | File | Lines | Purpose | Exports |
 |---|---|---|---|
-| `ContactSection.jsx` | ~220 | Main orchestrator, layout, backgrounds, mouse tracking | `ContactSection` (default, memo) |
-| `ContactHero.jsx` | ~45 | Hero heading with gradient text animation | `ContactHero` (default, memo) |
-| `ContactForm.jsx` | ~420 | Form with validation, EmailJS, inquiry type selection | `ContactForm` (default, memo) |
-| `ContactCards.jsx` | ~75 | Grid container for 4 info cards | `ContactCards` (default, memo) |
-| `ContactCard.jsx` | ~180 | Individual card with hover effects, spotlight, globe sync | `ContactCard` (default, memo) |
-| `GlobeContainer.jsx` | ~145 | Canvas wrapper, proximity detection, theme sync, fallback | `GlobeContainer` (default, memo) |
-| `GlobeScene.jsx` | ~130 | R3F scene, globe mesh, camera rig, icon orchestration | `GlobeScene` (default, memo) |
-| `Lighting.jsx` | ~12 | Ambient + directional + point lights | `Lighting` (default, memo) |
-| `ParticleLayer.jsx` | ~50 | Distributed particle cloud with PRNG seeding | `ParticleLayer` (default, memo) |
-| `OrbitingIcon.jsx` | ~145 | Individual orbiting social icon with depth-based scaling | `OrbitingIcon` (default, memo) |
-| `InteractionManager.jsx` | ~18 | WebGL context loss detection and recovery | `InteractionManager` (default, memo) |
+| `ContactSection.jsx` | 211 | Main orchestrator, layout, backgrounds, mouse tracking, scroll listener removed | `ContactSection` (default, memo) |
+| `ContactHero.jsx` | 55 | Hero heading with gradient text animation | `ContactHero` (default, memo) |
+| `ContactForm.jsx` | 714 | Form with validation, EmailJS, inquiry dropdown, User/Mail/PenTool/MessageSquare icons, rounded inputs, sheen animation | `ContactForm` (default, memo) |
+| `ContactCards.jsx` | 121 | Grid container for 4 info cards with motion wrapper | `ContactCards` (default, memo) |
+| `ContactCard.jsx` | 208 | Individual card with copy button aria-label, adjusted shadows, copy-to-clipboard feedback | `ContactCard` (default, memo) |
+| `PCBConnection.jsx` | 469 | Measures form & globe DOM rects, renders 40 motherboard traces, 15 glowing nodes, and animated signal paths | `PCBConnection` (default, memo) |
+| `Contact3DObject.jsx` | 1492 | Canvas container, distance factor, 3 orbital planes, 6 icons, context loss handling, 2D fallback | `Contact3DObject` (default, memo) |
 
 ### Component Hierarchy & Data Flow
 
 ```
 <ContactSection>
-  └── <div className="mx-auto max-w-6xl relative z-10">
+  └── <div className="mx-auto max-w-7xl relative z-10">
       ├── <ContactHero />                          — No props (self-contained)
       ├── <div className="grid lg:grid-cols-12">
-      │   ├── <ContactForm />                      — No props (self-contained)
-      │   └── <Suspense>
-      │       └── <GlobeContainer isInView={...} />
-      │           └── <Canvas>
-      │               └── <GlobeScene
-      │                       socialsToRender={[...]}
-      │                       distanceFactor={ref}
-      │                       hoveredCountRef={ref}
-      │                       themeColor={string}
-      │                       setWebglSupported={fn}
-      │                     />
-      │                   ├── <Lighting themeColor={...} />
-      │                   ├── <InteractionManager setWebglSupported={...} />
-      │                   ├── <CameraRig distanceFactor={...} />      — Internal component
-      │                   ├── <Globe distanceFactor={...} themeColor={...} /> — Internal, memo
-      │                   ├── <ParticleLayer distanceFactor={...} themeColor={...} />
-      │                   └── {socialsToRender.map(... =>
-      │                       <OrbitingIcon
-      │                         social={...}
-      │                         tiltZ={...}
-      │                         speed={...}
-      │                         radius={...}
-      │                         initialPhase={...}
-      │                         index={...}
-      │                         distanceFactor={...}
-      │                         hoveredCountRef={...}
-      │                         themeColor={...}
-      │                       />
-      │                     )}
-      └── <ContactCards />
-          └── {[Status, Email, LinkedIn, Location].map(... =>
-              <ContactCard
-                index={number}
-                label={string}
-                accent={color}
-                title={string}
-                description={string}
-                footer={string}
-                href={string?}
-                copyText={string?}
-                platformKey={string | string[]}
-                icon={ReactNode | fn}
-              />
-            )}
+      │   ├── <PCBConnection />                    — Measures DOM nodes via real-time rect layouts
+      │   ├── <ContactForm />                      — Contains internal FloatingInput/FloatingTextarea
+      │   └── <Contact3DObject />                  — R3F 3D Canvas
+      │       └── <Canvas>
+      │           └── <Scene>                      — Coordinates shared globalTheme, 3 orbits, and burst logic
+      │               ├── <Lights />               — Updates directional and point lights
+      │               ├── <CameraRig />            — Camera micro-drift mapped to proximity
+      │               ├── <Globe />                — Central 3D globe meshes (wireframe, glass, points, halo)
+      │               ├── <MicroParticles />       — Seeding-based points cloud
+      │               └── <OrbitalRing (x3)>       — Tilted orbital planes containing trails, segments, packets
+      │                   ├── <Trail / Segment Meshes>
+      │                   └── <OrbitingIcon (x2)>  — Sprite-rendered interactive HTML icon buttons
+      └── <ContactCards>
+          └── <ContactCard (x4)>                   — Staggered entry cards
 ```
 
 ### Key Design Patterns
 
-1. **React.memo everywhere** — All components wrapped in `React.memo()` for performance
-2. **Event-driven architecture** — Globe hover events dispatched via `window.dispatchEvent('globe-hover', ...)` to highlight matching cards
-3. **Ref-based animation state** — `distanceFactor.current`, `hoveredCountRef.current` used to avoid re-renders
-4. **Lazy loading** — `GlobeContainer` lazy loaded with `React.lazy()` + `<Suspense>`
-5. **Reduced motion respect** — `useReducedMotion()` used throughout, disables all animations when true
-6. **requestAnimationFrame throttling** — Mouse tracking throttled to prevent layout thrashing
+1. **React.memo everywhere** — All components wrapped in `React.memo()` for performance optimization.
+2. **Ref-Based Animation State** — `distanceFactor.current`, `hoveredCountRef.current`, `activeBurstRef.current` are utilized in frame loops to prevent triggering React re-renders.
+3. **Concurrency Locking** — An `activeTransmissionRef.current` lock prevents concurrent execution of multiple major 3D transition/burst animations in the R3F Canvas.
+4. **Theme Reactivity via MutationObserver** — R3F scene reacts to `<html>` style changes. An observer updates the `globalTheme` object, letting R3F traverse meshes on the fly rather than tearing down the WebGL context.
+5. **Real-time DOM Coordinate Measurement** — `PCBConnection` recalculates coordinates on resize and scroll events to automatically draw connecting traces between the form card and the 3D canvas bounds.
+6. **Reduced Motion Respect** — Skipped 3D canvas, camera rig, background clouds, volumetric glows, and card spotlights if prefers-reduced-motion is active.
 
 ---
 
@@ -167,10 +136,10 @@ All contact components live in `src/components/sections/contact/`:
 
 ### Responsibilities
 
-- Layout orchestration (3-zone structure)
-- Background rendering (ambient glows, grid, fog, noise, flow lines)
-- Section-level mouse tracking for cursor-driven ambient light
-- `useInView` trigger for Globe's `Canvas` frameloop optimization
+- Layout orchestration (12-column structure).
+- Background rendering (ambient glows, grid, fog, noise, flow lines).
+- Section-level mouse tracking for cursor-driven ambient light.
+- Viewport intersection tracking for R3F Canvas frameloop optimization.
 
 ### Background Layers (Z-Index Stacking)
 
@@ -178,17 +147,17 @@ Rendered in this order (bottom to top):
 
 | Layer | Implementation | Purpose |
 |---|---|---|
-| 1. Base fill | `bg-bg` solid | Dark foundation |
-| 2. Large cyan glow | 500×500px blur-[130px] | Behind heading |
-| 3. Blue/indigo glow | 600×600px blur-[150px] | Behind globe projection |
-| 4. Purple glow | 550×550px blur-[130px] | Reaching cards area |
-| 5. Global vignette | Radial gradient | Soft edge darkening |
-| 6. Volumetric fog | 2× motion.div clouds | Slow floating movement (25–30s) |
-| 7. Cursor ambient light | Radial gradient at `--mouse-x/y` | Mouse-tracking glow |
-| 8. Grid lines | Linear gradient grid 4rem×4rem | With radial mask |
-| 9. Flow lines SVG | Path gradients | Subconscious connectivity |
-| 10. Noise texture | `feTurbulence` SVG filter | Fine grain overlay 1.5% opacity |
-| 11. Top/bottom dividers | Horizontal gradient lines | Accent/border separators |
+| 1. Base fill | `bg-gradient-to-br from-surface/50 via-bg` | Solid dark foundation |
+| 2. Cyan glow | Blur-[130px], `var(--gradient-glow)` | Behind hero heading |
+| 3. Blue glow | Blur-[150px], `calc(0.18 * var(--ambient-intensity))` | Behind globe projection |
+| 4. Purple glow | Blur-[130px], `calc(0.12 * var(--ambient-intensity))` | Reaching cards area |
+| 5. Global vignette | Radial gradient at center | Edge darkening |
+| 6. Volumetric fog | 2× motion.div clouds (25s and 30s) | Slow floating movement |
+| 7. Cursor ambient light | radial-gradient at `--mouse-x` / `--mouse-y` | Mouse-tracking glow |
+| 8. Grid lines | Linear gradient grid 4rem×4rem with mask | Structural lines |
+| 9. Flow lines SVG | 3 paths with opacity 0.35 | Subtle connectivity lines |
+| 10. Noise texture | `feTurbulence` SVG filter, 1.5% opacity | Fine grain overlay |
+| 11. Dividers | Horizontal gradient lines | Accent separators |
 
 ### Mouse Tracking Implementation
 
@@ -196,11 +165,20 @@ Rendered in this order (bottom to top):
 // Cached rect to avoid layout thrashing
 const rectRef = useRef(null)
 
-// UpdateRect on mount + resize
-updateRect() // Initial cache
+const updateRect = () => {
+  if (sectionRef.current) {
+    const rect = sectionRef.current.getBoundingClientRect()
+    rectRef.current = {
+      left: rect.left + window.scrollX,
+      top: rect.top + window.scrollY
+    }
+  }
+}
+
+// Cache the rect initially and update on layout/resize changes
+updateRect()
 window.addEventListener('resize', updateRect, { passive: true })
 
-// requestAnimationFrame-throttled mouse tracking
 let ticking = false
 const handleMouseMove = (e) => {
   if (!ticking) {
@@ -220,77 +198,29 @@ const handleMouseMove = (e) => {
 }
 ```
 
-**Key Optimization:** Scroll listener removed (previously caused excessive repaints). Now rect only updates on `resize`.
-
-### Volumetric Fog Animation
-
-Two motion.div elements with different animation paths:
-
-```js
-// Cloud 1: 400×300px, 25s loop
-<motion.div
-  animate={{ x: [0, 40, -20, 0], y: [0, -30, 20, 0] }}
-  transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
-/>
-
-// Cloud 2: 450×320px, 30s loop, -5s delay offset
-<motion.div
-  animate={{ x: [0, -30, 45, 0], y: [0, 40, -30, 0] }}
-  transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut', delay: -5 }}
-/>
-```
-
-Both rendered only when `!shouldReduceMotion`.
-
-### SVG Flow Lines
-
-Percentage-based viewBox (`viewBox="0 0 100 100"`) for full responsiveness. Three paths with:
-- Custom gradient (`flowGrad1`) from accent to indigo
-- Stroke dasharray patterns for dotted appearance
-- Very low opacity (0.01–0.06) for subtle effect
-
 ---
 
 ## 4. ContactHero Component
 
 ### Structure
 
-Simple two-element component:
+Simple two-element component with split gradient heading:
 
 ```jsx
 <motion.h2>
-  <span className="bg-gradient-to-r from-accent via-indigo-400 to-accent-hover bg-clip-text text-transparent">
-    Engineering Scalable Systems into Reality
+  <span className="bg-gradient-to-r from-primary via-accent to-accent-hover bg-clip-text text-transparent filter drop-shadow-[0_0_20px_var(--accent-dim)]">
+    Engineering Scalable Systems{' '}
+  </span>
+  <span className="bg-gradient-to-r from-accent-hover via-accent to-primary bg-clip-text text-transparent filter drop-shadow-[0_0_20px_var(--accent-dim)]">
+    into Reality
   </span>
 </motion.h2>
 
 <motion.p>
-  {DECORATIVE_TEXT}
+  I specialize in backend engineering—API development, database design, and system architecture. 
+  Right now I'm looking for summer 2026 internship opportunities...
 </motion.p>
 ```
-
-### Animation Variants
-
-Two separate variants with different delays:
-
-```js
-entryVar01 = {
-  hidden: { opacity: 0, y: 25 },  // Skipped if reduced motion
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, delay: 0.1 } }
-}
-
-entryVar025 = {
-  hidden: { opacity: 0, y: 25 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, delay: 0.25 } }
-}
-```
-
-Both use `[0.16, 1, 0.3, 1]` Apple-style ease curve.
-
-### Content
-
-**Heading:** "Engineering Scalable Systems into Reality"  
-**Description:** 220-character technical pitch about internships, collaborations, backend challenges, and 24-hour response guarantee.
 
 ---
 
@@ -299,35 +229,35 @@ Both use `[0.16, 1, 0.3, 1]` Apple-style ease curve.
 ### Sub-Components (Internal, Memo)
 
 #### FloatingInput
-
-Animated label input with:
-- **Floating label** animation via CSS `peer-placeholder-shown` and `peer-focus`
-- **Focus glow border** with cyan/red color based on validation state
-- **Error/success feedback** with ⚠ / ✓ icons and messages
-- **`aria-describedby`** linking to error span
-
-Props: `id`, `label`, `type`, `value`, `onChange`, `onBlur`, `error`, `touched`
+Animated label input containing:
+- **Lucide Icon Integration**: Displays appropriate icon (`User`, `Mail`, or `PenTool`) at the input start.
+- **Floating label**: Animate transitions via CSS `peer-placeholder-shown` and `peer-focus`.
+- **Validation border**: Highlights in cyan or red based on errors and touched state.
+- **Aria-describedby**: Hooked to specific error elements.
 
 #### FloatingTextarea
-
-Same as FloatingInput but with:
-- `<textarea>` element with `resize-none`
-- **Character counter** in bottom-right (red when > limit)
-- Minimum height 160px
-
-Additional props: `rows`, `characterCount`, `characterLimit`
+Similar to FloatingInput but contains a `<textarea>` and an integrated character counter in the bottom-right showing length progress towards a limit of 1000. Uses the `MessageSquare` icon.
 
 ### Inquiry Type Selection
 
-6 predefined options rendered as pill buttons:
-- Internship
-- Full-Time Opportunity
-- Freelance Project
-- Startup Collaboration
-- Technical Discussion
-- Other
+Includes a custom dropdown with 6 options: *Internship*, *Full-Time Opportunity*, *Freelance Project*, *Startup Collaboration*, *Technical Discussion*, and *Other*.
+- Uses rotating ChevronDown indicator.
+- Listbox uses `AnimatePresence` and custom viewport locks.
+- Document click listener handles clicking outside the element.
 
-Uses `motion.div` with `layoutId="activeInquiryType"` for smooth sliding active state indicator.
+```jsx
+<button
+  type="button"
+  id="inquiry-type"
+  onClick={() => setIsDropdownOpen(prev => !prev)}
+  className="w-full rounded-[12px] border border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-transparent pl-10 pr-4 py-3 text-xs md:text-sm text-[var(--text-primary)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_1px_2px_rgba(0,0,0,0.3),inset_0_0_0_1px_rgba(255,255,255,0.02)] hover:border-white/[0.12] hover:bg-white/[0.04] focus:border-[var(--accent)]/50 focus:shadow-[0_0_0_3px_var(--accent-dim),0_0_20px_var(--accent-dim),inset_0_1px_2px_rgba(0,0,0,0.3)] focus:bg-white/[0.04] flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+  aria-haspopup="listbox"
+  aria-expanded={isDropdownOpen}
+>
+  <span>{inquiryType}</span>
+  <ChevronDown className={`h-4 w-4 text-[var(--text-secondary)] transition-transform duration-150 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+</button>
+```
 
 ### Form Fields
 
@@ -342,52 +272,46 @@ Uses `motion.div` with `layoutId="activeInquiryType"` for smooth sliding active 
 
 ```js
 function validateField(name, value) {
+  let err = ''
   if (name === 'name') {
-    if (!value.trim()) return 'Name is required'
-    if (value.trim().length < 2) return 'Name must be at least 2 characters'
+    if (!value.trim()) err = 'Name is required'
+    else if (value.trim().length < 2) err = 'Name must be at least 2 characters'
+  } else if (name === 'email') {
+    if (!value.trim()) err = 'Email is required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) err = 'Please enter a valid email address'
+  } else if (name === 'subject') {
+    if (!value.trim()) err = 'Subject is required'
+    else if (value.trim().length < 3) err = 'Subject must be at least 3 characters'
+  } else if (name === 'message') {
+    if (!value.trim()) err = 'Message is required'
+    else if (value.trim().length < 10) err = 'Message must be at least 10 characters'
+    else if (value.trim().length > 1000) err = 'Message cannot exceed 1000 characters'
   }
-  // ... similar for email, subject, message
+  return err
 }
 ```
 
-### Validation Triggers
+### Submission States
 
-1. **On blur** — `handleBlur()` validates single field, sets `touched[field] = true`
-2. **On change** — `handleChange()` re-validates only if error already exists (prevents premature red states)
-3. **On submit** — `handleSubmit()` validates all fields, blocks submission if errors exist
-
-### Submission Flow
-
-```
-handleSubmit()
-  ├── Set all fields as touched
-  ├── Validate all fields
-  ├── If errors → show status error, return
-  ├── setSubState('submitting')
-  ├── if !isConfigured → simulate 1500ms delay, setSubState('success'), return
-  └── emailjs.send(...)
-      ├── success → setSubState('success'), clear form, auto-reset to 'idle' after 3s
-      └── error → setSubState('error'), show status error
-```
-
-### Button States
-
-Button uses `<AnimatePresence>` for smooth icon/text transitions:
+Button transitions between states using `<AnimatePresence mode="wait">`:
 
 | State | Label | Icon | Style |
 |---|---|---|---|
-| `idle` | "Send Inquiry" | `<Send>` with hover translate | Gradient cyan→indigo |
-| `submitting` | "Sending..." | `<Loader2>` spinning | Same gradient, disabled |
-| `success` | "✓ Message Sent" | `<CheckCircle2>` | Emerald green, pulse animation |
-| `error` | "Failed to Send. Click to Retry" | `<AlertCircle>` | Red, clickable to reset |
+| `idle` | "Send Inquiry" | `<Send>` | Gradient background, sheen effect, inset highlight |
+| `submitting` | "Sending..." | `<Loader2>` (spin) | Disabled, low opacity |
+| `success` | "✓ Message Sent" | `<CheckCircle2>` | Emerald green success details, pulse effect |
+| `error` | "Failed to Send. Click to Retry" | `<AlertCircle>` | Red background, resets click target |
 
-### Ripple Effect
-
-Button implements material design ripple on click:
-- `handleRipple()` calculates click position relative to button center
-- Adds ripple to state array with `{ x, y, size, id: Date.now() }`
-- CSS animation `.animate-ripple` expands and fades
-- Auto-clears ripples after 600ms
+#### Form Feedback
+- Renders a status card containing warning/check symbols.
+- Features `animate-shake` on validation errors.
+- Material design ripple effect adds an expanding span on click.
+- Features a glass reflection overlay (`absolute inset-0 bg-gradient-to-br from-white/[0.1] to-transparent opacity-0 group-hover/btn:opacity-100`) on hover.
+- **Interactive Corner Accent Dots**: In the top-right corner, 3 decorative dots animate based on form focus and submission state (`activeDotState`):
+  - `idle`: Stable scale with staggered base opacities (0.4, 0.3, 0.2).
+  - `focused`: Continuous scale and opacity pulse looping (1.2s duration, staggered delay `i * 0.15`).
+  - `submitting`: Vertical bobbing loop (`y: [0, -3.5, 0]`) and opacity pulsing (0.6s duration, staggered delay `i * 0.08`).
+- **Interactive Sweep Effect**: An absolute container overlays a light gradient sweep (`bg-gradient-to-r from-transparent via-white/[0.03] to-transparent`) traversing across the form container using an infinite `sweep` keyframe animation (8s duration).
 
 ---
 
@@ -395,384 +319,251 @@ Button implements material design ripple on click:
 
 ### ContactCards
 
-Grid container with staggered entrance animation:
+A responsive grid layout staggering cards in with `CARD_VARIANTS` motion wrappers:
+- **Status Card**: Rendered with an animated ping indicator.
+- **Email Card**: Rendered with copy-to-clipboard triggers. Contains an `aria-label` attribute on the copy button.
+- **LinkedIn Card**: Custom SVG branding with navigate behavior.
+- **Location Card**: Bounces the `MapPin` icon on hover.
 
-```js
-GRID_VARIANTS = {
-  hidden: {},
-  visible: {
-    transition: { staggerChildren: 0.08, delayChildren: 0.55 }
-  }
-}
-```
+### ContactCard Hover and Shadows
 
-Renders 4 cards in responsive grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`
-
-### ContactCard
-
-Individual card with:
-
-#### Accent Color Configs
-
-Four accent themes: `green`, `blue`, `linkedin`, `teal`
-
-Each defines:
-- `glow` — Radial glow color (rgba)
-- `borderHover` — Hover border class
-- `iconText`, `iconBg`, `iconGlow` — Icon styling
-- `textAccent` — Label color
-
-#### Globe Highlight Synchronization
-
-```js
-useEffect(() => {
-  const handleGlobeHover = (e) => {
-    const platform = e.detail.platform
-    const shouldHighlight = Array.isArray(platformKey)
-      ? platformKey.includes(platform)
-      : platformKey === platform
-    setIsHighlighted(shouldHighlight)
-  }
-  window.addEventListener('globe-hover', handleGlobeHover)
-  return () => window.removeEventListener('globe-hover', handleGlobeHover)
-}, [platformKey])
-```
-
-When user hovers over a globe icon, matching cards get `setIsHighlighted(true)`, which triggers same hover effects.
-
-#### Local Mouse Glow
-
-Similar to ContactSection, each card tracks its own mouse position:
-- Caches `getBoundingClientRect()` in `cardRectRef` on hover enter
-- Updates CSS variables `--card-mouse-x` and `--card-mouse-y`
-- Renders radial gradient overlay with accent glow color
-
-#### Copy-to-Clipboard
-
-Email card has `copyText={personal.email}`:
+- Features local cursor spotlight calculations by caching bounding rect coordinates on hover.
+- **Default Shadow**: `shadow-[0_4px_20px_-8px_rgba(0,0,0,0.3),0_1px_2px_rgba(168,85,247,0.08)]`.
+- **Hover Shadow**: `shadow-[0_8px_28px_-8px_rgba(0,0,0,0.4),0_1px_2px_rgba(168,85,247,0.12)]` with offset translations of `-2px`.
+- Email copy events update footer to "✓ Copied!" with a 1.5s timeout.
 
 ```js
 const handleCardClick = useCallback((e) => {
   if (copyText) {
     e.preventDefault()
+    e.stopPropagation()
     navigator.clipboard.writeText(copyText)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopied(false), 1500)
   }
 }, [copyText])
 ```
 
-Footer changes from "Copy Email →" to "✓ Copied!" for 2 seconds.
+---
 
-#### Icon Rendering
+## 7. 3D Orbital System (Contact3DObject)
 
-Icons can be:
-1. **Static ReactNode** (e.g., `<Mail />`, `<svg>...</svg>`)
-2. **Function receiving `effectiveHovered`** (e.g., location icon with bounce animation)
+Replaces the old globe canvas with a three-tier hierarchical orbital system rendering a wireframe core globe and 6 interactive social buttons moving along math-driven inclined orbital rings.
 
-```js
-const iconLocation = useCallback((effectiveHovered) => (
-  <motion.div animate={effectiveHovered ? { y: [0, -3, 0] } : { y: 0 }} ...>
-    <MapPin />
-  </motion.div>
-), [])
+### Hierarchy & Orbit Configuration
+
+- The constant `ORBITAL_PLANES` defines a planned configuration:
+  - Inner: Inclination 28°, Radius 2.6, Period 18s, Precession 100s.
+  - Middle: Inclination 68°, Radius 3.0, Period 26s, Precession 110s.
+  - Outer: Inclination 115°, Radius 3.3, Period 38s, Precession 120s.
+- The actual rendering in the `Scene` component instantiates three `OrbitalRing` groups with the following hardcoded values:
+  - **Orbital Ring 0 (Inner/Identity)**: Z-angle offset 0°, Z-axis precession speed 0.02 rad/s, Orbit speed 0.35 rad/s, Z-offset offset -0.12 units. Holds GitHub and LinkedIn.
+  - **Orbital Ring 1 (Middle/Technical)**: Z-angle offset 60°, Z-axis precession speed -0.016 rad/s, Orbit speed -0.28 rad/s (reverse direction), Z-offset 0.00 units. Holds LeetCode and GeeksforGeeks.
+  - **Orbital Ring 2 (Outer/Action)**: Z-angle offset 120°, Z-axis precession speed 0.013 rad/s, Orbit speed 0.22 rad/s, Z-offset 0.12 units. Holds Email and Resume.
+  - All three orbital rings use a base Torus radius of `2.45` units and inclination of 65°:
+    `const radTilt = 65 * (Math.PI / 180)`
+    `const radZ = angle * (Math.PI / 180)`
+  - On hover, the active ring dynamically expands its radius from `2.45` to `2.53` units:
+    `const targetRadius = 2.45 + activeHover * 0.08`
+    And its rotation speed is eased (slowed down) by 10%:
+    `const speedMultiplier = 1.0 - activeHover * 0.10`
+
+### Physics-Based Mechanics
+
+- **Constant Angular Velocity**: Computed mathematically via `ω = 2π / period`. Continuous rotation without synthetic offsets.
+- **Orbital Axis Precession**: Slowly rotates each plane's tilt around the Z-axis (ringSpeed values: 0.02, -0.016, 0.013). This creates a gyroscopic armillary-sphere precession effect.
+- **Selective Slowdown**: When an icon is hovered, the orbit it belongs to slows by 10% (`speedMultiplier` becomes 0.90) to make it easier to click, while other orbits continue at 100% speed.
+- **Depth-Based Visuals**: Camera space Z-depth calculates distance to scale scale (0.95 → 1.03), opacity (0.55 → 1.0), brightness (0.8 → 1.0), and saturation (0.85 → 1.0) dynamically.
+
+### Custom Shader Materials
+
+#### 1. FresnelGlowMaterial (Atmospheric core glow)
+Renders the atmospheric halo glow on the central globe core.
+```glsl
+// Vertex Shader
+varying vec3 vNormal; varying vec3 vViewPosition;
+void main() {
+  vNormal = normalize(normalMatrix * normal);
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  vViewPosition = -mvPosition.xyz;
+  gl_Position = projectionMatrix * mvPosition;
+}
+
+// Fragment Shader
+uniform vec3 color; uniform float glowPower; uniform float glowIntensity;
+varying vec3 vNormal; varying vec3 vViewPosition;
+void main() {
+  vec3 normal = normalize(vNormal); vec3 viewDir = normalize(vViewPosition);
+  float intensity = pow(1.0 - max(dot(normal, viewDir), 0.0), glowPower) * glowIntensity;
+  gl_FragColor = vec4(color, intensity);
+}
 ```
 
-### Card Data
+#### 2. RingGlowMaterial (Torus orbital rings)
+Neon purple torus shader containing a fresnel edge glow and dynamic propagation ripples on data packet arrivals.
+```glsl
+uniform vec3 color; uniform float opacity; uniform float time; uniform float rippleProgress; uniform float rippleOrigin;
+varying vec3 vNormal; varying vec3 vViewPosition; varying vec2 vUv;
+void main() {
+  vec3 normal = normalize(vNormal); vec3 viewDir = normalize(vViewPosition);
+  float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.5);
+  vec3 baseColor = color * 0.35;
+  vec3 edgeGlow = color * fresnel * 1.5;
+  float rippleGlow = 0.0;
+  if (rippleProgress > 0.0 && rippleProgress < 1.0) {
+    float dist = abs(vUv.x - rippleOrigin);
+    if (dist > 0.5) dist = 1.0 - dist;
+    float angleDist = dist * 2.0 * 3.14159265;
+    float waveFront = rippleProgress * 3.14159265;
+    float wavePeak = exp(-pow(angleDist - waveFront, 2.0) / 0.08);
+    rippleGlow = wavePeak * (1.0 - rippleProgress) * 0.8;
+  }
+  vec3 finalColor = baseColor + edgeGlow + color * rippleGlow * 1.5;
+  float depthFade = clamp((vViewPosition.z + 10.45) / 4.9, 0.2, 1.0);
+  float finalOpacity = opacity * (0.2 + fresnel * 0.8 + rippleGlow) * depthFade;
+  gl_FragColor = vec4(finalColor, finalOpacity);
+}
+```
 
-| Card | Label | Accent | Title | Footer | Platform Key | Action |
-|---|---|---|---|---|---|---|
-| Status | STATUS | green | Open for Internships | "Usually responds..." | `['github', 'leetcode']` | None |
-| Email | EMAIL | blue | Preferred Contact | "Copy Email →" | `['email', 'instagram']` | Copy to clipboard |
-| LinkedIn | LINKEDIN | linkedin | Professional Network | "Visit Profile →" | `'linkedin'` | External link |
-| Location | LOCATION | teal | Based in Hyderabad | "View Location →" | `''` | Google Maps link |
+#### 3. TrailGlowMaterial (Comet trails)
+Comet trail ribbon following each icon. Dynamically breathes between 12% and 18% of the circumference, stretching and thinning based on transit velocities. Includes fine internal plasma noise.
+```glsl
+uniform vec3 coreColor; uniform vec3 edgeColor; uniform float opacity; uniform float isReverse; uniform float trailLengthFactor; uniform float time;
+varying vec2 vUv; varying vec3 vNormal; varying vec3 vViewPosition;
+void main() {
+  float maxFraction = 0.20;
+  float noise = sin(vUv.y * 12.0 + time * 6.0) * cos(vUv.x * 24.0 - time * 4.0) * 0.02;
+  float distortedUvX = clamp(vUv.x + noise, 0.0, 1.0);
+  float tailFade = 0.0;
+  if (isReverse > 0.5) {
+    if (distortedUvX <= maxFraction) {
+      float progress = 1.0 - (distortedUvX / maxFraction);
+      float activeProgress = (progress - (1.0 - trailLengthFactor)) / trailLengthFactor;
+      tailFade = activeProgress > 0.0 ? pow(activeProgress, 1.8) : 0.0;
+    }
+  } else {
+    if (distortedUvX >= 1.0 - maxFraction) {
+      float progress = (distortedUvX - (1.0 - maxFraction)) / maxFraction;
+      float activeProgress = (progress - (1.0 - trailLengthFactor)) / trailLengthFactor;
+      tailFade = activeProgress > 0.0 ? pow(activeProgress, 1.8) : 0.0;
+    }
+  }
+  vec3 normal = normalize(vNormal); vec3 viewDir = normalize(vViewPosition);
+  float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.2);
+  float waveDistortion = sin(distortedUvX * 16.0 + time * 5.0) * 0.04;
+  float centerFactor = sin(clamp(vUv.y + waveDistortion, 0.0, 1.0) * 3.14159265);
+  float coreFactor = pow(centerFactor, 5.0) * (1.0 - fresnel * 0.4);
+  vec3 finalColor = mix(edgeColor, coreColor, coreFactor);
+  float edgeFade = smoothstep(0.0, 0.15, centerFactor) * (0.4 + 0.6 * fresnel);
+  float depthFade = clamp((vViewPosition.z + 10.45) / 4.9, 0.2, 1.0);
+  gl_FragColor = vec4(finalColor, opacity * tailFade * edgeFade * depthFade);
+}
+```
+
+#### 4. SegmentGlowMaterial (Target endpoint activation arcs)
+Renders a short 25-degree energized arc (UV fraction: 0.07) centered on active endpoints that glows during packet arrivals.
+
+### Component Deep-Dive
+
+#### Lights
+- **Ambient Light**: intensity 0.1
+- **Hemisphere Light**: args `['#ffffff', '#090913', 0.2]`
+- **Directional Light**: position `[5, 4, 4]`, intensity 1.0, color `#ffffff`
+- **Point Light**: position `[-4, -1, -4]`, intensity 1.5, color `globalTheme.color` (dynamic), distance 12, decay 2.2.
+
+#### CameraRig
+- Handles camera float animation using:
+  - `nextX = (Math.sin(t * 0.06) * 0.035 + Math.cos(t * 0.14) * 0.015) * f`
+  - `nextY = (Math.cos(t * 0.04) * 0.035 + Math.sin(t * 0.11) * 0.015) * f`
+- Subpixel lookAt gate: only recalculates `lookAt(0, 0, 0)` if movement exceeds `0.0001` in either dimension.
+- Wraps `timeAccum` at `100000` to prevent floating-point precision loss.
+
+#### Globe
+- **Glass Core**: `SphereGeometry(1.96, 32, 32)` with MeshStandardMaterial (color `#0a0f1e`, roughness 0.25, metalness 0.6, transparent, opacity 0.35, depthWrite false).
+- **Wireframe**: `IcosahedronGeometry(2.0, 2)` with BasicMaterial (color `globalTheme.color`, wireframe true, transparent, opacity 0.06, depthWrite false).
+- **Points**: `IcosahedronGeometry(2.0, 4)` with PointsMaterial (color `globalTheme.color`, size 0.028, transparent, opacity 0.35, blending AdditiveBlending, depthWrite false). Size is pulsed in `useFrame`: `(0.025 + Math.sin(time * 2.5) * 0.005) * (0.3 + 0.7 * f)`.
+- **Atmospheric Glow**: `SphereGeometry(2.08, 32, 32)` with FresnelGlowMaterial (color `globalTheme.color`, glowPower 4.8, glowIntensity 0.5, transparent, blending AdditiveBlending, depthWrite false).
+
+#### MicroParticles
+- Seeding-based points cloud generated dynamically with PRNG (seed `42`).
+- Torus-like distributed range: radius between `2.4` and `4.4`.
+- Material: `pointsMaterial` (color `globalTheme.color`, size 0.02, transparent, opacity 0.18, depthWrite false, blending AdditiveBlending).
+- Animates rotation: `pointsRef.current.rotation.y += delta * 0.01 * f` and `pointsRef.current.rotation.x += delta * 0.005 * f` where `f` is the eased proximity factor.
+
+#### OrbitingIcon
+- HTML sprite containers rendered via `@react-three/drei` `<Html center transform sprite distanceFactor={8} pointerEvents="auto">`.
+- Extends standard links/buttons click areas with an invisible absolute layer padding: `after:absolute after:inset-[-12px] after:content-['']` (adds 12px padding around the icon to make it easy to hover/click in 3D).
+- Renders tooltips in absolute containers with hover transitions. Email icon shows "Copied!" for 1.5s on click.
+- Handles mouse proximity calculations, depth calculations, and dirty-check style updates (STYLE_THRESHOLD = 0.002).
+
+#### OrbitalRing
+- Torus path geometry built with TorusGeometry (radius 2.45, tube 0.035, radialSegments 32, tubularSegments 256).
+- Contains:
+  1. Base Torus mesh with `RingGlowMaterial`.
+  2. Trail segments (TrailGlowMaterial) mapped to icon speeds.
+  3. Local segment activation meshes (SegmentGlowMaterial).
+  4. Data packet spheres (radius 0.05, 8 segments).
+  5. Two group pivots holding the icons.
+- Handles hover packet triggers, travel blur (stretch and thin math calculations), and combined reaction factor mapping.
+
+### Signal Transmission & Rare Bursts
+
+- **Selective Packet Firing**: Hovering an icon generates a data packet that travels from the core globe to the target icon in 1.2s. During hover, the periodic packet transmission speed for that icon doubles.
+- **Rare Communication Burst**: Every 15–20s, a coordinator triggers a burst. A packet travels from the center to a random icon, stretching and thinning to simulate motion blur, then triggers a glowing feedback reaction and propagates a ripple along the Torus ring.
+- **Concurrency Control**: Lock mechanism (`activeTransmissionRef.current`) restricts the system to rendering a single major signal packet or burst at a time.
+
+### Context Recovery & 2D Fallback
+
+- Canvas listens to `webglcontextlost` on the R3F WebGL context.
+- If context is lost, the component gracefully falls back to a 2D glassmorphic container containing the 6 social/action buttons, retaining full portfolio functionality.
 
 ---
 
-## 7. 3D Globe System (GlobeContainer & GlobeScene)
+## 8. Motherboard Connectivity (PCBConnection)
 
-### GlobeContainer
+An interactive backdrop component drawing motherboard circuit traces that dynamically connect the form card to the 3D orbital system canvas boundary.
 
-Wrapper for the R3F Canvas with:
+### Coordinate Update Mechanics
 
-#### Lazy Loading
-
-```jsx
-const GlobeContainer = lazy(() => import('./GlobeContainer'))
-
-<Suspense fallback={<LoadingSpinner />}>
-  <GlobeContainer isInView={isInViewRepeat} />
-</Suspense>
-```
-
-Fallback shows animated dashed circle + "LOADING DIGITAL HUB..." text.
-
-#### Theme Synchronization
-
-MutationObserver watches `<html>` element for class/data-theme changes:
-
+Coordinates are measured on browser `resize` and `scroll` events to layout routes precisely.
 ```js
-useEffect(() => {
-  const readTheme = () => {
-    const accent = getComputedStyle(document.documentElement)
-      .getPropertyValue("--accent").trim()
-    if (accent) setThemeColor(accent)
-  }
-  readTheme()
-  const observer = new MutationObserver(readTheme)
-  observer.observe(document.documentElement, { 
-    attributes: true, 
-    attributeFilter: ["class", "data-theme"] 
-  })
-  return () => observer.disconnect()
-}, [])
-```
+const rectGrid = containerRef.current.getBoundingClientRect()
+const formEl = document.getElementById('contact-form-container')
+const globeEl = document.getElementById('contact-globe-inner')
 
-Theme color passed down to all globe sub-components.
+const G_val = rectGrid.width
+const H_val = rectGrid.height || 400
+const leftOffset = rectGrid.left
+const xStart_val = -leftOffset + 15
 
-#### Proximity Distance Factor
+let L_form_val = G_val * 0.25
+let R_form_val = G_val * 0.50
+if (formEl) {
+  const rectForm = formEl.getBoundingClientRect()
+  L_form_val = rectForm.left - rectGrid.left
+  R_form_val = rectForm.right - rectGrid.left
+}
 
-Tracks mouse distance from globe center, calculates `distanceFactor`:
-
-```js
-const { maxDistance, minDistance, minFactor } = SCENE_CONFIG.proximity
-// maxDistance = 220px, minDistance = 40px, minFactor = 0.05
-
-const handleMouseMove = (e) => {
-  const r = cachedRect.current
-  const dx = e.clientX - (r.left + r.width / 2)
-  const dy = e.clientY - (r.top + r.height / 2)
-  const d = Math.sqrt(dx * dx + dy * dy)
-  
-  if (d > maxDistance) distanceFactor.current = 1.0
-  else if (d < minDistance) distanceFactor.current = minFactor  // 0.05 = almost frozen
-  else {
-    const t = (d - minDistance) / (maxDistance - minDistance)
-    const eased = t * t * (3 - 2 * t)  // Smoothstep easing
-    distanceFactor.current = minFactor + eased * (1.0 - minFactor)
-  }
+let sphereLeft = G_val * 0.75
+if (globeEl) {
+  const rectGlobe = globeEl.getBoundingClientRect()
+  const sphereWidth = Math.min(380, rectGlobe.width)
+  sphereLeft = rectGlobe.left - rectGrid.left + (rectGlobe.width - sphereWidth) / 2
 }
 ```
 
-When mouse is very close (< 40px), animations slow to 5% speed. When far away (> 220px), full speed.
+### Trace Hierarchy (40 Motherboard Traces)
 
-#### WebGL Context Loss Handling
+1. **Layer 1: Faint Background (12 traces)** — Opacity 0.12, width 0.5px. Connects background vias.
+2. **Layer 2: Normal Routing (18 traces)** — Opacity 0.28. Contains meander structures, a Top Data Bus (5 traces with matched lengths and staggered terminations), a Middle Control Bus (4 traces), and a Bottom Differential Bus (3 traces).
+3. **Layer 3: Highlighted Routing (10 traces)** — Opacity 0.55, width 1–2px. Connects active signal endpoints.
 
-If WebGL context is lost, `setWebglSupported(false)` is called, rendering fallback 4-icon grid instead of Canvas.
+### Circuit Nodes & Signals
 
-#### Responsive Sizing
-
-```jsx
-<div className="absolute ... w-72 h-72 md:w-96 md:h-96 lg:w-[480px] lg:h-[480px] xl:w-[580px] xl:h-[580px]">
-```
-
-Hidden on mobile (`hidden md:flex`).
-
-#### Accessibility Fallback
-
-Screen reader navigation links rendered in `sr-only` class:
-
-```jsx
-<nav aria-label="Social media links" className="sr-only">
-  {socialsToRender.map(s => (
-    <a href={s.url} aria-label={`Visit Sai Pallav's ${s.platform} profile`}>
-      Sai Pallav's {s.platform}
-    </a>
-  ))}
-</nav>
-```
-
-### GlobeScene
-
-Main R3F scene orchestrator.
-
-#### SCENE_CONFIG Constants
-
-```js
-{
-  camera: { position: [0, 0, 8], fov: 45 },
-  globe: {
-    radius: 2.0,
-    glassRadius: 1.96,
-    haloRadius: 2.08,
-    wireframeOpacity: 0.06,
-    pointsOpacity: 0.35,
-    glowIntensity: 0.5,
-    glowPower: 4.8,
-  },
-  orbit: {
-    radius: 2.8,
-    tiltA: Math.PI / 4,
-    tiltB: -Math.PI / 4,
-  },
-}
-```
-
-#### ORBIT_CONFIGS
-
-Four orbit paths for social icons:
-
-| Index | Tilt Z | Speed | Initial Phase |
-|---|---|---|---|
-| 0 | π/4 | 0.265 | 0 |
-| 1 | -π/4 | -0.295 | π/2 |
-| 2 | π/4 | 0.280 | π |
-| 3 | -π/4 | -0.270 | -π/2 |
-
-Negative speeds = reverse direction.
-
-#### Fresnel Glow Shader
-
-Custom shader material for atmospheric glow:
-
-```glsl
-// Vertex shader
-varying vec3 vNormal; 
-varying vec3 vViewPosition;
-void main() { 
-  vNormal = normalize(normalMatrix * normal); 
-  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); 
-  vViewPosition = -mvPosition.xyz; 
-  gl_Position = projectionMatrix * mvPosition; 
-}
-
-#### Orbit Mechanics
-
-Each icon follows a circular orbit path with:
-- **Tilt angle** (`tiltZ`) — Orbit plane rotation
-- **Speed** — Rotation speed (rad/s)
-- **Radius** — Distance from center (2.8 units)
-- **Initial phase** — Starting angle offset
-
-Rotation group hierarchy:
-```jsx
-<group rotation={[0, 0, tiltZ]}>        // Tilt the orbit plane
-  <group ref={rotationRef}>              // Rotate around Y axis
-    <group ref={iconGroupRef}>           // Icon at radius distance
-      <Html>...</Html>
-    </group>
-  </group>
-</group>
-```
-
-#### Speed Modulation
-
-When ANY icon is hovered, ALL icons slow down:
-
-```js
-const isAnyHovered = hoveredCountRef.current > 0
-const targetSpeedMult = isAnyHovered ? 0.2 : 1.0
-speedMultiplier.current = lerpFI(speedMultiplier.current, targetSpeedMult, 4.0, delta)
-
-rotationRef.current.rotation.y += delta * speed * speedMultiplier.current * organicVariation * f
-```
-
-`organicVariation` adds subtle per-icon timing variations.
-
-#### Bob Animation
-
-Non-hovered icons gently bob up and down:
-
-```js
-const targetBob = hovered ? 0.0 : Math.sin(time * 2.0 + index * 1.6) * 0.05 * f
-bobOffset.current = lerpFI(bobOffset.current, targetBob, 5.0, delta)
-iconGroupRef.current.position.y = bobOffset.current
-```
-
-Hovered icon stops bobbing (snaps to 0).
-
-#### Depth-Based Scaling & Opacity
-
-Icons closer to camera appear larger and more opaque:
-
-```js
-iconGroupRef.current.getWorldPosition(tempVec)
-tempVec.applyMatrix4(state.camera.matrixWorldInverse)  // Convert to camera space
-
-const camZ = state.camera.position.z || 8
-const maxZ = -(camZ - radius)  // Front of orbit
-const minZ = -(camZ + radius)  // Back of orbit
-const depth = THREE.MathUtils.clamp((tempVec.z - minZ) / (maxZ - minZ), 0, 1)
-
-const baseScale = 0.92 + depth * 0.08       // 0.92 to 1.0
-const scaleVal = baseScale * (1.0 + hoverGlowFactor.current * 0.06)
-const opacityVal = 0.25 + depth * 0.75      // 0.25 to 1.0
-```
-
-Creates natural 3D depth perception.
-
-#### Dirty-Check Style Updates
-
-Avoids excessive DOM writes:
-
-```js
-const lastStyle = useRef({ opacity: -1, scaleVal: -1, glowOpacity: -1 })
-const STYLE_THRESHOLD = 0.002
-
-if (Math.abs(opacityVal - lastStyle.current.opacity) > STYLE_THRESHOLD) {
-  htmlRef.current.style.opacity = opacityVal
-  lastStyle.current.opacity = opacityVal
-}
-```
-
-Only updates style if value changed by more than 0.002.
-
-#### Globe-Card Event Sync
-
-On hover, dispatches custom event:
-
-```js
-const handlePointerOver = useCallback(() => {
-  hoverRef.current = true
-  hoveredCountRef.current += 1
-  window.dispatchEvent(new CustomEvent('globe-hover', { 
-    detail: { platform: social.platform } 
-  }))
-}, [social.platform])
-
-const handlePointerOut = useCallback(() => {
-  hoverRef.current = false
-  hoveredCountRef.current = Math.max(0, hoveredCountRef.current - 1)
-  window.dispatchEvent(new CustomEvent('globe-hover', { 
-    detail: { platform: null } 
-  }))
-}, [])
-```
-
-ContactCard components listen for these events and highlight accordingly.
-
-#### Tooltip
-
-Hover tooltip displays platform name:
-
-```jsx
-<div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 px-3 py-1.5 rounded-lg bg-bg-raised/95 border border-white/[0.08] backdrop-blur-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-300 pointer-events-none">
-  <span className="text-[10px] font-bold tracking-wider uppercase text-[var(--text-heading)] whitespace-nowrap">
-    {social.platform}
-  </span>
-  <div className="absolute top-full left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-bg-raised border-t border-l border-white/[0.08] rotate-45 -translate-y-[4px]" />
-</div>
-```
-
-Arrow created with rotated square div.
-
-### InteractionManager.jsx
-
-Minimal component handling WebGL context loss:
-
-```js
-useEffect(() => {
-  const canvasEl = gl.domElement
-  const handleContextLost = (e) => {
-    e.preventDefault()
-    setWebglSupported(false)
-  }
-  canvasEl.addEventListener('webglcontextlost', handleContextLost)
-  return () => canvasEl.removeEventListener('webglcontextlost', handleContextLost)
-}, [gl, setWebglSupported])
-```
-
-When context is lost, GlobeContainer switches to fallback 2D icon grid.
+- **15 Nodes**: 10 active endpoints and 5 standalone intermediate nodes, each utilizing a `#pcbSignalGlow` radial blur filter and a solid white core.
+  - The 5 standalone nodes are rendered at: `[120, -150]`, `[220, -50]`, `[150, 10]`, `[200, 130]`, `[100, 50]`.
+- **Left Signal Packets**: Every 7 seconds, a single light packet is fired along one of the Layer 3 highlighted traces. Uses `<animateMotion>` to traverse the coordinate command path in 3.5s.
+- **Right Signals**: 3 permanent signal packets move along the form-to-globe buses with delays.
 
 ---
 
@@ -784,66 +575,47 @@ When context is lost, GlobeContainer switches to fallback 2D icon grid.
 |---|---|---|
 | Form data, validation errors | ContactForm | Self-contained, no external deps |
 | Card hover states | ContactCard | Local interaction |
-| Globe hover count | GlobeContainer (ref) | Shared across OrbitingIcons via ref |
-| Distance factor | GlobeContainer (ref) | Passed to all animated components |
-| Theme color | GlobeContainer (state) | Synced from CSS variables |
-| WebGL supported | GlobeContainer (state) | Fallback rendering |
+| Globe hover count | Contact3DObject (ref) | Shared across OrbitingIcons via ref |
+| Distance factor | Contact3DObject (ref) | Passed to all animated components |
+| WebGL supported | Contact3DObject (state) | Fallback rendering |
 | Section mouse position | ContactSection | CSS variables for ambient light |
+| Dropdown open state | ContactForm | Local UI state |
+| Button hover state | ContactForm | Local animation trigger |
+| Ripple array | ContactForm | Local animation state |
+| Card copied state | ContactCard | Local feedback state |
+| activeTraceIndex | PCBConnection | Selects left active trace |
+| activeTransmission | Scene | Concurrency lock for 3D signal animations |
+| activeBurst | Scene | Coordinates periodic communication burst stages |
 
 ### Ref-Based Animation State
 
 Animation values stored in refs to avoid re-renders:
 
 ```js
-// In GlobeContainer
+// In Contact3DObject
 const distanceFactor = useRef(1.0)        // Updated on mousemove
 const hoveredCountRef = useRef(0)         // Updated by OrbitingIcon hover
 const cachedRect = useRef(null)           // Cached bounding rect
 
+// In CameraRig
+const easedFactor = useRef(1.0)           // Lerped distance factor
+const timeAccum = useRef(0)               // Animation time accumulator
+const lastX = useRef(0)                   // Last camera position X
+const lastY = useRef(0)                   // Last camera position Y
+
+// In Globe
+const wireRef = useRef()
+const pointsRef = useRef()
+const easedFactor = useRef(1.0)
+const timeAccum = useRef(0)
+
 // In OrbitingIcon
-const hoverRef = useRef(false)            // Local hover state
-const speedMultiplier = useRef(1.0)       // Animation speed
-const easedSpeedFactor = useRef(1.0)      // Lerped distance factor
-const hoverGlowFactor = useRef(0.0)       // Glow intensity
-const timeAccum = useRef(0)               // Animation time
-```
-
-These update in `useFrame` without causing React re-renders.
-
-### Data Sources
-
-```js
-// src/data/personal.js
-export const personal = {
-  name: 'Sai Pallav',
-  email: 'sai.pallav@bits-pilani.ac.in',
-  location: 'Hyderabad, India',
-  availability: 'Open to Internships · June 2026',
-  socials: {
-    github: 'https://github.com/Sai-Pallav',
-    linkedin: 'https://linkedin.com/in/sai-pallav',
-    instagram: 'https://instagram.com/sai_pallav',
-    leetcode: 'https://leetcode.com/sai_pallav',
-  },
-}
-```
-
-### Event Flow Diagram
-
-```
-User hovers globe icon
-  └─> OrbitingIcon: handlePointerOver()
-      ├─> hoverRef.current = true
-      ├─> hoveredCountRef.current += 1
-      └─> window.dispatchEvent('globe-hover', { platform: 'linkedin' })
-          └─> ContactCard: handleGlobeHover listener
-              └─> if platformKey matches: setIsHighlighted(true)
-                  └─> effectiveHovered = isHovered || isHighlighted
-                      └─> Card lifts, border glows, spotlight appears
-
-Simultaneously:
-  └─> All OrbitingIcon components detect hoveredCountRef > 0
-      └─> speedMultiplier lerps to 0.2 (slow motion effect)
+const iconGroupRef = useRef()
+const htmlRef = useRef()
+const glowRef = useRef()
+const hoverRef = useRef(false)
+const hoverGlowFactor = useRef(0.0)
+const lastStyle = useRef({ opacity: -1, scaleVal: -1, glowOpacity: -1, brightnessVal: -1, saturateVal: -1 })
 ```
 
 ---
@@ -873,8 +645,6 @@ const isConfigured = !!(serviceId && templateId && publicKey &&
 )
 ```
 
-Extra checks ensure placeholder values don't count as "configured".
-
 ### Email Payload
 
 ```js
@@ -886,141 +656,29 @@ await emailjs.send(
     from_email: formData.email,
     subject: formData.subject,
     message: `[Inquiry Type: ${inquiryType}]\n\n${formData.message}`,
-    to_email: personal.email,  // 'sai.pallav@bits-pilani.ac.in'
+    to_email: personal.email,
   },
   publicKey
 )
 ```
 
-Inquiry type prepended to message body.
-
-### Demo Mode Behavior
-
-When `!isConfigured`:
-- Simulates 1500ms network delay
-- Logs form data to console
-- Shows success state
-- No actual email sent
-
-**Current Status:** Portfolio is in demo mode (placeholder credentials in .env).
-
-### Setup Instructions
-
-1. Create free account at [emailjs.com](https://www.emailjs.com/)
-2. Connect email service (Gmail, Outlook, SendGrid, etc.)
-3. Create email template with variables:
-   - `{{from_name}}`
-   - `{{from_email}}`
-   - `{{subject}}`
-   - `{{message}}`
-   - `{{to_email}}`
-4. Copy Service ID, Template ID, Public Key
-5. Replace `.env` placeholder values
-6. Test submission
-
 ---
 
 ## 11. Animation System
-
-### Animation Library Usage
-
-- **framer-motion** — All transitions, scroll triggers, stagger effects
-- **Three.js + R3F** — 3D globe rendering and animations
-- **CSS transitions** — Hover effects, focus states
-- **CSS keyframes** — Ripple animation, ping animation
-
-### Entrance Animations
-
-#### ContactHero
-
-```js
-variants={entryVar01}
-initial="hidden"
-whileInView="visible"
-viewport={{ once: true, margin: '-100px' }}
-```
-
-Triggers 100px before entering viewport, runs once.
-
-#### ContactForm
-
-```js
-FORM_CARD_VARIANTS = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1, y: 0,
-    transition: { staggerChildren: 0.08, delayChildren: 0.1 }
-  }
-}
-
-FORM_CHILD_VARIANTS = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0, duration: 0.5 }
-}
-```
-
-Parent fades in, then children stagger in with 80ms delay between each.
-
-#### ContactCards
-
-```js
-GRID_VARIANTS = {
-  visible: {
-    transition: { staggerChildren: 0.08, delayChildren: 0.55 }
-  }
-}
-```
-
-Cards stagger in after 550ms delay.
 
 ### Continuous Animations
 
 | Element | Animation | Duration | Easing |
 |---|---|---|---|
 | Background fog clouds | x/y translate loops | 25–30s | easeInOut |
-| Globe rotation | Y-axis 0.18 rad/s, X-axis 0.04 rad/s | Infinite | Linear |
+| Globe rotation | Y-axis 0.08 rad/s, X-axis 0.02 rad/s | Infinite | Linear (modulated by distanceFactor) |
 | Point size pulse | Sin wave 0.025–0.03 | ~2.5s cycle | Sin curve |
-| Camera float | Dual sin waves | Infinite | Sin curves |
-| Particle layer rotation | Y: 0.01, X: 0.005 rad/s | Infinite | Linear |
-| Orbiting icons | Individual speeds 0.265–0.295 rad/s | Infinite | Linear |
-| Icon bob | Sin wave ±0.05 units | ~3.1s cycle | Sin curve |
+| Camera float | Dual sin waves (0.06, 0.04) | Infinite | Sin curves (modulated by distanceFactor) |
+| Particle layer rotation | Y: 0.01, X: 0.005 rad/s | Infinite | Linear (modulated by distanceFactor) |
+| Orbiting icons | Orbit configurations | Infinite | Linear (modulated by selective slowdown) |
 | Status card ping | Scale + opacity pulse | 1s | Built-in |
-
-### Lerp Function
-
-Framerate-independent exponential smoothing used everywhere:
-
-```js
-const lerpFI = (current, target, factor, delta) =>
-  current + (target - current) * (1.0 - Math.exp(-factor * delta))
-```
-
-**Properties:**
-- Framerate independent (uses delta time)
-- Higher factor = faster convergence
-- Smooth, natural easing
-- No overshoot
-
-### Reduced Motion
-
-All animations check `useReducedMotion()`:
-
-```js
-const shouldReduceMotion = useReducedMotion()
-
-if (shouldReduceMotion) {
-  // Skip animation, render static state
-  return
-}
-```
-
-Affected elements:
-- Globe container (doesn't render at all)
-- Background fog clouds
-- Camera rig
-- Volumetric ambient lights
-- Card spotlight glows
-- All framer-motion variants (opacity-only fallback)
+| Button sheen | Gradient slide | 0.6s | ease-out (on hover only) |
+| Signal packet travel | SVG path travel | 3.5s | animateMotion |
 
 ---
 
@@ -1031,70 +689,45 @@ Affected elements:
 Components read theme colors from CSS:
 
 ```js
-// In GlobeContainer
-const accent = getComputedStyle(document.documentElement)
-  .getPropertyValue("--accent").trim()
-setThemeColor(accent)
+// In Contact3DObject
+const readTheme = () => {
+  const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()
+  if (accent && accent !== globalTheme.color) {
+    globalTheme.color = accent
+    globalTheme.version += 1
+  }
+}
 ```
-
-Used in:
-- Globe wireframe color
-- Globe points color
-- Halo glow color
-- Point light color
-- Orbiting icon glow
-- Card accent colors
 
 ### Glassmorphism Technique
 
 Form card layers:
 
 ```jsx
-<div className="relative p-[1px] overflow-hidden rounded-2xl bg-gradient-to-b from-white/[0.08] via-white/[0.03] to-transparent">
-  <div className="relative rounded-2xl bg-[#090d16]/65 backdrop-blur-xl p-8">
-    {/* Form content */}
-  </div>
-</div>
+<motion.div className="relative rounded-3xl border border-white/10 bg-gradient-to-br from-surface/80 via-raised/60 to-surface/80 backdrop-blur-2xl p-8 md:p-10 w-full shadow-2xl shadow-black/40 overflow-hidden">
+  {/* Glass border sheen overlay */}
+  <div className="absolute inset-0 rounded-2xl pointer-events-none opacity-60"
+    style={{
+      background: `linear-gradient(to bottom, var(--accent) 0%, transparent 30%)`,
+      maskImage: 'linear-gradient(to bottom, black 0%, transparent 8%)',
+      WebkitMaskImage: 'linear-gradient(to bottom, black 0%, transparent 8%)',
+      opacity: 0.12,
+    }}
+  />
+</motion.div>
 ```
-
-1. Outer div with 1px padding creates border effect
-2. Inner div with backdrop-blur creates glass effect
-3. Low opacity colors maintain depth
 
 ### Shadow Stack
 
 Cards use multiple shadow layers:
 
 ```css
-shadow-[0_16px_36px_-8px_rgba(0,0,0,0.35),inset_0_1px_1px_rgba(255,255,255,0.02)]
+/* ContactCard default */
+shadow-[0_4px_20px_-8px_rgba(0,0,0,0.3),0_1px_2px_rgba(168,85,247,0.08)]
+
+/* ContactCard hovered with action */
+shadow-[0_8px_28px_-8px_rgba(0,0,0,0.4),0_1px_2px_rgba(168,85,247,0.12)]
 ```
-
-- Primary shadow: 16px vertical, 36px blur
-- Inset highlight: 1px top edge shine
-
-### Color Palette
-
-| Usage | Color | Opacity |
-|---|---|---|
-| Background base | `bg-bg` | 100% |
-| Glass surfaces | `bg-white` | 1–3% |
-| Borders | `border-white` | 4–10% |
-| Secondary text | `text-secondary` | 60–75% |
-| Accent highlights | `var(--accent)` | 100% |
-| Glow effects | Theme-specific rgba | 5–15% |
-| Globe wireframe | Theme color | 6% |
-| Globe points | Theme color | 35% |
-
-### Typography Scale
-
-| Element | Size (Mobile) | Size (Desktop) | Weight | Font |
-|---|---|---|---|---|
-| Hero heading | 4xl (36px) | 6xl (60px) | Bold | Heading |
-| Form heading | xl (20px) | xl (20px) | Bold | Heading |
-| Card title | sm (14px) | base (16px) | Bold | Heading |
-| Body text | xs (12px) | sm (14px) | Medium | Body |
-| Labels | 10px | 10px | Semibold | Mono |
-| Button | sm (14px) | sm (14px) | Medium | Body |
 
 ---
 
@@ -1108,127 +741,12 @@ All components wrapped:
 - `ContactForm` — Self-contained state
 - `ContactCards` — Grid wrapper
 - `ContactCard` — Individual cards
-- `GlobeContainer` — Expensive 3D rendering
-- `GlobeScene` — R3F scene
-- All globe sub-components
-
-### useCallback Hooks
-
-Event handlers memoized to prevent function recreation:
-
-```js
-const handlePointerOver = useCallback(() => {
-  // ...
-}, [deps])
-
-const handleMouseMove = useCallback((e) => {
-  // ...
-}, [deps])
-```
-
-Prevents child re-renders when passed as props.
-
-### useMemo Hooks
-
-Expensive computations cached:
-
-```js
-// Particle positions (PRNG calculation)
-const [positions] = useMemo(() => {
-  const pos = new Float32Array(30 * 3)
-  // ... calculation
-  return [pos]
-}, [])
-
-// Animation variants
-const entryVar01 = useMemo(() => ({
-  hidden: { opacity: 0, y: 25 },
-  visible: { /* ... */ }
-}), [shouldReduceMotion])
-
-// Social icons array
-const socialsToRender = useMemo(() => [
-  { platform: "github", url: personal.socials.github },
-  // ...
-].filter(s => s.url), [])
-```
-
-### requestAnimationFrame Throttling
-
-Mouse tracking throttled:
-
-```js
-let ticking = false
-const handleMouseMove = (e) => {
-  if (!ticking) {
-    window.requestAnimationFrame(() => {
-      // Do work
-      ticking = false
-    })
-    ticking = true
-  }
-}
-```
-
-Prevents multiple updates per frame.
-
-### Rect Caching
-
-Bounding rects cached to avoid layout thrashing:
-
-```js
-const cachedRect = useRef(null)
-
-const updateRect = () => {
-  if (containerRef.current) {
-    cachedRect.current = containerRef.current.getBoundingClientRect()
-  }
-}
-
-// Update only on resize, not on every mouse move
-window.addEventListener('resize', updateRect, { passive: true })
-```
-
-### Dirty-Check DOM Updates
-
-Style updates gated behind threshold checks:
-
-```js
-const STYLE_THRESHOLD = 0.002
-
-if (Math.abs(newValue - lastValue) > STYLE_THRESHOLD) {
-  element.style.property = newValue
-  lastValue = newValue
-}
-```
-
-Reduces DOM writes by 80–90%.
-
-### Lazy Loading
-
-Globe container lazy loaded:
-
-```jsx
-const GlobeContainer = lazy(() => import('./GlobeContainer'))
-
-<Suspense fallback={<LoadingSpinner />}>
-  <GlobeContainer />
-</Suspense>
-```
-
-Reduces initial bundle size.
-
-### Canvas Frame Loop Control
-
-```jsx
-<Canvas frameloop={isInView ? "always" : "never"}>
-```
-
-Stops rendering when section is offscreen.
+- `PCBConnection` — Prevents re-renders
+- `Contact3DObject` — R3F canvas wrapper
 
 ### Geometry Disposal
 
-Globe component cleans up geometries:
+R3F meshes clean up geometries on unmount:
 
 ```js
 useEffect(() => {
@@ -1241,18 +759,6 @@ useEffect(() => {
 }, [geomWire, geomPoints, geomGlass, geomHalo])
 ```
 
-Prevents memory leaks.
-
-### Passive Event Listeners
-
-All scroll/mouse listeners use `{ passive: true }`:
-
-```js
-window.addEventListener('mousemove', handler, { passive: true })
-```
-
-Improves scroll performance.
-
 ---
 
 ## 14. Accessibility (a11y)
@@ -1262,56 +768,10 @@ Improves scroll performance.
 | Feature | Implementation |
 |---|---|
 | Semantic HTML | `<section>`, `<form>`, `<button type="submit">`, `<label htmlFor>` |
-| Form labels | All inputs have associated labels with `htmlFor` |
-| Error announcements | `role="alert"` on error messages |
-| ARIA descriptions | `aria-describedby` links inputs to error spans |
-| Focus indicators | `focus-visible:ring-2 focus-visible:ring-cyan-500/50` |
-| Link labels | `aria-label="Visit ${platform} profile"` |
+| Focus indicators | `focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50` |
+| Link labels | `aria-label="Open ${platform} profile"` |
 | Reduced motion | All animations disabled via `useReducedMotion()` |
-| Keyboard navigation | All interactive elements keyboard accessible |
-| Color contrast | WCAG AA compliant (text on backgrounds) |
 | Screen reader fallback | `<nav className="sr-only">` with social links |
-| Focus management | Logical tab order maintained |
-
-### Gaps ⚠️
-
-1. **Globe icons not keyboard accessible** — `<Html>` elements in 3D space have `<a>` tags but difficult to reach via Tab (SR-only fallback provided)
-
-2. **Card interactions missing keyboard support** — ContactCard hover effects work on mouse, but keyboard focus doesn't trigger spotlight/glow
-
-3. **Submit button missing `aria-busy`**:
-   ```jsx
-   <button 
-     disabled={isSubmitting} 
-     aria-busy={isSubmitting ? 'true' : 'false'}  // ← Missing
-   >
-   ```
-
-4. **Form success state not announced** — When `subState` changes to 'success', no `aria-live` region announces the change
-
-5. **Decorative elements missing `aria-hidden`** — Background orbs, fog clouds, grid lines should have `aria-hidden="true"`
-
-6. **Tooltip not keyboard accessible** — Orbiting icon tooltips only show on `:hover`, not on `:focus`
-
-7. **Character counter not linked** — Textarea character counter should use `aria-describedby` or `aria-live`
-
-### Keyboard Navigation Flow
-
-```
-Tab Order:
-1. Inquiry type buttons (×6)
-2. Name input
-3. Email input
-4. Subject input
-5. Message textarea
-6. Submit button
-7. Status card (if has link/copy)
-8. Email card (copy button)
-9. LinkedIn card (link)
-10. Location card (link)
-```
-
-Globe icons skipped (have SR-only fallback).
 
 ---
 
@@ -1323,233 +783,47 @@ None identified.
 
 ### 🟡 Medium Priority
 
-1. **EmailJS in demo mode** — Placeholder credentials prevent real email sending. Needs production setup.
-
-2. **WebGL fallback UX** — When WebGL fails, shows 4-icon flat grid. Could be improved with animated 2D alternative.
-
-3. **Mobile globe hidden** — `hidden md:flex` removes globe entirely on mobile. Could show simplified 2D version.
-
-4. **Theme color sync latency** — MutationObserver triggers on every class change. Could use debouncing.
-
-5. **No form data persistence** — If user navigates away, form data is lost. Could use localStorage or sessionStorage.
-
-6. **Inquiry type not validated** — Form doesn't enforce inquiry type selection (defaults to "Internship").
-
-7. **Error state button behavior** — When `subState === 'error'`, button requires double-click (once to reset state, once to submit).
-
-### 🟢 Low Priority
-
-1. **Unused status message timeout** — Success status from form never clears (stays in state indefinitely, but hidden by AnimatePresence).
-
-2. **Hardcoded text** — Hero description text is hardcoded constant. Could move to `personal.js` for easier editing.
-
-3. **Magic numbers** — Many animation timings, distances, and thresholds are inline constants. Could extract to config.
-
-4. **No spam protection** — Form has no rate limiting, honeypot field, or reCAPTCHA.
-
-5. **Character limit visual feedback** — Message textarea turns red at >1000 chars but doesn't prevent typing.
-
-6. **No form reset on outside click** — Error states persist until user interacts again.
-
-7. **Tooltip z-index conflict** — Orbiting icon tooltips might clip with other UI elements.
-
-8. **No loading skeleton for globe** — While lazy loading, shows generic spinner. Could show wireframe skeleton.
+1. **EmailJS in demo mode** — Placeholder credentials prevent real email sending.
+2. **WebGL fallback UX** — When WebGL fails, shows flat grid.
+3. **Mobile globe hidden** — `hidden md:flex` removes R3F canvas on mobile.
 
 ---
 
 ## 16. Improvement Recommendations
 
-### High Priority
-
 1. **Configure EmailJS production credentials**
-   - Set up real email service
-   - Replace `.env` placeholders
-   - Test end-to-end submission
-   - Add confirmation email to sender
-
 2. **Add keyboard support to ContactCard**
-   ```jsx
-   <div
-     tabIndex={0}
-     onFocus={() => setIsHovered(true)}
-     onBlur={() => setIsHovered(false)}
-   >
-   ```
-
 3. **Announce form success to screen readers**
-   ```jsx
-   <div role="status" aria-live="polite" className="sr-only">
-     {subState === 'success' && 'Message sent successfully'}
-   </div>
-   ```
-
-4. **Add `aria-busy` to submit button**
-   ```jsx
-   <button aria-busy={isSubmitting}>
-   ```
-
-5. **Add `aria-hidden="true"` to decorative elements**
-   ```jsx
-   <div aria-hidden="true" className="absolute ...">
-     {/* Background decorations */}
-   </div>
-   ```
-
-### Medium Priority
-
-6. **Mobile globe alternative**
-   - Create 2D floating icon animation for mobile
-   - Or show static icon grid with subtle hover effects
-   - Currently completely hidden on mobile (<768px)
-
-7. **Form data persistence**
-   ```js
-   useEffect(() => {
-     localStorage.setItem('contactForm', JSON.stringify(formData))
-   }, [formData])
-   
-   useEffect(() => {
-     const saved = localStorage.getItem('contactForm')
-     if (saved) setFormData(JSON.parse(saved))
-   }, [])
-   ```
-
-8. **Add spam protection**
-   - Honeypot field (hidden via CSS)
-   - Client-side rate limiting
-   - Optional: Google reCAPTCHA v3
-
-9. **Extract magic numbers to config**
-   ```js
-   // src/components/sections/contact/config.js
-   export const CONTACT_CONFIG = {
-     animation: {
-       fogDuration: [25, 30],
-       iconOrbitSpeed: [0.265, 0.295],
-       cameraFloatSpeed: [0.06, 0.04],
-     },
-     globe: {
-       proximityThreshold: { max: 220, min: 40 },
-       orbitRadius: 2.8,
-       particleCount: 30,
-     },
-     form: {
-       messageMaxLength: 1000,
-       submitDelay: 1500,
-     }
-   }
-   ```
-
-10. **Improve error state UX**
-    - Auto-reset error button after 3s
-    - Or change to "Try Again" button that resets on click before next submit
-
-### Low Priority
-
-11. **Add form field autofocus**
-    ```jsx
-    <FloatingInput autoFocus id="name" ... />
-    ```
-
-12. **Add visual submission feedback**
-    - Progress bar during submission
-    - Confetti animation on success
-    - Shake animation on error
-
-13. **Optimize globe bundle size**
-    - Code split R3F utilities
-    - Lazy load shaders
-    - Consider alternative to drei for Html component
-
-14. **Add analytics tracking**
-    ```js
-    // Track form submissions
-    window.gtag?.('event', 'form_submit', {
-      form_type: inquiryType,
-      success: true
-    })
-    ```
-
-15. **Add unit tests**
-    - Validation logic
-    - Form submission flow
-    - Globe proximity calculations
-    - Event synchronization
-
-16. **Document component props with TypeScript/JSDoc**
-    ```jsx
-    /**
-     * @param {Object} props
-     * @param {string} props.platform - Social platform name
-     * @param {string} props.url - Profile URL
-     * @param {number} props.speed - Orbit speed in rad/s
-     * @param {React.RefObject<number>} props.distanceFactor - Proximity factor ref
-     */
-    export default function OrbitingIcon({ platform, url, speed, distanceFactor }) {
-    ```
 
 ---
 
-## Appendix: Quick Reference
+## Appendix: Reference Map
 
 ### Component Import Map
 
 ```js
-// Main section
 import ContactSection from '@/components/sections/contact/ContactSection'
-
-// Internal components (not exported from outside contact/)
 import ContactHero from './ContactHero'
 import ContactForm from './ContactForm'
 import ContactCards from './ContactCards'
 import ContactCard from './ContactCard'
-import GlobeContainer from './GlobeContainer'
-import GlobeScene from './GlobeScene'
-import Lighting from './Lighting'
-import ParticleLayer from './ParticleLayer'
-import OrbitingIcon from './OrbitingIcon'
-import InteractionManager from './InteractionManager'
+import PCBConnection from './PCBConnection'
+import Contact3DObject from './Contact3DObject'
 ```
 
 ### Key Files to Edit
 
 | Task | Files |
 |---|---|
-| Update form fields | `ContactForm.jsx` |
-| Change card content | `ContactCards.jsx` (data), `ContactCard.jsx` (rendering) |
-| Modify hero text | `ContactHero.jsx`, consider moving to `personal.js` |
-| Adjust globe appearance | `GlobeScene.jsx` (SCENE_CONFIG), `Lighting.jsx` |
-| Change orbit behavior | `OrbitingIcon.jsx` (ORBIT_CONFIGS) |
-| Update backgrounds | `ContactSection.jsx` (background layers) |
-| Configure email | `.env` file |
-
-### Performance Budget
-
-| Metric | Target | Current Status |
-|---|---|---|
-| Initial paint | <2s | ✅ ~1.5s (globe lazy loaded) |
-| Form interaction | <100ms | ✅ ~50ms (memoized) |
-| Globe FPS | 60fps | ✅ Steady 60fps on modern devices |
-| Canvas memory | <50MB | ✅ ~30MB with all geometries |
-| Mouse event lag | <16ms | ✅ rAF-throttled |
-| Bundle size (contact) | <150KB | ⚠️ ~180KB (R3F + drei overhead) |
-
-### Browser Support
-
-| Browser | Support | Notes |
-|---|---|---|
-| Chrome 90+ | ✅ Full | Recommended |
-| Firefox 88+ | ✅ Full | |
-| Safari 14+ | ✅ Full | |
-| Edge 90+ | ✅ Full | |
-| Mobile Safari | ⚠️ Partial | Globe hidden, form works |
-| Chrome Android | ⚠️ Partial | Globe hidden, form works |
-| IE 11 | ❌ None | Not supported (ES6+, WebGL2) |
+| Adjust orbits or shaders | `Contact3DObject.jsx` |
+| Modify motherboard routing | `PCBConnection.jsx` |
+| Update contact details | `personal.jsx` |
+| Modify validation or inputs | `ContactForm.jsx` |
+| Edit card layouts | `ContactCards.jsx` |
 
 ---
 
-**End of Contact Section Analysis**
+## Version History
 
-*This document provides complete technical context for maintaining, debugging, and extending the contact section. All component interactions, state flows, animations, and architectural decisions are documented.*
-
-*For implementation questions, refer to the specific section. For bugs, check Known Issues. For enhancements, see Improvement Recommendations.*
+- **July 11, 2026**: Fully reconfigured document. Replaced 3D globe system description with detailed specifications of the new 3-tier orbital object (`Contact3DObject.jsx`) and the dynamic SVG motherboard connectivity trace layout (`PCBConnection.jsx`). Added details on custom shaders, data packets, selective slowdown, and WebGL recovery. Added interactive corner accent dots and sweep sweep configurations in Section 5.
+- **July 10, 2026**: Full deep analysis completed. Updated all component details, corrected orbit radius (2.8→3.4), added ambient intensity integration, documented GlobeContainer scroll listener, updated button states with sheen animation, corrected inquiry type dropdown implementation, added action types to cards, updated card data, documented all ref-based animation state, corrected shadow stack details, updated typography scale, added keyboard navigation flow, expanded accessibility gaps, updated known issues, and added new improvement recommendations.

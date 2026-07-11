@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import Footer from '@/components/layout/Footer'
+import Navbar from '@/components/layout/Navbar'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import BackToTop from '@/components/ui/BackToTop'
-import SectionIndicator from '@/components/ui/SectionIndicator'
 import CustomCursor from '@/components/ui/CustomCursor'
 import SmoothScroll from '@/components/layout/SmoothScroll'
 import Hero from '@/components/sections/Hero'
@@ -29,8 +29,8 @@ function App() {
 
       <ThemeToggle showPicker={isThemePickerOpen} setShowPicker={setIsThemePickerOpen} />
       <BackToTop isThemePickerOpen={isThemePickerOpen} />
-      <SectionIndicator activeSection={activeSection} />
       <CustomCursor />
+      <Navbar activeSection={activeSection} />
 
       <SmoothScroll>
         <main id="main-content" className="relative">

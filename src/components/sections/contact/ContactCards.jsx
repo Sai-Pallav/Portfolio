@@ -14,6 +14,15 @@ const GRID_VARIANTS = {
   }
 }
 
+const CARD_VARIANTS = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] }
+  }
+}
+
 export default React.memo(function ContactCards() {
   const iconStatus = useMemo(() => (
     <div className="relative flex h-3 w-3 overflow-hidden">
@@ -51,54 +60,62 @@ export default React.memo(function ContactCards() {
       <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent w-full" aria-hidden="true" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-10">
         {/* Availability Status Card */}
-        <ContactCard
-          index={0}
-          label="STATUS"
-          title="Open for Internships"
-          description="Actively seeking internship opportunities, engineering collaborations, and challenging backend projects."
-          footer="Usually responds within 24 hours."
-          platformKey={['github', 'leetcode']}
-          icon={iconStatus}
-        />
+        <motion.div variants={CARD_VARIANTS}>
+          <ContactCard
+            index={0}
+            label="STATUS"
+            title="Open for Internships"
+            description="Actively seeking internship opportunities, engineering collaborations, and challenging backend projects."
+            footer="Usually responds within 24 hours."
+            platformKey={['github', 'leetcode']}
+            icon={iconStatus}
+          />
+        </motion.div>
 
         {/* Email Address Card */}
-        <ContactCard
-          index={1}
-          label="EMAIL"
-          title="Preferred Contact"
-          description="The fastest way to reach me for technical discussions, opportunities, and collaborations."
-          footer="Copy Email →"
-          copyText={personal.email}
-          platformKey={['email', 'instagram']}
-          icon={iconEmail}
-          actionType="copy"
-        />
+        <motion.div variants={CARD_VARIANTS}>
+          <ContactCard
+            index={1}
+            label="EMAIL"
+            title="Preferred Contact"
+            description="The fastest way to reach me for technical discussions, opportunities, and collaborations."
+            footer="Copy Email →"
+            copyText={personal.email}
+            platformKey={['email', 'instagram']}
+            icon={iconEmail}
+            actionType="copy"
+          />
+        </motion.div>
 
         {/* LinkedIn Contact Card */}
-        <ContactCard
-          index={2}
-          label="LINKEDIN"
-          title="Professional Network"
-          description="Explore my experience, projects, achievements, and professional journey."
-          footer="Visit Profile →"
-          href={personal.socials.linkedin}
-          platformKey="linkedin"
-          icon={iconLinkedIn}
-          actionType="navigate"
-        />
+        <motion.div variants={CARD_VARIANTS}>
+          <ContactCard
+            index={2}
+            label="LINKEDIN"
+            title="Professional Network"
+            description="Explore my experience, projects, achievements, and professional journey."
+            footer="Visit Profile →"
+            href={personal.socials.linkedin}
+            platformKey="linkedin"
+            icon={iconLinkedIn}
+            actionType="navigate"
+          />
+        </motion.div>
 
         {/* Location Card */}
-        <ContactCard
-          index={3}
-          label="LOCATION"
-          title="Based in Hyderabad"
-          description="Open to relocation, hybrid roles, and remote opportunities worldwide."
-          footer="View Location →"
-          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(personal.location)}`}
-          platformKey=""
-          icon={iconLocation}
-          actionType="navigate"
-        />
+        <motion.div variants={CARD_VARIANTS}>
+          <ContactCard
+            index={3}
+            label="LOCATION"
+            title="Based in Hyderabad"
+            description="Open to relocation, hybrid roles, and remote opportunities worldwide."
+            footer="View Location →"
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(personal.location)}`}
+            platformKey=""
+            icon={iconLocation}
+            actionType="navigate"
+          />
+        </motion.div>
       </div>
     </motion.div>
   )
