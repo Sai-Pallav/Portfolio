@@ -1,13 +1,13 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { useReducedMotion } from 'framer-motion'
 
-export default React.memo(function PCBConnection() {
+export default React.memo(function PCBConnection({ formRef, globeRef }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   
   // Real-time calculated layout coordinates from the DOM
   const [layout, setLayout] = useState({
-    G: 1000,
+    G: 1200,
     H: 400,
     xStart: 15,
     L_form_end: 250,
@@ -18,18 +18,18 @@ export default React.memo(function PCBConnection() {
   const [activeTraceIndex, setActiveTraceIndex] = useState(0)
 
   useEffect(() => {
+    let ticking = false
     const update = () => {
-      if (containerRef.current) {
-        const rectGrid = containerRef.current.getBoundingClientRect()
-        const formEl = document.getElementById('contact-form-container')
-        const globeEl = document.getElementById('contact-globe-inner')
+      const gridEl = containerRef.current
+      const formEl = formRef?.current
+      const globeEl = globeRef?.current
 
+      if (gridEl) {
+        const rectGrid = gridEl.getBoundingClientRect()
         const G_val = rectGrid.width
         const H_val = rectGrid.height || 400
-        const leftOffset = rectGrid.left
-        const xStart_val = -leftOffset + 15
 
-        // Measure actual form card position
+        // Measure actual form card position relative to full-width coordinate space
         let L_form_val = G_val * 0.25
         let R_form_val = G_val * 0.50
         if (formEl) {
@@ -38,7 +38,7 @@ export default React.memo(function PCBConnection() {
           R_form_val = rectForm.right - rectGrid.left
         }
 
-        // Measure globe container — use original sphereWidth formula to land near the canvas left edge
+        // Measure globe container relative to full-width coordinate space
         let sphereLeft = G_val * 0.75
         if (globeEl) {
           const rectGlobe = globeEl.getBoundingClientRect()
@@ -46,33 +46,52 @@ export default React.memo(function PCBConnection() {
           sphereLeft = rectGlobe.left - rectGrid.left + (rectGlobe.width - sphereWidth) / 2
         }
 
-        // Equal 40px gap on both sides of the form (left PCB→form and form→right PCB)
-        // L_globe uses original formula: traces connect slightly into the globe sphere
         const GAP = 40
 
         setLayout({
           G: G_val,
           H: H_val,
-          xStart: xStart_val,
+          xStart: 15,
           L_form_end: L_form_val - GAP,
           R_form_start: R_form_val + GAP,
           L_globe: sphereLeft + 15
         })
       }
     }
+
+    const throttledUpdate = () => {
+      if (ticking) return
+      ticking = true
+      window.requestAnimationFrame(() => {
+        update()
+        ticking = false
+      })
+    }
     
+    const gridEl = containerRef.current
+    const formEl = formRef?.current
+    const globeEl = globeRef?.current
+
     update()
-    const timer = setTimeout(update, 150) // Small delay to let browser paint DOM
+
+    // Create ResizeObserver to monitor layout updates on container, form, and globe
+    const resizeObserver = new ResizeObserver(() => {
+      throttledUpdate()
+    })
+
+    if (gridEl) resizeObserver.observe(gridEl)
+    if (formEl) resizeObserver.observe(formEl)
+    if (globeEl) resizeObserver.observe(globeEl)
     
-    window.addEventListener('resize', update, { passive: true })
-    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', throttledUpdate, { passive: true })
+    window.addEventListener('scroll', throttledUpdate, { passive: true })
     
     return () => {
-      clearTimeout(timer)
-      window.removeEventListener('resize', update)
-      window.removeEventListener('scroll', update)
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', throttledUpdate)
+      window.removeEventListener('scroll', throttledUpdate)
     }
-  }, [])
+  }, [formRef, globeRef])
 
   const { G, H, xStart, L_form_end, R_form_start, L_globe } = layout
   const Y_center = H / 2
@@ -202,9 +221,9 @@ export default React.memo(function PCBConnection() {
   if (shouldReduceMotion) return null
 
   return (
-    <div ref={containerRef} className="absolute inset-0 pointer-events-none z-0 hidden lg:block overflow-visible">
+    <div ref={containerRef} className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-screen pointer-events-none z-0 hidden lg:block">
       <svg 
-        className="w-full h-full overflow-visible" 
+        className="w-full h-full" 
         viewBox={`0 0 ${G || 1000} ${H || 400}`}
         xmlns="http://www.w3.org/2000/svg"
       >

@@ -1311,26 +1311,57 @@ export default function Contact3DObject() {
     return () => observer.disconnect()
   }, [])
 
-  // Issue #9: Cache rect, update on resize/scroll only
+  // Cache rect, update on resize/scroll/mutation using ResizeObserver to prevent layout thrashing
   useEffect(() => {
-    const update = () => { if (containerRef.current) cachedRect.current = containerRef.current.getBoundingClientRect() }
+    const update = () => { 
+      if (containerRef.current) {
+        cachedRect.current = containerRef.current.getBoundingClientRect()
+      }
+    }
     update()
+
+    const resizeObserver = new ResizeObserver(() => {
+      update()
+    })
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current)
+    }
+
     window.addEventListener("resize", update, { passive: true })
     window.addEventListener("scroll", update, { passive: true })
-    return () => { window.removeEventListener("resize", update); window.removeEventListener("scroll", update) }
+    return () => { 
+      resizeObserver.disconnect()
+      window.removeEventListener("resize", update)
+      window.removeEventListener("scroll", update)
+    }
   }, [])
 
   useEffect(() => {
     const { maxDistance, minDistance, minFactor } = SCENE_CONFIG.proximity
+    let ticking = false
+
     const handleMouseMove = (e) => {
-      if (!cachedRect.current || shouldReduceMotion || !webglSupported) return
-      const r = cachedRect.current
-      const dx = e.clientX - (r.left + r.width / 2)
-      const dy = e.clientY - (r.top + r.height / 2)
-      const d = Math.sqrt(dx * dx + dy * dy)
-      if (d > maxDistance) { distanceFactor.current = 1.0 }
-      else if (d < minDistance) { distanceFactor.current = minFactor }
-      else { const t = (d - minDistance) / (maxDistance - minDistance); const eased = t * t * (3 - 2 * t); distanceFactor.current = minFactor + eased * (1.0 - minFactor) }
+      if (ticking || !cachedRect.current || shouldReduceMotion || !webglSupported) return
+      ticking = true
+
+      window.requestAnimationFrame(() => {
+        const r = cachedRect.current
+        if (r) {
+          const dx = e.clientX - (r.left + r.width / 2)
+          const dy = e.clientY - (r.top + r.height / 2)
+          const d = Math.sqrt(dx * dx + dy * dy)
+          if (d > maxDistance) { 
+            distanceFactor.current = 1.0 
+          } else if (d < minDistance) { 
+            distanceFactor.current = minFactor 
+          } else { 
+            const t = (d - minDistance) / (maxDistance - minDistance)
+            const eased = t * t * (3 - 2 * t)
+            distanceFactor.current = minFactor + eased * (1.0 - minFactor) 
+          }
+        }
+        ticking = false
+      })
     }
     window.addEventListener("mousemove", handleMouseMove, { passive: true })
     return () => window.removeEventListener("mousemove", handleMouseMove)
@@ -1406,7 +1437,7 @@ export default function Contact3DObject() {
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-72 h-72 md:w-96 md:h-96 z-10 pointer-events-none hidden md:flex items-center justify-center"
+        className="relative w-full aspect-square max-w-[400px] lg:max-w-[500px] z-10 pointer-events-none hidden md:flex items-center justify-center"
       >
         <div
           className="absolute w-[60%] h-[60%] rounded-full blur-[100px] pointer-events-none -z-10 transition-colors duration-500"
