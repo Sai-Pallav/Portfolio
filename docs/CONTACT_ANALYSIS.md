@@ -14,7 +14,7 @@
 5. [ContactForm Component](#5-contactform-component)
 6. [ContactCards & ContactCard Components](#6-contactcards--contactcard-components)
 7. [3D Orbital System (Contact3DObject)](#7-3d-orbital-system-contact3dobject)
-8. [Motherboard Connectivity (PCBConnection)](#8-motherboard-connectivity-pcbconnection)
+8. [Motherboard Connectivity (LeftPCB and RightPCB)](#8-motherboard-connectivity-leftpcb-and-rightpcb)
 9. [State Management & Data Flow](#9-state-management--data-flow)
 10. [EmailJS Integration](#10-emailjs-integration)
 11. [Animation System](#11-animation-system)
@@ -40,7 +40,8 @@ src/components/sections/contact/
 │   └── Form State Management  — Validation, submission, inquiry types
 ├── ContactCards.jsx           — Grid container for 4 info cards
 ├── ContactCard.jsx            — Individual info card (status, email, LinkedIn, location)
-├── PCBConnection.jsx          — Dynamically rendered SVG PCB motherboard trace paths with glowing signal packets
+├── LeftPCB.jsx                — Decoupled SVG PCB traces on the left side of the screen
+├── RightPCB.jsx               — Decoupled SVG PCB connections on the right side of the screen (form to globe)
 └── Contact3DObject.jsx        — R3F 3D Canvas rendering a wireframe globe and a three-tier hierarchical orbital system with 6 orbiting icons
     ├── Lights                 — Hemispherical + directional + point light source
     ├── CameraRig              — Micro-drift camera movement linked to mouse distance factor
@@ -61,11 +62,11 @@ Zone 1: HERO AREA
 
 Zone 2: INTERACTION AREA
 ┌─────────────────────────────────────────────┐
-│               PCB CONNECTION                │
+│             LEFT AND RIGHT PCB              │
 │            (Spans entire width)             │
 │  ┌──────────────────┐   ┌─────────────────┐ │
 │  │   Contact Form   │   │ 3D Orbital Sys  │ │
-│  │  (Cols 2-6 Area) │   │ (Cols 7-12 Area)│ │
+│  │  (Left of Center)│   │(Right of Center)│ │
 │  │                  │   │ • 3 Tiers       │ │
 │  │ • Inquiry Type   │   │ • 6 Social Icons│ │
 │  │ • Floating Input │   │ • Rare Bursts   │ │
@@ -95,17 +96,19 @@ All contact components live in `src/components/sections/contact/`:
 | `ContactForm.jsx` | 714 | Form with validation, EmailJS, inquiry dropdown, User/Mail/PenTool/MessageSquare icons, rounded inputs, sheen animation | `ContactForm` (default, memo) |
 | `ContactCards.jsx` | 121 | Grid container for 4 info cards with motion wrapper | `ContactCards` (default, memo) |
 | `ContactCard.jsx` | 208 | Individual card with copy button aria-label, adjusted shadows, copy-to-clipboard feedback | `ContactCard` (default, memo) |
-| `PCBConnection.jsx` | 469 | Measures form & globe DOM rects, renders 40 motherboard traces, 15 glowing nodes, and animated signal paths | `PCBConnection` (default, memo) |
+| `LeftPCB.jsx` | 365 | Decoupled background traces, 12 background, 18 normal, 10 highlight traces on the left | `LeftPCB` (default, memo) |
+| `RightPCB.jsx` | 191 | Decoupled form-to-globe traces, matches 3 continuous signal packet paths and joints | `RightPCB` (default, memo) |
 | `Contact3DObject.jsx` | 1492 | Canvas container, distance factor, 3 orbital planes, 6 icons, context loss handling, 2D fallback | `Contact3DObject` (default, memo) |
 
 ### Component Hierarchy & Data Flow
 
 ```
 <ContactSection>
-  └── <div className="mx-auto max-w-7xl relative z-10">
-      ├── <ContactHero />                          — No props (self-contained)
-      ├── <div className="grid lg:grid-cols-12">
-      │   ├── <PCBConnection />                    — Measures DOM nodes via real-time rect layouts
+  ├── <LeftPCB />                              — Absolute backdrop layer
+  ├── <RightPCB />                             — Absolute backdrop layer
+  └── <div className="w-full relative z-10">
+      ├── <ContactHero />                          — Centered layout container
+      ├── <div className="flex flex-col lg:flex-row">
       │   ├── <ContactForm />                      — Contains internal FloatingInput/FloatingTextarea
       │   └── <Contact3DObject />                  — R3F 3D Canvas
       │       └── <Canvas>
@@ -127,7 +130,7 @@ All contact components live in `src/components/sections/contact/`:
 2. **Ref-Based Animation State** — `distanceFactor.current`, `hoveredCountRef.current`, `activeBurstRef.current` are utilized in frame loops to prevent triggering React re-renders.
 3. **Concurrency Locking** — An `activeTransmissionRef.current` lock prevents concurrent execution of multiple major 3D transition/burst animations in the R3F Canvas.
 4. **Theme Reactivity via MutationObserver** — R3F scene reacts to `<html>` style changes. An observer updates the `globalTheme` object, letting R3F traverse meshes on the fly rather than tearing down the WebGL context.
-5. **Real-time DOM Coordinate Measurement** — `PCBConnection` recalculates coordinates on resize and scroll events to automatically draw connecting traces between the form card and the 3D canvas bounds.
+5. **Real-time DOM Coordinate Measurement** — `LeftPCB` and `RightPCB` recalculate coordinates using `ResizeObserver` tracking and throttled `requestAnimationFrame` on resize/scroll events to dynamically draw traces between the form card and the 3D globe.
 6. **Reduced Motion Respect** — Skipped 3D canvas, camera rig, background clouds, volumetric glows, and card spotlights if prefers-reduced-motion is active.
 
 ---
@@ -519,51 +522,53 @@ Renders a short 25-degree energized arc (UV fraction: 0.07) centered on active e
 
 ---
 
-## 8. Motherboard Connectivity (PCBConnection)
+## 8. Motherboard Connectivity (LeftPCB and RightPCB)
 
-An interactive backdrop component drawing motherboard circuit traces that dynamically connect the form card to the 3D orbital system canvas boundary.
+Instead of a coupled, monolithic layout, the backdrop traces are divided into two single-responsibility modular components.
+
+### 1. Left PCB backdrop (`LeftPCB.jsx`)
+- Covers the left half of the viewport (`inset-0` absolute canvas relative to the full viewport).
+- Tracks the Form Card left bounding boundary (`formRef`).
+- It has **zero awareness** of the 3D globe, preventing cross-component dependency.
+- Coordinates dynamic single data packets that traverse the highlight traces every 7s.
+- Operates in a local coordinate system starting at `X = 15px`.
+- Renders **40 Motherboard Traces** on the left side:
+  - **Layer 1: Faint Background (12 traces)** — Opacity 0.12, width 0.5px. Connects background vias.
+  - **Layer 2: Normal Routing (18 traces)** — Opacity 0.28. Contains meander structures, a Top Data Bus (5 traces with matched lengths and staggered terminations), a Middle Control Bus (4 traces), and a Bottom Differential Bus (3 traces).
+  - **Layer 3: Highlighted Routing (10 traces)** — Opacity 0.55, width 1–2px. Connects active signal endpoints.
+  - **Nodes**: 15 nodes utilizing `#leftPcbSignalGlow` blurs and solid white cores.
+
+### 2. Right PCB backdrop (`RightPCB.jsx`)
+- Covers the right half of the viewport (`inset-0` absolute canvas).
+- Tracks both the Form Card right border (`formRef`) and the Globe container left border (`globeRef`).
+- Draws 3 main connecting traces bridging the space between the Form and the Globe.
+- Spawns 3 continuous signal packets traveling along the traces with offsets and animation blur.
 
 ### Coordinate Update Mechanics
 
-Coordinates are measured on browser `resize` and `scroll` events to layout routes precisely.
+Coordinates are measured dynamically via `ResizeObserver` callbacks on mount and window listeners, throttled via `requestAnimationFrame` to avoid layout thrashing.
 ```js
 const rectGrid = containerRef.current.getBoundingClientRect()
-const formEl = document.getElementById('contact-form-container')
-const globeEl = document.getElementById('contact-globe-inner')
+const formEl = formRef?.current
+const globeEl = globeRef?.current
 
 const G_val = rectGrid.width
 const H_val = rectGrid.height || 400
-const leftOffset = rectGrid.left
-const xStart_val = -leftOffset + 15
 
-let L_form_val = G_val * 0.25
-let R_form_val = G_val * 0.50
+// Measure form right edge and globe left edge relative to screen coordinate space
+let R_form_val = G_val * 0.15
 if (formEl) {
   const rectForm = formEl.getBoundingClientRect()
-  L_form_val = rectForm.left - rectGrid.left
   R_form_val = rectForm.right - rectGrid.left
 }
 
-let sphereLeft = G_val * 0.75
+let sphereLeft = G_val * 0.65
 if (globeEl) {
   const rectGlobe = globeEl.getBoundingClientRect()
   const sphereWidth = Math.min(380, rectGlobe.width)
   sphereLeft = rectGlobe.left - rectGrid.left + (rectGlobe.width - sphereWidth) / 2
 }
 ```
-
-### Trace Hierarchy (40 Motherboard Traces)
-
-1. **Layer 1: Faint Background (12 traces)** — Opacity 0.12, width 0.5px. Connects background vias.
-2. **Layer 2: Normal Routing (18 traces)** — Opacity 0.28. Contains meander structures, a Top Data Bus (5 traces with matched lengths and staggered terminations), a Middle Control Bus (4 traces), and a Bottom Differential Bus (3 traces).
-3. **Layer 3: Highlighted Routing (10 traces)** — Opacity 0.55, width 1–2px. Connects active signal endpoints.
-
-### Circuit Nodes & Signals
-
-- **15 Nodes**: 10 active endpoints and 5 standalone intermediate nodes, each utilizing a `#pcbSignalGlow` radial blur filter and a solid white core.
-  - The 5 standalone nodes are rendered at: `[120, -150]`, `[220, -50]`, `[150, 10]`, `[200, 130]`, `[100, 50]`.
-- **Left Signal Packets**: Every 7 seconds, a single light packet is fired along one of the Layer 3 highlighted traces. Uses `<animateMotion>` to traverse the coordinate command path in 3.5s.
-- **Right Signals**: 3 permanent signal packets move along the form-to-globe buses with delays.
 
 ---
 
@@ -807,7 +812,8 @@ import ContactHero from './ContactHero'
 import ContactForm from './ContactForm'
 import ContactCards from './ContactCards'
 import ContactCard from './ContactCard'
-import PCBConnection from './PCBConnection'
+import LeftPCB from './LeftPCB'
+import RightPCB from './RightPCB'
 import Contact3DObject from './Contact3DObject'
 ```
 
@@ -816,7 +822,8 @@ import Contact3DObject from './Contact3DObject'
 | Task | Files |
 |---|---|
 | Adjust orbits or shaders | `Contact3DObject.jsx` |
-| Modify motherboard routing | `PCBConnection.jsx` |
+| Modify left motherboard routing | `LeftPCB.jsx` |
+| Modify right motherboard routing | `RightPCB.jsx` |
 | Update contact details | `personal.jsx` |
 | Modify validation or inputs | `ContactForm.jsx` |
 | Edit card layouts | `ContactCards.jsx` |
