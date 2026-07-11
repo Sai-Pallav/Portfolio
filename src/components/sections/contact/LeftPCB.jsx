@@ -178,7 +178,7 @@ export default React.memo(function LeftPCB({ formRef }) {
   const activePathD = activeTrace ? buildPath(activeTrace) : ''
 
   return (
-    <div ref={containerRef} className="absolute top-0 bottom-0 left-0 w-[50vw] pointer-events-none z-0 hidden lg:block">
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none z-0 hidden lg:block">
       <svg 
         className="w-full h-full" 
         viewBox={`0 0 ${G || 600} ${H || 400}`}

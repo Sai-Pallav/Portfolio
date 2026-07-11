@@ -185,22 +185,29 @@ export default memo(function ContactSection() {
         <ContactHero />
       </div>
 
-      {/* Zone 2: Interaction Area — 12-col grid, form at col 2-6, globe at col 7-12 */}
+      {/* Zone 2: Interaction Area — 12-col symmetric grid, form at cols 2-6, globe at cols 8-12 */}
       <div className="relative w-full mt-8 lg:mt-10">
-        <div className="relative grid grid-cols-1 lg:grid-cols-12 lg:gap-x-6 items-center">
+        {/* Full-width backdrop wrapper for Left and Right PCB */}
+        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen pointer-events-none z-0 hidden lg:block">
           <LeftPCB formRef={formContainerRef} />
           <RightPCB formRef={formContainerRef} globeRef={globeContainerRef} />
-          {/* Form: col-start-2 leaves col-1 as left PCB breathing room */}
-          <div id="contact-form-container" ref={formContainerRef} className="lg:col-start-2 lg:col-span-5 w-full relative z-20 flex flex-col items-start lg:items-center">
-            <div className="w-full max-w-[474px]">
-              <ContactForm />
+        </div>
+
+        {/* Centered grid container for interactive elements */}
+        <div className="mx-auto max-w-7xl px-6 md:px-12 relative z-10">
+          <div className="relative grid grid-cols-1 lg:grid-cols-12 lg:gap-x-6 items-center">
+            {/* Form: col-start-2 leaves col-1 as left PCB breathing room */}
+            <div id="contact-form-container" ref={formContainerRef} className="lg:col-start-2 lg:col-span-5 w-full relative z-20 flex flex-col items-start lg:items-center">
+              <div className="w-full max-w-[474px]">
+                <ContactForm />
+              </div>
             </div>
-          </div>
-          {/* Globe: col-span-6, pushed to right edge with justify-end */}
-          <div className="hidden md:flex lg:col-span-6 items-center justify-center lg:justify-end w-full relative z-20">
-            <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-full h-[450px] lg:h-[520px] overflow-visible flex items-center justify-center lg:justify-end pointer-events-none z-10">
-              <div className="absolute w-[300px] h-[300px] md:w-[400px] md:h-[400px] lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.10 * var(--ambient-intensity))' }} />
-              <Contact3DObject isInView={isInViewRepeat} />
+            {/* Globe: col-start-8 leaves col-7 as middle gap. Centers the globe canvas */}
+            <div className="hidden md:flex lg:col-start-8 lg:col-span-5 items-center justify-center w-full relative z-20">
+              <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-full h-[450px] lg:h-[520px] overflow-visible flex items-center justify-center pointer-events-none z-10">
+                <div className="absolute w-[300px] h-[300px] md:w-[400px] md:h-[400px] lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.10 * var(--ambient-intensity))' }} />
+                <Contact3DObject isInView={isInViewRepeat} />
+              </div>
             </div>
           </div>
         </div>

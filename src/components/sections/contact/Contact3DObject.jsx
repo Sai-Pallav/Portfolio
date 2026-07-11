@@ -1162,11 +1162,11 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
   const burstCooldownRef = useRef(15 + Math.random() * 5) // 15-20s
   const burstTimerRef = useRef(0)
 
-  // Issue #7: Continuous linear interpolation scaling instead of discrete pop-jumps
+  // Issue #7: Continuous linear interpolation scaling instead of discrete pop-jumps (scaled down by 30% for better visual balance)
   const scale = useMemo(() => {
-    if (width < 300) return 0.7
-    if (width > 380) return 1.0
-    return 0.7 + ((width - 300) / 80) * 0.3
+    if (width < 300) return 0.45
+    if (width > 380) return 0.70
+    return 0.45 + ((width - 300) / 80) * 0.25
   }, [width])
 
   // Imperative scene color update on theme state transitions
