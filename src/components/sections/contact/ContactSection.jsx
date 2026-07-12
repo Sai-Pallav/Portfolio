@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, memo } from 'react'
+import { useEffect, useRef, memo } from 'react'
 import { useReducedMotion, useInView, motion } from 'framer-motion'
 import ContactHero from './ContactHero'
 import ContactForm from './ContactForm'
@@ -9,7 +9,7 @@ import RightPCB from './RightPCB'
 
 export default memo(function ContactSection() {
   const sectionRef = useRef(null)
-  
+
   // Optimization: Tracks viewport intersection to toggle canvas animation state
   const isInViewRepeat = useInView(sectionRef, { margin: '200px 0px' })
   const shouldReduceMotion = useReducedMotion()
@@ -67,9 +67,9 @@ export default memo(function ContactSection() {
   const globeContainerRef = useRef(null)
 
   return (
-    <section 
-      id="contact" 
-      ref={sectionRef} 
+    <section
+      id="contact"
+      ref={sectionRef}
       className="relative min-h-screen overflow-hidden px-6 lg:px-0 pt-16 pb-24 md:pt-24 md:pb-32 group/section"
     >
       {/* Background Layers Stack (11 Layers) */}
@@ -195,19 +195,19 @@ export default memo(function ContactSection() {
           <RightPCB formRef={formContainerRef} globeRef={globeContainerRef} />
         </div>
 
-        {/* Full-width flex container to ensure exact equal gaps between components */}
+        {/* Full-width flex container keeps the form and globe in their natural positions. */}
         <div className="w-full px-6 md:px-12 lg:px-0 relative z-10">
           <div className="relative flex flex-col lg:flex-row items-center justify-evenly w-full gap-12 lg:gap-0">
             {/* Form Container */}
-            <div id="contact-form-container" ref={formContainerRef} className="w-full max-w-[474px] relative z-20 flex flex-col items-start lg:items-center">
+            <div id="contact-form-container" ref={formContainerRef} className="w-full max-w-[474px] relative z-20 flex flex-col items-start lg:items-center lg:translate-x-20">
               <div className="w-full max-w-[474px]">
                 <ContactForm />
               </div>
             </div>
             {/* Globe Container */}
-            <div className="hidden md:flex items-center justify-center relative z-20">
-              <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[420px] lg:h-[420px] overflow-hidden flex items-center justify-center pointer-events-none z-10">
-                <div className="absolute w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[420px] lg:h-[420px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.10 * var(--ambient-intensity))' }} />
+            <div className="hidden md:flex items-center justify-center relative z-20 lg:translate-x-16">
+              <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] overflow-visible flex items-center justify-center pointer-events-none z-10">
+                <div className="absolute w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.10 * var(--ambient-intensity))' }} />
                 <Contact3DObject isInView={isInViewRepeat} />
               </div>
             </div>

@@ -8,11 +8,9 @@ export default React.memo(function LeftPCB({ formRef }) {
   const [layout, setLayout] = useState({
     G: 600,
     H: 400,
-    xStart: 15,
+    xStart: 5,
     L_form_end: 250
   })
-
-  const [activeTraceIndex, setActiveTraceIndex] = useState(0)
 
   useEffect(() => {
     let ticking = false
@@ -32,13 +30,14 @@ export default React.memo(function LeftPCB({ formRef }) {
           L_form_val = rectForm.left - rectGrid.left
         }
 
-        const GAP = 40
+        const GAP_LEFT = 5
+        const GAP_RIGHT = 12 // Maintain a small visible gap of 12px before the Form
 
         setLayout({
           G: G_val,
           H: H_val,
-          xStart: 15,
-          L_form_end: L_form_val - GAP
+          xStart: GAP_LEFT,
+          L_form_end: L_form_val - GAP_RIGHT
         })
       }
     }
@@ -78,75 +77,103 @@ export default React.memo(function LeftPCB({ formRef }) {
   const Y_center = H / 2
 
   const leftTraces = useMemo(() => {
-    const W_left = Math.max(100, L_form_end - xStart)
-    return [
-      // LAYER 1: Faint Background (12 traces)
-      { id: 'L1-1', layer: 1, widthType: 'micro', yStart: -170, xStartOffset: 10, bends: [], endXOffset: W_left - 30, hasStartVia: true, hasEndVia: true },
-      { id: 'L1-2', layer: 1, widthType: 'secondary', yStart: -160, xStartOffset: 0, bends: [[110, -160], [130, -140]], endXOffset: W_left - 150, hasEndVia: true },
-      { id: 'L1-3', layer: 1, widthType: 'micro', yStart: -150, xStartOffset: 80, bends: [], endXOffset: W_left - 180, hasStartVia: true },
-      { id: 'L1-4', layer: 1, widthType: 'micro', yStart: -140, xStartOffset: 0, bends: [[140, -140], [160, -120]], endXOffset: W_left - 60, hasEndVia: true },
-      { id: 'L1-5', layer: 1, widthType: 'secondary', yStart: -110, xStartOffset: 150, bends: [], endXOffset: W_left - 90, hasStartVia: true },
-      { id: 'L1-6', layer: 1, widthType: 'micro', yStart: -90, xStartOffset: 0, bends: [[200, -90], [220, -70]], endXOffset: W_left - 40, hasEndVia: true },
-      { id: 'L1-7', layer: 1, widthType: 'micro', yStart: -50, xStartOffset: 120, bends: [], endXOffset: W_left - 110, hasStartVia: true },
-      { id: 'L1-8', layer: 1, widthType: 'micro', yStart: -10, xStartOffset: 0, bends: [[100, -10], [120, 10]], endXOffset: W_left - 200 },
-      { id: 'L1-9', layer: 1, widthType: 'secondary', yStart: 40, xStartOffset: 60, bends: [], endXOffset: W_left - 240, hasStartVia: true },
-      { id: 'L1-10', layer: 1, widthType: 'micro', yStart: 80, xStartOffset: 0, bends: [[220, 80], [240, 100]], endXOffset: W_left - 50, hasEndVia: true },
-      { id: 'L1-11', layer: 1, widthType: 'micro', yStart: 130, xStartOffset: 100, bends: [], endXOffset: W_left - 120, hasStartVia: true },
-      { id: 'L1-12', layer: 1, widthType: 'micro', yStart: 160, xStartOffset: 0, bends: [[180, 160], [200, 140]], endXOffset: W_left - 70, hasEndVia: true },
+    const W_left = Math.max(50, L_form_end - xStart)
+    const scale = W_left / 240
 
-      // LAYER 2: Normal Routing (18 traces)
-      { id: 'L2-1', layer: 2, widthType: 'micro', yStart: -150, xStartOffset: 0, bends: [[100, -150], [120, -170], [180, -170], [200, -150]], endXOffset: W_left - 120 },
-      { id: 'L2-2', layer: 2, widthType: 'micro', yStart: -142, xStartOffset: 0, bends: [[100, -142], [120, -162], [180, -162], [200, -142]], endXOffset: W_left - 100 },
-      { id: 'L2-3', layer: 2, widthType: 'micro', yStart: -134, xStartOffset: 0, bends: [[100, -134], [120, -154], [180, -154], [200, -134]], endXOffset: W_left - 80 },
-      { id: 'L2-4', layer: 2, widthType: 'micro', yStart: -126, xStartOffset: 0, bends: [[100, -126], [120, -146], [180, -146], [200, -126]], endXOffset: W_left - 60 },
-      { id: 'L2-5', layer: 2, widthType: 'micro', yStart: -118, xStartOffset: 0, bends: [[100, -118], [120, -138], [180, -138], [200, -118]], endXOffset: W_left - 40 },
+    const traceDefs = [
+      // ==========================================
+      // Level 1: Main Buses (13 Traces - Highlighted, Long, branching)
+      // ==========================================
+      // Top Bus
+      { id: 'L3-1', layer: 3, yStart: -160, xStartOffset: 0, bends: [[70, -160], [110, -120]], endXOffset: 220, hasEndVia: true, hasNode: true },
+      { id: 'L3-2', layer: 3, yStart: -140, xStartOffset: 0, bends: [[70, -140], [110, -100]], endXOffset: 200, hasEndVia: true, hasNode: true },
+      { id: 'L3-3', layer: 3, yStart: -120, xStartOffset: 0, bends: [[70, -120], [110, -80]], endXOffset: 210, hasEndVia: true, hasNode: true },
 
-      { id: 'L2-6', layer: 2, widthType: 'secondary', yStart: -60, xStartOffset: 0, bends: [[150, -60], [180, -30]], endXOffset: W_left - 90 },
-      { id: 'L2-7', layer: 2, widthType: 'secondary', yStart: -50, xStartOffset: 0, bends: [[150, -50], [180, -20]], endXOffset: W_left - 110 },
-      { id: 'L2-8', layer: 2, widthType: 'secondary', yStart: -40, xStartOffset: 0, bends: [[150, -40], [180, -10]], endXOffset: W_left - 130 },
-      { id: 'L2-9', layer: 2, widthType: 'secondary', yStart: -30, xStartOffset: 0, bends: [[150, -30], [180, 0]], endXOffset: W_left - 150 },
+      // Upper Mid Bus
+      { id: 'L3-4', layer: 3, yStart: -80, xStartOffset: 0, bends: [[90, -80], [120, -50]], endXOffset: 220, hasEndVia: true, hasNode: true },
+      { id: 'L3-5', layer: 3, yStart: -60, xStartOffset: 0, bends: [[90, -60], [120, -30]], endXOffset: 200, hasEndVia: true, hasNode: true },
 
-      { id: 'L2-10', layer: 2, widthType: 'primary', yStart: 100, xStartOffset: 50, bends: [[120, 100], [150, 130]], endXOffset: W_left - 30, hasStartVia: true },
-      { id: 'L2-11', layer: 2, widthType: 'primary', yStart: 115, xStartOffset: 50, bends: [[120, 115], [150, 145]], endXOffset: W_left - 30, hasStartVia: true },
-      { id: 'L2-12', layer: 2, widthType: 'primary', yStart: 130, xStartOffset: 50, bends: [[120, 130], [150, 160]], endXOffset: W_left - 30, hasStartVia: true },
+      // Center Bus (Straight, dense)
+      { id: 'L3-6', layer: 3, yStart: -20, xStartOffset: 0, bends: [], endXOffset: 230, hasEndVia: true, hasNode: true },
+      { id: 'L3-7', layer: 3, yStart: 0, xStartOffset: 0, bends: [], endXOffset: 240, hasEndVia: true, hasNode: true },
+      { id: 'L3-8', layer: 3, yStart: 20, xStartOffset: 0, bends: [], endXOffset: 230, hasEndVia: true, hasNode: true },
 
-      { id: 'L2-13', layer: 2, widthType: 'secondary', yStart: -80, xStartOffset: 40, bends: [[110, -80], [130, -60], [130, -30], [150, -10]], endXOffset: W_left - 180, hasStartVia: true },
-      { id: 'L2-14', layer: 2, widthType: 'secondary', yStart: -20, xStartOffset: 0, bends: [[140, -20], [160, 0]], endXOffset: W_left - 70 },
-      { id: 'L2-15', layer: 2, widthType: 'primary', yStart: 20, xStartOffset: 90, bends: [], endXOffset: W_left - 120, hasStartVia: true },
-      { id: 'L2-16', layer: 2, widthType: 'secondary', yStart: 50, xStartOffset: 0, bends: [[210, 50], [230, 30]], endXOffset: W_left - 30 },
-      { id: 'L2-17', layer: 2, widthType: 'secondary', yStart: 70, xStartOffset: 110, bends: [], endXOffset: W_left - 90, hasStartVia: true },
-      { id: 'L2-18', layer: 2, widthType: 'secondary', yStart: 140, xStartOffset: 80, bends: [[200, 140], [220, 160]], endXOffset: W_left - 100, hasStartVia: true },
+      // Lower Mid Bus
+      { id: 'L3-9', layer: 3, yStart: 60, xStartOffset: 0, bends: [[90, 60], [120, 30]], endXOffset: 200, hasEndVia: true, hasNode: true },
+      { id: 'L3-10', layer: 3, yStart: 80, xStartOffset: 0, bends: [[90, 80], [120, 50]], endXOffset: 220, hasEndVia: true, hasNode: true },
 
-      // LAYER 3: Highlighted Routing (10 traces)
-      { id: 'L3-1', layer: 3, widthType: 'primary', yStart: -130, xStartOffset: 0, bends: [[100, -130], [120, -150]], endXOffset: W_left - 50, hasNode: true, hasEndVia: true },
-      { id: 'L3-2', layer: 3, widthType: 'secondary', yStart: -70, xStartOffset: 60, bends: [[200, -70], [220, -50]], endXOffset: W_left - 10, hasStartVia: true, hasNode: true, hasEndVia: true },
-      { id: 'L3-3', layer: 3, widthType: 'primary', yStart: -40, xStartOffset: 0, bends: [], endXOffset: W_left - 130, hasNode: true, hasEndVia: true },
-      { id: 'L3-4', layer: 3, widthType: 'secondary', yStart: -20, xStartOffset: 120, bends: [[220, -20], [245, 5]], endXOffset: W_left - 60, hasStartVia: true, hasNode: true, hasEndVia: true },
-      { id: 'L3-5', layer: 3, widthType: 'primary', yStart: 30, xStartOffset: 0, bends: [[130, 30], [150, 10]], endXOffset: W_left - 140, hasNode: true, hasEndVia: true },
-      { id: 'L3-6', layer: 3, widthType: 'secondary', yStart: 60, xStartOffset: 70, bends: [], endXOffset: W_left - 20, hasStartVia: true, hasNode: true, hasEndVia: true },
-      { id: 'L3-7', layer: 3, widthType: 'primary', yStart: 110, xStartOffset: 0, bends: [[190, 110], [210, 130]], endXOffset: W_left - 70, hasNode: true, hasEndVia: true },
-      { id: 'L3-8', layer: 3, widthType: 'secondary', yStart: 150, xStartOffset: 50, bends: [[180, 150], [200, 130]], endXOffset: W_left - 120, hasStartVia: true, hasNode: true, hasEndVia: true },
-      { id: 'L3-9', layer: 3, widthType: 'primary', yStart: 10, xStartOffset: 0, bends: [[80, 10], [100, 30], [100, 50], [120, 70]], endXOffset: W_left - 95, hasNode: true, hasEndVia: true },
-      { id: 'L3-10', layer: 3, widthType: 'secondary', yStart: -100, xStartOffset: 50, bends: [[130, -100], [150, -80], [150, -60], [170, -40]], endXOffset: W_left - 160, hasStartVia: true, hasNode: true, hasEndVia: true }
+      // Bottom Bus
+      { id: 'L3-11', layer: 3, yStart: 120, xStartOffset: 0, bends: [[70, 120], [110, 80]], endXOffset: 210, hasEndVia: true, hasNode: true },
+      { id: 'L3-12', layer: 3, yStart: 140, xStartOffset: 0, bends: [[70, 140], [110, 100]], endXOffset: 200, hasEndVia: true, hasNode: true },
+      { id: 'L3-13', layer: 3, yStart: 160, xStartOffset: 0, bends: [[70, 160], [110, 120]], endXOffset: 220, hasEndVia: true, hasNode: true },
+
+      // ==========================================
+      // Level 2: Secondary Traces (16 Traces - Standard, medium length)
+      // ==========================================
+      { id: 'L2-1', layer: 2, yStart: -150, xStartOffset: 0, bends: [[70, -150], [110, -110]], endXOffset: 170 },
+      { id: 'L2-2', layer: 2, yStart: -130, xStartOffset: 0, bends: [[70, -130], [110, -90]], endXOffset: 180 },
+      { id: 'L2-3', layer: 2, yStart: -110, xStartOffset: 0, bends: [[70, -110], [110, -70]], endXOffset: 160 },
+      { id: 'L2-4', layer: 2, yStart: -90, xStartOffset: 0, bends: [[90, -90], [120, -60]], endXOffset: 190 },
+      { id: 'L2-5', layer: 2, yStart: -70, xStartOffset: 0, bends: [[90, -70], [120, -40]], endXOffset: 170 },
+      { id: 'L2-6', layer: 2, yStart: -50, xStartOffset: 0, bends: [[90, -50], [120, -20]], endXOffset: 180 },
+      
+      { id: 'L2-7', layer: 2, yStart: -30, xStartOffset: 0, bends: [], endXOffset: 190 },
+      { id: 'L2-8', layer: 2, yStart: -10, xStartOffset: 0, bends: [], endXOffset: 200 },
+      { id: 'L2-9', layer: 2, yStart: 10, xStartOffset: 0, bends: [], endXOffset: 200 },
+      { id: 'L2-10', layer: 2, yStart: 30, xStartOffset: 0, bends: [], endXOffset: 190 },
+
+      { id: 'L2-11', layer: 2, yStart: 50, xStartOffset: 0, bends: [[90, 50], [120, 20]], endXOffset: 180 },
+      { id: 'L2-12', layer: 2, yStart: 70, xStartOffset: 0, bends: [[90, 70], [120, 40]], endXOffset: 170 },
+      { id: 'L2-13', layer: 2, yStart: 90, xStartOffset: 0, bends: [[90, 90], [120, 60]], endXOffset: 190 },
+      { id: 'L2-14', layer: 2, yStart: 110, xStartOffset: 0, bends: [[70, 110], [110, 70]], endXOffset: 160 },
+      { id: 'L2-15', layer: 2, yStart: 130, xStartOffset: 0, bends: [[70, 130], [110, 90]], endXOffset: 180 },
+      { id: 'L2-16', layer: 2, yStart: 150, xStartOffset: 0, bends: [[70, 150], [110, 110]], endXOffset: 170 },
+
+      // ==========================================
+      // Level 3: Micro Traces (12 Traces - very short, high engineering realism)
+      // ==========================================
+      { id: 'L1-1', layer: 1, yStart: -170, xStartOffset: 0, bends: [], endXOffset: 80 },
+      { id: 'L1-2', layer: 1, yStart: -165, xStartOffset: 30, bends: [], endXOffset: 90 },
+      { id: 'L1-3', layer: 1, yStart: -105, xStartOffset: 120, bends: [], endXOffset: 160 },
+      { id: 'L1-4', layer: 1, yStart: -95, xStartOffset: 100, bends: [], endXOffset: 140 },
+      { id: 'L1-5', layer: 1, yStart: -45, xStartOffset: 0, bends: [], endXOffset: 70 },
+      { id: 'L1-6', layer: 1, yStart: -15, xStartOffset: 140, bends: [], endXOffset: 180 },
+      { id: 'L1-7', layer: 1, yStart: 15, xStartOffset: 140, bends: [], endXOffset: 180 },
+      { id: 'L1-8', layer: 1, yStart: 45, xStartOffset: 0, bends: [], endXOffset: 70 },
+      { id: 'L1-9', layer: 1, yStart: 95, xStartOffset: 100, bends: [], endXOffset: 140 },
+      { id: 'L1-10', layer: 1, yStart: 105, xStartOffset: 120, bends: [], endXOffset: 160 },
+      { id: 'L1-11', layer: 1, yStart: 165, xStartOffset: 30, bends: [], endXOffset: 90 },
+      { id: 'L1-12', layer: 1, yStart: 170, xStartOffset: 0, bends: [], endXOffset: 80 },
+
+      // ==========================================
+      // Secondary Branches (10 Branches originating from Level 1 Main Buses)
+      // ==========================================
+      { id: 'L-br1', layer: 3, yStart: -160, xStartOffset: 30, bends: [[30, -160], [50, -140]], endXOffset: 150, hasNode: true },
+      { id: 'L-br2', layer: 2, yStart: -140, xStartOffset: 40, bends: [[40, -140], [60, -120]], endXOffset: 160 },
+      { id: 'L-br3', layer: 3, yStart: -80, xStartOffset: 30, bends: [[30, -80], [50, -60]], endXOffset: 150, hasNode: true },
+      { id: 'L-br4', layer: 2, yStart: -60, xStartOffset: 40, bends: [[40, -60], [60, -40]], endXOffset: 160 },
+      
+      { id: 'L-br5', layer: 3, yStart: -20, xStartOffset: 60, bends: [[60, -20], [80, 0]], endXOffset: 170, hasNode: true },
+      { id: 'L-br6', layer: 3, yStart: 20, xStartOffset: 60, bends: [[60, 20], [80, 0]], endXOffset: 170, hasNode: true },
+      
+      { id: 'L-br7', layer: 2, yStart: 60, xStartOffset: 40, bends: [[40, 60], [60, 40]], endXOffset: 160 },
+      { id: 'L-br8', layer: 3, yStart: 80, xStartOffset: 30, bends: [[30, 80], [50, 60]], endXOffset: 150, hasNode: true },
+      { id: 'L-br9', layer: 2, yStart: 140, xStartOffset: 40, bends: [[40, 140], [60, 120]], endXOffset: 160 },
+      { id: 'L-br10', layer: 3, yStart: 160, xStartOffset: 30, bends: [[30, 160], [50, 140]], endXOffset: 150, hasNode: true }
     ]
-  }, [xStart, L_form_end, Y_center])
 
-  useEffect(() => {
-    const layer3Traces = leftTraces.filter(t => t.layer === 3)
-    const interval = setInterval(() => {
-      if (layer3Traces.length > 0) {
-        const randIdx = Math.floor(Math.random() * layer3Traces.length)
-        setActiveTraceIndex(randIdx)
-      }
-    }, 7000)
-    return () => clearInterval(interval)
-  }, [leftTraces])
+    return traceDefs.map(t => ({
+      ...t,
+      xStartOffset: t.xStartOffset * scale,
+      bends: t.bends.map(([bx, by]) => [bx * scale, by]),
+      endXOffset: t.endXOffset * scale
+    }))
+  }, [xStart, L_form_end])
 
   const buildPath = (trace) => {
     const startX = xStart + (trace.xStartOffset || 0)
     const startY = Y_center + trace.yStart
     let path = `M ${startX},${startY}`
-    let currentX = startX
     let currentY = startY
 
     if (trace.bends) {
@@ -154,13 +181,12 @@ export default React.memo(function LeftPCB({ formRef }) {
         const targetX = xStart + bx
         const targetY = Y_center + by
         path += ` L ${targetX},${targetY}`
-        currentX = targetX
         currentY = targetY
       })
     }
 
-    const endX = xStart + trace.endXOffset
-    path += ` L ${endX},${currentY}`
+    const endXVal = xStart + trace.endXOffset
+    path += ` L ${endXVal},${currentY}`
     return path
   }
 
@@ -173,190 +199,154 @@ export default React.memo(function LeftPCB({ formRef }) {
 
   if (shouldReduceMotion) return null
 
+  const layer1Traces = leftTraces.filter(t => t.layer === 1)
+  const layer2Traces = leftTraces.filter(t => t.layer === 2)
   const layer3Traces = leftTraces.filter(t => t.layer === 3)
-  const activeTrace = layer3Traces[activeTraceIndex] || layer3Traces[0]
-  const activePathD = activeTrace ? buildPath(activeTrace) : ''
+
+  const renderVia = (x, y, isNode) => (
+    <g key={`via-${x}-${y}`}>
+      {/* Solid Blocker backing */}
+      <circle cx={x} cy={y} r={isNode ? "2.7" : "2.0"} fill="#050506" opacity="1.0" />
+      <circle cx={x} cy={y} r={isNode ? "2.5" : "1.8"} fill="none" stroke="var(--accent)" strokeWidth="1.0" />
+      <circle cx={x} cy={y} r="0.6" fill="var(--accent)" opacity="0.8" />
+      {isNode && (
+        <circle 
+          cx={x} 
+          cy={y} 
+          r="4.5" 
+          fill="none" 
+          stroke="var(--accent)" 
+          opacity="0.3" 
+          className="animate-pulse" 
+          style={{ animationDuration: `${2 + Math.random() * 2}s` }} 
+        />
+      )}
+    </g>
+  )
 
   return (
-    <div ref={containerRef} className="absolute top-0 bottom-0 left-0 w-[50vw] pointer-events-none z-0 hidden lg:block">
+    <div ref={containerRef} className="absolute top-0 bottom-0 left-0 w-full pointer-events-none z-0 hidden lg:block">
       <svg 
         className="w-full h-full" 
         viewBox={`0 0 ${G || 600} ${H || 400}`}
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <filter id="leftPcbSignalGlow" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="3.5" result="blur" />
+          <filter id="leftPcbSignalGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+
+          <linearGradient id="gradL2" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.05" />
+            <stop offset="50%" stopColor="var(--accent)" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.6" />
+          </linearGradient>
+
+          <linearGradient id="gradL3" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="var(--accent-hover)" stopOpacity="0.1" />
+            <stop offset="80%" stopColor="var(--accent-hover)" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="var(--accent-hover)" stopOpacity="1" />
+          </linearGradient>
+          
+          <pattern id="pcbDotGrid" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="1" fill="rgba(255,255,255,0.03)" />
+          </pattern>
         </defs>
 
-        {/* Traces */}
-        <g fill="none">
-          {leftTraces.map((trace) => {
-            const d = buildPath(trace)
-            const strokeWidth = trace.widthType === 'primary' ? 2 : trace.widthType === 'secondary' ? 1 : 0.5
-            const strokeColor = trace.layer === 3 
-              ? 'rgba(190,150,255,0.55)' 
-              : trace.layer === 2 
-                ? 'rgba(170,120,255,0.28)' 
-                : 'rgba(170,120,255,0.12)'
-                
-            return (
-              <path 
-                key={trace.id} 
-                d={d} 
-                stroke={strokeColor} 
-                strokeWidth={strokeWidth} 
-              />
-            )
-          })}
+        {/* Decorative Tech Background Grid */}
+        <rect x={xStart} y={Y_center - 200} width={Math.max(50, L_form_end - xStart)} height="400" fill="url(#pcbDotGrid)" />
+
+        {/* High-Tech Labels */}
+        <text x={xStart + 30} y={Y_center - 165} fontSize="7" fill="var(--accent-dim)" opacity="0.7" fontFamily="monospace" letterSpacing="1">DATA_LINK_01</text>
+        <text x={xStart + 80} y={Y_center + 165} fontSize="7" fill="var(--accent-dim)" opacity="0.7" fontFamily="monospace" letterSpacing="1">SYS_PWR_OK</text>
+        <text x={xStart + 180} y={Y_center - 30} fontSize="6" fill="rgba(255,255,255,0.2)" fontFamily="monospace">TX-8902</text>
+
+        {/* Layer 1 Traces: Background Traces (faint - 24% opacity) */}
+        <g fill="none" stroke="url(#gradL2)" strokeWidth="1.0" opacity="0.24">
+          {layer1Traces.map((trace) => <path key={trace.id} d={buildPath(trace)} strokeDasharray={trace.strokeDasharray} />)}
         </g>
 
-        {/* Vias */}
-        <g fill="var(--bg)">
-          {leftTraces.map((trace) => {
-            const strokeColor = trace.layer === 3 ? 'rgba(190,150,255,0.55)' : 'rgba(170,120,255,0.28)'
-            const radius = trace.widthType === 'primary' ? 3.5 : 2.5
-            const opacity = trace.layer === 3 ? 0.75 : trace.layer === 2 ? 0.45 : 0.22
-
-            return (
-              <g key={`vias-${trace.id}`} opacity={opacity}>
-                {trace.hasStartVia && (
-                  <circle 
-                    cx={xStart + trace.xStartOffset} 
-                    cy={Y_center + trace.yStart} 
-                    r={radius} 
-                    stroke={strokeColor} 
-                    strokeWidth="1.2" 
-                  />
-                )}
-                {trace.hasEndVia && (
-                  <circle 
-                    cx={xStart + trace.endXOffset} 
-                    cy={getEndY(trace)} 
-                    r={radius} 
-                    stroke={strokeColor} 
-                    strokeWidth="1.2" 
-                  />
-                )}
-              </g>
-            )
-          })}
+        {/* Layer 2 Traces: Middle Traces (Normal - 34% opacity) */}
+        <g fill="none" stroke="url(#gradL2)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.34">
+          {layer2Traces.map((trace) => <path key={trace.id} d={buildPath(trace)} strokeDasharray={trace.strokeDasharray} />)}
         </g>
 
-        {/* Engineering Details */}
-        <g opacity="0.3">
-          {[
-            { type: 'square', x: xStart + 180, y: Y_center - 150 },
-            { type: 'circle', x: xStart + 240, y: Y_center - 100 },
-            { type: 'square', x: xStart + 110, y: Y_center - 20 },
-            { type: 'circle', x: xStart + 280, y: Y_center + 45 },
-            { type: 'square', x: xStart + 160, y: Y_center + 90 },
-            { type: 'circle', x: xStart + 320, y: Y_center + 140 }
-          ].map((detail, idx) => {
-            if (detail.type === 'square') {
-              return (
-                <rect 
-                  key={`detail-${idx}`}
-                  x={detail.x - 1.5}
-                  y={detail.y - 1.5}
-                  width="3"
-                  height="3"
-                  fill="none"
-                  stroke="rgba(170,120,255,0.22)"
-                  strokeWidth="0.8"
-                />
-              )
-            } else {
-              return (
-                <circle 
-                  key={`detail-${idx}`}
-                  cx={detail.x}
-                  cy={detail.y}
-                  r="1.5"
-                  fill="none"
-                  stroke="rgba(170,120,255,0.22)"
-                  strokeWidth="0.8"
-                />
-              )
-            }
-          })}
+        {/* Layer 3 Traces: Foreground Traces (Slightly brighter - 45% opacity) */}
+        <g fill="none" stroke="url(#gradL3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.45">
+          {layer3Traces.map((trace) => <path key={trace.id} d={buildPath(trace)} strokeDasharray={trace.strokeDasharray} />)}
         </g>
 
-        {/* Glowing Nodes (exactly 15) */}
-        {leftTraces.filter(t => t.hasNode).map((trace) => {
+        {/* Realistic Vias (Solder Joints) - ONLY at end points close to the form */}
+        {leftTraces.map((trace) => {
           const endX = xStart + trace.endXOffset
+          const endY = getEndY(trace)
+
+          return (
+            <React.Fragment key={`vias-${trace.id}`}>
+              {trace.hasEndVia && renderVia(endX, endY, trace.hasNode)}
+            </React.Fragment>
+          )
+        })}
+
+        {/* Scattered Isolated Test Points (30% opacity) */}
+        <g fill="var(--accent)" opacity="0.30">
+          {[
+            { x: 30, y: -150 },
+            { x: 90, y: -120 },
+            { x: 140, y: -70 },
+            { x: 50, y: -10 },
+            { x: 120, y: 30 },
+            { x: 80, y: 70 },
+            { x: 150, y: 110 },
+            { x: 40, y: 150 }
+          ].map((pt, idx) => {
+            const scale = Math.max(50, L_form_end - xStart) / 240
+            return (
+              <React.Fragment key={`tp-${idx}`}>
+                {idx % 3 === 0 ? (
+                  <g>
+                    {/* Solid blocker */}
+                    <rect x={xStart + pt.x * scale - 1.7} y={Y_center + pt.y - 1.7} width="3.4" height="3.4" fill="#050506" opacity="1.0" />
+                    {/* Square pad */}
+                    <rect x={xStart + pt.x * scale - 1.5} y={Y_center + pt.y - 1.5} width="3" height="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
+                  </g>
+                ) : (
+                  <circle cx={xStart + pt.x * scale} cy={Y_center + pt.y} r="1" />
+                )}
+              </React.Fragment>
+            )
+          })}
+        </g>
+
+        {/* Glowing Nodes (Pure white core, accent purple outer glow, small bloom - solid body underneath) */}
+        {leftTraces.filter(t => t.hasNode).map((trace) => {
+          const endXVal = xStart + trace.endXOffset
           const endY = getEndY(trace)
           return (
             <g key={`node-${trace.id}`}>
-              <circle 
-                cx={endX} 
-                cy={endY} 
-                r="4.5" 
-                fill="var(--accent)" 
-                opacity="0.5" 
-                filter="url(#leftPcbSignalGlow)" 
-              />
-              <circle 
-                cx={endX} 
-                cy={endY} 
-                r="1.8" 
-                fill="#FFFFFF" 
-              />
+              {/* Opaque Base Body Blocker to mask out background grid/dots completely */}
+              <circle cx={endXVal} cy={endY} r="3.2" fill="#050506" opacity="1.0" />
+              {/* Outer Glow Ring (50% opacity) */}
+              <circle cx={endXVal} cy={endY} r="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" filter="url(#leftPcbSignalGlow)" opacity="0.50" />
+              {/* Core */}
+              <circle cx={endXVal} cy={endY} r="1" fill="#ffffff" opacity="0.80" />
             </g>
           )
         })}
 
-        {/* 5 Intermediate Nodes to make exactly 15 nodes overall */}
-        {[
-          { x: xStart + 120, y: Y_center - 150 },
-          { x: xStart + 220, y: Y_center - 50 },
-          { x: xStart + 150, y: Y_center + 10 },
-          { x: xStart + 200, y: Y_center + 130 },
-          { x: xStart + 100, y: Y_center + 50 }
-        ].map((pt, idx) => (
-          <g key={`node-inter-${idx}`}>
-            <circle 
-              cx={pt.x} 
-              cy={pt.y} 
-              r="4.5" 
-              fill="var(--accent)" 
-              opacity="0.5" 
-              filter="url(#leftPcbSignalGlow)" 
-            />
-            <circle 
-              cx={pt.x} 
-              cy={pt.y} 
-              r="1.8" 
-              fill="#FFFFFF" 
-            />
+        {/* Single Traveling Signal Packet (travels every 7 seconds, linear) */}
+        {!shouldReduceMotion && layer3Traces.length > 0 && (
+          <g style={{
+            offsetPath: `path("${buildPath(layer3Traces[0])}")`,
+            animation: `pcbTravel 7s linear infinite`
+          }}>
+            <circle r="1.5" fill="#ffffff" filter="url(#leftPcbSignalGlow)" />
+            <circle cx="-3" r="1.0" fill="var(--accent-hover)" opacity="0.6" filter="url(#leftPcbSignalGlow)" />
           </g>
-        ))}
-
-        {/* Dynamic Single Light Packet */}
-        {activePathD && (
-          <circle r="2.5" fill="#ffffff" filter="url(#leftPcbSignalGlow)" opacity="0">
-            <animateMotion 
-              dur="3.5s" 
-              repeatCount="1" 
-              path={activePathD}
-              fill="remove"
-              key={`motion-${activeTraceIndex}`}
-            />
-            <animate 
-              attributeName="opacity" 
-              values="0;1;1;0" 
-              keyTimes="0;0.1;0.9;1" 
-              dur="3.5s" 
-              repeatCount="1"
-              fill="freeze"
-              key={`opacity-${activeTraceIndex}`}
-            />
-          </circle>
         )}
       </svg>
     </div>

@@ -513,10 +513,10 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, distanceFactor
   const renderLink = () => {
     const iconContent = (
       <>
-        <SocialIcon platform={platform} className="h-5 w-5" />
+        <SocialIcon platform={platform} className="h-4 w-4" />
         <div
           ref={glowRef}
-          className="absolute inset-0 rounded-xl pointer-events-none opacity-0 transition-shadow duration-300 blur-sm"
+          className="absolute inset-0 rounded-lg pointer-events-none opacity-0 transition-shadow duration-300 blur-sm"
           style={{ boxShadow: `0 0 16px ${globalTheme.color}` }}
         />
       </>
@@ -527,7 +527,7 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, distanceFactor
         <button
           onClick={handleIconClick}
           aria-label="Copy email address to clipboard"
-          className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-bg-surface/90 border border-white/10 text-secondary hover:text-accent hover:border-accent/40 transition-colors duration-300 backdrop-blur-md cursor-pointer shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-accent after:absolute after:inset-[-12px] after:content-['']"
+          className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-bg-surface/90 border border-white/10 text-secondary hover:text-accent hover:border-accent/40 transition-colors duration-300 backdrop-blur-md cursor-pointer shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-accent after:absolute after:inset-[-12px] after:content-['']"
           onPointerOver={handlePointerOver}
           onPointerOut={handlePointerOut}
           ref={htmlRef}
@@ -545,7 +545,7 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, distanceFactor
           rel="noopener noreferrer"
           download
           aria-label="Download resume PDF"
-          className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-bg-surface/90 border border-white/10 text-secondary hover:text-accent hover:border-accent/40 transition-colors duration-300 backdrop-blur-md cursor-pointer shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-accent after:absolute after:inset-[-12px] after:content-['']"
+          className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-bg-surface/90 border border-white/10 text-secondary hover:text-accent hover:border-accent/40 transition-colors duration-300 backdrop-blur-md cursor-pointer shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-accent after:absolute after:inset-[-12px] after:content-['']"
           onPointerOver={handlePointerOver}
           onPointerOut={handlePointerOut}
           ref={htmlRef}
@@ -562,7 +562,7 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, distanceFactor
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`Open ${platform} profile`}
-        className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-bg-surface/90 border border-white/10 text-secondary hover:text-accent hover:border-accent/40 transition-colors duration-300 backdrop-blur-md cursor-pointer shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-accent after:absolute after:inset-[-12px] after:content-['']"
+        className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-bg-surface/90 border border-white/10 text-secondary hover:text-accent hover:border-accent/40 transition-colors duration-300 backdrop-blur-md cursor-pointer shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-accent after:absolute after:inset-[-12px] after:content-['']"
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
         ref={htmlRef}
@@ -1060,7 +1060,7 @@ const OrbitalRing = memo(function OrbitalRing({
         {/* OrbitGroup contains the RingMesh, both IconPivots, and trails */}
         <group ref={orbitGroupRef}>
           {/* RingMesh with localized material for independent ripple wave propagation */}
-          <mesh ref={meshRef} geometry={sharedRingGeometry} material={ringMaterial} />
+          <mesh ref={meshRef} position={[0, 0, zOffset]} geometry={sharedRingGeometry} material={ringMaterial} />
 
           {/* IconPivot A */}
           <group ref={pivotARef}>
@@ -1251,7 +1251,7 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
         ringSpeed={0.02} 
         iconSpeed={0.35}
         icons={ringIcons[0]} 
-        zOffset={-0.12}
+        zOffset={0.00}
         distanceFactor={distanceFactor}
         hoveredCountRef={hoveredCountRef}
         hoveredOrbitRef={hoveredOrbitRef}
@@ -1277,7 +1277,7 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
         ringSpeed={0.013} 
         iconSpeed={0.22}
         icons={ringIcons[2]} 
-        zOffset={0.12}
+        zOffset={0.00}
         distanceFactor={distanceFactor}
         hoveredCountRef={hoveredCountRef}
         hoveredOrbitRef={hoveredOrbitRef}
