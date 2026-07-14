@@ -41,19 +41,19 @@ const SCENE_CONFIG = {
 // Orbit 3 (outer): Direct Action - Email (copy), Resume (download)
 const ORBITAL_PLANES = {
   inner: {
-    inclination: 28 * (Math.PI / 180),   // 28° tilt
+    inclination: 28 * (Math.PI / 180),   // 28Â° tilt
     radius: 2.6,                           // Closest orbit
     period: 18,                            // 18 seconds per revolution
     precessionPeriod: 100,                 // Axis precession over 100s
   },
   middle: {
-    inclination: 68 * (Math.PI / 180),   // 68° tilt
+    inclination: 68 * (Math.PI / 180),   // 68Â° tilt
     radius: 3.0,                           // Medium orbit
     period: 26,                            // 26 seconds per revolution
     precessionPeriod: 110,                 // Axis precession over 110s
   },
   outer: {
-    inclination: 115 * (Math.PI / 180),  // 115° tilt
+    inclination: 115 * (Math.PI / 180),  // 115Â° tilt
     radius: 3.3,                           // Outermost orbit
     period: 38,                            // 38 seconds per revolution
     precessionPeriod: 120,                 // Axis precession over 120s
@@ -64,15 +64,15 @@ const ORBITAL_PLANES = {
 const ICON_ORBIT_CONFIG = {
   // Orbit 1: Professional Identity
   github:   { orbit: 'inner',  initialPhase: 0 },
-  linkedin: { orbit: 'inner',  initialPhase: Math.PI },  // Phase-locked 180° opposite
+  linkedin: { orbit: 'inner',  initialPhase: Math.PI },  // Phase-locked 180Â° opposite
   
   // Orbit 2: Technical Proof
   leetcode: { orbit: 'middle', initialPhase: 0 },
-  gfg:      { orbit: 'middle', initialPhase: Math.PI },  // Phase-locked 180° opposite
+  gfg:      { orbit: 'middle', initialPhase: Math.PI },  // Phase-locked 180Â° opposite
   
   // Orbit 3: Direct Action
   email:    { orbit: 'outer',  initialPhase: 0 },
-  resume:   { orbit: 'outer',  initialPhase: Math.PI },  // Phase-locked 180° opposite
+  resume:   { orbit: 'outer',  initialPhase: Math.PI },  // Phase-locked 180Â° opposite
 }
 
 // Named constants for framerate-independent easing rates
@@ -247,7 +247,7 @@ const SegmentGlowMaterial = shaderMaterial(
    }`
 )
 extend({ SegmentGlowMaterial })
-// ─── CameraRig ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ CameraRig â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Issue #7: Camera drift respects distanceFactor.
 // Issue #18: lookAt cached and only calculated on subpixel movement.
 // Issue #4: Wrap timer accumulator to prevent precision loss.

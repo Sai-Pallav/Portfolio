@@ -1,18 +1,23 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react'
+import React, { useRef, useState, useEffect, useMemo, memo } from 'react'
 import { useReducedMotion } from 'framer-motion'
 
-export default React.memo(function RightPCB({ formRef, globeRef }) {
+export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
 
   const [layout, setLayout] = useState({
     G: 600,
-    H: 400,
+    H: 600,
     M_form: 220,
     L_globe: 200,
-    R_globe: 500
+    R_globe: 500,
+    globeCenterX: 800,
+    globeCenterY: 300
   })
 
+
+
+  // Layout calculations (throttled using requestAnimationFrame)
   useEffect(() => {
     let ticking = false
     const update = () => {
@@ -23,9 +28,8 @@ export default React.memo(function RightPCB({ formRef, globeRef }) {
       if (gridEl) {
         const rectGrid = gridEl.getBoundingClientRect()
         const G_val = rectGrid.width
-        const H_val = rectGrid.height || 400
+        const H_val = rectGrid.height || 600
 
-        // Measure form right edge and globe edges in the full-width PCB coordinate space.
         let formRight = G_val * 0.42
         if (formEl) {
           const rectForm = formEl.getBoundingClientRect()
@@ -46,12 +50,22 @@ export default React.memo(function RightPCB({ formRef, globeRef }) {
         const middleStart = Math.min(formRight + FORM_PCB_GAP, sphereLeft + GLOBE_PCB_OVERLAP)
         const middleEnd = Math.max(sphereLeft + GLOBE_PCB_OVERLAP, middleStart + 20)
 
+        let gx = G_val * 0.8
+        let gy = H_val * 0.5
+        if (globeEl) {
+          const rectGlobe = globeEl.getBoundingClientRect()
+          gx = rectGlobe.left - rectGrid.left + rectGlobe.width / 2
+          gy = rectGlobe.top - rectGrid.top + rectGlobe.height / 2
+        }
+
         setLayout({
           G: G_val,
           H: H_val,
           M_form: middleStart,
           L_globe: middleEnd,
-          R_globe: sphereRight - GLOBE_PCB_OVERLAP
+          R_globe: sphereRight - GLOBE_PCB_OVERLAP,
+          globeCenterX: gx,
+          globeCenterY: gy
         })
       }
     }
@@ -71,10 +85,7 @@ export default React.memo(function RightPCB({ formRef, globeRef }) {
 
     update()
 
-    const resizeObserver = new ResizeObserver(() => {
-      throttledUpdate()
-    })
-
+    const resizeObserver = new ResizeObserver(() => throttledUpdate())
     if (gridEl) resizeObserver.observe(gridEl)
     if (formEl) resizeObserver.observe(formEl)
     if (globeEl) resizeObserver.observe(globeEl)
@@ -91,360 +102,700 @@ export default React.memo(function RightPCB({ formRef, globeRef }) {
 
   const { G, H, M_form, L_globe, R_globe } = layout
   const Y_center = H / 2
-  const endX = G - 15 // Extended start offset rightward to increase right-end length
+  const endX = G - 15
+  const isTransmit = contactSystemState === 'transmit'
+  const isTransmitOrFailed = isTransmit || transmissionFailed
 
-  // Right PCB: independent boundaries
-  const rightTargetLimit = R_globe + 15 // stops closer to globe
-  const rightWidth = Math.max(80, endX - rightTargetLimit)
+  const getTransitionStyle = () => {
+    if (contactSystemState === 'dormant') {
+      return { transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1)' }
+    }
+    if (isTransmit) {
+      return { transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }
+    }
+    return { transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)' }
+  }
+  
+  const getTrailPath = (chKey) => {
+    const startX = middleTargetLimit
+    let startY = Y_center - 36
+    if (chKey === 'email') startY = Y_center - 12
+    else if (chKey === 'subject') startY = Y_center + 12
+    else if (chKey === 'message') startY = Y_center + 36
 
-  // Middle PCB: independent start point connected directly to the Form container
-  const middleTargetLimit = L_globe - 15 // stops closer to globe
+    const targetX = layout.globeCenterX
+    let targetY = layout.globeCenterY
+    if (chKey === 'name') {
+      targetY = layout.globeCenterY - 35
+    } else if (chKey === 'subject') {
+      targetY = layout.globeCenterY + 35
+    }
+
+    const dx = targetX - startX
+    const dy = targetY - startY
+
+    let cy1 = -30
+    if (chKey === 'email') cy1 = -15
+    else if (chKey === 'subject') cy1 = 15
+    else if (chKey === 'message') cy1 = 30
+
+    return `M ${startX},${startY} C ${startX + dx * 0.3},${startY + cy1} ${startX + dx * 0.7},${startY + dy - 10} ${startX + dx},${startY + dy}`
+  }
+
+  const getTrailStyle = (chIdx) => {
+    const delay = 150 + chIdx * 80
+    return {
+      strokeDasharray: '120 280',
+      strokeDashoffset: 400,
+      animation: `pcbTrailAnim 650ms cubic-bezier(0.65, 0, 0.35, 1) ${delay}ms forwards`
+    }
+  }
+
+  const getTravelStyle = (chKey, index) => {
+    if (!isTransmit && !transmissionFailed) return {}
+
+    const startX = middleTargetLimit
+    let startY = Y_center - 36
+    if (chKey === 'email') startY = Y_center - 12
+    else if (chKey === 'subject') startY = Y_center + 12
+    else if (chKey === 'message') startY = Y_center + 36
+
+    // Targets relative to globe center
+    const targetX = layout.globeCenterX
+    let targetY = layout.globeCenterY
+    if (chKey === 'name') {
+      targetY = layout.globeCenterY - 35
+    } else if (chKey === 'subject') {
+      targetY = layout.globeCenterY + 35
+    }
+
+    const dx = targetX - startX
+    const dy = targetY - startY
+
+    let cy1 = -30
+    if (chKey === 'email') cy1 = -15
+    else if (chKey === 'subject') cy1 = 15
+    else if (chKey === 'message') cy1 = 30
+
+    const pathData = `M 0,0 C ${dx * 0.3},${cy1} ${dx * 0.7},${dy - 10} ${dx},${dy}`
+
+    const delay = 150 + index * 80 // Stagger by 80ms
+
+    return {
+      offsetPath: `path('${pathData}')`,
+      offsetRotate: '0deg',
+      transformOrigin: `${startX}px ${startY}px`,
+      animation: `pcbTravel 650ms cubic-bezier(0.65, 0, 0.35, 1) ${delay}ms forwards`
+    }
+  }
+
+  const getChannelGroupStyle = (chKey, index) => {
+    const baseStyle = getTravelStyle(chKey, index)
+    if (transmissionFailed) {
+      return {
+        ...baseStyle,
+        opacity: 0,
+        transition: 'opacity 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+      }
+    }
+    return baseStyle
+  }
+
+  const rightTargetLimit = R_globe + 15
+  const middleTargetLimit = L_globe - 15
   const midStart = M_form
   const W_mid = Math.max(50, middleTargetLimit - midStart)
+  const W_right = Math.max(50, endX - rightTargetLimit)
 
-  // Middle PCB traces connecting Form to Globe
-  const middleTraces = useMemo(() => {
-    const scale = W_mid / 220
+  // Precision 45-degree PCB Auto-Router Path Helper
+  // Guarantees all routes run exclusively horizontally and at exact 45-degree angles.
+  const drawPCBPath = (x1, y1, x2, y2) => {
+    const dx = Math.abs(x2 - x1)
+    const dy = y2 - y1
+    const absDy = Math.abs(dy)
+    const direction = x2 > x1 ? 1 : -1
+    
+    if (absDy < dx) {
+      // Center the 45-degree angled segment in the available space
+      const remainingX = dx - absDy
+      const px1 = x1 + (remainingX / 2) * direction
+      const px2 = px1 + absDy * direction
+      return `M ${x1},${y1} H ${px1} L ${px2},${y2} H ${x2}`
+    } else {
+      // Fallback if space is extremely restricted (no vertical stretch)
+      return `M ${x1},${y1} L ${x2},${y2}`
+    }
+  }
 
-    const traceDefs = [
-      // Primary Traces (8 Traces - grouped into clean, non-overlapping parallel buses)
-      // Top Bus
-      { id: 'M-top', layer: 3, yStart: -120, xStartOffset: 0, bends: [[70, -120], [110, -80]], endXOffset: 180, hasNode: true },
-      { id: 'M-topmid', layer: 2, yStart: -100, xStartOffset: 0, bends: [[70, -100], [110, -60]], endXOffset: 160 },
-      { id: 'M-mid1', layer: 3, yStart: -80, xStartOffset: 0, bends: [[70, -80], [110, -40]], endXOffset: 180, hasNode: true },
-      
-      // Center Bus
-      { id: 'M-center', layer: 3, yStart: -10, xStartOffset: 0, bends: [], endXOffset: 210, hasNode: true },
-      { id: 'M-mid2', layer: 2, yStart: 10, xStartOffset: 0, bends: [], endXOffset: 190 },
-      
-      // Bottom Bus
-      { id: 'M-mid3', layer: 3, yStart: 80, xStartOffset: 0, bends: [[70, 80], [110, 40]], endXOffset: 180, hasNode: true },
-      { id: 'M-botmid', layer: 2, yStart: 100, xStartOffset: 0, bends: [[70, 100], [110, 60]], endXOffset: 160 },
-      { id: 'M-bottom', layer: 3, yStart: 120, xStartOffset: 0, bends: [[70, 120], [110, 80]], endXOffset: 180, hasNode: true },
+  const pcbData = useMemo(() => {
+    const middleTracesList = []
 
-      // Secondary Branches (8 Branches - perfectly aligned on 45-degree channels)
-      { id: 'M-b1', layer: 2, yStart: -120, xStartOffset: 30, bends: [[30, -120], [50, -100]], endXOffset: 140 },
-      { id: 'M-b2', layer: 2, yStart: -40, xStartOffset: 120, bends: [[120, -40], [140, -60]], endXOffset: 170 },
-      { id: 'M-b3', layer: 2, yStart: 40, xStartOffset: 120, bends: [[120, 40], [140, 60]], endXOffset: 170 },
-      { id: 'M-b4', layer: 2, yStart: 120, xStartOffset: 30, bends: [[30, 120], [50, 100]], endXOffset: 140 },
-      
-      { id: 'M-b5', layer: 1, yStart: -100, xStartOffset: 50, bends: [[50, -100], [70, -80]], endXOffset: 130 },
-      { id: 'M-b6', layer: 1, yStart: 100, xStartOffset: 50, bends: [[50, 100], [70, 80]], endXOffset: 130 },
-      
-      { id: 'M-b7', layer: 2, yStart: -80, xStartOffset: 140, bends: [[140, -80], [160, -100]], endXOffset: 180 },
-      { id: 'M-b8', layer: 2, yStart: 80, xStartOffset: 140, bends: [[140, 80], [160, 100]], endXOffset: 180 }
+    // --- CHANNEL 1 (Name Input, starts at Y_center - 100, converges to Y_center - 36) ---
+    middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 100, middleTargetLimit, Y_center - 36), w: 1.5, opDefault: 0.25, main: true })
+    middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 112, middleTargetLimit, Y_center - 44), w: 0.6, opDefault: 0.15 })
+    middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 88, middleTargetLimit, Y_center - 28), w: 0.6, opDefault: 0.15 })
+
+    // --- CHANNEL 2 (Email Input, starts at Y_center - 50, converges to Y_center - 12) ---
+    middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 50, middleTargetLimit, Y_center - 12), w: 1.5, opDefault: 0.25, main: true })
+    middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 58, middleTargetLimit, Y_center - 20), w: 0.6, opDefault: 0.15 })
+    middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 42, middleTargetLimit, Y_center - 4), w: 0.6, opDefault: 0.15 })
+
+    // --- CHANNEL 3 (Subject Input, starts at Y_center + 50, converges to Y_center + 12) ---
+    middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 50, middleTargetLimit, Y_center + 12), w: 1.5, opDefault: 0.25, main: true })
+    middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 42, middleTargetLimit, Y_center + 4), w: 0.6, opDefault: 0.15 })
+    middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 58, middleTargetLimit, Y_center + 20), w: 0.6, opDefault: 0.15 })
+
+    // --- CHANNEL 4 (Message Input, starts at Y_center + 100, converges to Y_center + 36) ---
+    middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 100, middleTargetLimit, Y_center + 36), w: 1.5, opDefault: 0.25, main: true })
+    middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 88, middleTargetLimit, Y_center + 28), w: 0.6, opDefault: 0.15 })
+    middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 112, middleTargetLimit, Y_center + 44), w: 0.6, opDefault: 0.15 })
+
+    const rightTracesList = []
+    // Right section traces (starts wide at screen edge endX, converges to globe rightTargetLimit)
+    // Trace 1: Y_center - 140 converges to Y_center - 30
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 140, rightTargetLimit, Y_center - 30), w: 1.5, op: 0.45 })
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 150, rightTargetLimit, Y_center - 36), w: 0.6, op: 0.22 })
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 130, rightTargetLimit, Y_center - 24), w: 0.6, op: 0.22 })
+
+    // Trace 2: Y_center - 80 converges to Y_center - 12
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 80, rightTargetLimit, Y_center - 12), w: 1.5, op: 0.45 })
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 90, rightTargetLimit, Y_center - 18), w: 0.6, op: 0.22 })
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 70, rightTargetLimit, Y_center - 6), w: 0.6, op: 0.22 })
+
+    // Trace 3: Y_center + 80 converges to Y_center + 12
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 80, rightTargetLimit, Y_center + 12), w: 1.5, op: 0.45 })
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 70, rightTargetLimit, Y_center + 6), w: 0.6, op: 0.22 })
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 90, rightTargetLimit, Y_center + 18), w: 0.6, op: 0.22 })
+
+    // Trace 4: Y_center + 140 converges to Y_center + 30
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 140, rightTargetLimit, Y_center + 30), w: 1.5, op: 0.45 })
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 130, rightTargetLimit, Y_center + 24), w: 0.6, op: 0.22 })
+    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 150, rightTargetLimit, Y_center + 36), w: 0.6, op: 0.22 })
+
+    // Hardware Components (Aligned horizontally on trace flat sections)
+    const componentsList = [
+      // Resistors on Middle Traces (Input protection array)
+      { x: midStart + 15, y: Y_center - 112, w: 7.5, h: 4.0, l: 'R501', chKey: 'name' },
+      { x: midStart + 15, y: Y_center - 100, w: 7.5, h: 4.0, l: 'R502', chKey: 'name' },
+      { x: midStart + 15, y: Y_center - 88, w: 7.5, h: 4.0, l: 'R503', chKey: 'name' },
+
+      { x: midStart + 20, y: Y_center - 58, w: 7.5, h: 4.0, l: 'R504', chKey: 'email' },
+      { x: midStart + 20, y: Y_center - 50, w: 7.5, h: 4.0, l: 'R505', chKey: 'email' },
+      { x: midStart + 20, y: Y_center - 42, w: 7.5, h: 4.0, l: 'R506', chKey: 'email' },
+
+      { x: midStart + 20, y: Y_center + 42, w: 7.5, h: 4.0, l: 'R507', chKey: 'subject' },
+      { x: midStart + 20, y: Y_center + 50, w: 7.5, h: 4.0, l: 'R508', chKey: 'subject' },
+      { x: midStart + 20, y: Y_center + 58, w: 7.5, h: 4.0, l: 'R509', chKey: 'subject' },
+
+      { x: midStart + 15, y: Y_center + 88, w: 7.5, h: 4.0, l: 'R510', chKey: 'message' },
+      { x: midStart + 15, y: Y_center + 100, w: 7.5, h: 4.0, l: 'R511', chKey: 'message' },
+      { x: midStart + 15, y: Y_center + 112, w: 7.5, h: 4.0, l: 'R512', chKey: 'message' },
+
+      // Transceiver chips
+      { x: midStart + W_mid * 0.45, y: Y_center - 65, w: 12, h: 8.0, l: 'U10', chKey: 'email' },
+      { x: midStart + W_mid * 0.45, y: Y_center + 65, w: 12, h: 8.0, l: 'U11', chKey: 'subject' },
+
+      // Capacitors on Middle Traces (Globe filter pads)
+      { x: middleTargetLimit - 20, y: Y_center - 36, w: 7.5, h: 4.0, l: 'C501', chKey: 'name', isCap: true },
+      { x: middleTargetLimit - 20, y: Y_center - 12, w: 7.5, h: 4.0, l: 'C502', chKey: 'email', isCap: true },
+      { x: middleTargetLimit - 20, y: Y_center + 12, w: 7.5, h: 4.0, l: 'C503', chKey: 'subject', isCap: true },
+      { x: middleTargetLimit - 20, y: Y_center + 36, w: 7.5, h: 4.0, l: 'C504', chKey: 'message', isCap: true },
+
+      // Resistors on Right Traces (near screen edge)
+      { x: endX - 22, y: Y_center - 140, w: 7.5, h: 4.0, l: 'R601' },
+      { x: endX - 22, y: Y_center - 80, w: 7.5, h: 4.0, l: 'R602' },
+      { x: endX - 22, y: Y_center + 80, w: 7.5, h: 4.0, l: 'R603' },
+      { x: endX - 22, y: Y_center + 140, w: 7.5, h: 4.0, l: 'R604' },
+
+      // Capacitors on Right Traces (near globe)
+      { x: rightTargetLimit + 20, y: Y_center - 30, w: 7.5, h: 4.0, l: 'C601', isCap: true },
+      { x: rightTargetLimit + 20, y: Y_center - 12, w: 7.5, h: 4.0, l: 'C602', isCap: true },
+      { x: rightTargetLimit + 20, y: Y_center + 12, w: 7.5, h: 4.0, l: 'C603', isCap: true },
+      { x: rightTargetLimit + 20, y: Y_center + 30, w: 7.5, h: 4.0, l: 'C604', isCap: true }
     ]
 
-    return traceDefs.map(t => ({
-      ...t,
-      xStartOffset: t.xStartOffset * scale,
-      bends: t.bends.map(([bx, by]) => [bx * scale, by]),
-      endXOffset: t.endXOffset * scale
-    }))
-  }, [W_mid])
+    const viasList = [
+      // Middle Vias (Near trace start)
+      { x: midStart + 8, y: Y_center - 100, l: 'V501', chKey: 'name' },
+      { x: midStart + 8, y: Y_center - 50, l: 'V502', chKey: 'email' },
+      { x: midStart + 8, y: Y_center + 50, l: 'V503', chKey: 'subject' },
+      { x: midStart + 8, y: Y_center + 100, l: 'V504', chKey: 'message' },
 
-  // Right-hand PCB traces extending from the right edge toward the Globe
-  const rightTraces = useMemo(() => {
-    const scale = rightWidth / 160
-
-    const traceDefs = [
-      // Primary Traces (8 Traces)
-      { id: 'R-top', layer: 3, yStart: -120, xStartOffset: 0, bends: [[40, -120], [60, -100]], endXOffset: 140, hasNode: true },
-      { id: 'R-topmid', layer: 2, yStart: -80, xStartOffset: 0, bends: [[50, -80], [65, -95]], endXOffset: 130 },
-      { id: 'R-mid1', layer: 3, yStart: -40, xStartOffset: 0, bends: [[70, -40], [85, -25]], endXOffset: 145, hasNode: true },
-      { id: 'R-center', layer: 3, yStart: -5, xStartOffset: 0, bends: [], endXOffset: 155, hasNode: true },
-      { id: 'R-mid2', layer: 2, yStart: 25, xStartOffset: 0, bends: [], endXOffset: 135 },
-      { id: 'R-mid3', layer: 3, yStart: 60, xStartOffset: 0, bends: [[55, 60], [70, 45]], endXOffset: 140, hasNode: true },
-      { id: 'R-botmid', layer: 2, yStart: 100, xStartOffset: 0, bends: [[60, 100], [75, 115]], endXOffset: 130 },
-      { id: 'R-bottom', layer: 3, yStart: 140, xStartOffset: 0, bends: [[50, 140], [70, 120]], endXOffset: 145, hasNode: true },
-
-      // Secondary Branches (12 Branches)
-      { id: 'R-b1', layer: 1, yStart: -120, xStartOffset: 40, bends: [[60, -140]], endXOffset: 110 },
-      { id: 'R-b2', layer: 2, yStart: -100, xStartOffset: 60, bends: [[80, -85]], endXOffset: 120 },
-      { id: 'R-b3', layer: 1, yStart: -95, xStartOffset: 70, bends: [[85, -110]], endXOffset: 115 },
-      { id: 'R-b4', layer: 3, yStart: -40, xStartOffset: 50, bends: [[65, -55]], endXOffset: 115, hasNode: true },
-      { id: 'R-b5', layer: 2, yStart: -25, xStartOffset: 90, bends: [], endXOffset: 130 },
-      { id: 'R-b6', layer: 3, yStart: -5, xStartOffset: 60, bends: [[75, 10]], endXOffset: 125, hasNode: true },
-      { id: 'R-b7', layer: 2, yStart: 25, xStartOffset: 50, bends: [[65, 10]], endXOffset: 110 },
-      { id: 'R-b8', layer: 1, yStart: 60, xStartOffset: 45, bends: [[60, 75]], endXOffset: 115 },
-      { id: 'R-b9', layer: 2, yStart: 45, xStartOffset: 75, bends: [[90, 30]], endXOffset: 125 },
-      { id: 'R-b10', layer: 3, yStart: 100, xStartOffset: 50, bends: [[65, 85]], endXOffset: 120, hasNode: true },
-      { id: 'R-b11', layer: 1, yStart: 115, xStartOffset: 80, bends: [[95, 130]], endXOffset: 125 },
-      { id: 'R-b12', layer: 2, yStart: 120, xStartOffset: 70, bends: [[85, 105]], endXOffset: 115 }
+      // Right Vias (Near trace start / screen edge)
+      { x: endX - 10, y: Y_center - 140, l: 'V601' },
+      { x: endX - 10, y: Y_center - 80, l: 'V602' },
+      { x: endX - 10, y: Y_center + 80, l: 'V603' },
+      { x: endX - 10, y: Y_center + 140, l: 'V604' }
     ]
 
-    return traceDefs.map(t => ({
-      ...t,
-      xStartOffset: t.xStartOffset * scale,
-      bends: t.bends.map(([bx, by]) => [bx * scale, by]),
-      endXOffset: t.endXOffset * scale
-    }))
-  }, [rightWidth])
+    const padsList = [
+      { x: midStart + W_mid * 0.22, y: Y_center - 130, l: 'TP51' },
+      { x: midStart + W_mid * 0.22, y: Y_center + 130, l: 'TP52' },
+      { x: rightTargetLimit + W_right * 0.45, y: Y_center - 60, l: 'TP61' },
+      { x: rightTargetLimit + W_right * 0.45, y: Y_center + 60, l: 'TP62' }
+    ]
 
-  const buildMiddlePath = (trace) => {
-    const startX = midStart + (trace.xStartOffset || 0)
-    const startY = Y_center + trace.yStart
-    let path = `M ${startX},${startY}`
-    let currentY = startY
+    const mountingHolesList = [
+      { x: midStart + W_mid * 0.5, y: Y_center - 160 },
+      { x: midStart + W_mid * 0.5, y: Y_center + 160 },
+      { x: rightTargetLimit + W_right * 0.5, y: Y_center - 160 },
+      { x: rightTargetLimit + W_right * 0.5, y: Y_center + 160 }
+    ]
 
-    if (trace.bends) {
-      trace.bends.forEach(([bx, by]) => {
-        const targetX = midStart + bx
-        const targetY = Y_center + by
-        path += ` L ${targetX},${targetY}`
-        currentY = targetY
-      })
+    // Nodes (Terminations)
+    const nodesList = [
+      { x: middleTargetLimit, y: -36, label: 'RX_0', chKey: 'name' },
+      { x: middleTargetLimit, y: -12, label: 'RX_1', chKey: 'email' },
+      { x: middleTargetLimit, y: 12, label: 'RX_2', chKey: 'subject' },
+      { x: middleTargetLimit, y: 36, label: 'RX_3', chKey: 'message' },
+
+      { x: rightTargetLimit, y: -30, label: 'TX_0' },
+      { x: rightTargetLimit, y: -12, label: 'TX_1' },
+      { x: rightTargetLimit, y: 12, label: 'TX_2' },
+      { x: rightTargetLimit, y: 30, label: 'TX_3' }
+    ]
+
+    return {
+      middleTraces: middleTracesList,
+      rightTraces: rightTracesList,
+      components: componentsList,
+      vias: viasList,
+      pads: padsList,
+      mountingHoles: mountingHolesList,
+      nodes: nodesList
     }
-
-    const endXVal = midStart + trace.endXOffset
-    path += ` L ${endXVal},${currentY}`
-    return path
-  }
-
-  const getMiddleEndY = (trace) => {
-    if (trace.bends && trace.bends.length > 0) {
-      return Y_center + trace.bends[trace.bends.length - 1][1]
-    }
-    return Y_center + trace.yStart
-  }
-
-  const buildRightPath = (trace) => {
-    const startX = endX - (trace.xStartOffset || 0)
-    const startY = Y_center + trace.yStart
-    let path = `M ${startX},${startY}`
-    let currentY = startY
-
-    if (trace.bends) {
-      trace.bends.forEach(([bx, by]) => {
-        const targetX = endX - bx
-        const targetY = Y_center + by
-        path += ` L ${targetX},${targetY}`
-        currentY = targetY
-      })
-    }
-
-    const endXVal = endX - trace.endXOffset
-    path += ` L ${endXVal},${currentY}`
-    return path
-  }
-
-  const getRightEndY = (trace) => {
-    if (trace.bends && trace.bends.length > 0) {
-      return Y_center + trace.bends[trace.bends.length - 1][1]
-    }
-    return Y_center + trace.yStart
-  }
+  }, [midStart, middleTargetLimit, rightTargetLimit, endX, Y_center, W_mid, W_right])
 
   if (shouldReduceMotion) return null
 
-  const midLayer1Traces = middleTraces.filter(t => t.layer === 1)
-  const midLayer2Traces = middleTraces.filter(t => t.layer === 2)
-  const midLayer3Traces = middleTraces.filter(t => t.layer === 3)
+  const getTargetOpacity = (chKey) => {
+    const isHero = ['name', 'email', 'subject', 'message'].includes(chKey)
+    if (isTransmit) return 0
+    if (transmissionFailed && isHero) return 0
+    if (contactSystemState === 'engaged') {
+      if (chKey === null || chKey === undefined) {
+        return 0.80
+      }
+      return isHero ? 0.85 : 0.30
+    }
+    return 0.40
+  }
 
-  const rightLayer1Traces = rightTraces.filter(t => t.layer === 1)
-  const rightLayer2Traces = rightTraces.filter(t => t.layer === 2)
-  const rightLayer3Traces = rightTraces.filter(t => t.layer === 3)
+  // SMT Package Renderer
+  const renderSMT = (x, y, w, h, label, chKey = null, isCap = false) => {
+    const dropShadowClass = contactSystemState === 'dormant' ? "" : "filter drop-shadow-[0.5px_0.8px_0.5px_rgba(0,0,0,0.85)]"
+    const targetOpacity = getTargetOpacity(chKey)
+
+    return (
+      <g 
+        key={`smt-${label}-${x}-${y}`} 
+        transform={`translate(${x}, ${y})`} 
+        className={dropShadowClass}
+        opacity={targetOpacity}
+        style={getTransitionStyle()}
+      >
+        <rect x={-w/2 - 0.8} y={-h/2 - 0.4} width={w + 1.6} height={h + 0.8} fill="#030304" />
+        <rect x={-w/2} y={-h/2} width={1.6} height={h} fill="#444452" stroke="#6e6e80" strokeWidth="0.25" opacity="1.0" />
+        <rect x={w/2 - 1.6} y={-h/2} width={1.6} height={h} fill="#444452" stroke="#6e6e80" strokeWidth="0.25" opacity="1.0" />
+        <rect x={-w/2 + 1.4} y={-h/2 + 0.3} width={w - 2.8} height={h - 0.6} rx={0.3} fill={isCap ? "#5c4b3c" : "#0e0e12"} stroke={isCap ? "#7d6855" : "#22222a"} strokeWidth="0.35" opacity="0.9" />
+        <rect x={-w/2 - 1.2} y={-h/2 - 0.8} width={w + 2.4} height={h + 1.6} fill="none" stroke="#ffffff" strokeWidth="0.25" opacity="0.4" />
+        <rect x={-w/2 + 2} y={-h/2 + 1} width={w - 4} height={h - 2} fill="none" stroke="var(--accent)" strokeWidth="0.25" opacity={0.6} />
+      </g>
+    )
+  }
+
+  // Micro Via Renderer
+  const renderVia = (x, y, label, chKey = null) => {
+    const targetOpacity = getTargetOpacity(chKey)
+
+    return (
+      <g 
+        key={`via-${x}-${y}`} 
+        transform={`translate(${x}, ${y})`}
+        opacity={targetOpacity}
+        style={getTransitionStyle()}
+      >
+        <circle cx="0" cy="0" r="1.6" fill="none" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} />
+        <circle cx="0" cy="0" r="1.0" fill="#030304" stroke="#444452" strokeWidth="0.25" opacity="1.0" />
+        <circle cx="0" cy="0" r="0.4" fill="#000000" />
+      </g>
+    )
+  }
+
+  // Exposed copper Test Point Pad
+  const renderPad = (x, y, label, chKey = null) => {
+    const targetOpacity = getTargetOpacity(chKey)
+
+    return (
+      <g 
+        key={`pad-${x}-${y}`} 
+        transform={`translate(${x}, ${y})`}
+        opacity={targetOpacity}
+        style={getTransitionStyle()}
+      >
+        <circle cx="0" cy="0" r="2.0" fill="#14141c" stroke="#333340" strokeWidth="0.4" />
+        <circle cx="0" cy="0" r="1.1" fill="#3a3a4c" stroke="var(--accent)" strokeWidth="0.25" opacity={0.65} style={{ transition: 'opacity 0.4s ease' }} />
+        <circle cx="0" cy="0" r="0.4" fill="#000000" />
+      </g>
+    )
+  }
+
+  // Grounded Mechanical Mounting Screw Hole
+  const renderMountingHole = (x, y) => {
+    const targetOpacity = (isTransmit || transmissionFailed) ? 0 : (contactSystemState === 'engaged' ? 0.30 : 0.40)
+    return (
+      <g 
+        key={`mount-${x}-${y}`} 
+        transform={`translate(${x}, ${y})`}
+        opacity={targetOpacity}
+        style={getTransitionStyle()}
+      >
+        <circle cx="0" cy="0" r="10" fill="#030304" />
+        <circle cx="0" cy="0" r="8.2" fill="none" stroke="var(--accent)" strokeWidth="1.6" opacity="0.75" />
+        <circle cx="0" cy="0" r="5.6" fill="none" stroke="#444452" strokeWidth="0.5" opacity="1.0" />
+        <circle cx="0" cy="0" r="4.0" fill="#000" />
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, idx) => {
+          const rad = angle * (Math.PI / 180)
+          const vx = Math.cos(rad) * 6.8
+          const vy = Math.sin(rad) * 6.8
+          return (
+            <circle key={idx} cx={vx} cy={vy} r="0.65" fill="#000" stroke="#444452" strokeWidth="0.25" opacity="1.0" />
+          )
+        })}
+      </g>
+    )
+  }
+
+
+  if (shouldReduceMotion) return null
+
+  const dormantStyles = contactSystemState === 'dormant' ? {
+    opacity: 0.40,
+    filter: 'saturate(0)'
+  } : {}
 
   return (
-    <div ref={containerRef} className="absolute top-0 bottom-0 left-0 w-full pointer-events-none z-0 hidden lg:block">
+    <div
+      ref={containerRef}
+      className="absolute top-0 bottom-0 left-0 w-full pointer-events-none z-0 hidden lg:block"
+      style={{ ...dormantStyles, transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1)' }}
+    >
+      <style>{`
+        @keyframes pcbTravel {
+          0% {
+            offset-distance: 0%;
+            transform: scale(1);
+            opacity: 0.35;
+          }
+          100% {
+            offset-distance: 100%;
+            transform: scale(0.45);
+            opacity: 0.35;
+          }
+        }
+        @keyframes pcbPulse {
+          0%, 100% {
+            opacity: 0.3;
+          }
+          50% {
+            opacity: 0.55;
+          }
+        }
+        @keyframes pcbStandbyPulse {
+          0%, 100% {
+            opacity: 0.12;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.32;
+            transform: scale(1.08);
+          }
+        }
+        @keyframes pcbTrailAnim {
+          0% {
+            stroke-dashoffset: 400;
+            opacity: 0.8;
+          }
+          70% {
+            stroke-dashoffset: 120;
+            opacity: 0.8;
+          }
+          100% {
+            stroke-dashoffset: 0;
+            opacity: 0;
+          }
+        }
+        @keyframes pcbRadarRotate {
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+        @keyframes pcbRadarRotateCounter {
+          0% {
+            transform: rotate(360deg);
+          }
+          100% {
+            transform: rotate(0deg);
+          }
+        }
+        @keyframes pcbRadarPulse {
+          0% {
+            transform: scale(0.6);
+            opacity: 0.8;
+          }
+          100% {
+            transform: scale(1.6);
+            opacity: 0;
+          }
+        }
+        .animate-standby-pulse {
+          animation: pcbStandbyPulse 3.5s ease-in-out infinite;
+        }
+        @keyframes pcbSignalFlow {
+          0% {
+            stroke-dashoffset: 200;
+          }
+          100% {
+            stroke-dashoffset: 0;
+          }
+        }
+      `}</style>
+
       <svg
         className="w-full h-full"
-        viewBox={`0 0 ${G || 600} ${H || 400}`}
+        viewBox={`0 0 ${G || 600} ${H || 600}`}
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <filter id="rightPcbSignalGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
+          <filter id="pcbHairlineGlow" filterUnits="userSpaceOnUse" x="-10%" y="-10%" width="120%" height="120%">
+            <feGaussianBlur stdDeviation="0.6" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-
-          <linearGradient id="gradR2" x1="100%" y1="0%" x2="0%" y2="0%">
-            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.05" />
-            <stop offset="50%" stopColor="var(--accent)" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.6" />
+          <filter id="pcbGlowActive" filterUnits="userSpaceOnUse" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <linearGradient id="pcbTrailGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(168, 85, 247, 0)" />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.8" />
           </linearGradient>
-
-          <linearGradient id="gradR3" x1="100%" y1="0%" x2="0%" y2="0%">
-            <stop offset="0%" stopColor="var(--accent-hover)" stopOpacity="0.1" />
-            <stop offset="80%" stopColor="var(--accent-hover)" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="var(--accent-hover)" stopOpacity="1" />
-          </linearGradient>
-
-          <pattern id="pcbDotGridR" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
-            <circle cx="1" cy="1" r="1" fill="rgba(255,255,255,0.03)" />
+          <pattern id="pcbFiberglassWeaveR" width="6" height="6" patternUnits="userSpaceOnUse">
+            <path d="M 0 3 L 6 3 M 3 0 L 3 6" stroke="rgba(255,255,255,0.012)" strokeWidth="0.4" />
+          </pattern>
+          <pattern id="pcbDotsR" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1" fill="#ffffff" opacity="0.015" />
           </pattern>
         </defs>
 
-        {/* Decorative Tech Background Grids */}
-        <rect x={midStart} y={Y_center - 200} width={W_mid} height="400" fill="url(#pcbDotGridR)" />
-        <rect x={rightTargetLimit} y={Y_center - 200} width={Math.max(50, endX - rightTargetLimit)} height="400" fill="url(#pcbDotGridR)" opacity="0.30" />
+        {/* Fiberglass weave and Grid overlays */}
+        <rect 
+          x={midStart} 
+          y={Y_center - 180} 
+          width={endX - midStart} 
+          height="360" 
+          fill="url(#pcbFiberglassWeaveR)" 
+          opacity={isTransmit ? 0 : 1}
+          style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
+        />
+        <rect 
+          x={midStart} 
+          y={Y_center - 180} 
+          width={endX - midStart} 
+          height="360" 
+          fill="url(#pcbDotsR)" 
+          opacity={isTransmit ? 0 : 1}
+          style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
+        />
 
-        {/* High-Tech Labels */}
-        <text x={midStart + 20} y={Y_center - 180} fontSize="7" fill="var(--accent-dim)" opacity="0.7" fontFamily="monospace" letterSpacing="1">LINK_NODE_A</text>
-        <text x={midStart + 50} y={Y_center + 180} fontSize="7" fill="var(--accent-dim)" opacity="0.7" fontFamily="monospace" letterSpacing="1">LINK_NODE_B</text>
-        <text x={endX - 120} y={Y_center - 165} fontSize="6" fill="rgba(255,255,255,0.2)" fontFamily="monospace">NODE_MATRIX_RX</text>
+        {/* Trailing Lines for Traveling Hero Channels */}
+        {isTransmitOrFailed && ['name', 'email', 'subject', 'message'].map((chKey, chIdx) => (
+          <path
+            key={`trail-${chKey}`}
+            d={getTrailPath(chKey)}
+            stroke="url(#pcbTrailGradient)"
+            strokeWidth="1.2"
+            fill="none"
+            strokeLinecap="round"
+            style={{
+              ...getTrailStyle(chIdx),
+              ...(transmissionFailed ? {
+                opacity: 0,
+                transition: 'opacity 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+              } : {})
+            }}
+          />
+        ))}
 
         {/* ========================================================
-            MIDDLE SECTION: Connecting Form to Globe
-            (REWORKED - DECOUPLED INDEPENDENT WIDTHS)
+            HERO TRANSMISSION CHANNELS
            ======================================================== */}
-        {/* Layer 1: Background Traces (faint - 24% opacity) */}
-        <g fill="none" stroke="url(#gradR2)" strokeWidth="1.0" opacity="0.24">
-          {midLayer1Traces.map((trace) => <path key={trace.id} d={buildMiddlePath(trace)} strokeDasharray={trace.strokeDasharray} />)}
-        </g>
-
-        {/* Layer 2: Middle Traces (Normal - 34% opacity) */}
-        <g fill="none" stroke="url(#gradR2)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.34">
-          {midLayer2Traces.map((trace) => <path key={trace.id} d={buildMiddlePath(trace)} strokeDasharray={trace.strokeDasharray} />)}
-        </g>
-
-        {/* Layer 3: Foreground Traces (Slightly brighter - 45% opacity) */}
-        <g fill="none" stroke="url(#gradR3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.45">
-          {midLayer3Traces.map((trace) => <path key={trace.id} d={buildMiddlePath(trace)} strokeDasharray={trace.strokeDasharray} />)}
-        </g>
-
-        {/* Glowing Nodes - Middle Section (solid blocker backing underneath) */}
-        {middleTraces.filter(t => t.hasNode).map((trace) => {
-          const endXVal = midStart + trace.endXOffset
-          const endY = getMiddleEndY(trace)
+        {['name', 'email', 'subject', 'message'].map((chKey, chIdx) => {
+          const travelStyle = getChannelGroupStyle(chKey, chIdx)
           return (
-            <g key={`mid-node-${trace.id}`}>
-              {/* Opaque Base Body Blocker to mask out background grid/dots completely */}
-              <circle cx={endXVal} cy={endY} r="3.2" fill="#050506" opacity="1.0" />
-              {/* Outer Glow Ring (50% opacity) */}
-              <circle cx={endXVal} cy={endY} r="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" filter="url(#rightPcbSignalGlow)" opacity="0.50" />
-              {/* Core */}
-              <circle cx={endXVal} cy={endY} r="1" fill="#ffffff" opacity="0.80" />
+            <g key={chKey} style={travelStyle}>
+              {/* Traces for this channel */}
+              <g strokeLinecap="round" strokeLinejoin="round" fill="none">
+                {pcbData.middleTraces.filter(t => t.chKey === chKey).map((t, idx) => {
+                  const targetOpacity = getTargetOpacity(t.chKey)
+                  return (
+                    <React.Fragment key={`m-trace-${idx}`}>
+                      {contactSystemState === 'engaged' && !isTransmit && (
+                        <>
+                          <path
+                            d={t.d}
+                            stroke="var(--accent)"
+                            strokeWidth={t.w + 0.8}
+                            opacity="0.35"
+                            filter="url(#pcbHairlineGlow)"
+                            style={getTransitionStyle()}
+                          />
+                          {t.main && isTyping && (
+                            <path
+                              d={t.d}
+                              stroke="var(--accent)"
+                              strokeWidth={t.w + 0.2}
+                              fill="none"
+                              opacity="0.8"
+                              style={{
+                                strokeDasharray: '40 160',
+                                animation: 'pcbSignalFlow 3s ease-in-out infinite alternate'
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+                      <path
+                        d={t.d}
+                        stroke="var(--accent)"
+                        strokeWidth={t.w}
+                        opacity={targetOpacity}
+                        style={getTransitionStyle()}
+                      />
+                    </React.Fragment>
+                  )
+                })}
+              </g>
+
+              {/* SMTs for this channel */}
+              {pcbData.components.filter(c => c.chKey === chKey).map((comp, i) => (
+                renderSMT(comp.x, comp.y, comp.w, comp.h, comp.l, comp.chKey, comp.isCap)
+              ))}
+
+              {/* Vias for this channel */}
+              {pcbData.vias.filter(v => v.chKey === chKey).map((v, i) => (
+                renderVia(v.x, v.y, v.l, v.chKey)
+              ))}
+
+              {/* Nodes for this channel */}
+              {pcbData.nodes.filter(n => n.chKey === chKey).map((node, i) => {
+                const targetOpacity = getTargetOpacity(node.chKey)
+                return (
+                  <g 
+                    key={`core-node-${i}`} 
+                    transform={`translate(${node.x}, ${Y_center + node.y})`}
+                    opacity={targetOpacity}
+                    style={getTransitionStyle()}
+                  >
+                    <circle cx="0" cy="0" r="4.2" fill="#030304" />
+                    <circle cx="0" cy="0" r="3.5" fill="none" stroke="#ffffff" strokeWidth="0.4" opacity="0.55" />
+                    <circle cx="0" cy="0" r="1.3" fill="var(--accent)" opacity="0.75" />
+                    {/* Pulsing Outer Ring */}
+                    <circle cx="0" cy="0" r="3.5" fill="none" stroke="var(--accent)" strokeWidth="0.4"
+                      style={{
+                        animation: isTyping ? 'pcbRadarPulse 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite' : 'none',
+                        transformOrigin: '0px 0px'
+                      }}
+                    />
+                  </g>
+                )
+              })}
             </g>
           )
         })}
 
-        {/* Tiny isolated pads / connector markers - Middle Section (30% opacity) */}
-        <g fill="var(--accent)" opacity="0.30">
-          {[
-            { x: 30, y: -130 },
-            { x: 75, y: -100 },
-            { x: 110, y: -70 },
-            { x: 45, y: -15 },
-            { x: 80, y: 15 },
-            { x: 120, y: 40 },
-            { x: 50, y: 85 },
-            { x: 85, y: 110 },
-            { x: 130, y: 135 }
-          ].map((pt, idx) => {
-            const scale = Math.max(80, W_mid) / 220
-            const cx = midStart + pt.x * scale
-            const cy = Y_center + pt.y
+        {/* ========================================================
+            AMBIENT COMPONENTS & TRACES (FADE OUT DURING TRANSMIT)
+           ======================================================== */}
+        <g strokeLinecap="round" strokeLinejoin="round" fill="none">
+          {pcbData.rightTraces.map((t, idx) => {
+            const targetOpacity = getTargetOpacity(null)
             return (
-              <React.Fragment key={`mid-tp-${idx}`}>
-                {idx % 3 === 0 ? (
-                  <g>
-                    {/* Solid blocker */}
-                    <rect x={cx - 1.7} y={cy - 1.7} width="3.4" height="3.4" fill="#050506" opacity="1.0" />
-                    {/* Square pad */}
-                    <rect x={cx - 1.5} y={cy - 1.5} width="3" height="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
-                  </g>
-                ) : (
-                  <circle cx={cx} cy={cy} r="1" />
+              <React.Fragment key={`r-trace-${idx}`}>
+                {contactSystemState === 'engaged' && !isTransmit && (
+                  <path
+                    d={t.d}
+                    stroke="var(--accent)"
+                    strokeWidth={t.w + 0.8}
+                    opacity="0.35"
+                    filter="url(#pcbHairlineGlow)"
+                    style={getTransitionStyle()}
+                  />
                 )}
+                <path
+                  d={t.d}
+                  stroke="var(--accent)"
+                  strokeWidth={t.w}
+                  opacity={targetOpacity}
+                  style={getTransitionStyle()}
+                />
               </React.Fragment>
             )
           })}
         </g>
 
-        {/* Single Traveling Signal Packet - Middle Section */}
-        {!shouldReduceMotion && midLayer3Traces.length > 0 && (
-          <g style={{
-            offsetPath: `path("${buildMiddlePath(midLayer3Traces[0])}")`,
-            animation: `pcbTravel 7s linear infinite`
-          }}>
-            <circle r="1.5" fill="#ffffff" filter="url(#rightPcbSignalGlow)" />
-            <circle cx="-3" r="1.0" fill="var(--accent-hover)" opacity="0.6" filter="url(#rightPcbSignalGlow)" />
-          </g>
-        )}
+        {/* Mounting screw holes (ambient) */}
+        {pcbData.mountingHoles.map(hole => (
+          renderMountingHole(hole.x, hole.y)
+        ))}
 
-        {/* ========================================================
-            RIGHT SECTION: Extending inwards from Right Edge
-            (STRICTLY UNCHANGED)
-           ======================================================== */}
-        {/* Layer 1: Background Traces (faint - 24% opacity) */}
-        <g fill="none" stroke="url(#gradR2)" strokeWidth="1.0" opacity="0.24">
-          {rightLayer1Traces.map((trace) => <path key={trace.id} d={buildRightPath(trace)} strokeDasharray={trace.strokeDasharray} />)}
-        </g>
+        {/* Right SMT components (ambient) */}
+        {pcbData.components.filter(comp => !comp.chKey).map(comp => (
+          renderSMT(comp.x, comp.y, comp.w, comp.h, comp.l, comp.chKey, comp.isCap)
+        ))}
 
-        {/* Layer 2: Middle Traces (Normal - 34% opacity) */}
-        <g fill="none" stroke="url(#gradR2)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.34">
-          {rightLayer2Traces.map((trace) => <path key={trace.id} d={buildRightPath(trace)} strokeDasharray={trace.strokeDasharray} />)}
-        </g>
+        {/* Right vias (ambient) */}
+        {pcbData.vias.filter(v => !v.chKey).map((v, i) => (
+          renderVia(v.x, v.y, v.l, v.chKey)
+        ))}
 
-        {/* Layer 3: Foreground Traces (Slightly brighter - 45% opacity) */}
-        <g fill="none" stroke="url(#gradR3)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity="0.45">
-          {rightLayer3Traces.map((trace) => <path key={trace.id} d={buildRightPath(trace)} strokeDasharray={trace.strokeDasharray} />)}
-        </g>
+        {/* Right pads (ambient) */}
+        {pcbData.pads.map((p, i) => (
+          renderPad(p.x, p.y, p.l)
+        ))}
 
-        {/* Glowing Nodes - Right Section (solid blocker backing underneath) */}
-        {rightTraces.filter(t => t.hasNode).map((trace) => {
-          const endXVal = endX - trace.endXOffset
-          const endY = getRightEndY(trace)
+        {/* Ambient nodes (TX nodes on the right) */}
+        {pcbData.nodes.filter(n => !n.chKey).map((node, i) => {
+          const targetOpacity = getTargetOpacity(null)
           return (
-            <g key={`node-${trace.id}`}>
-              {/* Opaque Base Body Blocker to mask out background grid/dots completely */}
-              <circle cx={endXVal} cy={endY} r="3.2" fill="#050506" opacity="1.0" />
-              {/* Outer Glow Ring (50% opacity) */}
-              <circle cx={endXVal} cy={endY} r="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" filter="url(#rightPcbSignalGlow)" opacity="0.50" />
-              {/* Core */}
-              <circle cx={endXVal} cy={endY} r="1" fill="#ffffff" opacity="0.80" />
+            <g 
+              key={`ambient-node-${i}`} 
+              transform={`translate(${node.x}, ${Y_center + node.y})`}
+              opacity={targetOpacity}
+              style={getTransitionStyle()}
+            >
+              <circle cx="0" cy="0" r="4.2" fill="#030304" />
+              <circle cx="0" cy="0" r="3.5" fill="none" stroke="#ffffff" strokeWidth="0.4" opacity="0.55" />
+              <circle cx="0" cy="0" r="1.3" fill="var(--accent)" opacity="0.75" />
+              {/* Pulsing Outer Ring */}
+              <circle cx="0" cy="0" r="3.5" fill="none" stroke="var(--accent)" strokeWidth="0.4"
+                style={{
+                  animation: isTyping ? 'pcbRadarPulse 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite' : 'none',
+                  transformOrigin: '0px 0px'
+                }}
+              />
             </g>
           )
         })}
 
-        {/* Tiny isolated pads / connector markers - Right Section */}
-        <g fill="var(--accent)" opacity="0.30">
-          {[
-            { x: 30, y: -130 },
-            { x: 75, y: -100 },
-            { x: 110, y: -70 },
-            { x: 45, y: -15 },
-            { x: 80, y: 15 },
-            { x: 120, y: 40 },
-            { x: 50, y: 85 },
-            { x: 85, y: 110 },
-            { x: 130, y: 135 }
-          ].map((pt, idx) => {
-            const scale = Math.max(50, endX - rightTargetLimit) / 160
-            const cx = endX - pt.x * scale
-            const cy = Y_center + pt.y
-            return (
-              <React.Fragment key={`tp-${idx}`}>
-                {idx % 3 === 0 ? (
-                  <g>
-                    {/* Solid blocker */}
-                    <rect x={cx - 1.7} y={cy - 1.7} width="3.4" height="3.4" fill="#050506" opacity="1.0" />
-                    {/* Square pad */}
-                    <rect x={cx - 1.5} y={cy - 1.5} width="3" height="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
-                  </g>
-                ) : (
-                  // Tiny circular pad
-                  <circle cx={cx} cy={cy} r="1" />
-                )}
-              </React.Fragment>
-            )
-          })}
-        </g>
-
-        {/* Single Traveling Signal Packet - Right Section */}
-        {!shouldReduceMotion && rightLayer3Traces.length > 0 && (
-          <g style={{
-            offsetPath: `path("${buildRightPath(rightLayer3Traces[0])}")`,
-            animation: `pcbTravel 7s linear infinite`
-          }}>
-            <circle r="1.5" fill="#ffffff" filter="url(#rightPcbSignalGlow)" />
-            <circle cx="-3" r="1.0" fill="var(--accent-hover)" opacity="0.6" filter="url(#rightPcbSignalGlow)" />
-          </g>
-        )}
       </svg>
     </div>
   )

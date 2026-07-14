@@ -1,4 +1,4 @@
-import { useEffect, useRef, memo } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import { useReducedMotion, useInView, motion } from 'framer-motion'
 import ContactHero from './ContactHero'
 import ContactForm from './ContactForm'
@@ -8,6 +8,9 @@ import LeftPCB from './LeftPCB'
 import RightPCB from './RightPCB'
 
 export default memo(function ContactSection() {
+  const [contactSystemState, setContactSystemState] = useState('dormant')
+  const [transmissionFailed, setTransmissionFailed] = useState(false)
+  const [isTyping, setIsTyping] = useState(false)
   const sectionRef = useRef(null)
 
   // Optimization: Tracks viewport intersection to toggle canvas animation state
@@ -65,6 +68,32 @@ export default memo(function ContactSection() {
 
   const formContainerRef = useRef(null)
   const globeContainerRef = useRef(null)
+
+  useEffect(() => {
+    if (contactSystemState !== 'dormant') return
+
+    const formEl = formContainerRef.current
+    if (!formEl) return
+
+    const handleFocusIn = () => {
+      setContactSystemState('engaged')
+    }
+
+    formEl.addEventListener('focusin', handleFocusIn)
+    return () => {
+      formEl.removeEventListener('focusin', handleFocusIn)
+    }
+  }, [contactSystemState])
+
+  useEffect(() => {
+    if (contactSystemState === 'transmit') {
+      const timerDormant = setTimeout(() => {
+        setContactSystemState('dormant')
+      }, 1900) // 1100ms + 800ms settle = 1900ms
+
+      return () => clearTimeout(timerDormant)
+    }
+  }, [contactSystemState])
 
   return (
     <section
@@ -191,8 +220,8 @@ export default memo(function ContactSection() {
       <div className="relative w-full mt-8 lg:mt-10">
         {/* Full-width backdrop wrapper for Left and Right PCB */}
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen pointer-events-none z-0 hidden lg:block">
-          <LeftPCB formRef={formContainerRef} />
-          <RightPCB formRef={formContainerRef} globeRef={globeContainerRef} />
+          <LeftPCB formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} />
+          <RightPCB formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} />
         </div>
 
         {/* Full-width flex container keeps the form and globe in their natural positions. */}
@@ -201,14 +230,21 @@ export default memo(function ContactSection() {
             {/* Form Container */}
             <div id="contact-form-container" ref={formContainerRef} className="w-full max-w-[474px] relative z-20 flex flex-col items-start lg:items-center lg:translate-x-20">
               <div className="w-full max-w-[474px]">
-                <ContactForm />
+                <ContactForm 
+                  contactSystemState={contactSystemState}
+                  onTransmit={() => setContactSystemState('transmit')}
+                  setContactSystemState={setContactSystemState}
+                  setTransmissionFailed={setTransmissionFailed}
+                  setIsTyping={setIsTyping}
+                  isTyping={isTyping}
+                />
               </div>
             </div>
             {/* Globe Container */}
             <div className="hidden md:flex items-center justify-center relative z-20 lg:translate-x-16">
               <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] overflow-visible flex items-center justify-center pointer-events-none z-10">
-                <div className="absolute w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.10 * var(--ambient-intensity))' }} />
-                <Contact3DObject isInView={isInViewRepeat} />
+                <div className="absolute w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 0.10 }} />
+                <Contact3DObject isInView={isInViewRepeat} contactSystemState={contactSystemState} />
               </div>
             </div>
           </div>
