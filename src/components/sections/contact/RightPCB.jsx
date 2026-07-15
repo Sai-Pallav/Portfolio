@@ -1,6 +1,235 @@
 import React, { useRef, useState, useEffect, useMemo, memo } from 'react'
 import { useReducedMotion } from 'framer-motion'
 
+const drawPCBPath = (x1, y1, x2, y2, bendPositions, style = 1) => {
+  const dx = Math.abs(x2 - x1);
+  const dy = y2 - y1;
+  const absDy = Math.abs(dy);
+  const direction = x2 > x1 ? 1 : -1;
+
+  if (absDy === 0) {
+    return [
+      { x1, y1, x2, y2 }
+    ];
+  }
+
+  if (bendPositions.length === 2) {
+    const [p1, p2] = bendPositions;
+    const pCenter = (p1 + p2) / 2;
+    const px1 = x1 + (dx * pCenter - absDy / 2) * direction;
+    const px2 = px1 + absDy * direction;
+
+    const leftBound = Math.min(x1, x2);
+    const rightBound = Math.max(x1, x2);
+
+    if (px1 >= leftBound && px1 <= rightBound && px2 >= leftBound && px2 <= rightBound) {
+      return [
+        { x1, y1, x2: px1, y2: y1 },
+        { x1: px1, y1: y1, x2: px2, y2 },
+        { x1: px2, y1: y2, x2, y2 }
+      ];
+    }
+  }
+
+  if (bendPositions.length === 3) {
+    const [p1, p2, p3] = bendPositions;
+    const diagWidth = style === 1 ? dx * (p2 - p1) : dx * (p3 - p2);
+
+    if (absDy >= diagWidth) {
+      if (style === 1) {
+        // H -> D -> V -> H
+        const px1 = x1 + dx * p1 * direction;
+        const px2 = x1 + dx * p2 * direction;
+        const dyPart = diagWidth * Math.sign(dy);
+        const py2 = y1 + dyPart;
+        return [
+          { x1, y1, x2: px1, y2: y1 },
+          { x1: px1, y1: y1, x2: px2, y2: py2 },
+          { x1: px2, y1: py2, x2: px2, y2 },
+          { x1: px2, y1: y2, x2, y2 }
+        ];
+      } else {
+        // H -> V -> D -> H
+        const px1_v = x1 + dx * p2 * direction;
+        const px2_v = x1 + dx * p3 * direction;
+        const dyPart = diagWidth * Math.sign(dy);
+        const py2_v = y1 + (dy - dyPart);
+        return [
+          { x1, y1, x2: px1_v, y2: y1 },
+          { x1: px1_v, y1: y1, x2: px1_v, y2: py2_v },
+          { x1: px1_v, y1: py2_v, x2: px2_v, y2 },
+          { x1: px2_v, y1: y2, x2, y2 }
+        ];
+      }
+    } else {
+      // Fallback to 2-bend centered around p2
+      const px1_f = x1 + (dx * p2 - absDy / 2) * direction;
+      const px2_f = px1_f + absDy * direction;
+      const leftBound = Math.min(x1, x2);
+      const rightBound = Math.max(x1, x2);
+
+      if (px1_f >= leftBound && px1_f <= rightBound && px2_f >= leftBound && px2_f <= rightBound) {
+        return [
+          { x1, y1, x2: px1_f, y2: y1 },
+          { x1: px1_f, y1: y1, x2: px2_f, y2 },
+          { x1: px2_f, y1: y2, x2, y2 }
+        ];
+      }
+    }
+  }
+
+  // General fallback
+  if (absDy < dx) {
+    const remainingX = dx - absDy;
+    const px1_alt = x1 + (remainingX / 2) * direction;
+    const px2_alt = px1_alt + absDy * direction;
+    return [
+      { x1, y1, x2: px1_alt, y2: y1 },
+      { x1: px1_alt, y1: y1, x2: px2_alt, y2 },
+      { x1: px2_alt, y1: y2, x2, y2 }
+    ];
+  }
+
+  return [
+    { x1, y1, x2, y2 }
+  ];
+};
+
+const clipSegment = (x1, y1, x2, y2, components) => {
+  let intervals = [[0, 1]];
+
+  const dx_seg = x2 - x1;
+  const dy_seg = y2 - y1;
+  const len2 = dx_seg * dx_seg + dy_seg * dy_seg;
+  
+  if (len2 === 0) return [];
+
+  components.forEach(c => {
+    let t_in = -1;
+    let t_out = -1;
+
+    if (c.type === 'circle') {
+      const X_0 = x1 - c.cx;
+      const Y_0 = y1 - c.cy;
+      
+      const a = len2;
+      const b = 2 * (X_0 * dx_seg + Y_0 * dy_seg);
+      const c_val = X_0 * X_0 + Y_0 * Y_0 - c.r * c.r;
+      
+      const disc = b * b - 4 * a * c_val;
+      if (disc >= 0) {
+        const sqrtDisc = Math.sqrt(disc);
+        const t1 = (-b - sqrtDisc) / (2 * a);
+        const t2 = (-b + sqrtDisc) / (2 * a);
+        t_in = Math.min(t1, t2);
+        t_out = Math.max(t1, t2);
+      }
+    } else if (c.type === 'rect') {
+      const x_left = c.cx - c.w / 2;
+      const x_right = c.cx + c.w / 2;
+      const y_top = c.cy - c.h / 2;
+      const y_bottom = c.cy + c.h / 2;
+
+      let tx_min = -Infinity;
+      let tx_max = Infinity;
+      if (dx_seg !== 0) {
+        const tx1 = (x_left - x1) / dx_seg;
+        const tx2 = (x_right - x1) / dx_seg;
+        tx_min = Math.min(tx1, tx2);
+        tx_max = Math.max(tx1, tx2);
+      } else {
+        if (x1 < x_left || x1 > x_right) return;
+      }
+
+      let ty_min = -Infinity;
+      let ty_max = Infinity;
+      if (dy_seg !== 0) {
+        const ty1 = (y_top - y1) / dy_seg;
+        const ty2 = (y_bottom - y1) / dy_seg;
+        ty_min = Math.min(ty1, ty2);
+        ty_max = Math.max(ty1, ty2);
+      } else {
+        if (y1 < y_top || y1 > y_bottom) return;
+      }
+
+      t_in = Math.max(tx_min, ty_min);
+      t_out = Math.min(tx_max, ty_max);
+    }
+
+    if (t_in < t_out && t_out > 0 && t_in < 1) {
+      const clip_start = Math.max(0, t_in);
+      const clip_end = Math.min(1, t_out);
+
+      const next_intervals = [];
+      intervals.forEach(([s, e]) => {
+        if (e <= clip_start || s >= clip_end) {
+          next_intervals.push([s, e]);
+        } else {
+          if (s < clip_start) {
+            next_intervals.push([s, clip_start]);
+          }
+          if (e > clip_end) {
+            next_intervals.push([clip_end, e]);
+          }
+        }
+      });
+      intervals = next_intervals;
+    }
+  });
+
+  return intervals.map(([s, e]) => ({
+    x1: x1 + s * dx_seg,
+    y1: y1 + s * dy_seg,
+    x2: x1 + e * dx_seg,
+    y2: y1 + e * dy_seg
+  }));
+};
+
+const applyClearance = (segments, components) => {
+  const clipped = [];
+  segments.forEach(seg => {
+    clipped.push(...clipSegment(seg.x1, seg.y1, seg.x2, seg.y2, components));
+  });
+  if (clipped.length === 0) return '';
+  return clipped.map((seg, idx) => {
+    const prefix = idx === 0 || clipped[idx - 1].x2 !== seg.x1 || clipped[idx - 1].y2 !== seg.y1 ? `M ${seg.x1},${seg.y1}` : '';
+    return `${prefix} L ${seg.x2},${seg.y2}`;
+  }).join(' ');
+};
+
+const generateLeftBusPaths = (x1, y1, x2, y2, category, components) => {
+  let bendPositions;
+  if (category === 'main') {
+    bendPositions = [0.40, 0.70];
+  } else if (category === 'auxiliary') {
+    bendPositions = [0.25, 0.60];
+  } else {
+    bendPositions = [0.45, 0.75];
+  }
+  const rawSegments = drawPCBPath(x1, y1, x2, y2, bendPositions);
+  return applyClearance(rawSegments, components);
+};
+
+const generateRightBusPaths = (x1, y1, x2, y2, category, components) => {
+  let bendPositions, style;
+  if (category === 'main') {
+    bendPositions = [0.30, 0.55, 0.80];
+    style = 1; // H-D-V-H
+  } else if (category === 'auxiliary') {
+    bendPositions = [0.20, 0.45, 0.70];
+    style = 2; // H-V-D-H
+  } else {
+    bendPositions = [0.35, 0.60, 0.85];
+    style = 1;
+  }
+  const rawSegments = drawPCBPath(x1, y1, x2, y2, bendPositions, style);
+  return applyClearance(rawSegments, components);
+};
+
+const getWidthForCategory = (category) => {
+  return category === 'main' ? 1.8 : category === 'auxiliary' ? 0.5 : 0.2;
+};
+
 export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping, formProgress = 0 }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
@@ -208,71 +437,7 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
   const W_mid = Math.max(50, middleTargetLimit - midStart)
   const W_right = Math.max(50, endX - rightTargetLimit)
 
-  // Precision 45-degree PCB Auto-Router Path Helper
-  // Guarantees all routes run exclusively horizontally and at exact 45-degree angles.
-  const drawPCBPath = (x1, y1, x2, y2) => {
-    const dx = Math.abs(x2 - x1)
-    const dy = y2 - y1
-    const absDy = Math.abs(dy)
-    const direction = x2 > x1 ? 1 : -1
-    
-    if (absDy < dx) {
-      // Center the 45-degree angled segment in the available space
-      const remainingX = dx - absDy
-      const px1 = x1 + (remainingX / 2) * direction
-      const px2 = px1 + absDy * direction
-      return `M ${x1},${y1} H ${px1} L ${px2},${y2} H ${x2}`
-    } else {
-      // Fallback if space is extremely restricted (no vertical stretch)
-      return `M ${x1},${y1} L ${x2},${y2}`
-    }
-  }
-
-  const pcbData = useMemo(() => {
-    const middleTracesList = []
-
-    // --- CHANNEL 1 (Name Input, starts at Y_center - 100, converges to Y_center - 36) ---
-    middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 100, middleTargetLimit, Y_center - 36), w: 1.5, opDefault: 0.25, main: true })
-    middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 112, middleTargetLimit, Y_center - 44), w: 0.6, opDefault: 0.15, pulse: true })
-    middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 88, middleTargetLimit, Y_center - 28), w: 0.6, opDefault: 0.15 })
-
-    // --- CHANNEL 2 (Email Input, starts at Y_center - 50, converges to Y_center - 12) ---
-    middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 50, middleTargetLimit, Y_center - 12), w: 1.5, opDefault: 0.25, main: true })
-    middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 58, middleTargetLimit, Y_center - 20), w: 0.6, opDefault: 0.15, pulse: true })
-    middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 42, middleTargetLimit, Y_center - 4), w: 0.6, opDefault: 0.15 })
-
-    // --- CHANNEL 3 (Subject Input, starts at Y_center + 50, converges to Y_center + 12) ---
-    middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 50, middleTargetLimit, Y_center + 12), w: 1.5, opDefault: 0.25, main: true })
-    middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 42, middleTargetLimit, Y_center + 4), w: 0.6, opDefault: 0.15, pulse: true })
-    middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 58, middleTargetLimit, Y_center + 20), w: 0.6, opDefault: 0.15 })
-
-    // --- CHANNEL 4 (Message Input, starts at Y_center + 100, converges to Y_center + 36) ---
-    middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 100, middleTargetLimit, Y_center + 36), w: 1.5, opDefault: 0.25, main: true })
-    middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 88, middleTargetLimit, Y_center + 28), w: 0.6, opDefault: 0.15, pulse: true })
-    middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 112, middleTargetLimit, Y_center + 44), w: 0.6, opDefault: 0.15 })
-
-    const rightTracesList = []
-    // Right section traces (reversed direction: starts at globe rightTargetLimit and goes to screen edge endX)
-    // Trace 1: converges to Y_center - 30, exits to Y_center - 140
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 30, endX, Y_center - 140), w: 1.5, op: 0.45, main: true })
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 36, endX, Y_center - 150), w: 0.6, op: 0.22, pulse: true })
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 24, endX, Y_center - 130), w: 0.6, op: 0.22 })
-
-    // Trace 2: converges to Y_center - 12, exits to Y_center - 80
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 12, endX, Y_center - 80), w: 1.5, op: 0.45, main: true })
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 18, endX, Y_center - 90), w: 0.6, op: 0.22, pulse: true })
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 6, endX, Y_center - 70), w: 0.6, op: 0.22 })
-
-    // Trace 3: converges to Y_center + 12, exits to Y_center + 80
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 12, endX, Y_center + 80), w: 1.5, op: 0.45, main: true })
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 6, endX, Y_center + 70), w: 0.6, op: 0.22, pulse: true })
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 18, endX, Y_center + 90), w: 0.6, op: 0.22 })
-
-    // Trace 4: converges to Y_center + 30, exits to Y_center + 140
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 30, endX, Y_center + 140), w: 1.5, op: 0.45, main: true })
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 24, endX, Y_center + 130), w: 0.6, op: 0.22, pulse: true })
-    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 36, endX, Y_center + 150), w: 0.6, op: 0.22 })
-
+  const pcbComponentsData = useMemo(() => {
     // Hardware Components (Aligned horizontally on trace flat sections)
     const componentsList = [
       // Resistors on Middle Traces (Input protection array)
@@ -313,7 +478,7 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
       { x: rightTargetLimit + 20, y: Y_center - 12, w: 7.5, h: 4.0, l: 'C602', isCap: true },
       { x: rightTargetLimit + 20, y: Y_center + 12, w: 7.5, h: 4.0, l: 'C603', isCap: true },
       { x: rightTargetLimit + 20, y: Y_center + 30, w: 7.5, h: 4.0, l: 'C604', isCap: true }
-    ]
+    ];
 
     const viasList = [
       // Middle Vias (Near trace start)
@@ -327,14 +492,14 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
       { x: endX - 10, y: Y_center - 80, l: 'V602' },
       { x: endX - 10, y: Y_center + 80, l: 'V603' },
       { x: endX - 10, y: Y_center + 140, l: 'V604' }
-    ]
+    ];
 
     const padsList = [
       { x: midStart + W_mid * 0.22, y: Y_center - 130, l: 'TP51' },
       { x: midStart + W_mid * 0.22, y: Y_center + 130, l: 'TP52' },
       { x: rightTargetLimit + W_right * 0.45, y: Y_center - 60, l: 'TP61' },
       { x: rightTargetLimit + W_right * 0.45, y: Y_center + 60, l: 'TP62' }
-    ]
+    ];
 
     const mountingHolesList = [
       // Between globe and middle PCB
@@ -343,7 +508,7 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
       // Between globe and right PCB
       { x: rightTargetLimit - 30, y: Y_center - 24 },
       { x: rightTargetLimit - 30, y: Y_center + 24 }
-    ]
+    ];
 
     // Nodes (Terminations)
     const nodesList = [
@@ -356,20 +521,147 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
       { x: rightTargetLimit, y: -12, label: 'TX_1' },
       { x: rightTargetLimit, y: 12, label: 'TX_2' },
       { x: rightTargetLimit, y: 30, label: 'TX_3' }
-    ]
+    ];
 
     return {
-      middleTraces: middleTracesList,
-      rightTraces: rightTracesList,
       components: componentsList,
       vias: viasList,
       pads: padsList,
       mountingHoles: mountingHolesList,
       nodes: nodesList
-    }
-  }, [midStart, middleTargetLimit, rightTargetLimit, endX, Y_center, W_mid, W_right])
+    };
+  }, [midStart, middleTargetLimit, rightTargetLimit, endX, Y_center, W_mid, W_right]);
 
-  if (shouldReduceMotion) return null
+  const clearanceComponents = useMemo(() => {
+    const list = [];
+
+    // Nodes (dial gauges)
+    pcbComponentsData.nodes.forEach(n => {
+      list.push({
+        type: 'circle',
+        cx: n.x,
+        cy: Y_center + n.y,
+        r: 4.2 + 1.5
+      });
+    });
+
+    // SMT components
+    pcbComponentsData.components.forEach(c => {
+      list.push({
+        type: 'rect',
+        cx: c.x,
+        cy: c.y,
+        w: c.w + 3.0,
+        h: c.h + 3.0
+      });
+    });
+
+    // Vias
+    pcbComponentsData.vias.forEach(v => {
+      list.push({
+        type: 'circle',
+        cx: v.x,
+        cy: v.y,
+        r: 1.6 + 1.5
+      });
+    });
+
+    // Pads
+    pcbComponentsData.pads.forEach(p => {
+      list.push({
+        type: 'circle',
+        cx: p.x,
+        cy: p.y,
+        r: 2.0 + 1.5
+      });
+    });
+
+    // Mounting holes
+    pcbComponentsData.mountingHoles.forEach(mh => {
+      list.push({
+        type: 'circle',
+        cx: mh.x,
+        cy: mh.y,
+        r: 10 + 1.5
+      });
+    });
+
+    return list;
+  }, [pcbComponentsData, Y_center]);
+
+  const pcbTracesData = useMemo(() => {
+    const middleTracesList = [];
+    const addMiddleTrace = (chKey, y1, y2, category, extra = {}) => {
+      const d = generateLeftBusPaths(midStart, y1, middleTargetLimit, y2, category, clearanceComponents);
+      middleTracesList.push({
+        chKey,
+        d,
+        category,
+        ...extra
+      });
+    };
+
+    // --- CHANNEL 1 (Name Input) ---
+    addMiddleTrace('name', Y_center - 100, Y_center - 36, 'main', { main: true });
+    addMiddleTrace('name', Y_center - 112, Y_center - 44, 'auxiliary', { pulse: true });
+    addMiddleTrace('name', Y_center - 88, Y_center - 28, 'ground');
+
+    // --- CHANNEL 2 (Email Input) ---
+    addMiddleTrace('email', Y_center - 50, Y_center - 12, 'main', { main: true });
+    addMiddleTrace('email', Y_center - 58, Y_center - 20, 'auxiliary', { pulse: true });
+    addMiddleTrace('email', Y_center - 42, Y_center - 4, 'ground');
+
+    // --- CHANNEL 3 (Subject Input) ---
+    addMiddleTrace('subject', Y_center + 50, Y_center + 12, 'main', { main: true });
+    addMiddleTrace('subject', Y_center + 42, Y_center + 4, 'auxiliary', { pulse: true });
+    addMiddleTrace('subject', Y_center + 58, Y_center + 20, 'ground');
+
+    // --- CHANNEL 4 (Message Input) ---
+    addMiddleTrace('message', Y_center + 100, Y_center + 36, 'main', { main: true });
+    addMiddleTrace('message', Y_center + 88, Y_center + 28, 'auxiliary', { pulse: true });
+    addMiddleTrace('message', Y_center + 112, Y_center + 44, 'ground');
+
+    const rightTracesList = [];
+    const addRightTrace = (y1, y2, category, extra = {}) => {
+      const d = generateRightBusPaths(rightTargetLimit, y1, endX, y2, category, clearanceComponents);
+      rightTracesList.push({
+        d,
+        category,
+        ...extra
+      });
+    };
+
+    // Trace 1: converges to Y_center - 30, exits to Y_center - 140
+    addRightTrace(Y_center - 30, Y_center - 140, 'main', { main: true });
+    addRightTrace(Y_center - 36, Y_center - 150, 'auxiliary', { pulse: true });
+    addRightTrace(Y_center - 24, Y_center - 130, 'ground');
+
+    // Trace 2: converges to Y_center - 12, exits to Y_center - 80
+    addRightTrace(Y_center - 12, Y_center - 80, 'main', { main: true });
+    addRightTrace(Y_center - 18, Y_center - 90, 'auxiliary', { pulse: true });
+    addRightTrace(Y_center - 6, Y_center - 70, 'ground');
+
+    // Trace 3: converges to Y_center + 12, exits to Y_center + 80
+    addRightTrace(Y_center + 12, Y_center + 80, 'main', { main: true });
+    addRightTrace(Y_center + 6, Y_center + 70, 'auxiliary', { pulse: true });
+    addRightTrace(Y_center + 18, Y_center + 90, 'ground');
+
+    // Trace 4: converges to Y_center + 30, exits to Y_center + 140
+    addRightTrace(Y_center + 30, Y_center + 140, 'main', { main: true });
+    addRightTrace(Y_center + 24, Y_center + 130, 'auxiliary', { pulse: true });
+    addRightTrace(Y_center + 36, Y_center + 150, 'ground');
+
+    return {
+      middleTraces: middleTracesList,
+      rightTraces: rightTracesList
+    };
+  }, [clearanceComponents, midStart, middleTargetLimit, rightTargetLimit, endX, Y_center]);
+
+  const pcbData = useMemo(() => ({
+    ...pcbComponentsData,
+    ...pcbTracesData
+  }), [pcbComponentsData, pcbTracesData]);
+
 
   const getTargetOpacity = (chKey) => {
     const isHero = ['name', 'email', 'subject', 'message'].includes(chKey)
@@ -479,7 +771,8 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
-        <rect x={-w/2 - 0.8} y={-h/2 - 0.4} width={w + 1.6} height={h + 0.8} fill="#030304" />
+        {/* Negative space clearance gap */}
+        <rect x={-w/2 - 2.7} y={-h/2 - 2.3} width={w + 5.4} height={h + 4.6} fill="#030304" />
         <rect x={-w/2} y={-h/2} width={1.6} height={h} fill="#444452" stroke="#6e6e80" strokeWidth="0.25" opacity="1.0" />
         <rect x={w/2 - 1.6} y={-h/2} width={1.6} height={h} fill="#444452" stroke="#6e6e80" strokeWidth="0.25" opacity="1.0" />
         <rect x={-w/2 + 1.4} y={-h/2 + 0.3} width={w - 2.8} height={h - 0.6} rx={0.3} fill={isCap ? "#5c4b3c" : "#0e0e12"} stroke={isCap ? "#7d6855" : "#22222a"} strokeWidth="0.35" opacity="0.9" />
@@ -500,6 +793,8 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
+        {/* Negative space clearance gap */}
+        <circle cx="0" cy="0" r="3.1" fill="#030304" />
         <circle cx="0" cy="0" r="1.6" fill="none" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} />
         <circle cx="0" cy="0" r="1.0" fill="#030304" stroke="#444452" strokeWidth="0.25" opacity="1.0" />
         <circle cx="0" cy="0" r="0.4" fill="#000000" />
@@ -518,6 +813,8 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
+        {/* Negative space clearance gap */}
+        <circle cx="0" cy="0" r="3.5" fill="#030304" />
         <circle cx="0" cy="0" r="2.0" fill="#14141c" stroke="#333340" strokeWidth="0.4" />
         <circle cx="0" cy="0" r="1.1" fill="#3a3a4c" stroke="var(--accent)" strokeWidth="0.25" opacity={0.65} style={{ transition: 'opacity 0.4s ease' }} />
         <circle cx="0" cy="0" r="0.4" fill="#000000" />
@@ -542,6 +839,8 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
+        {/* Negative space clearance gap */}
+        <circle cx="0" cy="0" r="11.5" fill="#030304" />
         <circle cx="0" cy="0" r="10" fill="#030304" />
         
         {/* Inner detail circle - radius reduced to 4.8 to prevent antialiasing merging with tick marks */}
@@ -696,7 +995,7 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
                           <path
                             d={t.d}
                             stroke="var(--accent)"
-                            strokeWidth={t.w + 0.8}
+                            strokeWidth={getWidthForCategory(t.category) + 0.8}
                             opacity="0.35"
                             filter="url(#pcbHairlineGlow)"
                             style={getTransitionStyle()}
@@ -705,7 +1004,7 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
                             <path
                               d={t.d}
                               stroke="var(--accent)"
-                              strokeWidth={t.w + 1.2}
+                              strokeWidth={getWidthForCategory(t.category) + 1.2}
                               fill="none"
                               opacity="1"
                               pathLength="100"
@@ -723,8 +1022,14 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
                       <path
                         d={t.d}
                         stroke="var(--accent)"
-                        strokeWidth={t.w}
-                        opacity={targetOpacity}
+                        strokeWidth={t.category === 'main' ? 1.8 : t.category === 'auxiliary' ? 0.5 : 0.2}
+                        opacity={
+                          t.category === 'main'
+                            ? 0.9 * targetOpacity
+                            : t.category === 'auxiliary'
+                            ? 0.6 * targetOpacity
+                            : 0.15 * targetOpacity
+                        }
                         style={getTransitionStyle()}
                       />
                     </React.Fragment>
@@ -733,12 +1038,12 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
               </g>
 
               {/* SMTs for this channel */}
-              {pcbData.components.filter(c => c.chKey === chKey).map((comp, i) => (
+              {pcbData.components.filter(c => c.chKey === chKey).map(comp => (
                 renderSMT(comp.x, comp.y, comp.w, comp.h, comp.l, comp.chKey, comp.isCap)
               ))}
 
               {/* Vias for this channel */}
-              {pcbData.vias.filter(v => v.chKey === chKey).map((v, i) => (
+              {pcbData.vias.filter(v => v.chKey === chKey).map(v => (
                 renderVia(v.x, v.y, v.l, v.chKey)
               ))}
 
@@ -752,6 +1057,8 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
                     opacity={targetOpacity}
                     style={getTransitionStyle()}
                   >
+                    {/* Negative space clearance gap */}
+                    <circle cx="0" cy="0" r="5.7" fill="#030304" />
                     <circle cx="0" cy="0" r="4.2" fill="#030304" />
                     <circle cx="0" cy="0" r="3.5" fill="none" stroke="#ffffff" strokeWidth="0.4" opacity="0.55" />
                     <circle cx="0" cy="0" r="1.3" fill="var(--accent)" opacity="0.75" />
@@ -782,7 +1089,7 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
                     <path
                       d={t.d}
                       stroke="var(--accent)"
-                      strokeWidth={t.w + 0.8}
+                      strokeWidth={getWidthForCategory(t.category) + 0.8}
                       opacity="0.35"
                       filter="url(#pcbHairlineGlow)"
                       style={getTransitionStyle()}
@@ -791,7 +1098,7 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
                       <path
                         d={t.d}
                         stroke="var(--accent)"
-                        strokeWidth={t.w + 1.2}
+                        strokeWidth={getWidthForCategory(t.category) + 1.2}
                         fill="none"
                         opacity="1"
                         pathLength="100"
@@ -809,8 +1116,14 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
                 <path
                   d={t.d}
                   stroke="var(--accent)"
-                  strokeWidth={t.w}
-                  opacity={targetOpacity}
+                  strokeWidth={t.category === 'main' ? 1.8 : t.category === 'auxiliary' ? 0.5 : 0.2}
+                  opacity={
+                    t.category === 'main'
+                      ? 0.9 * targetOpacity
+                      : t.category === 'auxiliary'
+                      ? 0.6 * targetOpacity
+                      : 0.15 * targetOpacity
+                  }
                   style={getTransitionStyle()}
                 />
               </React.Fragment>
@@ -829,12 +1142,12 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
         ))}
 
         {/* Right vias (ambient) */}
-        {pcbData.vias.filter(v => !v.chKey).map((v, i) => (
+        {pcbData.vias.filter(v => !v.chKey).map(v => (
           renderVia(v.x, v.y, v.l, v.chKey)
         ))}
 
         {/* Right pads (ambient) */}
-        {pcbData.pads.map((p, i) => (
+        {pcbData.pads.map(p => (
           renderPad(p.x, p.y, p.l)
         ))}
 
@@ -848,6 +1161,8 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
               opacity={targetOpacity}
               style={getTransitionStyle()}
             >
+              {/* Negative space clearance gap */}
+              <circle cx="0" cy="0" r="5.7" fill="#030304" />
               <circle cx="0" cy="0" r="4.2" fill="#030304" />
               <circle cx="0" cy="0" r="3.5" fill="none" stroke="#ffffff" strokeWidth="0.4" opacity="0.55" />
               <circle cx="0" cy="0" r="1.3" fill="var(--accent)" opacity="0.75" />

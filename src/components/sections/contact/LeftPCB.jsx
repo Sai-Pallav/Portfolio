@@ -1,6 +1,65 @@
 import React, { useRef, useState, useEffect, useMemo, memo } from 'react'
 import { useReducedMotion } from 'framer-motion'
 
+const getTraceStyleAttrs = (category) => {
+  if (category === 'main') {
+    return { w: 1.8, opDefault: 0.9 };
+  } else if (category === 'auxiliary') {
+    return { w: 0.5, opDefault: 0.6 };
+  } else {
+    return { w: 0.2, opDefault: 0.15 };
+  }
+};
+
+const drawLeftPCBPath = (x1, y1, x2, y2, category) => {
+  const dx = Math.abs(x2 - x1);
+  const dy = y2 - y1;
+  const absDy = Math.abs(dy);
+  const direction = x2 > x1 ? 1 : -1;
+
+  if (absDy === 0) {
+    return `M ${x1},${y1} H ${x2}`;
+  }
+
+  // Define Left PCB custom percentages for each tier
+  let pStart, pEnd;
+  if (category === 'main') {
+    pStart = 0.40;
+    pEnd = 0.70;
+  } else if (category === 'auxiliary') {
+    pStart = 0.25;
+    pEnd = 0.60;
+  } else { // ground
+    pStart = 0.45;
+    pEnd = 0.75;
+  }
+
+  const pCenter = (pStart + pEnd) / 2; // Center point of the diagonal
+
+  // To keep 45-degree, diagonal width must equal absDy.
+  // We center the diagonal around pCenter.
+  const px1 = x1 + (dx * pCenter - absDy / 2) * direction;
+  const px2 = px1 + absDy * direction;
+
+  // Check boundaries
+  const leftBound = Math.min(x1, x2);
+  const rightBound = Math.max(x1, x2);
+
+  if (px1 >= leftBound && px1 <= rightBound && px2 >= leftBound && px2 <= rightBound) {
+    return `M ${x1},${y1} H ${px1} L ${px2},${y2} H ${x2}`;
+  }
+
+  // Fallback if space is restricted
+  if (absDy < dx) {
+    const remainingX = dx - absDy;
+    const px1_f = x1 + (remainingX / 2) * direction;
+    const px2_f = px1_f + absDy * direction;
+    return `M ${x1},${y1} H ${px1_f} L ${px2_f},${y2} H ${x2}`;
+  }
+
+  return `M ${x1},${y1} L ${x2},${y2}`;
+};
+
 export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
@@ -86,73 +145,68 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
   const CH3_Y = H * 0.62
   const CH4_Y = H * 0.82
 
-  const buildPath = (startX, startY, segments) => {
-    let path = `M ${xStart + startX * scale},${startY}`
-    let cx = startX
-    let cy = startY
-
-    segments.forEach(([type, val1, val2]) => {
-      if (type === 'H') {
-        cx = val1
-        path += ` L ${xStart + cx * scale},${cy}`
-      } else if (type === 'V') {
-        cy = val1
-        path += ` L ${xStart + cx * scale},${cy}`
-      } else if (type === 'L') {
-        cx = val1
-        cy = val2
-        path += ` L ${xStart + cx * scale},${cy}`
-      }
-    })
-    return path
-  }
-
   // Draw intricate traces.
-  // CH3 (Subject) is a direct vertical Y-mirror of CH2 (Email).
-  // CH4 (Message) is a direct vertical Y-mirror of CH1 (Name).
-  const traces = useMemo(() => [
-    // --- CHANNEL 1 (NAME) & ITS TOP Zone ---
-    { chKey: 'name', d: buildPath(0, CH1_Y - 90, [['H', 20], ['L', 40, CH1_Y - 70], ['H', 150], ['L', 170, CH1_Y - 50], ['H', 200], ['L', 222, CH1_Y - 30], ['H', 280]]), w: 0.6, opDefault: 0.15, pulse: true },
-    { chKey: 'name', d: buildPath(0, CH1_Y - 75, [['H', 14], ['L', 36, CH1_Y - 55], ['H', 123], ['L', 141, CH1_Y - 35], ['H', 179], ['L', 196, CH1_Y - 20], ['H', 280]]), w: 0.45, opDefault: 0.15 },
-    { chKey: 'name', d: buildPath(0, CH1_Y - 55, [['H', 10], ['L', 30, CH1_Y - 35], ['H', 100], ['L', 120, CH1_Y - 15], ['H', 180], ['L', 190, CH1_Y - 5], ['H', 280]]), w: 1.6, opDefault: 0.25, main: true },
-    { chKey: 'name', d: buildPath(0, CH1_Y - 45, [['H', 5], ['L', 24, CH1_Y - 25], ['H', 91], ['L', 111, CH1_Y - 5], ['H', 176], ['L', 186, CH1_Y + 5], ['H', 280]]), w: 0.6, opDefault: 0.15 },
-    { chKey: 'name', d: buildPath(0, CH1_Y - 62, [['H', 8], ['L', 27, CH1_Y - 42], ['H', 96], ['L', 116, CH1_Y - 22], ['H', 168]]), w: 0.3, opDefault: 0.1 },
+  const traces = useMemo(() => {
+    const list = [];
+    
+    const addTrace = (chKey, x1_unscaled, y1, x2_unscaled, y2, category, extra = {}) => {
+      const x1 = xStart + x1_unscaled * scale;
+      const x2 = xStart + x2_unscaled * scale;
+      const d = drawLeftPCBPath(x1, y1, x2, y2, category);
+      const styleAttrs = getTraceStyleAttrs(category);
+      list.push({
+        chKey,
+        d,
+        w: styleAttrs.w,
+        opDefault: styleAttrs.opDefault,
+        ...extra
+      });
+    };
 
-    { chKey: 'name', d: buildPath(0, CH1_Y, [['H', 72], ['L', 82, CH1_Y + 10], ['H', 130]]), w: 0.45, opDefault: 0.15 },
-    { chKey: 'name', d: buildPath(60, CH1_Y + 20, [['H', 153], ['L', 171, CH1_Y + 40], ['H', 280]]), w: 0.6, opDefault: 0.15 },
-    { chKey: 'name', d: buildPath(140, CH1_Y + 10, [['H', 160], ['L', 180, CH1_Y + 30], ['H', 280]]), w: 0.45, opDefault: 0.15 },
+    // --- CHANNEL 1 (NAME) & ITS TOP Zone ---
+    addTrace('name', 0, CH1_Y - 90, 280, CH1_Y - 30, 'auxiliary', { pulse: true });
+    addTrace('name', 0, CH1_Y - 75, 280, CH1_Y - 20, 'auxiliary');
+    addTrace('name', 0, CH1_Y - 55, 280, CH1_Y - 5, 'main', { main: true });
+    addTrace('name', 0, CH1_Y - 45, 280, CH1_Y + 5, 'auxiliary');
+    addTrace('name', 0, CH1_Y - 62, 168, CH1_Y - 22, 'ground');
+
+    addTrace('name', 0, CH1_Y, 130, CH1_Y + 10, 'auxiliary');
+    addTrace('name', 60, CH1_Y + 20, 280, CH1_Y + 40, 'auxiliary');
+    addTrace('name', 140, CH1_Y + 10, 280, CH1_Y + 30, 'auxiliary');
 
     // --- CHANNEL 2 (EMAIL) ---
-    { chKey: 'email', d: buildPath(0, CH2_Y - 20, [['H', 32], ['L', 52, CH2_Y], ['H', 101], ['L', 121, CH2_Y + 20], ['H', 152], ['L', 172, CH2_Y + 40], ['H', 280]]), w: 0.6, opDefault: 0.15, pulse: true },
-    { chKey: 'email', d: buildPath(0, CH2_Y, [['H', 20], ['L', 40, CH2_Y + 20], ['H', 90], ['L', 110, CH2_Y + 40], ['H', 180], ['L', 190, CH2_Y + 30], ['H', 280]]), w: 1.6, opDefault: 0.25, main: true },
-    { chKey: 'email', d: buildPath(40, CH2_Y - 30, [['H', 83], ['L', 101, CH2_Y - 11], ['H', 170], ['L', 190, CH2_Y + 10], ['H', 280]]), w: 0.6, opDefault: 0.15 },
-    { chKey: 'email', d: buildPath(0, CH2_Y - 26, [['H', 23], ['L', 44, CH2_Y - 6], ['H', 94], ['L', 114, CH2_Y + 14]]), w: 0.3, opDefault: 0.1 },
-    { chKey: 'email', d: buildPath(50, CH2_Y + 24, [['H', 86], ['L', 104, CH2_Y + 44], ['H', 176]]), w: 0.3, opDefault: 0.1 },
+    addTrace('email', 0, CH2_Y - 20, 280, CH2_Y + 40, 'auxiliary', { pulse: true });
+    addTrace('email', 0, CH2_Y, 280, CH2_Y + 30, 'main', { main: true });
+    addTrace('email', 40, CH2_Y - 30, 280, CH2_Y + 10, 'auxiliary');
+    addTrace('email', 0, CH2_Y - 26, 114, CH2_Y + 14, 'ground');
+    addTrace('email', 50, CH2_Y + 24, 176, CH2_Y + 44, 'ground');
 
-    // --- CHANNEL 3 (SUBJECT) - Mirrored Y-version of CHANNEL 2 ---
-    { chKey: 'subject', d: buildPath(0, CH3_Y + 20, [['H', 32], ['L', 52, CH3_Y], ['H', 101], ['L', 121, CH3_Y - 20], ['H', 152], ['L', 172, CH3_Y - 40], ['H', 280]]), w: 0.6, opDefault: 0.15, pulse: true },
-    { chKey: 'subject', d: buildPath(0, CH3_Y, [['H', 20], ['L', 40, CH3_Y - 20], ['H', 90], ['L', 110, CH3_Y - 40], ['H', 180], ['L', 190, CH3_Y - 30], ['H', 280]]), w: 1.6, opDefault: 0.25, main: true },
-    { chKey: 'subject', d: buildPath(40, CH3_Y + 30, [['H', 83], ['L', 101, CH3_Y + 11], ['H', 170], ['L', 190, CH3_Y - 10], ['H', 280]]), w: 0.6, opDefault: 0.15 },
-    { chKey: 'subject', d: buildPath(0, CH3_Y + 26, [['H', 23], ['L', 44, CH3_Y + 6], ['H', 94], ['L', 114, CH3_Y - 14]]), w: 0.3, opDefault: 0.1 },
-    { chKey: 'subject', d: buildPath(50, CH3_Y - 24, [['H', 86], ['L', 104, CH3_Y - 44], ['H', 176]]), w: 0.3, opDefault: 0.1 },
+    // --- CHANNEL 3 (SUBJECT) ---
+    addTrace('subject', 0, CH3_Y + 20, 280, CH3_Y - 40, 'auxiliary', { pulse: true });
+    addTrace('subject', 0, CH3_Y, 280, CH3_Y - 30, 'main', { main: true });
+    addTrace('subject', 40, CH3_Y + 30, 280, CH3_Y - 10, 'auxiliary');
+    addTrace('subject', 0, CH3_Y + 26, 114, CH3_Y - 14, 'ground');
+    addTrace('subject', 50, CH3_Y - 24, 176, CH3_Y - 44, 'ground');
 
-    // --- CHANNEL 4 (MESSAGE) - Mirrored Y-version of CHANNEL 1 ---
-    { chKey: 'message', d: buildPath(0, CH4_Y + 90, [['H', 20], ['L', 40, CH4_Y + 70], ['H', 150], ['L', 170, CH4_Y + 50], ['H', 200], ['L', 222, CH4_Y + 30], ['H', 280]]), w: 0.6, opDefault: 0.15, pulse: true },
-    { chKey: 'message', d: buildPath(0, CH4_Y + 75, [['H', 14], ['L', 36, CH4_Y + 55], ['H', 123], ['L', 141, CH4_Y + 35], ['H', 179], ['L', 196, CH4_Y + 20], ['H', 280]]), w: 0.45, opDefault: 0.15 },
-    { chKey: 'message', d: buildPath(0, CH4_Y + 55, [['H', 10], ['L', 30, CH4_Y + 35], ['H', 100], ['L', 120, CH4_Y + 15], ['H', 180], ['L', 190, CH4_Y + 5], ['H', 280]]), w: 1.6, opDefault: 0.25, main: true },
-    { chKey: 'message', d: buildPath(0, CH4_Y + 45, [['H', 5], ['L', 24, CH4_Y + 25], ['H', 91], ['L', 111, CH4_Y + 5], ['H', 176], ['L', 186, CH4_Y - 5], ['H', 280]]), w: 0.6, opDefault: 0.15 },
-    { chKey: 'message', d: buildPath(0, CH4_Y + 62, [['H', 8], ['L', 27, CH4_Y + 42], ['H', 96], ['L', 116, CH4_Y + 22], ['H', 168]]), w: 0.3, opDefault: 0.1 },
+    // --- CHANNEL 4 (MESSAGE) ---
+    addTrace('message', 0, CH4_Y + 90, 280, CH4_Y + 30, 'auxiliary', { pulse: true });
+    addTrace('message', 0, CH4_Y + 75, 280, CH4_Y + 20, 'auxiliary');
+    addTrace('message', 0, CH4_Y + 55, 280, CH4_Y + 5, 'main', { main: true });
+    addTrace('message', 0, CH4_Y + 45, 280, CH4_Y - 5, 'auxiliary');
+    addTrace('message', 0, CH4_Y + 62, 168, CH4_Y + 22, 'ground');
 
-    { chKey: 'message', d: buildPath(0, CH4_Y, [['H', 72], ['L', 82, CH4_Y - 10], ['H', 130]]), w: 0.45, opDefault: 0.15 },
-    { chKey: 'message', d: buildPath(60, CH4_Y - 20, [['H', 153], ['L', 171, CH4_Y - 40], ['H', 280]]), w: 0.6, opDefault: 0.15 },
-    { chKey: 'message', d: buildPath(140, CH4_Y - 10, [['H', 160], ['L', 180, CH4_Y - 30], ['H', 280]]), w: 0.45, opDefault: 0.15 },
+    addTrace('message', 0, CH4_Y, 130, CH4_Y - 10, 'auxiliary');
+    addTrace('message', 60, CH4_Y - 20, 280, CH4_Y - 40, 'auxiliary');
+    addTrace('message', 140, CH4_Y - 10, 280, CH4_Y - 30, 'auxiliary');
 
     // Edge Connectors on the far right
-    { chKey: 'name', d: buildPath(260, CH1_Y - 40, [['H', 280]]), w: 1.5, opDefault: 0.25 },
-    { chKey: 'email', d: buildPath(260, CH2_Y + 20, [['H', 280]]), w: 1.5, opDefault: 0.25 },
-    { chKey: 'subject', d: buildPath(260, CH3_Y - 20, [['H', 280]]), w: 1.5, opDefault: 0.25 },
-    { chKey: 'message', d: buildPath(260, CH4_Y + 40, [['H', 280]]), w: 1.5, opDefault: 0.25 },
-  ], [scale, xStart, CH1_Y, CH2_Y, CH3_Y, CH4_Y])
+    addTrace('name', 260, CH1_Y - 40, 280, CH1_Y - 40, 'main');
+    addTrace('email', 260, CH2_Y + 20, 280, CH2_Y + 20, 'main');
+    addTrace('subject', 260, CH3_Y - 20, 280, CH3_Y - 20, 'main');
+    addTrace('message', 260, CH4_Y + 40, 280, CH4_Y + 40, 'main');
+
+    return list;
+  }, [scale, xStart, CH1_Y, CH2_Y, CH3_Y, CH4_Y])
 
   // Nodes (Mirrored Y coordinates)
   const nodes = useMemo(() => [
@@ -194,7 +248,6 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
         circle.setAttribute('cx', '0')
         circle.setAttribute('cy', '0')
         
-        const isTransmit = contactSystemState === 'transmit'
         const r = isBurst ? '2.0' : '1.6'
         circle.setAttribute('r', r)
         
@@ -266,7 +319,8 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
-        <rect x={-w / 2 - 1} y={-h / 2 - 0.5} width={w + 2} height={h + 1} fill="#030304" />
+        {/* Negative space clearance gap */}
+        <rect x={-w / 2 - 3} y={-h / 2 - 3} width={w + 6} height={h + 6} fill="#030304" />
         <rect x={-w / 2} y={-h / 2} width={3} height={h} fill="#2f2f38" stroke="#4a4a58" strokeWidth="0.3" />
         <rect x={w / 2 - 3} y={-h / 2} width={3} height={h} fill="#2f2f38" stroke="#4a4a58" strokeWidth="0.3" />
         <rect x={-w / 2 - 1.5} y={-h / 2 - 1.5} width={w + 3} height={h + 3} fill="none" stroke="#ffffff" strokeWidth="0.3" opacity="0.35" />
@@ -276,27 +330,6 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
     )
   }
 
-  // Small Vias with outer copper pad ring for mechanical depth
-  const renderSmallVia = (x, y, label, chKey) => {
-    const targetOpacity = getTargetOpacity(chKey)
-    const ringAnimation = isTyping ? {
-      animation: 'pcbViaPulse 1.5s ease-in-out infinite',
-      animationDelay: `${(x + y) % 5 * 150}ms`
-    } : {}
-
-    return (
-      <g 
-        key={`via-${x}-${y}`} 
-        transform={`translate(${xStart + x * scale}, ${y})`}
-        opacity={targetOpacity}
-        style={getTransitionStyle()}
-      >
-        <circle cx="0" cy="0" r="2.2" fill="none" stroke="var(--accent)" strokeWidth="0.4" opacity={0.65} style={ringAnimation} />
-        <circle cx="0" cy="0" r="1.4" fill="#030304" stroke="#4a4a58" strokeWidth="0.3" />
-        <circle cx="0" cy="0" r="0.6" fill="#000000" />
-      </g>
-    )
-  }
 
   // Plated Through Hole / Test Pad Terminations
   const renderTerminationPad = (x, y, label, chKey) => {
@@ -314,6 +347,8 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
+        {/* Negative space clearance gap */}
+        <circle cx="0" cy="0" r="4.5" fill="#030304" />
         <circle cx="0" cy="0" r="3" fill="#18181f" stroke="#333" strokeWidth="0.5" />
         <circle cx="0" cy="0" r="1.8" fill="#2d2d3a" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} style={ringAnimation} />
         <circle cx="0" cy="0" r="0.8" fill="#000" />
@@ -449,7 +484,7 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
           d={t.d}
           stroke="var(--accent)"
           strokeWidth={t.w}
-          opacity={targetOpacity}
+          opacity={targetOpacity * (t.opDefault || 0.3)}
           style={getTransitionStyle()}
         />
       </React.Fragment>
@@ -483,6 +518,8 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
         style={getTransitionStyle()}
       >
         <g style={nodeStyle}>
+          {/* Substrate Clearance Gap */}
+          <circle cx="0" cy="0" r="17.5" fill="#030304" />
           {/* Solder Mask Opening */}
           <circle cx="0" cy="0" r="16" fill="#030304" opacity={0.6} />
 
@@ -607,6 +644,8 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
+        {/* Negative space clearance gap */}
+        <circle cx="0" cy="0" r="4.5" fill="#030304" />
         <circle cx="0" cy="0" r="3" fill="#18181f" stroke="#333" strokeWidth="0.5" />
         <circle cx="0" cy="0" r="1.8" fill="#2d2d3a" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} style={ringAnimation} />
         <circle cx="0" cy="0" r="0.8" fill="#000" />
