@@ -4,6 +4,7 @@ import { useReducedMotion } from 'framer-motion'
 export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
+  const particlesContainerRef = useRef(null)
 
   const [layout, setLayout] = useState({
     G: 600,
@@ -111,7 +112,7 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
   // CH4 (Message) is a direct vertical Y-mirror of CH1 (Name).
   const traces = useMemo(() => [
     // --- CHANNEL 1 (NAME) & ITS TOP Zone ---
-    { chKey: 'name', d: buildPath(0, CH1_Y - 90, [['H', 20], ['L', 40, CH1_Y - 70], ['H', 150], ['L', 170, CH1_Y - 50], ['H', 200], ['L', 222, CH1_Y - 30], ['H', 280]]), w: 0.6, opDefault: 0.15 },
+    { chKey: 'name', d: buildPath(0, CH1_Y - 90, [['H', 20], ['L', 40, CH1_Y - 70], ['H', 150], ['L', 170, CH1_Y - 50], ['H', 200], ['L', 222, CH1_Y - 30], ['H', 280]]), w: 0.6, opDefault: 0.15, pulse: true },
     { chKey: 'name', d: buildPath(0, CH1_Y - 75, [['H', 14], ['L', 36, CH1_Y - 55], ['H', 123], ['L', 141, CH1_Y - 35], ['H', 179], ['L', 196, CH1_Y - 20], ['H', 280]]), w: 0.45, opDefault: 0.15 },
     { chKey: 'name', d: buildPath(0, CH1_Y - 55, [['H', 10], ['L', 30, CH1_Y - 35], ['H', 100], ['L', 120, CH1_Y - 15], ['H', 180], ['L', 190, CH1_Y - 5], ['H', 280]]), w: 1.6, opDefault: 0.25, main: true },
     { chKey: 'name', d: buildPath(0, CH1_Y - 45, [['H', 5], ['L', 24, CH1_Y - 25], ['H', 91], ['L', 111, CH1_Y - 5], ['H', 176], ['L', 186, CH1_Y + 5], ['H', 280]]), w: 0.6, opDefault: 0.15 },
@@ -122,21 +123,21 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
     { chKey: 'name', d: buildPath(140, CH1_Y + 10, [['H', 160], ['L', 180, CH1_Y + 30], ['H', 280]]), w: 0.45, opDefault: 0.15 },
 
     // --- CHANNEL 2 (EMAIL) ---
-    { chKey: 'email', d: buildPath(0, CH2_Y - 20, [['H', 32], ['L', 52, CH2_Y], ['H', 101], ['L', 121, CH2_Y + 20], ['H', 152], ['L', 172, CH2_Y + 40], ['H', 280]]), w: 0.6, opDefault: 0.15 },
+    { chKey: 'email', d: buildPath(0, CH2_Y - 20, [['H', 32], ['L', 52, CH2_Y], ['H', 101], ['L', 121, CH2_Y + 20], ['H', 152], ['L', 172, CH2_Y + 40], ['H', 280]]), w: 0.6, opDefault: 0.15, pulse: true },
     { chKey: 'email', d: buildPath(0, CH2_Y, [['H', 20], ['L', 40, CH2_Y + 20], ['H', 90], ['L', 110, CH2_Y + 40], ['H', 180], ['L', 190, CH2_Y + 30], ['H', 280]]), w: 1.6, opDefault: 0.25, main: true },
     { chKey: 'email', d: buildPath(40, CH2_Y - 30, [['H', 83], ['L', 101, CH2_Y - 11], ['H', 170], ['L', 190, CH2_Y + 10], ['H', 280]]), w: 0.6, opDefault: 0.15 },
     { chKey: 'email', d: buildPath(0, CH2_Y - 26, [['H', 23], ['L', 44, CH2_Y - 6], ['H', 94], ['L', 114, CH2_Y + 14]]), w: 0.3, opDefault: 0.1 },
     { chKey: 'email', d: buildPath(50, CH2_Y + 24, [['H', 86], ['L', 104, CH2_Y + 44], ['H', 176]]), w: 0.3, opDefault: 0.1 },
 
     // --- CHANNEL 3 (SUBJECT) - Mirrored Y-version of CHANNEL 2 ---
-    { chKey: 'subject', d: buildPath(0, CH3_Y + 20, [['H', 32], ['L', 52, CH3_Y], ['H', 101], ['L', 121, CH3_Y - 20], ['H', 152], ['L', 172, CH3_Y - 40], ['H', 280]]), w: 0.6, opDefault: 0.15 },
+    { chKey: 'subject', d: buildPath(0, CH3_Y + 20, [['H', 32], ['L', 52, CH3_Y], ['H', 101], ['L', 121, CH3_Y - 20], ['H', 152], ['L', 172, CH3_Y - 40], ['H', 280]]), w: 0.6, opDefault: 0.15, pulse: true },
     { chKey: 'subject', d: buildPath(0, CH3_Y, [['H', 20], ['L', 40, CH3_Y - 20], ['H', 90], ['L', 110, CH3_Y - 40], ['H', 180], ['L', 190, CH3_Y - 30], ['H', 280]]), w: 1.6, opDefault: 0.25, main: true },
     { chKey: 'subject', d: buildPath(40, CH3_Y + 30, [['H', 83], ['L', 101, CH3_Y + 11], ['H', 170], ['L', 190, CH3_Y - 10], ['H', 280]]), w: 0.6, opDefault: 0.15 },
     { chKey: 'subject', d: buildPath(0, CH3_Y + 26, [['H', 23], ['L', 44, CH3_Y + 6], ['H', 94], ['L', 114, CH3_Y - 14]]), w: 0.3, opDefault: 0.1 },
     { chKey: 'subject', d: buildPath(50, CH3_Y - 24, [['H', 86], ['L', 104, CH3_Y - 44], ['H', 176]]), w: 0.3, opDefault: 0.1 },
 
     // --- CHANNEL 4 (MESSAGE) - Mirrored Y-version of CHANNEL 1 ---
-    { chKey: 'message', d: buildPath(0, CH4_Y + 90, [['H', 20], ['L', 40, CH4_Y + 70], ['H', 150], ['L', 170, CH4_Y + 50], ['H', 200], ['L', 222, CH4_Y + 30], ['H', 280]]), w: 0.6, opDefault: 0.15 },
+    { chKey: 'message', d: buildPath(0, CH4_Y + 90, [['H', 20], ['L', 40, CH4_Y + 70], ['H', 150], ['L', 170, CH4_Y + 50], ['H', 200], ['L', 222, CH4_Y + 30], ['H', 280]]), w: 0.6, opDefault: 0.15, pulse: true },
     { chKey: 'message', d: buildPath(0, CH4_Y + 75, [['H', 14], ['L', 36, CH4_Y + 55], ['H', 123], ['L', 141, CH4_Y + 35], ['H', 179], ['L', 196, CH4_Y + 20], ['H', 280]]), w: 0.45, opDefault: 0.15 },
     { chKey: 'message', d: buildPath(0, CH4_Y + 55, [['H', 10], ['L', 30, CH4_Y + 35], ['H', 100], ['L', 120, CH4_Y + 15], ['H', 180], ['L', 190, CH4_Y + 5], ['H', 280]]), w: 1.6, opDefault: 0.25, main: true },
     { chKey: 'message', d: buildPath(0, CH4_Y + 45, [['H', 5], ['L', 24, CH4_Y + 25], ['H', 91], ['L', 111, CH4_Y + 5], ['H', 176], ['L', 186, CH4_Y - 5], ['H', 280]]), w: 0.6, opDefault: 0.15 },
@@ -178,6 +179,79 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
       ? 0 
       : (contactSystemState === 'engaged' ? (isHero ? 0.85 : 0.30) : 0.40)
   }
+
+  useEffect(() => {
+    if (shouldReduceMotion) return
+
+    const container = particlesContainerRef.current
+    if (!container) return
+
+    let intervalId = null
+
+    const spawnParticle = (trace, isBurst = false, delayMs = 0) => {
+      const delayTimer = setTimeout(() => {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+        circle.setAttribute('cx', '0')
+        circle.setAttribute('cy', '0')
+        
+        const isTransmit = contactSystemState === 'transmit'
+        const r = isBurst ? '2.0' : '1.6'
+        circle.setAttribute('r', r)
+        
+        const colors = ['var(--accent)', 'var(--accent-secondary)', '#ffffff']
+        const randomColor = isBurst 
+          ? colors[Math.floor(Math.random() * colors.length)] 
+          : 'var(--accent)'
+        circle.setAttribute('fill', randomColor)
+        
+        circle.setAttribute('filter', isBurst ? 'url(#pcbGlowActive)' : 'url(#pcbHairlineGlow)')
+        circle.style.offsetPath = `path('${trace.d}')`
+        
+        const duration = isBurst ? '0.7s' : '1.2s'
+        circle.style.animation = `pcbParticleTravel ${duration} linear forwards`
+        
+        container.appendChild(circle)
+
+        const cleanupTimer = setTimeout(() => {
+          circle.remove()
+        }, isBurst ? 700 : 1200)
+
+        circle.__cleanupTimer = cleanupTimer
+      }, delayMs)
+
+      return delayTimer
+    }
+
+    const timers = []
+
+    const isTransmit = contactSystemState === 'transmit'
+
+    if (isTransmit) {
+      traces.forEach((t) => {
+        if (t.main) {
+          timers.push(spawnParticle(t, true, 0))
+          timers.push(spawnParticle(t, true, 120))
+          timers.push(spawnParticle(t, true, 240))
+          timers.push(spawnParticle(t, true, 360))
+        }
+      })
+    } else if (isTyping) {
+      const runSpawn = () => {
+        traces.forEach((t) => {
+          if (t.main) {
+            timers.push(spawnParticle(t, false, Math.random() * 150))
+          }
+        })
+      }
+      runSpawn()
+      intervalId = setInterval(runSpawn, 450)
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+      timers.forEach((t) => clearTimeout(t))
+    }
+  }, [isTyping, contactSystemState, traces, shouldReduceMotion])
 
   const renderGlassBlock = (x, y, w, h, label, chKey) => {
     const px = xStart + x * scale
@@ -351,16 +425,20 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
               filter="url(#pcbHairlineGlow)"
               style={getTransitionStyle()}
             />
-            {t.main && isTyping && (
+            {(t.main || t.pulse) && isTyping && (
               <path
                 d={t.d}
                 stroke="var(--accent)"
-                strokeWidth={t.w + 0.2}
+                strokeWidth={t.w + 1.2}
                 fill="none"
-                opacity="0.8"
+                opacity="1"
+                pathLength="100"
+                filter="url(#pcbGlowActive)"
                 style={{
-                  strokeDasharray: '40 160',
-                  animation: 'pcbSignalFlow 3s ease-in-out infinite alternate'
+                  strokeDasharray: '15 100',
+                  animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
+                  willChange: 'stroke-dashoffset',
+                  transform: 'translate3d(0, 0, 0)'
                 }}
               />
             )}
@@ -549,139 +627,13 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
       className="absolute top-0 bottom-0 left-0 w-full pointer-events-none z-0 hidden lg:block"
       style={{ ...dormantStyles, transition: 'opacity 800ms cubic-bezier(0.4,0,0.2,1)' }}
     >
-      <style>{`
-        @keyframes pcbTravel {
-          0% {
-            offset-distance: 0%;
-            transform: scale(1);
-            opacity: 0.35;
-          }
-          100% {
-            offset-distance: 100%;
-            transform: scale(0.45);
-            opacity: 0.35;
-          }
-        }
-        @keyframes pcbPulse {
-          0%, 100% {
-            opacity: 0.3;
-          }
-          50% {
-            opacity: 0.55;
-          }
-        }
-        @keyframes pcbStandbyPulse {
-          0%, 100% {
-            opacity: 0.12;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.32;
-            transform: scale(1.08);
-          }
-        }
-        @keyframes pcbTrailAnim {
-          0% {
-            stroke-dashoffset: 400;
-            opacity: 0.8;
-          }
-          70% {
-            stroke-dashoffset: 120;
-            opacity: 0.8;
-          }
-          100% {
-            stroke-dashoffset: 0;
-            opacity: 0;
-          }
-        }
-        @keyframes pcbRadarRotate {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
-        }
-        @keyframes pcbRadarRotateCounter {
-          0% {
-            transform: rotate(360deg);
-          }
-          100% {
-            transform: rotate(0deg);
-          }
-        }
-        @keyframes pcbRadarPulse {
-          0% {
-            transform: scale(0.6);
-            opacity: 0.8;
-          }
-          100% {
-            transform: scale(1.6);
-            opacity: 0;
-          }
-        }
-        .animate-standby-pulse {
-          animation: pcbStandbyPulse 3.5s ease-in-out infinite;
-        }
-        @keyframes pcbSignalFlow {
-          0% {
-            stroke-dashoffset: 200;
-          }
-          100% {
-            stroke-dashoffset: 0;
-          }
-        }
-        @keyframes pcbNodeMove {
-          0% {
-            transform: translate(0px, 0px);
-          }
-          30% {
-            transform: translate(var(--move-x1), 0px);
-          }
-          50% {
-            transform: translate(var(--move-x2), var(--move-y1));
-          }
-          70% {
-            transform: translate(var(--move-x1), 0px);
-          }
-          100% {
-            transform: translate(0px, 0px);
-          }
-        }
-        @keyframes pcbCorePulse {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 0.7;
-          }
-          50% {
-            transform: scale(1.6);
-            opacity: 1.0;
-          }
-        }
-        @keyframes pcbRingBreathe {
-          0%, 100% {
-            opacity: 0.4;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.85;
-            transform: scale(1.15);
-          }
-        }
-        @keyframes pcbViaPulse {
-          0%, 100% {
-            opacity: 0.65;
-          }
-          50% {
-            opacity: 1.0;
-          }
-        }
-      `}</style>
+
 
       <svg
         className="w-full h-full"
         viewBox={`0 0 ${G || 600} ${H || 600}`}
         xmlns="http://www.w3.org/2000/svg"
+        shapeRendering="geometricPrecision"
       >
         <defs>
           <filter id="pcbHairlineGlow" filterUnits="userSpaceOnUse" x="-10%" y="-10%" width="120%" height="120%">
@@ -691,8 +643,8 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <filter id="pcbGlowActive" filterUnits="userSpaceOnUse" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3.5" result="blur" />
+          <filter id="pcbGlowActive" filterUnits="userSpaceOnUse" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -717,6 +669,9 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
           opacity={isTransmit ? 0 : 1}
           style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
         />
+
+        {/* Dynamic Particles Container */}
+        <g ref={particlesContainerRef} />
 
         {/* Trailing Lines for Traveling Hero Channels */}
         {isTransmitOrFailed && ['name', 'email', 'subject', 'message'].map((chKey, chIdx) => (

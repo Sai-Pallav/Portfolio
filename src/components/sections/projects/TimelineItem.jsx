@@ -43,27 +43,14 @@ const TimelineItem = memo(function TimelineItem({
     offset: ["start end", "end start"],
   });
 
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
     <div
       ref={itemRef}
       className="absolute left-0 right-0"
       style={{ top: `${topOffset}px` }}
     >
-      {/* Symmetrical Date Marker next to spine node */}
-      <div
-        className={`absolute top-1/2 -translate-y-1/2 font-mono text-[10px] md:text-xs tracking-[0.25em] uppercase opacity-40 select-none ${
-          isLeft ? "text-left" : "text-right"
-        }`}
-        style={{
-          width: "90px",
-          ...(isLeft
-            ? { left: "calc(50% + 28px)" }
-            : { right: "calc(50% + 28px)" }),
-        }}
-      >
-        {project.date}
-      </div>
-
       <div
         className="absolute group/item"
         style={{
@@ -73,7 +60,25 @@ const TimelineItem = memo(function TimelineItem({
             : { left: `calc(50% + ${BRANCH_WIDTH}px)` }),
           width: `calc(50% - ${BRANCH_WIDTH + 90}px)`,
         }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
+        {/* Symmetrical Date Marker next to spine node (perfectly vertically centered with card center) */}
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 font-mono text-[10px] md:text-xs tracking-[0.25em] uppercase select-none transition-all duration-300 ease-out z-10 text-[var(--text-secondary)] opacity-40 group-hover/item:text-[var(--accent)] group-hover/item:opacity-95 ${
+            isLeft ? "text-left" : "text-right"
+          }`}
+          style={{
+            width: "90px",
+            ...(isLeft
+              ? { left: `calc(100% + ${BRANCH_WIDTH}px + 28px)` }
+              : { right: `calc(100% + ${BRANCH_WIDTH}px + 28px)` }),
+            textShadow: isHovered ? "0 0 12px var(--accent-dim)" : "none",
+          }}
+        >
+          {project.date}
+        </div>
+
         {/* Clickable Orb Smooth-Scroll Navigation Point */}
         <button
           onClick={() => {
@@ -87,7 +92,7 @@ const TimelineItem = memo(function TimelineItem({
           }}
           aria-label={`Scroll to ${project.title}`}
         >
-          <TimelineNode scrollYProgress={scrollYProgress} hasAwakened={hasAwakened} />
+          <TimelineNode scrollYProgress={scrollYProgress} hasAwakened={hasAwakened} isHovered={isHovered} />
         </button>
 
         {/* Branch with viewport entrance animation */}
@@ -109,7 +114,7 @@ const TimelineItem = memo(function TimelineItem({
           }}
           aria-hidden="true"
         >
-          <BranchConnector isLeft={isLeft} />
+          <BranchConnector isLeft={isLeft} isHovered={isHovered} />
         </motion.div>
 
         {/* Card with viewport entrance animation */}
@@ -127,6 +132,7 @@ const TimelineItem = memo(function TimelineItem({
             project={project}
             index={index}
             isLeft={isLeft}
+            isHovered={isHovered}
           />
         </motion.div>
       </div>

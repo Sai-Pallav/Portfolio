@@ -37,23 +37,26 @@ const CATEGORY_LABELS = {
   }
 };
 
-const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, isLeft }) {
+const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, isLeft, isHovered = false }) {
   const catInfo = CATEGORY_LABELS[project.category] || { label: 'Project', icon: null };
 
   return (
     <div className="relative group/card">
       {/* Card container */}
       <div
-        className="relative rounded-2xl border overflow-hidden transition-all duration-500 bg-gradient-to-br from-zinc-900/[0.35] to-zinc-950/[0.05] hover:from-zinc-900/[0.45] hover:to-zinc-950/[0.15] border-white/[0.05] hover:border-white/[0.12] shadow-[0_4px_20px_-5px_rgba(0,0,0,0.3)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7),0_0_20px_-5px_var(--accent-dim)]"
+        className="relative rounded-2xl border overflow-hidden transition-all duration-250 bg-gradient-to-br from-zinc-900/[0.35] to-zinc-950/[0.05] border-white/[0.05] shadow-[0_8px_30px_-4px_rgba(0,0,0,0.5)] group-hover/item:from-zinc-900/[0.45] group-hover/item:to-zinc-950/[0.15] group-hover/item:border-white/[0.15] group-hover/item:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.85),_0_0_25px_-5px_color-mix(in srgb,_var(--accent)_20%,_transparent)]"
         style={{
           backdropFilter: "blur(12px)",
         }}
       >
         {/* Connection port indicator on the branch-facing edge */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-full z-10 transition-all duration-500 opacity-50 group-hover/card:opacity-90 group-hover/card:shadow-[0_0_10px_var(--accent)] ${isLeft ? "-right-0.75" : "-left-0.75"}`}
+          className={`absolute top-1/2 -translate-y-1/2 w-2 h-7 rounded-full z-10 transition-all duration-250 border border-[var(--accent)]/30 opacity-60 group-hover/item:opacity-100 group-hover/item:scale-y-110 group-hover/item:shadow-[0_0_12px_var(--accent)] ${
+            isLeft ? "-right-1" : "-left-1"
+          }`}
           style={{
-            background: "var(--accent)",
+            background: "linear-gradient(to bottom, var(--accent), var(--accent-hover))",
+            boxShadow: "inset 0 1px 1px rgba(255, 255, 255, 0.3)",
           }}
           aria-hidden="true"
         />
@@ -85,18 +88,20 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
           <div className="absolute top-0 left-0 right-0 h-7 bg-black/40 backdrop-blur-md border-b border-white/[0.03] flex items-center justify-between px-3.5 z-20">
             {/* macOS Window dots */}
             <div className="flex items-center gap-1.5" aria-hidden="true">
-              <span className="w-2 h-2 rounded-full bg-[#ff5f56]" />
-              <span className="w-2 h-2 rounded-full bg-[#ffbd2e]" />
-              <span className="w-2 h-2 rounded-full bg-[#27c93f]" />
+              <span className="w-2 h-2 rounded-full border border-black/10 shadow-sm" style={{ background: "radial-gradient(circle at 30% 30%, #ff7b72, #ff5f56)" }} />
+              <span className="w-2 h-2 rounded-full border border-black/10 shadow-sm" style={{ background: "radial-gradient(circle at 30% 30%, #ffde6a, #ffbd2e)" }} />
+              <span className="w-2 h-2 rounded-full border border-black/10 shadow-sm" style={{ background: "radial-gradient(circle at 30% 30%, #46e35c, #27c93f)" }} />
             </div>
 
             {/* Secure URL Bar Capsule */}
-            <div className="flex items-center gap-1 px-2.5 py-0.5 rounded border border-white/[0.04] bg-white/[0.01] text-[8px] font-mono text-white/30 max-w-[60%] truncate">
-              <svg className="w-2 h-2 text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <div
+              className="flex items-center gap-1.5 px-3 py-0.5 rounded border transition-all duration-250 text-[8px] font-mono max-w-[60%] truncate border-white/[0.06] text-white/30 bg-[#070708]/30 group-hover/item:border-[var(--accent)]/30 group-hover/item:text-white/60 group-hover/item:bg-[#070708]/70 group-hover/item:shadow-[0_0_8px_rgba(37,99,235,0.06)]"
+            >
+              <svg className="w-2.5 h-2.5 transition-colors duration-250 text-white/30 group-hover/item:text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
-              <span className="truncate">saipallav.dev/projects/{project.title.toLowerCase().replace(/\s+/g, '-')}</span>
+              <span className="truncate select-all">saipallav.dev/projects/{project.title.toLowerCase().replace(/\s+/g, '-')}</span>
             </div>
 
             {/* Window Right control placeholder */}
@@ -106,7 +111,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
           <img
             src={project.image}
             alt={`Screenshot of ${project.title}`}
-            className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover/card:scale-102"
+            className="w-full h-full object-cover transition-transform duration-[1200ms] ease-[cubic-bezier(0.16,1,0.3,1)] scale-100 group-hover/item:scale-105 group-hover/item:brightness-[1.05]"
             loading="lazy"
             decoding="async"
             onError={(e) => {
@@ -145,7 +150,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
         <div className="p-6">
           {/* Title with hover color shift */}
           <h3
-            className="font-heading text-xl md:text-2xl font-bold mb-2 transition-colors duration-300 text-[var(--text-primary)] group-hover/card:text-[var(--accent)]"
+            className="font-heading text-xl md:text-2xl font-bold mb-2 tracking-tight transition-colors duration-300 text-[var(--text-primary)] group-hover/item:text-[var(--accent)]"
           >
             {project.title}
           </h3>
@@ -156,8 +161,8 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
               Released: {project.date}
             </span>
             <span className="text-white/20 select-none">•</span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase border border-[var(--accent)]/20 bg-[var(--accent-dim)] text-[var(--accent)] shadow-[0_0_8px_var(--accent-dim)]">
-              <svg className="w-2.5 h-2.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase border transition-all duration-250 border-[var(--accent)]/15 bg-white/[0.01] text-[var(--text-secondary)] group-hover/item:border-[var(--accent)]/35 group-hover/item:bg-[var(--accent-dim)] group-hover/item:text-[var(--accent)] group-hover/item:shadow-[0_0_12px_var(--accent-dim)]">
+              <svg className="w-2.5 h-2.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               Outcome: {project.highlights[0]}
@@ -182,7 +187,9 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
                     background: 'rgba(255, 255, 255, 0.005)',
                   }}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full border border-[var(--accent)] mt-1.5 flex-shrink-0 bg-[var(--accent)]/10" />
+                  <span
+                    className="w-1.5 h-1.5 rounded-full border mt-1.5 flex-shrink-0 transition-all duration-300 border-[var(--accent)]/60 bg-[var(--accent)]/10 group-hover/item:border-[var(--accent)] group-hover/item:bg-[var(--accent)] group-hover/item:shadow-[0_0_6px_var(--accent)] group-hover/item:scale-110"
+                  />
                   <span className="text-[11px] leading-relaxed text-zinc-300">
                     {h}
                   </span>
@@ -196,11 +203,11 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
             {project.tags.map((tag) => (
               <span
                 key={tag}
-                className="px-2.5 py-0.5 text-[10px] font-mono rounded border transition-colors duration-300 hover:border-[var(--accent)]/30 hover:text-[var(--accent-hover)] cursor-default"
+                className="px-2.5 py-0.5 text-[10px] font-mono rounded border transition-all duration-300 hover:border-[var(--accent)]/40 hover:text-[var(--accent-hover)] hover:bg-white/[0.04] cursor-default"
                 style={{
                   color: "var(--text-secondary)",
-                  background: "rgba(255, 255, 255, 0.02)",
-                  borderColor: "rgba(255, 255, 255, 0.05)",
+                  background: "rgba(255, 255, 255, 0.015)",
+                  borderColor: "rgba(255, 255, 255, 0.06)",
                 }}
               >
                 {tag}
@@ -218,7 +225,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
                 href={project.github}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-300 border border-white/[0.05] hover:border-white/15 text-center flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-black hover:bg-white/[0.06] hover:text-[var(--text-primary)]"
+                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-200 border border-white/[0.05] hover:border-white/20 text-center flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-black hover:bg-white/[0.06] hover:text-[var(--text-primary)] hover:-translate-y-0.5 hover:scale-[1.02] shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.3)]"
                 style={{
                   background: "rgba(255, 255, 255, 0.02)",
                   color: "var(--text-secondary)",
@@ -226,7 +233,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
                 data-custom-cursor-ignore
                 aria-label={`View source code for ${project.title}`}
               >
-                <svg className="w-3.5 h-3.5 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <svg className="w-3.5 h-3.5 opacity-70 transition-transform duration-200 group-hover/card:rotate-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
                 </svg>
                 Code
@@ -237,11 +244,10 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
                 href={project.live}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-300 text-center flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-black hover:bg-[var(--accent-hover)]"
+                className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-200 text-center flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-black hover:bg-[var(--accent-hover)] hover:-translate-y-0.5 hover:scale-[1.02] shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.4),_0_0_15px_var(--accent)]"
                 style={{
                   background: "var(--accent)",
                   color: "var(--accent-contrast)",
-                  boxShadow: "0 2px 8px var(--accent-dim)",
                 }}
                 data-custom-cursor-ignore
                 aria-label={`View live demo of ${project.title}`}

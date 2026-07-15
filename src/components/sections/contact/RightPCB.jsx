@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect, useMemo, memo } from 'react'
 import { useReducedMotion } from 'framer-motion'
 
-export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping }) {
+export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping, formProgress = 0 }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
+  const particlesContainerRef = useRef(null)
 
   const [layout, setLayout] = useState({
     G: 600,
@@ -232,45 +233,45 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
 
     // --- CHANNEL 1 (Name Input, starts at Y_center - 100, converges to Y_center - 36) ---
     middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 100, middleTargetLimit, Y_center - 36), w: 1.5, opDefault: 0.25, main: true })
-    middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 112, middleTargetLimit, Y_center - 44), w: 0.6, opDefault: 0.15 })
+    middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 112, middleTargetLimit, Y_center - 44), w: 0.6, opDefault: 0.15, pulse: true })
     middleTracesList.push({ chKey: 'name', d: drawPCBPath(midStart, Y_center - 88, middleTargetLimit, Y_center - 28), w: 0.6, opDefault: 0.15 })
 
     // --- CHANNEL 2 (Email Input, starts at Y_center - 50, converges to Y_center - 12) ---
     middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 50, middleTargetLimit, Y_center - 12), w: 1.5, opDefault: 0.25, main: true })
-    middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 58, middleTargetLimit, Y_center - 20), w: 0.6, opDefault: 0.15 })
+    middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 58, middleTargetLimit, Y_center - 20), w: 0.6, opDefault: 0.15, pulse: true })
     middleTracesList.push({ chKey: 'email', d: drawPCBPath(midStart, Y_center - 42, middleTargetLimit, Y_center - 4), w: 0.6, opDefault: 0.15 })
 
     // --- CHANNEL 3 (Subject Input, starts at Y_center + 50, converges to Y_center + 12) ---
     middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 50, middleTargetLimit, Y_center + 12), w: 1.5, opDefault: 0.25, main: true })
-    middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 42, middleTargetLimit, Y_center + 4), w: 0.6, opDefault: 0.15 })
+    middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 42, middleTargetLimit, Y_center + 4), w: 0.6, opDefault: 0.15, pulse: true })
     middleTracesList.push({ chKey: 'subject', d: drawPCBPath(midStart, Y_center + 58, middleTargetLimit, Y_center + 20), w: 0.6, opDefault: 0.15 })
 
     // --- CHANNEL 4 (Message Input, starts at Y_center + 100, converges to Y_center + 36) ---
     middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 100, middleTargetLimit, Y_center + 36), w: 1.5, opDefault: 0.25, main: true })
-    middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 88, middleTargetLimit, Y_center + 28), w: 0.6, opDefault: 0.15 })
+    middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 88, middleTargetLimit, Y_center + 28), w: 0.6, opDefault: 0.15, pulse: true })
     middleTracesList.push({ chKey: 'message', d: drawPCBPath(midStart, Y_center + 112, middleTargetLimit, Y_center + 44), w: 0.6, opDefault: 0.15 })
 
     const rightTracesList = []
-    // Right section traces (starts wide at screen edge endX, converges to globe rightTargetLimit)
-    // Trace 1: Y_center - 140 converges to Y_center - 30
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 140, rightTargetLimit, Y_center - 30), w: 1.5, op: 0.45 })
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 150, rightTargetLimit, Y_center - 36), w: 0.6, op: 0.22 })
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 130, rightTargetLimit, Y_center - 24), w: 0.6, op: 0.22 })
+    // Right section traces (reversed direction: starts at globe rightTargetLimit and goes to screen edge endX)
+    // Trace 1: converges to Y_center - 30, exits to Y_center - 140
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 30, endX, Y_center - 140), w: 1.5, op: 0.45, main: true })
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 36, endX, Y_center - 150), w: 0.6, op: 0.22, pulse: true })
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 24, endX, Y_center - 130), w: 0.6, op: 0.22 })
 
-    // Trace 2: Y_center - 80 converges to Y_center - 12
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 80, rightTargetLimit, Y_center - 12), w: 1.5, op: 0.45 })
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 90, rightTargetLimit, Y_center - 18), w: 0.6, op: 0.22 })
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center - 70, rightTargetLimit, Y_center - 6), w: 0.6, op: 0.22 })
+    // Trace 2: converges to Y_center - 12, exits to Y_center - 80
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 12, endX, Y_center - 80), w: 1.5, op: 0.45, main: true })
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 18, endX, Y_center - 90), w: 0.6, op: 0.22, pulse: true })
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center - 6, endX, Y_center - 70), w: 0.6, op: 0.22 })
 
-    // Trace 3: Y_center + 80 converges to Y_center + 12
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 80, rightTargetLimit, Y_center + 12), w: 1.5, op: 0.45 })
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 70, rightTargetLimit, Y_center + 6), w: 0.6, op: 0.22 })
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 90, rightTargetLimit, Y_center + 18), w: 0.6, op: 0.22 })
+    // Trace 3: converges to Y_center + 12, exits to Y_center + 80
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 12, endX, Y_center + 80), w: 1.5, op: 0.45, main: true })
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 6, endX, Y_center + 70), w: 0.6, op: 0.22, pulse: true })
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 18, endX, Y_center + 90), w: 0.6, op: 0.22 })
 
-    // Trace 4: Y_center + 140 converges to Y_center + 30
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 140, rightTargetLimit, Y_center + 30), w: 1.5, op: 0.45 })
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 130, rightTargetLimit, Y_center + 24), w: 0.6, op: 0.22 })
-    rightTracesList.push({ d: drawPCBPath(endX, Y_center + 150, rightTargetLimit, Y_center + 36), w: 0.6, op: 0.22 })
+    // Trace 4: converges to Y_center + 30, exits to Y_center + 140
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 30, endX, Y_center + 140), w: 1.5, op: 0.45, main: true })
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 24, endX, Y_center + 130), w: 0.6, op: 0.22, pulse: true })
+    rightTracesList.push({ d: drawPCBPath(rightTargetLimit, Y_center + 36, endX, Y_center + 150), w: 0.6, op: 0.22 })
 
     // Hardware Components (Aligned horizontally on trace flat sections)
     const componentsList = [
@@ -336,10 +337,12 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
     ]
 
     const mountingHolesList = [
-      { x: midStart + W_mid * 0.5, y: Y_center - 160 },
-      { x: midStart + W_mid * 0.5, y: Y_center + 160 },
-      { x: rightTargetLimit + W_right * 0.5, y: Y_center - 160 },
-      { x: rightTargetLimit + W_right * 0.5, y: Y_center + 160 }
+      // Between globe and middle PCB
+      { x: middleTargetLimit + 30, y: Y_center - 24 },
+      { x: middleTargetLimit + 30, y: Y_center + 24 },
+      // Between globe and right PCB
+      { x: rightTargetLimit - 30, y: Y_center - 24 },
+      { x: rightTargetLimit - 30, y: Y_center + 24 }
     ]
 
     // Nodes (Terminations)
@@ -380,6 +383,88 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
     }
     return 0.40
   }
+
+  useEffect(() => {
+    if (shouldReduceMotion) return
+
+    const container = particlesContainerRef.current
+    if (!container) return
+
+    let intervalId = null
+
+    const spawnParticle = (trace, isBurst = false, delayMs = 0, isRightTrace = false) => {
+      const delayTimer = setTimeout(() => {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+        circle.setAttribute('cx', '0')
+        circle.setAttribute('cy', '0')
+        
+        const r = isBurst ? '2.0' : '1.6'
+        circle.setAttribute('r', r)
+        
+        const colors = ['var(--accent)', 'var(--accent-secondary)', '#ffffff']
+        const randomColor = isBurst 
+          ? colors[Math.floor(Math.random() * colors.length)] 
+          : 'var(--accent)'
+        circle.setAttribute('fill', randomColor)
+        
+        circle.setAttribute('filter', isBurst ? 'url(#pcbGlowActive)' : 'url(#pcbHairlineGlow)')
+        circle.style.offsetPath = `path('${trace.d}')`
+        
+        const duration = isBurst ? '0.7s' : (isRightTrace ? '2.8s' : '1.2s')
+        circle.style.animation = `pcbParticleTravel ${duration} linear forwards`
+        
+        container.appendChild(circle)
+
+        const cleanupTimer = setTimeout(() => {
+          circle.remove()
+        }, isBurst ? 700 : (isRightTrace ? 2800 : 1200))
+
+        circle.__cleanupTimer = cleanupTimer
+      }, delayMs)
+
+      return delayTimer
+    }
+
+    const timers = []
+
+    const isTransmit = contactSystemState === 'transmit'
+
+    if (isTransmit) {
+      // Middle traces burst (inputs to globe)
+      pcbData.middleTraces.forEach((t) => {
+        if (t.main) {
+          timers.push(spawnParticle(t, true, 0, false))
+          timers.push(spawnParticle(t, true, 120, false))
+          timers.push(spawnParticle(t, true, 240, false))
+          timers.push(spawnParticle(t, true, 360, false))
+        }
+      })
+      // Right traces burst (exiting globe)
+      pcbData.rightTraces.forEach((t) => {
+        if (t.main) {
+          timers.push(spawnParticle(t, true, 200, true))
+          timers.push(spawnParticle(t, true, 320, true))
+          timers.push(spawnParticle(t, true, 440, true))
+          timers.push(spawnParticle(t, true, 560, true))
+        }
+      })
+    } else if (isTyping) {
+      const runSpawn = () => {
+        pcbData.middleTraces.forEach((t) => {
+          if (t.main) {
+            timers.push(spawnParticle(t, false, Math.random() * 150, false))
+          }
+        })
+      }
+      runSpawn()
+      intervalId = setInterval(runSpawn, 450)
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+      timers.forEach((t) => clearTimeout(t))
+    }
+  }, [isTyping, contactSystemState, pcbData, shouldReduceMotion])
 
   // SMT Package Renderer
   const renderSMT = (x, y, w, h, label, chKey = null, isCap = false) => {
@@ -443,6 +528,13 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
   // Grounded Mechanical Mounting Screw Hole
   const renderMountingHole = (x, y) => {
     const targetOpacity = (isTransmit || transmissionFailed) ? 0 : (contactSystemState === 'engaged' ? 0.30 : 0.40)
+    // r=8.2, circumference = 2 * PI * 8.2 ≈ 51.52
+    const R = 8.2
+    const circumference = 2 * Math.PI * R
+    // Clamp progress 0–100, convert to dashoffset
+    const pct = Math.min(100, Math.max(0, formProgress))
+    const fillLength = (pct / 100) * circumference
+    const dashOffset = circumference - fillLength
     return (
       <g 
         key={`mount-${x}-${y}`} 
@@ -451,8 +543,9 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
         style={getTransitionStyle()}
       >
         <circle cx="0" cy="0" r="10" fill="#030304" />
-        <circle cx="0" cy="0" r="8.2" fill="none" stroke="var(--accent)" strokeWidth="1.6" opacity="0.75" />
-        <circle cx="0" cy="0" r="5.6" fill="none" stroke="#444452" strokeWidth="0.5" opacity="1.0" />
+        
+        {/* Inner detail circle - radius reduced to 4.8 to prevent antialiasing merging with tick marks */}
+        <circle cx="0" cy="0" r="4.8" fill="none" stroke="#444452" strokeWidth="0.5" opacity="1.0" />
         <circle cx="0" cy="0" r="4.0" fill="#000" />
         {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, idx) => {
           const rad = angle * (Math.PI / 180)
@@ -462,6 +555,25 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
             <circle key={idx} cx={vx} cy={vy} r="0.65" fill="#000" stroke="#444452" strokeWidth="0.25" opacity="1.0" />
           )
         })}
+        {/* Existing base ring — rendered after the tick marks so it remains a perfect circle without tick marks biting into it */}
+        <circle cx="0" cy="0" r={R} fill="none" stroke="var(--accent)" strokeWidth="1.6" opacity="0.75" filter="url(#pcbHairlineGlow)" />
+        
+        {/* Progress fill on the same ring — rendered LAST so it remains a perfect circle without tick marks biting into it */}
+        <circle
+          cx="0"
+          cy="0"
+          r={R}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="1.6"
+          opacity="1"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          strokeLinecap={pct > 99 ? "butt" : "round"}
+          transform="rotate(-90)"
+          filter="url(#chargerGlowActive)"
+          style={{ transition: 'stroke-dashoffset 600ms cubic-bezier(0.4,0,0.2,1)' }}
+        />
       </g>
     )
   }
@@ -480,94 +592,13 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
       className="absolute top-0 bottom-0 left-0 w-full pointer-events-none z-0 hidden lg:block"
       style={{ ...dormantStyles, transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1)' }}
     >
-      <style>{`
-        @keyframes pcbTravel {
-          0% {
-            offset-distance: 0%;
-            transform: scale(1);
-            opacity: 0.35;
-          }
-          100% {
-            offset-distance: 100%;
-            transform: scale(0.45);
-            opacity: 0.35;
-          }
-        }
-        @keyframes pcbPulse {
-          0%, 100% {
-            opacity: 0.3;
-          }
-          50% {
-            opacity: 0.55;
-          }
-        }
-        @keyframes pcbStandbyPulse {
-          0%, 100% {
-            opacity: 0.12;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.32;
-            transform: scale(1.08);
-          }
-        }
-        @keyframes pcbTrailAnim {
-          0% {
-            stroke-dashoffset: 400;
-            opacity: 0.8;
-          }
-          70% {
-            stroke-dashoffset: 120;
-            opacity: 0.8;
-          }
-          100% {
-            stroke-dashoffset: 0;
-            opacity: 0;
-          }
-        }
-        @keyframes pcbRadarRotate {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
-        }
-        @keyframes pcbRadarRotateCounter {
-          0% {
-            transform: rotate(360deg);
-          }
-          100% {
-            transform: rotate(0deg);
-          }
-        }
-        @keyframes pcbRadarPulse {
-          0% {
-            transform: scale(0.6);
-            opacity: 0.8;
-          }
-          100% {
-            transform: scale(1.6);
-            opacity: 0;
-          }
-        }
-        .animate-standby-pulse {
-          animation: pcbStandbyPulse 3.5s ease-in-out infinite;
-        }
-        @keyframes pcbSignalFlow {
-          0% {
-            stroke-dashoffset: 200;
-          }
-          100% {
-            stroke-dashoffset: 0;
-          }
-        }
-      `}</style>
+
 
       <svg
         className="w-full h-full"
         viewBox={`0 0 ${G || 600} ${H || 600}`}
         xmlns="http://www.w3.org/2000/svg"
+        shapeRendering="geometricPrecision"
       >
         <defs>
           <filter id="pcbHairlineGlow" filterUnits="userSpaceOnUse" x="-10%" y="-10%" width="120%" height="120%">
@@ -577,10 +608,19 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <filter id="pcbGlowActive" filterUnits="userSpaceOnUse" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3.5" result="blur" />
+          <filter id="pcbGlowActive" filterUnits="userSpaceOnUse" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="chargerGlowActive" filterUnits="userSpaceOnUse" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4.0" result="blur1" />
+            <feGaussianBlur stdDeviation="1.5" result="blur2" />
+            <feMerge>
+              <feMergeNode in="blur1" />
+              <feMergeNode in="blur2" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
@@ -600,7 +640,7 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
         <rect 
           x={midStart} 
           y={Y_center - 180} 
-          width={endX - midStart} 
+          width={Math.max(0, endX - midStart)} 
           height="360" 
           fill="url(#pcbFiberglassWeaveR)" 
           opacity={isTransmit ? 0 : 1}
@@ -609,12 +649,15 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
         <rect 
           x={midStart} 
           y={Y_center - 180} 
-          width={endX - midStart} 
+          width={Math.max(0, endX - midStart)} 
           height="360" 
           fill="url(#pcbDotsR)" 
           opacity={isTransmit ? 0 : 1}
           style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
         />
+
+        {/* Dynamic Particles Container */}
+        <g ref={particlesContainerRef} />
 
         {/* Trailing Lines for Traveling Hero Channels */}
         {isTransmitOrFailed && ['name', 'email', 'subject', 'message'].map((chKey, chIdx) => (
@@ -658,16 +701,20 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
                             filter="url(#pcbHairlineGlow)"
                             style={getTransitionStyle()}
                           />
-                          {t.main && isTyping && (
+                          {(t.main || t.pulse) && isTyping && (
                             <path
                               d={t.d}
                               stroke="var(--accent)"
-                              strokeWidth={t.w + 0.2}
+                              strokeWidth={t.w + 1.2}
                               fill="none"
-                              opacity="0.8"
+                              opacity="1"
+                              pathLength="100"
+                              filter="url(#pcbGlowActive)"
                               style={{
-                                strokeDasharray: '40 160',
-                                animation: 'pcbSignalFlow 3s ease-in-out infinite alternate'
+                                strokeDasharray: '15 100',
+                                animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
+                                willChange: 'stroke-dashoffset',
+                                transform: 'translate3d(0, 0, 0)'
                               }}
                             />
                           )}
@@ -731,14 +778,33 @@ export default memo(function RightPCB({ formRef, globeRef, contactSystemState = 
             return (
               <React.Fragment key={`r-trace-${idx}`}>
                 {contactSystemState === 'engaged' && !isTransmit && (
-                  <path
-                    d={t.d}
-                    stroke="var(--accent)"
-                    strokeWidth={t.w + 0.8}
-                    opacity="0.35"
-                    filter="url(#pcbHairlineGlow)"
-                    style={getTransitionStyle()}
-                  />
+                  <>
+                    <path
+                      d={t.d}
+                      stroke="var(--accent)"
+                      strokeWidth={t.w + 0.8}
+                      opacity="0.35"
+                      filter="url(#pcbHairlineGlow)"
+                      style={getTransitionStyle()}
+                    />
+                    {(t.main || t.pulse) && isTyping && (
+                      <path
+                        d={t.d}
+                        stroke="var(--accent)"
+                        strokeWidth={t.w + 1.2}
+                        fill="none"
+                        opacity="1"
+                        pathLength="100"
+                        filter="url(#pcbGlowActive)"
+                        style={{
+                          strokeDasharray: '15 100',
+                          animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
+                          willChange: 'stroke-dashoffset',
+                          transform: 'translate3d(0, 0, 0)'
+                        }}
+                      />
+                    )}
+                  </>
                 )}
                 <path
                   d={t.d}

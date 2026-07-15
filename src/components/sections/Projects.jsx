@@ -99,7 +99,7 @@ const Projects = memo(function Projects() {
     };
   }, []);
 
-  const timelineHeight = getTimelineHeight(projects.length);
+  const timelineHeight = getTimelineHeight(filteredProjects.length);
 
   const stats = useMemo(() => [
     { value: projects.length, label: 'Projects' },
@@ -181,13 +181,17 @@ const Projects = memo(function Projects() {
           {stats.map((stat, i) => (
             <div
               key={i}
-              className="px-6 py-4 rounded-xl border border-white/[0.04] transition-all duration-300 hover:border-[var(--accent)]/30 hover:bg-white/[0.02] min-w-[130px] text-center backdrop-blur-md"
+              className="relative group px-6 py-4 rounded-xl border border-white/[0.04] transition-all duration-300 hover:border-[var(--accent)]/35 hover:bg-white/[0.03] hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.5),_0_0_12px_var(--accent-dim)] min-w-[130px] text-center backdrop-blur-md overflow-hidden"
               style={{
-                background: 'rgba(24, 24, 27, 0.15)',
+                background: 'rgba(10, 10, 12, 0.45)',
               }}
             >
+              {/* Micro tech corners */}
+              <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 border-t border-l border-white/20 transition-colors duration-300 group-hover:border-[var(--accent)]" />
+              <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 border-b border-r border-white/20 transition-colors duration-300 group-hover:border-[var(--accent)]" />
+
               <div
-                className="font-heading text-2xl md:text-3xl font-bold mb-0.5"
+                className="font-heading text-2xl md:text-3xl font-bold mb-0.5 transition-transform duration-300 group-hover:scale-105"
                 style={{
                   color: 'var(--accent)',
                 }}
@@ -195,7 +199,7 @@ const Projects = memo(function Projects() {
                 {stat.value}
               </div>
               <div
-                className="font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase"
+                className="font-mono text-[9px] md:text-[10px] tracking-[0.15em] uppercase transition-colors duration-300 group-hover:text-white"
                 style={{ color: 'var(--text-secondary)' }}
               >
                 {stat.label}
@@ -210,7 +214,7 @@ const Projects = memo(function Projects() {
         <div 
           className="inline-flex p-1 rounded-full border border-white/[0.05] backdrop-blur-md relative"
           style={{
-            background: "rgba(10, 10, 11, 0.4)",
+            background: "rgba(10, 10, 11, 0.45)",
           }}
         >
           {CATEGORIES.map((cat) => {
@@ -219,9 +223,9 @@ const Projects = memo(function Projects() {
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className="relative px-4 py-2 font-mono text-[9px] md:text-[10px] tracking-[0.12em] uppercase rounded-full transition-colors duration-300 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30 focus:ring-offset-1 focus:ring-offset-black z-10"
+                className="relative px-4 py-2 font-mono text-[9px] md:text-[10px] tracking-[0.12em] uppercase rounded-full transition-colors duration-300 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30 focus:ring-offset-1 focus:ring-offset-black z-10 text-[var(--text-secondary)] hover:text-white"
                 style={{
-                  color: isActive ? "var(--accent-contrast)" : "var(--text-secondary)",
+                  color: isActive ? "var(--accent-contrast)" : undefined,
                 }}
               >
                 {isActive && (
@@ -246,17 +250,19 @@ const Projects = memo(function Projects() {
         {isMobile ? (
           /* ─── Mobile: Single column with left spine ─── */
           <div className="relative">
-            {/* Mobile spine line — draws top to bottom when container enters viewport */}
-            <motion.div
-              className="absolute left-[10px] top-0 bottom-0 w-[2px] z-0 origin-top"
-              style={{
-                background:
-                  "linear-gradient(to bottom, transparent, var(--accent) 10%, var(--accent) 90%, transparent)",
-                opacity: 0.2,
-                scaleY: mobileLineProgress,
-              }}
-              aria-hidden="true"
-            />
+            {/* Mobile spine line container */}
+            <div className="absolute left-[10px] top-0 bottom-0 w-[2px] z-0 overflow-hidden pointer-events-none">
+              <motion.div
+                className="w-full h-full origin-top"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, transparent, var(--accent) 10%, var(--accent) 90%, transparent)",
+                  opacity: 0.25,
+                  scaleY: mobileLineProgress,
+                }}
+                aria-hidden="true"
+              />
+            </div>
 
             <div className="space-y-48 py-8">
               {filteredProjects.map((project, i) => (
@@ -273,9 +279,10 @@ const Projects = memo(function Projects() {
           </div>
         ) : (
           /* ─── Desktop: Alternating branching timeline ─── */
-          <div
+          <motion.div
             className="relative"
-            style={{ height: `${timelineHeight}px` }}
+            animate={{ height: timelineHeight }}
+            transition={{ type: "spring", stiffness: 220, damping: 28 }}
           >
             {/* Track line — faint full-height guide */}
             <motion.div
@@ -321,7 +328,7 @@ const Projects = memo(function Projects() {
                 </div>
               );
             })}
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -336,19 +343,31 @@ const Projects = memo(function Projects() {
       {/* ─── GitHub CTA ─── */}
       <div className="max-w-3xl mx-auto px-6 py-28 md:py-32 text-center">
         <div
-          className="relative rounded-2xl border p-8 md:p-12 overflow-hidden group/cta transition-all duration-500 hover:border-white/10"
+          className="relative rounded-2xl border p-8 md:p-12 overflow-hidden group/cta transition-all duration-500 hover:border-white/15"
           style={{
             background:
-              "linear-gradient(135deg, rgba(24, 24, 27, 0.4) 0%, rgba(24, 24, 27, 0.1) 100%)",
-            borderColor: "rgba(255,255,255,0.05)",
+              "linear-gradient(135deg, rgba(15, 15, 18, 0.6) 0%, rgba(10, 10, 12, 0.35) 100%)",
+            borderColor: "rgba(255,255,255,0.06)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
           }}
         >
-          <SocialIcon
-            platform="github"
-            className="w-14 h-14 mx-auto mb-5 text-[var(--accent)] relative z-10 transition-transform duration-300 group-hover/cta:scale-105"
+          {/* Ambient background glow inside card */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-0 group-hover/cta:opacity-100 transition-opacity duration-700 z-0"
+            style={{
+              background: "radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 7%, transparent) 0%, transparent 65%)",
+            }}
           />
+
+          {/* Icon Wrapper */}
+          <div className="relative w-20 h-20 mx-auto mb-6 flex items-center justify-center rounded-2xl border border-white/[0.04] bg-white/[0.01] transition-all duration-500 group-hover/cta:border-[var(--accent)]/30 group-hover/cta:bg-[var(--accent-dim)] group-hover/cta:shadow-[0_0_20px_var(--accent-dim)] z-10">
+            <SocialIcon
+              platform="github"
+              className="w-10 h-10 text-[var(--accent)] transition-transform duration-500 group-hover/cta:scale-110"
+            />
+          </div>
+
           <h3
             className="font-heading text-2xl md:text-3xl font-bold mb-3 relative z-10"
             style={{ color: "var(--text-primary)" }}
@@ -366,11 +385,10 @@ const Projects = memo(function Projects() {
             href={personal.socials.github}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm relative z-10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-transparent hover:bg-[var(--accent-hover)]"
+            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm relative z-10 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-transparent hover:bg-[var(--accent-hover)] hover:-translate-y-0.5 hover:scale-[1.02] shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.45),_0_0_15px_var(--accent)]"
             style={{
               background: "var(--accent)",
               color: "var(--accent-contrast)",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
             }}
             data-custom-cursor-ignore
             aria-label="Visit GitHub profile to see more projects"

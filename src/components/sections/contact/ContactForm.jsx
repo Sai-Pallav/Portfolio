@@ -71,29 +71,35 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
         {label}
       </label>
       
-      {touched && error && (
-        <motion.span
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          id={`${id}-error`}
-          className="mt-1.5 block text-[10px] text-amber-500/80 tracking-normal font-normal px-1"
-          role="alert"
-        >
-          ⚠ {error}
-        </motion.span>
-      )}
-      {touched && !error && hasValue && (
-        <motion.span
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-1.5 block text-[10px] tracking-normal font-normal px-1"
-          style={{ color: 'var(--accent)' }}
-        >
-          ✓ Valid {label.replace(' *', '').replace('Your ', '').toLowerCase()}
-        </motion.span>
-      )}
+      <div className="h-4 relative mt-1 overflow-visible">
+        <AnimatePresence initial={false}>
+          {touched && error && (
+            <motion.span
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              id={`${id}-error`}
+              className="absolute left-1 block text-[10px] text-amber-500/80 tracking-normal font-normal px-1"
+              role="alert"
+            >
+              ⚠ {error}
+            </motion.span>
+          )}
+          {touched && !error && hasValue && (
+            <motion.span
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute left-1 block text-[10px] tracking-normal font-normal px-1"
+              style={{ color: 'var(--accent)' }}
+            >
+              ✓ Valid {label.replace(' *', '').replace('Your ', '').toLowerCase()}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 })
@@ -151,29 +157,35 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
         {characterCount} / {characterLimit}
       </span>
 
-      {touched && error && (
-        <motion.span
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          id={`${id}-error`}
-          className="mt-1.5 block text-[10px] text-amber-500/80 tracking-normal font-normal px-1"
-          role="alert"
-        >
-          ⚠ {error}
-        </motion.span>
-      )}
-      {touched && !error && hasValue && (
-        <motion.span
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-1.5 block text-[10px] tracking-normal font-normal px-1"
-          style={{ color: 'var(--accent)' }}
-        >
-          ✓ Valid message
-        </motion.span>
-      )}
+      <div className="h-4 relative mt-1 overflow-visible">
+        <AnimatePresence initial={false}>
+          {touched && error && (
+            <motion.span
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              id={`${id}-error`}
+              className="absolute left-1 block text-[10px] text-amber-500/80 tracking-normal font-normal px-1"
+              role="alert"
+            >
+              ⚠ {error}
+            </motion.span>
+          )}
+          {touched && !error && hasValue && (
+            <motion.span
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute left-1 block text-[10px] tracking-normal font-normal px-1"
+              style={{ color: 'var(--accent)' }}
+            >
+              ✓ Valid message
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 })
@@ -281,7 +293,7 @@ function validateField(name, value) {
   return err
 }
 
-export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, isTyping, setIsTyping }) {
+export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, isTyping, setIsTyping, setFormProgress }) {
   const shouldReduceMotion = useReducedMotion()
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
   const [isFocused, setIsFocused] = useState(false)
@@ -319,11 +331,65 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       document.removeEventListener('click', handleClickOutside)
     }
   }, [isDropdownOpen])
+
+  const handleDropdownKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (!isDropdownOpen) {
+        setIsDropdownOpen(true)
+      } else {
+        const currIdx = INQUIRY_OPTIONS.indexOf(inquiryType)
+        const nextIdx = (currIdx + 1) % INQUIRY_OPTIONS.length
+        setInquiryType(INQUIRY_OPTIONS[nextIdx])
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (!isDropdownOpen) {
+        setIsDropdownOpen(true)
+      } else {
+        const currIdx = INQUIRY_OPTIONS.indexOf(inquiryType)
+        const prevIdx = (currIdx - 1 + INQUIRY_OPTIONS.length) % INQUIRY_OPTIONS.length
+        setInquiryType(INQUIRY_OPTIONS[prevIdx])
+      }
+    } else if (e.key === 'Escape') {
+      if (isDropdownOpen) {
+        e.preventDefault()
+        setIsDropdownOpen(false)
+      }
+    } else if (e.key === 'Home') {
+      if (isDropdownOpen) {
+        e.preventDefault()
+        setInquiryType(INQUIRY_OPTIONS[0])
+      }
+    } else if (e.key === 'End') {
+      if (isDropdownOpen) {
+        e.preventDefault()
+        setInquiryType(INQUIRY_OPTIONS[INQUIRY_OPTIONS.length - 1])
+      }
+    }
+  }, [isDropdownOpen, inquiryType])
+
+  const handleDropdownBlur = useCallback((e) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(e.relatedTarget)) {
+      setIsDropdownOpen(false)
+    }
+  }, [])
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState({ type: '', message: '' })
   const [subState, setSubState] = useState('idle') 
   const [isBtnHovered, setIsBtnHovered] = useState(false)
   const [ripples, setRipples] = useState([])
+
+  // Compute form fill progress (0–100) based on valid non-empty fields
+  useEffect(() => {
+    const fields = ['name', 'email', 'subject', 'message']
+    const filledCount = fields.filter(f => {
+      const val = formData[f]
+      return val && val.trim().length > 0 && !validateField(f, val)
+    }).length
+    const progress = Math.round((filledCount / fields.length) * 100)
+    if (setFormProgress) setFormProgress(progress)
+  }, [formData, setFormProgress])
 
   const resetErrorState = useCallback(() => {
     setSubState(prev => (prev === 'api_error' || prev === 'validation_error' || prev === 'error') ? 'idle' : prev)
@@ -530,11 +596,38 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       }}
       className="relative rounded-[16px] border border-white/[0.06] bg-gradient-to-br from-surface/75 via-raised/55 to-surface/75 backdrop-blur-2xl p-6 sm:p-8 md:p-8 w-full overflow-hidden"
     >
-      {/* Precision corner alignment marks */}
-      <div className="absolute top-3.5 left-3.5 w-1.5 h-1.5 border-t border-l border-white/[0.12] pointer-events-none" />
-      <div className="absolute top-3.5 right-3.5 w-1.5 h-1.5 border-t border-r border-white/[0.12] pointer-events-none" />
-      <div className="absolute bottom-3.5 left-3.5 w-1.5 h-1.5 border-b border-l border-white/[0.12] pointer-events-none" />
-      <div className="absolute bottom-3.5 right-3.5 w-1.5 h-1.5 border-b border-r border-white/[0.12] pointer-events-none" />
+      {/* Interactive Border Beam */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none rounded-[16px] z-10">
+        <defs>
+          <linearGradient id="borderBeamGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--accent-secondary)" stopOpacity="0" />
+            <stop offset="50%" stopColor="var(--accent)" stopOpacity={isFocused ? 0.9 : isHovered ? 0.6 : 0.25} />
+            <stop offset="100%" stopColor="var(--accent-hover)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <rect
+          x="0.5"
+          y="0.5"
+          width="calc(100% - 1px)"
+          height="calc(100% - 1px)"
+          rx="16"
+          fill="none"
+          stroke="url(#borderBeamGradient)"
+          strokeWidth={isFocused ? 1.75 : 1.25}
+          pathLength="100"
+          className="stroke-dasharray-[25_75] animate-border-beam"
+          style={{
+            transition: 'stroke-width 0.3s ease, stroke-opacity 0.3s ease',
+            animationDuration: isFocused ? '3s' : '6s'
+          }}
+        />
+      </svg>
+
+      {/* Pulsing Cyber Corner Brackets */}
+      <div className={`absolute top-3 left-3 w-3 h-3 border-t-2 border-l-2 transition-all duration-500 pointer-events-none ${isFocused ? 'border-accent animate-pulse scale-105' : 'border-white/[0.18]'}`} />
+      <div className={`absolute top-3 right-3 w-3 h-3 border-t-2 border-r-2 transition-all duration-500 pointer-events-none ${isFocused ? 'border-accent animate-pulse scale-105' : 'border-white/[0.18]'}`} />
+      <div className={`absolute bottom-3 left-3 w-3 h-3 border-b-2 border-l-2 transition-all duration-500 pointer-events-none ${isFocused ? 'border-accent animate-pulse scale-105' : 'border-white/[0.18]'}`} />
+      <div className={`absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2 transition-all duration-500 pointer-events-none ${isFocused ? 'border-accent animate-pulse scale-105' : 'border-white/[0.18]'}`} />
 
       {/* Ambient theme-based glow */}
       <div className="absolute -top-32 -right-32 w-64 h-64 rounded-full blur-[100px] pointer-events-none"
@@ -583,7 +676,12 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
           }}
           className="space-y-4"
         >
-          <motion.div variants={FORM_CHILD_VARIANTS} className="space-y-2 relative z-30" ref={dropdownRef}>
+          <motion.div 
+            variants={FORM_CHILD_VARIANTS} 
+            className="space-y-2 relative z-30" 
+            ref={dropdownRef}
+            onBlur={handleDropdownBlur}
+          >
           <label htmlFor="inquiry-type" className="sr-only text-[10px] font-mono tracking-[0.08em] font-medium text-[var(--text-muted)] uppercase">
             What brings you here?
           </label>
@@ -600,6 +698,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
               type="button"
               id="inquiry-type"
               onClick={() => setIsDropdownOpen(prev => !prev)}
+              onKeyDown={handleDropdownKeyDown}
               className="w-full rounded-[6px] border border-white/[0.06] bg-black/35 pl-10 pr-4 py-3 text-xs md:text-sm text-[var(--text-primary)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
               aria-haspopup="listbox"
               aria-expanded={isDropdownOpen}

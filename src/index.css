@@ -28,6 +28,7 @@
   --animate-float: float 6s ease-in-out infinite;
   --animate-glow-pulse: glowPulse 3s ease-in-out infinite;
   --animate-pcb-travel: pcbTravel 4s linear infinite;
+  --animate-border-beam: borderBeam 4s linear infinite;
 
   /* Keyframes fadeUp, fadeIn, slideLeft, float, glowPulse are defined in animations.css */
   @keyframes popIn {
@@ -41,6 +42,28 @@
   @keyframes pcbTravel {
     0% { offset-distance: 0%; }
     100% { offset-distance: 100%; }
+  }
+  @keyframes borderBeam {
+    0% { stroke-dashoffset: 100; }
+    100% { stroke-dashoffset: 0; }
+  }
+  @keyframes pcbParticleTravel {
+    0% {
+      offset-distance: 0%;
+      transform: scale(0.5);
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    85% {
+      opacity: 1;
+    }
+    100% {
+      offset-distance: 100%;
+      transform: scale(1.0);
+      opacity: 0;
+    }
   }
 
 }
@@ -141,4 +164,141 @@ main {
     background-position: 200% 0;
   }
 }
+
+/* PCB Animations */
+@keyframes pcbTravel {
+  0% {
+    offset-distance: 0%;
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  100% {
+    offset-distance: 100%;
+    transform: scale(0.45);
+    opacity: 0.35;
+  }
+}
+@keyframes pcbPulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes pcbStandbyPulse {
+  0%, 100% {
+    opacity: 0.12;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.32;
+    transform: scale(1.08);
+  }
+}
+@keyframes pcbTrailAnim {
+  0% {
+    stroke-dashoffset: 400;
+    opacity: 0.8;
+  }
+  70% {
+    stroke-dashoffset: 120;
+    opacity: 0.8;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes pcbRadarRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pcbRadarRotateCounter {
+  0% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes pcbRadarPulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+.animate-standby-pulse {
+  animation: pcbStandbyPulse 3.5s ease-in-out infinite;
+}
+@keyframes pcbSignalFlow {
+  0% {
+    stroke-dashoffset: 115;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes pcbSignalFlowReverse {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 115;
+  }
+}
+@keyframes pcbNodeMove {
+  0% {
+    transform: translate(0px, 0px);
+  }
+  30% {
+    transform: translate(var(--move-x1), 0px);
+  }
+  50% {
+    transform: translate(var(--move-x2), var(--move-y1));
+  }
+  70% {
+    transform: translate(var(--move-x1), 0px);
+  }
+  100% {
+    transform: translate(0px, 0px);
+  }
+}
+@keyframes pcbCorePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 1.0;
+  }
+}
+@keyframes pcbRingBreathe {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.15);
+  }
+}
+@keyframes pcbViaPulse {
+  0%, 100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1.0;
+  }
+}
+
 

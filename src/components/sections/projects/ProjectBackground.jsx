@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo, memo } from "react";
-import { motion, useTransform, motionValue } from "framer-motion";
-import PcbFragment from "./pcbFragments/PcbFragment";
+import { motion, useTransform, motionValue, useReducedMotion } from "framer-motion";
+// Removed PcbFragment import to clean up background circuit elements
 
 /* ─────────────────────────────────────────────────────────────
    DOT GRID LAYER
@@ -35,7 +35,8 @@ const DotGridLayer = memo(function DotGridLayer() {
 /* ─────────────────────────────────────────────────────────────
    MAIN COMPONENT
 ───────────────────────────────────────────────────────────── */
-function ProjectBackground({ activeCategory }) {
+function ProjectBackground({ scrollYProgress, activeCategory }) {
+  const isReducedMotion = useReducedMotion();
   const [itemPositions, setItemPositions] = useState([]);
   const [dimensions, setDimensions] = useState({ width: 1200, height: 2000 });
   const [isMobileView, setIsMobileView] = useState(false);
@@ -153,95 +154,13 @@ function ProjectBackground({ activeCategory }) {
   // Coordinates for the timeline spine axis
   const spineX = isMobileView ? 20 : dimensions.width / 2;
 
+  // Map scroll progress directly to the center coordinates of the moving energy corridor pulse
+  const energyGlowY = useTransform(scrollYProgress || { get: () => 0 }, [0, 1], ["0%", "100%"]);
+
   const CARD_KEEP_OUT_PX = 110; // within 90–120 spec
   const SPINE_KEEP_OUT_PX = 150; // per spec
 
-  const pcbKeepOutRects = useMemo(() => {
-    const keep = [];
-    // Card halos
-    for (const pos of itemPositions) {
-      keep.push({
-        x: Math.max(0, pos.left - CARD_KEEP_OUT_PX),
-        y: Math.max(0, pos.top - CARD_KEEP_OUT_PX),
-        w: Math.min(dimensions.width, pos.left + pos.width + CARD_KEEP_OUT_PX) - Math.max(0, pos.left - CARD_KEEP_OUT_PX),
-        h: Math.min(dimensions.height, pos.top + pos.height + CARD_KEEP_OUT_PX) - Math.max(0, pos.top - CARD_KEEP_OUT_PX),
-      });
-    }
-    // Timeline corridor keep-out (full height)
-    keep.push({
-      x: Math.max(0, spineX - SPINE_KEEP_OUT_PX),
-      y: 0,
-      w: Math.min(dimensions.width, spineX + SPINE_KEEP_OUT_PX) - Math.max(0, spineX - SPINE_KEEP_OUT_PX),
-      h: dimensions.height,
-    });
-    return keep;
-  }, [itemPositions, dimensions.width, dimensions.height, spineX]);
-
-  const pcbFragments = useMemo(() => {
-    if (dimensions.width <= 0 || dimensions.height <= 0) return [];
-
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-    const overlapsAny = (box) =>
-      pcbKeepOutRects.some((r) => {
-        const x1 = Math.max(box.x, r.x);
-        const y1 = Math.max(box.y, r.y);
-        const x2 = Math.min(box.x + box.w, r.x + r.w);
-        const y2 = Math.min(box.y + box.h, r.y + r.h);
-        return x2 > x1 && y2 > y1;
-      });
-
-    const leftLimit = isMobileView ? Math.max(0, spineX + SPINE_KEEP_OUT_PX) : Math.max(0, spineX - SPINE_KEEP_OUT_PX);
-    const rightStart = Math.max(0, spineX + SPINE_KEEP_OUT_PX);
-
-    const leftMaxW = isMobileView ? Math.max(0, dimensions.width - rightStart) : Math.max(0, leftLimit);
-    const rightMaxW = Math.max(0, dimensions.width - rightStart);
-
-    const base = [
-      { side: "left", edge: "left", density: "medium", yT: 0.13, wT: 0.28, hT: 0.18, opacity: 0.95 },
-      { side: "left", edge: "left", density: "light", yT: 0.40, wT: 0.22, hT: 0.16, opacity: 0.85 },
-      { side: "left", edge: "left", density: "dense", yT: 0.72, wT: 0.26, hT: 0.20, opacity: 0.95 },
-      { side: "right", edge: "right", density: "light", yT: 0.18, wT: 0.22, hT: 0.16, opacity: 0.85 },
-      { side: "right", edge: "right", density: "medium", yT: 0.52, wT: 0.26, hT: 0.19, opacity: 0.92 },
-      { side: "right", edge: "right", density: "light", yT: 0.84, wT: 0.20, hT: 0.15, opacity: 0.82 },
-    ];
-
-    // Mobile: only show subtle right-side fragments (avoid left spine).
-    const templates = isMobileView ? base.filter((t) => t.side === "right").map((t) => ({ ...t, density: "light", opacity: 0.75 })) : base;
-
-    const out = [];
-    for (let i = 0; i < templates.length; i++) {
-      const t = templates[i];
-      const maxW = t.side === "left" ? leftMaxW : rightMaxW;
-      if (maxW < 140) continue;
-
-      const w = clamp(Math.round(dimensions.width * t.wT), 180, Math.min(420, Math.round(maxW - 18)));
-      const h = clamp(Math.round(dimensions.height * t.hT), 160, 340);
-
-      const x = t.side === "left" ? 0 : rightStart;
-      let y = clamp(Math.round(dimensions.height * t.yT - h / 2), 0, Math.max(0, dimensions.height - h));
-
-      // Nudge down until we find negative space not colliding with keep-out.
-      let tries = 0;
-      while (tries < 10 && overlapsAny({ x, y, w, h })) {
-        y = clamp(y + 80, 0, Math.max(0, dimensions.height - h));
-        tries++;
-      }
-      if (overlapsAny({ x, y, w, h })) continue;
-
-      out.push({
-        id: `${activeCategory}-frag-${i}`,
-        x,
-        y,
-        w,
-        h,
-        edge: t.edge,
-        density: t.density,
-        opacity: t.opacity,
-        seedKey: `${activeCategory}-${i}-${t.side}-${t.density}`,
-      });
-    }
-    return out;
-  }, [dimensions.width, dimensions.height, pcbKeepOutRects, spineX, SPINE_KEEP_OUT_PX, isMobileView, activeCategory]);
+  // Keep-out logic and fragments removed to clear background circuit elements
 
   return (
     <>
@@ -290,23 +209,6 @@ function ProjectBackground({ activeCategory }) {
       {/* ─── Layer 1: Atmospheric Dot Grid ─── */}
       <DotGridLayer />
 
-      {/* ─── Layer 1.5: Independent PCB fragments (positioned in negative space) ─── */}
-      {pcbFragments.map((f) => (
-        <PcbFragment
-          key={f.id}
-          id={f.id}
-          x={f.x}
-          y={f.y}
-          w={f.w}
-          h={f.h}
-          edge={f.edge}
-          density={f.density}
-          keepOutRects={pcbKeepOutRects}
-          opacity={f.opacity}
-          seedKey={f.seedKey}
-        />
-      ))}
-
       {/* ─── Layer 2: Timeline Spine Corridor ─── */}
       <div 
         className="absolute inset-y-0 -z-20 pointer-events-none overflow-hidden select-none bg-transparent"
@@ -323,31 +225,18 @@ function ProjectBackground({ activeCategory }) {
             background: `linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 4.5%, transparent) 50%, transparent)`,
           }}
         />
-      </div>
 
-      {/* ─── Layer 3: Connection Network (Static connections) ─── */}
-      <div className="absolute inset-0 -z-15 pointer-events-none overflow-hidden select-none">
-        <motion.svg
-          className="w-full h-full"
-          style={{
-            opacity: 0.25,
-          }}
-        >
-          {itemPositions.map((pos, index) => {
-            const focusVal = focusValues[index];
-            if (!focusVal) return null;
-            return (
-              <ProjectConnectionLine
-                key={`network-group-${index}`}
-                focusVal={focusVal}
-                pos={pos}
-                index={index}
-                spineX={spineX}
-                isMobileView={isMobileView}
-              />
-            );
-          })}
-        </motion.svg>
+        {/* Traveling energy node following viewport center */}
+        {!isReducedMotion && (
+          <motion.div
+            className="absolute left-1/2 -translate-x-1/2 w-48 h-96 pointer-events-none blur-[45px]"
+            style={{
+              top: energyGlowY,
+              transform: "translate(-50%, -50%)",
+              background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 14%, transparent) 0%, transparent 70%)",
+            }}
+          />
+        )}
       </div>
 
       {/* ─── Layer 4: Static Focus Zone Lights ─── */}
@@ -369,64 +258,7 @@ function ProjectBackground({ activeCategory }) {
   );
 }
 
-const ProjectConnectionLine = memo(function ProjectConnectionLine({ focusVal, pos, index, spineX, isMobileView }) {
-  const opacity_line = useTransform(focusVal, (f) => 0.04 + f * 0.15);
-  const opacity_node1 = useTransform(focusVal, (f) => 0.15 + f * 0.55);
-  const opacity_node2 = useTransform(focusVal, (f) => 0.05 + f * 0.25);
-  const scale_node2 = useTransform(focusVal, (f) => 0.9 + f * 0.3);
-
-  const centerY = pos.centerY;
-  const pathData = isMobileView
-    ? `M ${spineX} ${centerY} L ${pos.left} ${centerY}`
-    : pos.isLeft
-      ? `M ${spineX} ${centerY} L ${spineX - 15} ${centerY} L ${spineX - 35} ${centerY - 15} L ${pos.left + pos.width} ${centerY - 15}`
-      : `M ${spineX} ${centerY} L ${spineX + 15} ${centerY} L ${spineX + 35} ${centerY + 15} L ${pos.left} ${centerY + 15}`;
-
-  const nodeX = isMobileView ? 0 : pos.isLeft ? spineX - 35 : spineX + 35;
-  const nodeY = isMobileView ? 0 : pos.isLeft ? centerY - 15 : centerY + 15;
-
-  return (
-    <g>
-      {/* Thin connection path */}
-      <motion.path
-        d={pathData}
-        stroke="var(--accent)"
-        strokeWidth="1"
-        fill="none"
-        style={{
-          opacity: opacity_line,
-        }}
-      />
-
-      {/* Micro-nodes (connection junctions) */}
-      {!isMobileView && (
-        <>
-          <motion.circle
-            cx={nodeX}
-            cy={nodeY}
-            r="2"
-            fill="var(--accent)"
-            style={{
-              opacity: opacity_node1,
-            }}
-          />
-          <motion.circle
-            cx={nodeX}
-            cy={nodeY}
-            r="4.5"
-            stroke="var(--accent)"
-            strokeWidth="1"
-            fill="none"
-            style={{
-              opacity: opacity_node2,
-              scale: scale_node2,
-            }}
-          />
-        </>
-      )}
-    </g>
-  );
-});
+// Static connection lines removed to clear background circuit elements
 
 const ProjectLightVolume = memo(function ProjectLightVolume({ focusVal, pos, isMobileView }) {
   const opacity_volume = useTransform(focusVal, (f) => 0.012 + f * 0.035);

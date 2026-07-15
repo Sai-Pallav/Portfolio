@@ -9,6 +9,7 @@ import SocialIcon from '@/components/ui/SocialIcon'
 // --- Global Theme Ref for Imperative Material Updates (No React Re-renders) ---
 const globalTheme = {
   color: '#3b82f6',
+  secondaryColor: '#8b5cff',
   version: 0,
 }
 
@@ -346,12 +347,14 @@ function MicroParticles({ distanceFactor }) {
 
 function Globe({ distanceFactor }) {
   const wireRef = useRef()
+  const gridRef = useRef()
   const pointsRef = useRef()
   const easedFactor = useRef(1.0)
   const timeAccum = useRef(0)
   const shouldReduceMotion = useReducedMotion()
 
   const geomWire = useMemo(() => new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 2), [])
+  const geomGrid = useMemo(() => new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius * 1.025, 1), [])
   const geomPoints = useMemo(() => new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 4), [])
   const geomGlass = useMemo(() => new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 32, 32), [])
   const geomHalo = useMemo(() => new THREE.SphereGeometry(SCENE_CONFIG.globe.haloRadius, 32, 32), [])
@@ -364,6 +367,10 @@ function Globe({ distanceFactor }) {
     easedFactor.current = lerpFI(easedFactor.current, distanceFactor.current, LERP.proximitySpeed, delta)
     const f = easedFactor.current
     if (wireRef.current) wireRef.current.rotation.y += delta * 0.08 * f
+    if (gridRef.current) {
+      gridRef.current.rotation.y -= delta * 0.05 * f
+      gridRef.current.rotation.x -= delta * 0.015 * f
+    }
     if (pointsRef.current) {
       pointsRef.current.rotation.y += delta * 0.10 * f
       pointsRef.current.rotation.x += delta * 0.02 * f
@@ -380,6 +387,10 @@ function Globe({ distanceFactor }) {
       <mesh ref={wireRef} geometry={geomWire}>
         <meshBasicMaterial color={globalTheme.color} wireframe transparent
           opacity={SCENE_CONFIG.globe.wireframeOpacity} depthWrite={false} />
+      </mesh>
+      <mesh ref={gridRef} geometry={geomGrid}>
+        <meshBasicMaterial color={globalTheme.color} wireframe transparent
+          opacity={SCENE_CONFIG.globe.wireframeOpacity * 0.7} depthWrite={false} />
       </mesh>
       <points ref={pointsRef} geometry={geomPoints}>
         <pointsMaterial color={globalTheme.color} size={0.028} transparent
@@ -662,6 +673,8 @@ const OrbitalRing = memo(function OrbitalRing({
   const reactionTimeB = useRef(0)
   const reactionFactorB = useRef(0.0)
 
+  const driftRef = useRef({ x: 0, y: 0 })
+
   const tempVecA = useMemo(() => new THREE.Vector3(), [])
   const tempVecB = useMemo(() => new THREE.Vector3(), [])
 
@@ -776,8 +789,19 @@ const OrbitalRing = memo(function OrbitalRing({
 
     // 1. Rotate the OrbitGroup itself slowly (carrying the RingMesh and both IconPivots)
     orbitGroupPhase.current = (orbitGroupPhase.current + delta * ringSpeed) % (2 * Math.PI)
+    
+    // Wave float/tilt drift when hovered (organic physics-based bobbing)
+    const floatTime = state.clock.getElapsedTime()
+    const targetDriftX = activeHover * Math.sin(floatTime * 2.0) * 0.08
+    const targetDriftY = activeHover * Math.cos(floatTime * 1.6) * 0.08
+    
+    driftRef.current.x = lerpFI(driftRef.current.x, targetDriftX, 4.0, delta)
+    driftRef.current.y = lerpFI(driftRef.current.y, targetDriftY, 4.0, delta)
+    
     if (orbitGroupRef.current) {
       orbitGroupRef.current.rotation.z = orbitGroupPhase.current
+      orbitGroupRef.current.rotation.x = driftRef.current.x
+      orbitGroupRef.current.rotation.y = driftRef.current.y
     }
 
     // 2. Rotate the IconPivots (making the icons revolve along the ring)
@@ -1206,16 +1230,21 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
 
     if (lastColorVersion.current !== globalTheme.version) {
       const color = new THREE.Color(globalTheme.color)
+      const secondaryColor = new THREE.Color(globalTheme.secondaryColor)
       state.scene.traverse((obj) => {
         if (obj.name === 'glassCore') return
-        if (obj.geometry && obj.geometry === sharedRingGeometry) return // Retain custom neon purple
         if (obj.isMesh || obj.isPoints) {
           if (obj.material) {
             const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
             mats.forEach((mat) => {
-              if (mat.color) mat.color.copy(color)
+              const isSecondary = obj.geometry && obj.geometry === sharedRingGeometry
+              const activeColor = isSecondary ? secondaryColor : color
+              if (mat.color) mat.color.copy(activeColor)
               if (mat.uniforms && mat.uniforms.color) {
-                mat.uniforms.color.value.copy(color)
+                mat.uniforms.color.value.copy(activeColor)
+              }
+              if (mat.uniforms && mat.uniforms.edgeColor) {
+                mat.uniforms.edgeColor.value.copy(secondaryColor)
               }
             })
           }
@@ -1286,7 +1315,7 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
   )
 }
 
-export default function Contact3DObject() {
+export default function Contact3DObject({ isInView, contactSystemState }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const distanceFactor = useRef(1.0)
@@ -1301,8 +1330,17 @@ export default function Contact3DObject() {
   useEffect(() => {
     const readTheme = () => {
       const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()
+      const secondary = getComputedStyle(document.documentElement).getPropertyValue("--accent-secondary").trim()
+      let updated = false
       if (accent && accent !== globalTheme.color) {
         globalTheme.color = accent
+        updated = true
+      }
+      if (secondary && secondary !== globalTheme.secondaryColor) {
+        globalTheme.secondaryColor = secondary
+        updated = true
+      }
+      if (updated) {
         globalTheme.version += 1
       }
     }
@@ -1446,7 +1484,7 @@ export default function Contact3DObject() {
         />
 
         <div className="absolute inset-0 pointer-events-none">
-          {webglSupported ? (
+          {webglSupported && isInView ? (
             <Canvas
               camera={SCENE_CONFIG.camera}
               onCreated={({ gl }) => {
@@ -1468,6 +1506,8 @@ export default function Contact3DObject() {
                 hoveredOrbitRef={hoveredOrbitRef}
               />
             </Canvas>
+          ) : webglSupported && !isInView ? (
+            null
           ) : (
             // Robust 2D recovery fallback: elegant animated list in place of crashed WebGL canvas
             <div className="flex items-center justify-center w-full h-full pointer-events-auto">

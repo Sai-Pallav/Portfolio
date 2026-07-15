@@ -11,6 +11,7 @@ export default memo(function ContactSection() {
   const [contactSystemState, setContactSystemState] = useState('dormant')
   const [transmissionFailed, setTransmissionFailed] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  const [formProgress, setFormProgress] = useState(0)
   const sectionRef = useRef(null)
 
   // Optimization: Tracks viewport intersection to toggle canvas animation state
@@ -221,7 +222,7 @@ export default memo(function ContactSection() {
         {/* Full-width backdrop wrapper for Left and Right PCB */}
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen pointer-events-none z-0 hidden lg:block">
           <LeftPCB formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} />
-          <RightPCB formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} />
+          <RightPCB formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} formProgress={formProgress} />
         </div>
 
         {/* Full-width flex container keeps the form and globe in their natural positions. */}
@@ -237,6 +238,7 @@ export default memo(function ContactSection() {
                   setTransmissionFailed={setTransmissionFailed}
                   setIsTyping={setIsTyping}
                   isTyping={isTyping}
+                  setFormProgress={setFormProgress}
                 />
               </div>
             </div>
