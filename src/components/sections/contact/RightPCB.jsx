@@ -1167,12 +1167,15 @@ const renderMountingHole = (x, y) => {
            ======================================================== */}
       <g opacity={isTransmit ? 0 : 1} style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}>
 
+        {/* ========================================================
+              TOP MARGIN CAD ZONES (Right PCB)
+           ======================================================== */}
         {/* Zone 1 — Interface Zone: left entry band (globe inputs) */}
         <rect
           x={midStart}
           y={Y_center - 185}
           width={Math.max(0, (middleTargetLimit - midStart) * 0.30)}
-          height={370}
+          height={60}
           fill="rgba(8, 10, 18, 0.20)"
           stroke="var(--accent)"
           strokeWidth="0.25"
@@ -1182,17 +1185,17 @@ const renderMountingHole = (x, y) => {
         <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.07" fill="none">
           <path d={`M ${midStart},${Y_center - 181} V ${Y_center - 185} H ${midStart + 5}`} />
           <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.30 - 5},${Y_center - 185} H ${midStart + (middleTargetLimit - midStart) * 0.30} V ${Y_center - 181}`} />
-          <path d={`M ${midStart},${Y_center + 181} V ${Y_center + 185} H ${midStart + 5}`} />
-          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.30 - 5},${Y_center + 185} H ${midStart + (middleTargetLimit - midStart) * 0.30} V ${Y_center + 181}`} />
+          <path d={`M ${midStart},${Y_center - 129} V ${Y_center - 125} H ${midStart + 5}`} />
+          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.30 - 5},${Y_center - 125} H ${midStart + (middleTargetLimit - midStart) * 0.30} V ${Y_center - 129}`} />
         </g>
-        <text x={midStart + 4} y={Y_center - 171} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1.1" opacity="0.07">IF_ZONE_R1</text>
+        <text x={midStart + 4} y={Y_center - 172} fill="var(--accent)" fontSize="5.0" fontFamily="monospace" letterSpacing="0.8" opacity="0.07">SYS_IF_R1</text>
 
         {/* Zone 2 — Process Zone: central corridor */}
         <rect
           x={midStart + (middleTargetLimit - midStart) * 0.32}
           y={Y_center - 185}
           width={Math.max(0, (middleTargetLimit - midStart) * 0.36)}
-          height={370}
+          height={60}
           fill="rgba(8, 10, 18, 0.18)"
           stroke="var(--accent)"
           strokeWidth="0.25"
@@ -1202,17 +1205,17 @@ const renderMountingHole = (x, y) => {
         <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.07" fill="none">
           <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.32},${Y_center - 181} V ${Y_center - 185} H ${midStart + (middleTargetLimit - midStart) * 0.32 + 5}`} />
           <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.68 - 5},${Y_center - 185} H ${midStart + (middleTargetLimit - midStart) * 0.68} V ${Y_center - 181}`} />
-          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.32},${Y_center + 181} V ${Y_center + 185} H ${midStart + (middleTargetLimit - midStart) * 0.32 + 5}`} />
-          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.68 - 5},${Y_center + 185} H ${midStart + (middleTargetLimit - midStart) * 0.68} V ${Y_center + 181}`} />
+          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.32},${Y_center - 129} V ${Y_center - 125} H ${midStart + (middleTargetLimit - midStart) * 0.32 + 5}`} />
+          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.68 - 5},${Y_center - 125} H ${midStart + (middleTargetLimit - midStart) * 0.68} V ${Y_center - 129}`} />
         </g>
-        <text x={midStart + (middleTargetLimit - midStart) * 0.32 + 4} y={Y_center - 171} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1.1" opacity="0.07">PROC_ZONE_R2</text>
+        <text x={midStart + (middleTargetLimit - midStart) * 0.32 + 4} y={Y_center - 172} fill="var(--accent)" fontSize="5.0" fontFamily="monospace" letterSpacing="0.8" opacity="0.07">SYS_PR_R2</text>
 
         {/* Zone 3 — Signal Hub Zone: node / BGA area */}
         <rect
           x={middleTargetLimit}
           y={Y_center - 185}
           width={Math.max(0, rightTargetLimit - middleTargetLimit)}
-          height={370}
+          height={60}
           fill="rgba(8, 10, 18, 0.22)"
           stroke="var(--accent)"
           strokeWidth="0.25"
@@ -1222,17 +1225,17 @@ const renderMountingHole = (x, y) => {
         <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.08" fill="none">
           <path d={`M ${middleTargetLimit},${Y_center - 181} V ${Y_center - 185} H ${middleTargetLimit + 5}`} />
           <path d={`M ${rightTargetLimit - 5},${Y_center - 185} H ${rightTargetLimit} V ${Y_center - 181}`} />
-          <path d={`M ${middleTargetLimit},${Y_center + 181} V ${Y_center + 185} H ${middleTargetLimit + 5}`} />
-          <path d={`M ${rightTargetLimit - 5},${Y_center + 185} H ${rightTargetLimit} V ${Y_center + 181}`} />
+          <path d={`M ${middleTargetLimit},${Y_center - 129} V ${Y_center - 125} H ${middleTargetLimit + 5}`} />
+          <path d={`M ${rightTargetLimit - 5},${Y_center - 125} H ${rightTargetLimit} V ${Y_center - 129}`} />
         </g>
-        <text x={middleTargetLimit + 4} y={Y_center - 171} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1.1" opacity="0.09">SH_ZONE_R3</text>
+        <text x={middleTargetLimit + 4} y={Y_center - 172} fill="var(--accent)" fontSize="5.0" fontFamily="monospace" letterSpacing="0.8" opacity="0.09">SYS_HB_R3</text>
 
         {/* Zone 4 — Exit Zone: far-right output edge */}
         <rect
           x={rightTargetLimit}
           y={Y_center - 185}
           width={Math.max(0, endX - rightTargetLimit)}
-          height={370}
+          height={60}
           fill="rgba(8, 10, 18, 0.28)"
           stroke="var(--accent)"
           strokeWidth="0.25"
@@ -1242,10 +1245,85 @@ const renderMountingHole = (x, y) => {
         <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.09" fill="none">
           <path d={`M ${rightTargetLimit},${Y_center - 181} V ${Y_center - 185} H ${rightTargetLimit + 5}`} />
           <path d={`M ${endX - 5},${Y_center - 185} H ${endX} V ${Y_center - 181}`} />
+          <path d={`M ${rightTargetLimit},${Y_center - 129} V ${Y_center - 125} H ${rightTargetLimit + 5}`} />
+          <path d={`M ${endX - 5},${Y_center - 125} H ${endX} V ${Y_center - 129}`} />
+        </g>
+        <text x={rightTargetLimit + 4} y={Y_center - 172} fill="var(--accent)" fontSize="5.0" fontFamily="monospace" letterSpacing="0.8" opacity="0.09">SYS_EX_R4</text>
+
+        {/* ========================================================
+              BOTTOM MARGIN CAD ZONES (Right PCB)
+           ======================================================== */}
+        <rect
+          x={midStart}
+          y={Y_center + 125}
+          width={Math.max(0, (middleTargetLimit - midStart) * 0.30)}
+          height={60}
+          fill="rgba(8, 10, 18, 0.20)"
+          stroke="var(--accent)"
+          strokeWidth="0.25"
+          opacity="0.05"
+        />
+        {/* CAD corner ticks — Bottom Zone 1 */}
+        <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.07" fill="none">
+          <path d={`M ${midStart},${Y_center + 129} V ${Y_center + 125} H ${midStart + 5}`} />
+          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.30 - 5},${Y_center + 125} H ${midStart + (middleTargetLimit - midStart) * 0.30} V ${Y_center + 129}`} />
+          <path d={`M ${midStart},${Y_center + 181} V ${Y_center + 185} H ${midStart + 5}`} />
+          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.30 - 5},${Y_center + 185} H ${midStart + (middleTargetLimit - midStart) * 0.30} V ${Y_center + 181}`} />
+        </g>
+
+        <rect
+          x={midStart + (middleTargetLimit - midStart) * 0.32}
+          y={Y_center + 125}
+          width={Math.max(0, (middleTargetLimit - midStart) * 0.36)}
+          height={60}
+          fill="rgba(8, 10, 18, 0.18)"
+          stroke="var(--accent)"
+          strokeWidth="0.25"
+          opacity="0.04"
+        />
+        {/* CAD corner ticks — Bottom Zone 2 */}
+        <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.07" fill="none">
+          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.32},${Y_center + 129} V ${Y_center + 125} H ${midStart + (middleTargetLimit - midStart) * 0.32 + 5}`} />
+          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.68 - 5},${Y_center + 125} H ${midStart + (middleTargetLimit - midStart) * 0.68} V ${Y_center + 129}`} />
+          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.32},${Y_center + 181} V ${Y_center + 185} H ${midStart + (middleTargetLimit - midStart) * 0.32 + 5}`} />
+          <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.68 - 5},${Y_center + 185} H ${midStart + (middleTargetLimit - midStart) * 0.68} V ${Y_center + 181}`} />
+        </g>
+
+        <rect
+          x={middleTargetLimit}
+          y={Y_center + 125}
+          width={Math.max(0, rightTargetLimit - middleTargetLimit)}
+          height={60}
+          fill="rgba(8, 10, 18, 0.22)"
+          stroke="var(--accent)"
+          strokeWidth="0.25"
+          opacity="0.06"
+        />
+        {/* CAD corner ticks — Bottom Zone 3 */}
+        <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.08" fill="none">
+          <path d={`M ${middleTargetLimit},${Y_center + 129} V ${Y_center + 125} H ${middleTargetLimit + 5}`} />
+          <path d={`M ${rightTargetLimit - 5},${Y_center + 125} H ${rightTargetLimit} V ${Y_center + 129}`} />
+          <path d={`M ${middleTargetLimit},${Y_center + 181} V ${Y_center + 185} H ${middleTargetLimit + 5}`} />
+          <path d={`M ${rightTargetLimit - 5},${Y_center + 185} H ${rightTargetLimit} V ${Y_center + 181}`} />
+        </g>
+
+        <rect
+          x={rightTargetLimit}
+          y={Y_center + 125}
+          width={Math.max(0, endX - rightTargetLimit)}
+          height={60}
+          fill="rgba(8, 10, 18, 0.28)"
+          stroke="var(--accent)"
+          strokeWidth="0.25"
+          opacity="0.07"
+        />
+        {/* CAD corner ticks — Bottom Zone 4 */}
+        <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.09" fill="none">
+          <path d={`M ${rightTargetLimit},${Y_center + 129} V ${Y_center + 125} H ${rightTargetLimit + 5}`} />
+          <path d={`M ${endX - 5},${Y_center + 125} H ${endX} V ${Y_center + 129}`} />
           <path d={`M ${rightTargetLimit},${Y_center + 181} V ${Y_center + 185} H ${rightTargetLimit + 5}`} />
           <path d={`M ${endX - 5},${Y_center + 185} H ${endX} V ${Y_center + 181}`} />
         </g>
-        <text x={rightTargetLimit + 4} y={Y_center - 171} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1.1" opacity="0.09">EXIT_ZONE_R4</text>
 
         {/* Inactive layered infrastructure CAD tracks */}
         <g stroke="var(--accent)" strokeWidth="0.55" fill="none" opacity="0.018">
@@ -1499,7 +1577,7 @@ return (
                 return (
                   <React.Fragment key={`m-trace-${idx}`}>
                     {/* Motherboard-style Negative Space Corridor Channel */}
-                    {t.category !== 'ground' && (
+                    {t.category === 'main' && (
                       <>
                         <path
                           d={t.d}
@@ -1685,7 +1763,7 @@ return (
           return (
             <React.Fragment key={`r-trace-${idx}`}>
               {/* Motherboard-style Negative Space Corridor Channel */}
-              {t.category !== 'ground' && (
+              {t.category === 'main' && (
                 <>
                   <path
                     d={t.d}

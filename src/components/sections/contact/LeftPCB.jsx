@@ -451,7 +451,7 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
     return (
       <React.Fragment key={`trace-${i}`}>
         {/* Motherboard-style Negative Space Corridor Channel */}
-        {t.category !== 'ground' && (
+        {t.category === 'main' && (
           <>
             <path
               d={t.d}
@@ -748,61 +748,115 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
           opacity={isTransmit ? 0 : 1}
           style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
         >
+          {/* ========================================================
+                TOP MARGIN CAD ZONES (Left PCB)
+             ======================================================== */}
           {/* Zone 1: Transmission (Input) Zone */}
           <rect 
             x={xStart + 2} 
             y={10} 
             width={60 * scale} 
-            height={H - 20} 
+            height={70} 
             fill="rgba(8, 10, 18, 0.25)" 
             stroke="var(--accent)" 
             strokeWidth="0.25" 
             opacity="0.05" 
           />
-          {renderCadTicks(xStart + 2, 10, 60 * scale, H - 20)}
-          <text x={xStart + 8} y={22} fill="var(--accent)" fontSize="6" fontFamily="monospace" letterSpacing="1.2" opacity="0.06">TX_ZONE_L1</text>
+          {renderCadTicks(xStart + 2, 10, 60 * scale, 70)}
+          <text x={xStart + 8} y={22} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1" opacity="0.07">SYS_TX_L1</text>
 
           {/* Zone 2: Branching Zone */}
           <rect 
             x={xStart + 65 * scale} 
             y={10} 
             width={85 * scale} 
-            height={H - 20} 
+            height={70} 
             fill="rgba(8, 10, 18, 0.20)" 
             stroke="var(--accent)" 
             strokeWidth="0.25" 
             opacity="0.04" 
           />
-          {renderCadTicks(xStart + 65 * scale, 10, 85 * scale, H - 20)}
-          <text x={xStart + (65 + 6) * scale} y={22} fill="var(--accent)" fontSize="6" fontFamily="monospace" letterSpacing="1.2" opacity="0.06">BR_ZONE_L2</text>
+          {renderCadTicks(xStart + 65 * scale, 10, 85 * scale, 70)}
+          <text x={xStart + (65 + 6) * scale} y={22} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1" opacity="0.07">SYS_BR_L2</text>
 
           {/* Zone 3: Buffer Zone */}
           <rect 
             x={xStart + 155 * scale} 
             y={10} 
             width={70 * scale} 
-            height={H - 20} 
+            height={70} 
             fill="rgba(8, 10, 18, 0.30)" 
             stroke="var(--accent)" 
             strokeWidth="0.25" 
             opacity="0.06" 
           />
-          {renderCadTicks(xStart + 155 * scale, 10, 70 * scale, H - 20)}
-          <text x={xStart + (155 + 6) * scale} y={22} fill="var(--accent)" fontSize="6" fontFamily="monospace" letterSpacing="1.2" opacity="0.08">BUF_ZONE_L3</text>
+          {renderCadTicks(xStart + 155 * scale, 10, 70 * scale, 70)}
+          <text x={xStart + (155 + 6) * scale} y={22} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1" opacity="0.08">SYS_BF_L3</text>
 
           {/* Zone 4: Interface Zone */}
           <rect 
             x={xStart + 230 * scale} 
             y={10} 
             width={46 * scale} 
-            height={H - 20} 
+            height={70} 
             fill="rgba(8, 10, 18, 0.35)" 
             stroke="var(--accent)" 
             strokeWidth="0.25" 
             opacity="0.07" 
           />
-          {renderCadTicks(xStart + 230 * scale, 10, 46 * scale, H - 20)}
-          <text x={xStart + (230 + 5) * scale} y={22} fill="var(--accent)" fontSize="6" fontFamily="monospace" letterSpacing="1.2" opacity="0.09">INT_ZONE_L4</text>
+          {renderCadTicks(xStart + 230 * scale, 10, 46 * scale, 70)}
+          <text x={xStart + (230 + 5) * scale} y={22} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1" opacity="0.09">SYS_IT_L4</text>
+
+          {/* ========================================================
+                BOTTOM MARGIN CAD ZONES (Left PCB)
+             ======================================================== */}
+          <rect 
+            x={xStart + 2} 
+            y={H - 80} 
+            width={60 * scale} 
+            height={70} 
+            fill="rgba(8, 10, 18, 0.25)" 
+            stroke="var(--accent)" 
+            strokeWidth="0.25" 
+            opacity="0.05" 
+          />
+          {renderCadTicks(xStart + 2, H - 80, 60 * scale, 70)}
+
+          <rect 
+            x={xStart + 65 * scale} 
+            y={H - 80} 
+            width={85 * scale} 
+            height={70} 
+            fill="rgba(8, 10, 18, 0.20)" 
+            stroke="var(--accent)" 
+            strokeWidth="0.25" 
+            opacity="0.04" 
+          />
+          {renderCadTicks(xStart + 65 * scale, H - 80, 85 * scale, 70)}
+
+          <rect 
+            x={xStart + 155 * scale} 
+            y={H - 80} 
+            width={70 * scale} 
+            height={70} 
+            fill="rgba(8, 10, 18, 0.30)" 
+            stroke="var(--accent)" 
+            strokeWidth="0.25" 
+            opacity="0.06" 
+          />
+          {renderCadTicks(xStart + 155 * scale, H - 80, 70 * scale, 70)}
+
+          <rect 
+            x={xStart + 230 * scale} 
+            y={H - 80} 
+            width={46 * scale} 
+            height={70} 
+            fill="rgba(8, 10, 18, 0.35)" 
+            stroke="var(--accent)" 
+            strokeWidth="0.25" 
+            opacity="0.07" 
+          />
+          {renderCadTicks(xStart + 230 * scale, H - 80, 46 * scale, 70)}
 
           {/* Inactive layered CAD tracks */}
           <path
