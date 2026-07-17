@@ -3,11 +3,11 @@ import { useReducedMotion } from 'framer-motion'
 
 const getTraceStyleAttrs = (category) => {
   if (category === 'main') {
-    return { w: 1.8, opDefault: 0.9 };
+    return { w: 2.0, opDefault: 0.95 };
   } else if (category === 'auxiliary') {
-    return { w: 0.5, opDefault: 0.6 };
+    return { w: 0.45, opDefault: 0.25 };
   } else {
-    return { w: 0.2, opDefault: 0.15 };
+    return { w: 0.18, opDefault: 0.08 };
   }
 };
 
@@ -154,11 +154,36 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
       const x2 = xStart + x2_unscaled * scale;
       const d = drawLeftPCBPath(x1, y1, x2, y2, category);
       const styleAttrs = getTraceStyleAttrs(category);
+
+      let bends = [];
+      if (y1 !== y2) {
+        let pStart, pEnd;
+        if (category === 'main') {
+          pStart = 0.40;
+          pEnd = 0.70;
+        } else if (category === 'auxiliary') {
+          pStart = 0.25;
+          pEnd = 0.60;
+        } else {
+          pStart = 0.45;
+          pEnd = 0.75;
+        }
+        const pCenter = (pStart + pEnd) / 2;
+        const dx = Math.abs(x2 - x1);
+        const absDy = Math.abs(y2 - y1);
+        const direction = x2 > x1 ? 1 : -1;
+        const px1 = x1 + (dx * pCenter - absDy / 2) * direction;
+        const px2 = px1 + absDy * direction;
+        bends = [{ x: px1, y: y1 }, { x: px2, y: y2 }];
+      }
+
       list.push({
         chKey,
         d,
         w: styleAttrs.w,
         opDefault: styleAttrs.opDefault,
+        category,
+        bends,
         ...extra
       });
     };
@@ -306,32 +331,33 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
     }
   }, [isTyping, contactSystemState, traces, shouldReduceMotion])
 
-  const renderGlassBlock = (x, y, w, h, label, chKey) => {
+  // Unified SMT Component Renderer (Pass 5 & 14)
+  const renderSMT = (x, y, w, h, label, chKey = null, isCap = false) => {
     const px = xStart + x * scale
-    const dropShadowClass = contactSystemState === 'dormant' ? "" : "filter drop-shadow-[0.5px_0.8px_0.5px_rgba(0,0,0,0.8)]"
+    const dropShadowClass = contactSystemState === 'dormant' ? "" : "filter drop-shadow-[0.5px_0.8px_0.5px_rgba(0,0,0,0.85)]"
     const targetOpacity = getTargetOpacity(chKey)
 
     return (
-      <g 
-        key={`comp-${label}-${x}-${y}`} 
-        transform={`translate(${px}, ${y})`} 
+      <g
+        key={`smt-${label}-${px}-${y}`}
+        transform={`translate(${px}, ${y})`}
         className={dropShadowClass}
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
         {/* Negative space clearance gap */}
-        <rect x={-w / 2 - 3} y={-h / 2 - 3} width={w + 6} height={h + 6} fill="#030304" />
-        <rect x={-w / 2} y={-h / 2} width={3} height={h} fill="#2f2f38" stroke="#4a4a58" strokeWidth="0.3" />
-        <rect x={w / 2 - 3} y={-h / 2} width={3} height={h} fill="#2f2f38" stroke="#4a4a58" strokeWidth="0.3" />
-        <rect x={-w / 2 - 1.5} y={-h / 2 - 1.5} width={w + 3} height={h + 3} fill="none" stroke="#ffffff" strokeWidth="0.3" opacity="0.35" />
-        <rect x={-w / 2 + 2.5} y={-h / 2 + 0.5} width={w - 5} height={h - 1} rx={0.5} fill="#0d0d10" stroke="#1c1c21" strokeWidth="0.4" />
-        <rect x={-w / 2 + 4} y={-h / 2 + 2} width={w - 8} height={h - 4} fill="none" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} />
+        <rect x={-w / 2 - 2.7} y={-h / 2 - 2.3} width={w + 5.4} height={h + 4.6} fill="#030304" />
+        <rect x={-w / 2} y={-h / 2} width={1.6} height={h} fill="#444452" stroke="#6e6e80" strokeWidth="0.25" opacity="1.0" />
+        <rect x={w / 2 - 1.6} y={-h / 2} width={1.6} height={h} fill="#444452" stroke="#6e6e80" strokeWidth="0.25" opacity="1.0" />
+        <rect x={-w / 2 + 1.4} y={-h / 2 + 0.3} width={w - 2.8} height={h - 0.6} rx={0.3} fill={isCap ? "#5c4b3c" : "#0e0e12"} stroke={isCap ? "#7d6855" : "#22222a"} strokeWidth="0.35" opacity="0.9" />
+        <rect x={-w / 2 - 1.2} y={-h / 2 - 0.8} width={w + 2.4} height={h + 1.6} fill="none" stroke="#ffffff" strokeWidth="0.25" opacity="0.4" />
+        <rect x={-w / 2 + 2} y={-h / 2 + 1} width={w - 4} height={h - 2} fill="none" stroke="var(--accent)" strokeWidth="0.25" opacity={0.6} />
       </g>
     )
   }
 
 
-  // Plated Through Hole / Test Pad Terminations
+  // Plated Through Hole / Test Pad Terminations (Refined as sockets, Pass 5)
   const renderTerminationPad = (x, y, label, chKey) => {
     const targetOpacity = getTargetOpacity(chKey)
     const ringAnimation = {
@@ -348,7 +374,11 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
         style={getTransitionStyle()}
       >
         {/* Negative space clearance gap */}
-        <circle cx="0" cy="0" r="4.5" fill="#030304" />
+        <circle cx="0" cy="0" r="7.5" fill="#030304" />
+        {/* Transmission socket footprint, Pass 5 */}
+        <rect x="-6" y="-6" width="12" height="12" rx="1" fill="#0b0b10" stroke="var(--accent)" strokeWidth="0.25" opacity="0.12" />
+        <rect x="-4.5" y="-4.5" width="9" height="9" fill="none" stroke="#222" strokeWidth="0.3" />
+        
         <circle cx="0" cy="0" r="3" fill="#18181f" stroke="#333" strokeWidth="0.5" />
         <circle cx="0" cy="0" r="1.8" fill="#2d2d3a" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} style={ringAnimation} />
         <circle cx="0" cy="0" r="0.8" fill="#000" />
@@ -473,6 +503,24 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
               strokeLinejoin="miter"
               style={getTransitionStyle()}
             />
+            {/* Octagonal corner clearance expansions at bends */}
+            {t.bends && t.bends.map((b, bIdx) => (
+              <g key={`bend-${bIdx}`} opacity={targetOpacity}>
+                <polygon
+                  points={`${b.x - 3},${b.y} ${b.x - 2.1},${b.y - 2.1} ${b.x},${b.y - 3} ${b.x + 2.1},${b.y - 2.1} ${b.x + 3},${b.y} ${b.x + 2.1},${b.y + 2.1} ${b.x},${b.y + 3} ${b.x - 2.1},${b.y + 2.1}`}
+                  fill="#080a12"
+                  style={getTransitionStyle()}
+                />
+                <polygon
+                  points={`${b.x - 3.4},${b.y} ${b.x - 2.4},${b.y - 2.4} ${b.x},${b.y - 3.4} ${b.x + 2.4},${b.y - 2.4} ${b.x + 3.4},${b.y} ${b.x + 2.4},${b.y + 2.4} ${b.x},${b.y + 3.4} ${b.x - 2.4},${b.y + 2.4}`}
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth="0.25"
+                  opacity="0.05"
+                  style={getTransitionStyle()}
+                />
+              </g>
+            ))}
           </>
         )}
         {isHero && contactSystemState === 'engaged' && !isTransmit && (
@@ -543,6 +591,15 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
         style={getTransitionStyle()}
       >
         <g style={nodeStyle}>
+          {/* Stepped CAD Docking Frame, Pass 5 */}
+          <g stroke="var(--accent)" strokeWidth="0.25" fill="none" opacity="0.08">
+            <rect x="-22" y="-22" width="44" height="44" rx="2" />
+            <path d="M -22,-16 V -22 H -16" />
+            <path d="M 22,-16 V -22 H 16" />
+            <path d="M -22,16 V 22 H -16" />
+            <path d="M 22,16 V 22 H 16" />
+            <circle cx="0" cy="0" r="20.5" strokeDasharray="2 2" />
+          </g>
           {/* Substrate Clearance Gap */}
           <circle cx="0" cy="0" r="17.5" fill="#030304" />
           {/* Solder Mask Opening */}
@@ -751,6 +808,19 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
           {/* ========================================================
                 TOP MARGIN CAD ZONES (Left PCB)
              ======================================================== */}
+          {/* Registration Marks (Manufacturing details, Pass 11) */}
+          <g stroke="var(--accent)" strokeWidth="0.3" opacity="0.08" fill="none">
+            {/* Top-left registration crosshair */}
+            <circle cx={xStart + 10} cy={20} r="2.5" />
+            <line x1={xStart + 6} y1={20} x2={xStart + 14} y2={20} />
+            <line x1={xStart + 10} y1={16} x2={xStart + 10} y2={24} />
+
+            {/* Bottom-left registration crosshair */}
+            <circle cx={xStart + 10} cy={H - 20} r="2.5" />
+            <line x1={xStart + 6} y1={H - 20} x2={xStart + 14} y2={H - 20} />
+            <line x1={xStart + 10} y1={H - 24} x2={xStart + 10} y2={H - 16} />
+          </g>
+
           {/* Zone 1: Transmission (Input) Zone */}
           <rect 
             x={xStart + 2} 
@@ -763,7 +833,6 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             opacity="0.05" 
           />
           {renderCadTicks(xStart + 2, 10, 60 * scale, 70)}
-          <text x={xStart + 8} y={22} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1" opacity="0.07">SYS_TX_L1</text>
 
           {/* Zone 2: Branching Zone */}
           <rect 
@@ -777,7 +846,6 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             opacity="0.04" 
           />
           {renderCadTicks(xStart + 65 * scale, 10, 85 * scale, 70)}
-          <text x={xStart + (65 + 6) * scale} y={22} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1" opacity="0.07">SYS_BR_L2</text>
 
           {/* Zone 3: Buffer Zone */}
           <rect 
@@ -791,7 +859,6 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             opacity="0.06" 
           />
           {renderCadTicks(xStart + 155 * scale, 10, 70 * scale, 70)}
-          <text x={xStart + (155 + 6) * scale} y={22} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1" opacity="0.08">SYS_BF_L3</text>
 
           {/* Zone 4: Interface Zone */}
           <rect 
@@ -805,7 +872,6 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             opacity="0.07" 
           />
           {renderCadTicks(xStart + 230 * scale, 10, 46 * scale, 70)}
-          <text x={xStart + (230 + 5) * scale} y={22} fill="var(--accent)" fontSize="5.5" fontFamily="monospace" letterSpacing="1" opacity="0.09">SYS_IT_L4</text>
 
           {/* ========================================================
                 BOTTOM MARGIN CAD ZONES (Left PCB)
@@ -889,6 +955,13 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
           />
           <rect x={xStart + 140 * scale} y={CH2_Y - 80} width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="0.30" strokeDasharray="2 2" opacity="0.03" />
           <rect x={xStart + 140 * scale} y={CH3_Y + 60} width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="0.30" strokeDasharray="2 2" opacity="0.03" />
+          {/* Machined panel segment lines, Pass 12 */}
+          <g stroke="var(--accent)" strokeWidth="0.25" opacity="0.03" fill="none">
+            <line x1={xStart + 10} y1={CH1_Y - 45} x2={xStart + 260 * scale} y2={CH1_Y - 45} />
+            <line x1={xStart + 10} y1={CH2_Y + 15} x2={xStart + 260 * scale} y2={CH2_Y + 15} />
+            <line x1={xStart + 10} y1={CH3_Y - 15} x2={xStart + 260 * scale} y2={CH3_Y - 15} />
+            <line x1={xStart + 10} y1={CH4_Y + 45} x2={xStart + 260 * scale} y2={CH4_Y + 45} />
+          </g>
         </g>
 
         {/* Dynamic Particles Container */}
@@ -944,9 +1017,9 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             {traces.filter(t => t.chKey === 'name').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderGlassBlock(130, CH1_Y - 70, 16, 8, 'R12', 'name')}
-          {renderGlassBlock(150, CH1_Y - 15, 20, 10, 'C08', 'name')}
-          {renderGlassBlock(130, CH1_Y + 10, 14, 8, 'R15', 'name')}
+          {renderSMT(130, CH1_Y - 70, 16, 8, 'R12', 'name', false)}
+          {renderSMT(150, CH1_Y - 15, 20, 10, 'C08', 'name', true)}
+          {renderSMT(130, CH1_Y + 10, 14, 8, 'R15', 'name', false)}
           {renderTerminationPad(0, CH1_Y - 90, 'TP1_S1', 'name')}
           {renderTerminationPad(0, CH1_Y - 55, 'TP1_S2', 'name')}
           {/* Nodes */}
@@ -962,9 +1035,9 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             {traces.filter(t => t.chKey === 'email').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderGlassBlock(100, CH2_Y, 18, 9, 'R21', 'email')}
-          {renderGlassBlock(140, CH2_Y + 30, 24, 11, 'C14', 'email')}
-          {renderGlassBlock(75, CH2_Y - 20, 14, 8, 'R22', 'email')}
+          {renderSMT(100, CH2_Y, 18, 9, 'R21', 'email', false)}
+          {renderSMT(140, CH2_Y + 30, 24, 11, 'C14', 'email', true)}
+          {renderSMT(75, CH2_Y - 20, 14, 8, 'R22', 'email', false)}
           {renderTerminationPad(0, CH2_Y - 20, 'TP2_S1', 'email')}
           {renderTerminationPad(0, CH2_Y, 'TP2_S2', 'email')}
           {/* Nodes */}
@@ -980,9 +1053,9 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             {traces.filter(t => t.chKey === 'subject').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderGlassBlock(100, CH3_Y, 18, 9, 'R31', 'subject')}
-          {renderGlassBlock(140, CH3_Y - 30, 24, 11, 'C31', 'subject')}
-          {renderGlassBlock(75, CH3_Y + 20, 14, 8, 'R32', 'subject')}
+          {renderSMT(100, CH3_Y, 18, 9, 'R31', 'subject', false)}
+          {renderSMT(140, CH3_Y - 30, 24, 11, 'C31', 'subject', true)}
+          {renderSMT(75, CH3_Y + 20, 14, 8, 'R32', 'subject', false)}
           {renderTerminationPad(0, CH3_Y + 20, 'TP3_S1', 'subject')}
           {renderTerminationPad(0, CH3_Y, 'TP3_S2', 'subject')}
           {/* Nodes */}
@@ -998,9 +1071,9 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             {traces.filter(t => t.chKey === 'message').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderGlassBlock(130, CH4_Y + 70, 16, 8, 'R41', 'message')}
-          {renderGlassBlock(150, CH4_Y + 15, 20, 10, 'C41', 'message')}
-          {renderGlassBlock(130, CH4_Y - 10, 14, 8, 'R42', 'message')}
+          {renderSMT(130, CH4_Y + 70, 16, 8, 'R41', 'message', false)}
+          {renderSMT(150, CH4_Y + 15, 20, 10, 'C41', 'message', true)}
+          {renderSMT(130, CH4_Y - 10, 14, 8, 'R42', 'message', false)}
           {renderTerminationPad(0, CH4_Y + 90, 'TP4_S1', 'message')}
           {renderTerminationPad(0, CH4_Y + 55, 'TP4_S2', 'message')}
           {/* Nodes */}

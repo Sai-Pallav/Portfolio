@@ -293,7 +293,7 @@ const generateRightBusPaths = (x1, y1, x2, y2, category, components) => {
 };
 
 const getWidthForCategory = (category) => {
-  return category === 'main' ? 2.0 : category === 'auxiliary' ? 0.55 : 0.15;
+  return category === 'main' ? 2.0 : category === 'auxiliary' ? 0.45 : 0.18;
 };
 
 export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, formProgress = 0 }) {
@@ -1167,6 +1167,27 @@ const renderMountingHole = (x, y) => {
            ======================================================== */}
       <g opacity={isTransmit ? 0 : 1} style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}>
 
+        {/* Manufacturing Registration Marks (Pass 11) */}
+        <g stroke="var(--accent)" strokeWidth="0.3" opacity="0.08" fill="none">
+          {/* Top-right registration crosshair */}
+          <circle cx={endX - 12} cy={Y_center - 170} r="2.5" />
+          <line x1={endX - 16} y1={Y_center - 170} x2={endX - 8} y2={Y_center - 170} />
+          <line x1={endX - 12} y1={Y_center - 174} x2={endX - 12} y2={Y_center - 166} />
+
+          {/* Bottom-right registration crosshair */}
+          <circle cx={endX - 12} cy={Y_center + 170} r="2.5" />
+          <line x1={endX - 16} y1={Y_center + 170} x2={endX - 8} y2={Y_center + 170} />
+          <line x1={endX - 12} y1={Y_center + 166} x2={endX - 12} y2={Y_center + 174} />
+        </g>
+
+        {/* Borderless Substrate Isolation Slots / Trenches (Pass 3 & 9) */}
+        <g fill="#020204" opacity="0.75">
+          {/* Trench 1 (Between Name and Email trace zones) */}
+          <rect x={midStart + 5} y={Y_center - 84} width={middleTargetLimit - midStart - 10} height="4" rx="0.5" />
+          {/* Trench 2 (Between Subject and Message trace zones) */}
+          <rect x={midStart + 5} y={Y_center + 80} width={middleTargetLimit - midStart - 10} height="4" rx="0.5" />
+        </g>
+
         {/* ========================================================
               TOP MARGIN CAD ZONES (Right PCB)
            ======================================================== */}
@@ -1188,7 +1209,6 @@ const renderMountingHole = (x, y) => {
           <path d={`M ${midStart},${Y_center - 129} V ${Y_center - 125} H ${midStart + 5}`} />
           <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.30 - 5},${Y_center - 125} H ${midStart + (middleTargetLimit - midStart) * 0.30} V ${Y_center - 129}`} />
         </g>
-        <text x={midStart + 4} y={Y_center - 172} fill="var(--accent)" fontSize="5.0" fontFamily="monospace" letterSpacing="0.8" opacity="0.07">SYS_IF_R1</text>
 
         {/* Zone 2 — Process Zone: central corridor */}
         <rect
@@ -1208,7 +1228,6 @@ const renderMountingHole = (x, y) => {
           <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.32},${Y_center - 129} V ${Y_center - 125} H ${midStart + (middleTargetLimit - midStart) * 0.32 + 5}`} />
           <path d={`M ${midStart + (middleTargetLimit - midStart) * 0.68 - 5},${Y_center - 125} H ${midStart + (middleTargetLimit - midStart) * 0.68} V ${Y_center - 129}`} />
         </g>
-        <text x={midStart + (middleTargetLimit - midStart) * 0.32 + 4} y={Y_center - 172} fill="var(--accent)" fontSize="5.0" fontFamily="monospace" letterSpacing="0.8" opacity="0.07">SYS_PR_R2</text>
 
         {/* Zone 3 — Signal Hub Zone: node / BGA area */}
         <rect
@@ -1228,7 +1247,6 @@ const renderMountingHole = (x, y) => {
           <path d={`M ${middleTargetLimit},${Y_center - 129} V ${Y_center - 125} H ${middleTargetLimit + 5}`} />
           <path d={`M ${rightTargetLimit - 5},${Y_center - 125} H ${rightTargetLimit} V ${Y_center - 129}`} />
         </g>
-        <text x={middleTargetLimit + 4} y={Y_center - 172} fill="var(--accent)" fontSize="5.0" fontFamily="monospace" letterSpacing="0.8" opacity="0.09">SYS_HB_R3</text>
 
         {/* Zone 4 — Exit Zone: far-right output edge */}
         <rect
@@ -1248,7 +1266,6 @@ const renderMountingHole = (x, y) => {
           <path d={`M ${rightTargetLimit},${Y_center - 129} V ${Y_center - 125} H ${rightTargetLimit + 5}`} />
           <path d={`M ${endX - 5},${Y_center - 125} H ${endX} V ${Y_center - 129}`} />
         </g>
-        <text x={rightTargetLimit + 4} y={Y_center - 172} fill="var(--accent)" fontSize="5.0" fontFamily="monospace" letterSpacing="0.8" opacity="0.09">SYS_EX_R4</text>
 
         {/* ========================================================
               BOTTOM MARGIN CAD ZONES (Right PCB)
@@ -1345,49 +1362,85 @@ const renderMountingHole = (x, y) => {
   const traceCorridors = useMemo(() => (
     <g strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={isTransmit ? 0.3 : 1}>
       {/* Middle Trace Corridors */}
-      {pcbData.middleTraces.map((t, idx) => {
+      {pcbData.middleTraces.filter(t => t.category === 'main').map((t, idx) => {
         const targetOpacity = getTargetOpacity(t.chKey)
         const w = getWidthForCategory(t.category)
         return (
           <React.Fragment key={`m-corridor-${idx}`}>
             <path
               d={t.d}
-              stroke="rgba(168, 85, 247, 0.14)"
-              strokeWidth={w + 6.0}
+              stroke="rgba(168, 85, 247, 0.05)"
+              strokeWidth={w * 3.0 + 6.0}
               opacity={targetOpacity}
               style={getTransitionStyle()}
             />
             <path
               d={t.d}
-              stroke="#020203"
-              strokeWidth={w + 4.8}
+              stroke="#080a12"
+              strokeWidth={w * 3.0 + 5.2}
               opacity={targetOpacity}
               style={getTransitionStyle()}
             />
+            {/* Octagonal corner clearance expansions at bends */}
+            {t.bends && t.bends.map((b, bIdx) => (
+              <g key={`m-bend-clear-${idx}-${bIdx}`} opacity={targetOpacity}>
+                <polygon
+                  points={`${b.x - 3},${b.y} ${b.x - 2.1},${b.y - 2.1} ${b.x},${b.y - 3} ${b.x + 2.1},${b.y - 2.1} ${b.x + 3},${b.y} ${b.x + 2.1},${b.y + 2.1} ${b.x},${b.y + 3} ${b.x - 2.1},${b.y + 2.1}`}
+                  fill="#080a12"
+                  style={getTransitionStyle()}
+                />
+                <polygon
+                  points={`${b.x - 3.4},${b.y} ${b.x - 2.4},${b.y - 2.4} ${b.x},${b.y - 3.4} ${b.x + 2.4},${b.y - 2.4} ${b.x + 3.4},${b.y} ${b.x + 2.4},${b.y + 2.4} ${b.x},${b.y + 3.4} ${b.x - 2.4},${b.y + 2.4}`}
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth="0.25"
+                  opacity="0.05"
+                  style={getTransitionStyle()}
+                />
+              </g>
+            ))}
           </React.Fragment>
         )
       })}
 
       {/* Right Trace Corridors */}
-      {pcbData.rightTraces.map((t, idx) => {
+      {pcbData.rightTraces.filter(t => t.category === 'main').map((t, idx) => {
         const targetOpacity = getTargetOpacity(null)
         const w = getWidthForCategory(t.category)
         return (
           <React.Fragment key={`r-corridor-${idx}`}>
             <path
               d={t.d}
-              stroke="rgba(168, 85, 247, 0.14)"
-              strokeWidth={w + 6.0}
+              stroke="rgba(168, 85, 247, 0.05)"
+              strokeWidth={w * 3.0 + 6.0}
               opacity={targetOpacity}
               style={getTransitionStyle()}
             />
             <path
               d={t.d}
-              stroke="#020203"
-              strokeWidth={w + 4.8}
+              stroke="#080a12"
+              strokeWidth={w * 3.0 + 5.2}
               opacity={targetOpacity}
               style={getTransitionStyle()}
             />
+            {/* Octagonal corner clearance expansions at bends */}
+            {t.bends && t.bends.map((b, bIdx) => (
+              <g key={`r-bend-clear-${idx}-${bIdx}`} opacity={targetOpacity}>
+                <polygon
+                  points={`${b.x - 3},${b.y} ${b.x - 2.1},${b.y - 2.1} ${b.x},${b.y - 3} ${b.x + 2.1},${b.y - 2.1} ${b.x + 3},${b.y} ${b.x + 2.1},${b.y + 2.1} ${b.x},${b.y + 3} ${b.x - 2.1},${b.y + 2.1}`}
+                  fill="#080a12"
+                  style={getTransitionStyle()}
+                />
+                <polygon
+                  points={`${b.x - 3.4},${b.y} ${b.x - 2.4},${b.y - 2.4} ${b.x},${b.y - 3.4} ${b.x + 2.4},${b.y - 2.4} ${b.x + 3.4},${b.y} ${b.x + 2.4},${b.y + 2.4} ${b.x},${b.y + 3.4} ${b.x - 2.4},${b.y + 2.4}`}
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth="0.25"
+                  opacity="0.05"
+                  style={getTransitionStyle()}
+                />
+              </g>
+            ))}
           </React.Fragment>
         )
       })}
@@ -1576,31 +1629,6 @@ return (
                 const w = getWidthForCategory(t.category)
                 return (
                   <React.Fragment key={`m-trace-${idx}`}>
-                    {/* Motherboard-style Negative Space Corridor Channel */}
-                    {t.category === 'main' && (
-                      <>
-                        <path
-                          d={t.d}
-                          stroke="var(--accent)"
-                          strokeWidth={w * 3.0 + 6.0}
-                          fill="none"
-                          opacity={targetOpacity * 0.05}
-                          strokeLinecap="square"
-                          strokeLinejoin="miter"
-                          style={getTransitionStyle()}
-                        />
-                        <path
-                          d={t.d}
-                          stroke="#080a12"
-                          strokeWidth={w * 3.0 + 5.2}
-                          fill="none"
-                          opacity={targetOpacity * 0.95}
-                          strokeLinecap="square"
-                          strokeLinejoin="miter"
-                          style={getTransitionStyle()}
-                        />
-                      </>
-                    )}
                     {/* Material Layer 2: Groove Shadow */}
                     {t.category !== 'ground' && (
                       <path
@@ -1733,6 +1761,15 @@ return (
                   opacity={targetOpacity}
                   style={getTransitionStyle()}
                 >
+                  {/* Stepped CAD Docking Frame, Pass 5 */}
+                  <g stroke="var(--accent)" strokeWidth="0.25" fill="none" opacity="0.08">
+                    <rect x="-8.5" y="-8.5" width="17" height="17" rx="1.2" />
+                    <path d="M -8.5,-6 V -8.5 H -6" />
+                    <path d="M 8.5,-6 V -8.5 H 6" />
+                    <path d="M -8.5,6 V 8.5 H -6" />
+                    <path d="M 8.5,6 V 8.5 H 6" />
+                    <circle cx="0" cy="0" r="7.2" strokeDasharray="1.5 1.5" />
+                  </g>
                   {/* Negative space clearance gap */}
                   <circle cx="0" cy="0" r="5.7" fill="#030304" />
                   <circle cx="0" cy="0" r="4.2" fill="#030304" />
@@ -1762,31 +1799,6 @@ return (
           const w = getWidthForCategory(t.category)
           return (
             <React.Fragment key={`r-trace-${idx}`}>
-              {/* Motherboard-style Negative Space Corridor Channel */}
-              {t.category === 'main' && (
-                <>
-                  <path
-                    d={t.d}
-                    stroke="var(--accent)"
-                    strokeWidth={w * 3.0 + 6.0}
-                    fill="none"
-                    opacity={targetOpacity * 0.05}
-                    strokeLinecap="square"
-                    strokeLinejoin="miter"
-                    style={getTransitionStyle()}
-                  />
-                  <path
-                    d={t.d}
-                    stroke="#080a12"
-                    strokeWidth={w * 3.0 + 5.2}
-                    fill="none"
-                    opacity={targetOpacity * 0.95}
-                    strokeLinecap="square"
-                    strokeLinejoin="miter"
-                    style={getTransitionStyle()}
-                  />
-                </>
-              )}
               {/* Material Layer 2: Groove Shadow */}
               {t.category !== 'ground' && (
                 <path
@@ -1929,6 +1941,15 @@ return (
             opacity={targetOpacity}
             style={getTransitionStyle()}
           >
+            {/* Stepped CAD Docking Frame, Pass 5 */}
+            <g stroke="var(--accent)" strokeWidth="0.25" fill="none" opacity="0.08">
+              <rect x="-8.5" y="-8.5" width="17" height="17" rx="1.2" />
+              <path d="M -8.5,-6 V -8.5 H -6" />
+              <path d="M 8.5,-6 V -8.5 H 6" />
+              <path d="M -8.5,6 V 8.5 H -6" />
+              <path d="M 8.5,6 V 8.5 H 6" />
+              <circle cx="0" cy="0" r="7.2" strokeDasharray="1.5 1.5" />
+            </g>
             {/* Negative space clearance gap */}
             <circle cx="0" cy="0" r="5.7" fill="#030304" />
             <circle cx="0" cy="0" r="4.2" fill="#030304" />
