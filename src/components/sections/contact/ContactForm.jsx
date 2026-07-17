@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef, memo } from 'react'
+import { useState, useCallback, useEffect, useRef, memo } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import emailjs from '@emailjs/browser'
 import { 
@@ -247,7 +247,7 @@ const FORM_CHILD_VARIANTS = {
 }
 
 const DOT_VARIANTS = {
-  idle: (i) => ({
+  idle: () => ({
     opacity: 0.15,
     backgroundColor: "rgba(0,0,0,0.9)",
     transition: { duration: 0.3 }
@@ -293,9 +293,10 @@ function validateField(name, value) {
   return err
 }
 
-export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, isTyping, setIsTyping, setFormProgress }) {
+export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, onTypingChange, setFormProgress }) {
   const shouldReduceMotion = useReducedMotion()
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
+  const [localIsTyping, setLocalIsTyping] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
   const typingTimeoutRef = useRef(null)
   const [isHovered, setIsHovered] = useState(false)
@@ -381,6 +382,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
   const [ripples, setRipples] = useState([])
 
   // Compute form fill progress (0–100) based on valid non-empty fields
+  const lastProgressRef = useRef(0)
   useEffect(() => {
     const fields = ['name', 'email', 'subject', 'message']
     const filledCount = fields.filter(f => {
@@ -388,7 +390,10 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       return val && val.trim().length > 0 && !validateField(f, val)
     }).length
     const progress = Math.round((filledCount / fields.length) * 100)
-    if (setFormProgress) setFormProgress(progress)
+    if (progress !== lastProgressRef.current) {
+      lastProgressRef.current = progress
+      if (setFormProgress) setFormProgress(progress)
+    }
   }, [formData, setFormProgress])
 
   const resetErrorState = useCallback(() => {
@@ -410,10 +415,14 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       }
       return prev
     })
-    setIsTyping(true)
+    setLocalIsTyping(true)
+    if (onTypingChange) onTypingChange(true)
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-    typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 800)
-  }, [resetErrorState, setIsTyping])
+    typingTimeoutRef.current = setTimeout(() => {
+      setLocalIsTyping(false)
+      if (onTypingChange) onTypingChange(false)
+    }, 800)
+  }, [resetErrorState, onTypingChange])
 
   const handleBlur = useCallback((e) => {
     const { name, value } = e.target
@@ -425,12 +434,13 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       setErrors(prev => ({ ...prev, [name]: err }))
     }
 
-    setIsTyping(false)
+    setLocalIsTyping(false)
+    if (onTypingChange) onTypingChange(false)
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
       typingTimeoutRef.current = null
     }
-  }, [errors, resetErrorState, setIsTyping])
+  }, [errors, resetErrorState, onTypingChange])
 
   const handleRipple = useCallback((e) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -559,7 +569,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
 
   const isInteracting = isFocused || isHovered
   const isTransmit = contactSystemState === 'transmit'
-  const activeDotState = subState === 'submitting' ? 'submitting' : isTyping ? 'submitting' : 'idle'
+  const activeDotState = subState === 'submitting' ? 'submitting' : localIsTyping ? 'submitting' : 'idle'
 
   return (
     <motion.div
@@ -621,6 +631,20 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             animationDuration: isFocused ? '3s' : '6s'
           }}
         />
+        {/* Idle Breathing Border */}
+        {contactSystemState === 'dormant' && !localIsTyping && !isInteracting && !shouldReduceMotion && (
+          <rect
+            x="1" y="1"
+            width="calc(100% - 2px)" height="calc(100% - 2px)"
+            rx="15"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="1.5"
+            style={{
+              animation: 'panelIdleBreathe 4s ease-in-out infinite'
+            }}
+          />
+        )}
       </svg>
 
       {/* Pulsing Cyber Corner Brackets */}

@@ -32,33 +32,62 @@
 
   /* Keyframes fadeUp, fadeIn, slideLeft, float, glowPulse are defined in animations.css */
   @keyframes popIn {
-    from { opacity: 0; transform: scale(0.8); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
+
   @keyframes drawLine {
-    from { transform: scaleY(0); }
-    to { transform: scaleY(1); }
+    from {
+      transform: scaleY(0);
+    }
+
+    to {
+      transform: scaleY(1);
+    }
   }
+
   @keyframes pcbTravel {
-    0% { offset-distance: 0%; }
-    100% { offset-distance: 100%; }
+    0% {
+      offset-distance: 0%;
+    }
+
+    100% {
+      offset-distance: 100%;
+    }
   }
+
   @keyframes borderBeam {
-    0% { stroke-dashoffset: 100; }
-    100% { stroke-dashoffset: 0; }
+    0% {
+      stroke-dashoffset: 100;
+    }
+
+    100% {
+      stroke-dashoffset: 0;
+    }
   }
+
   @keyframes pcbParticleTravel {
     0% {
       offset-distance: 0%;
       transform: scale(0.5);
       opacity: 0;
     }
+
     15% {
       opacity: 1;
     }
+
     85% {
       opacity: 1;
     }
+
     100% {
       offset-distance: 100%;
       transform: scale(1.0);
@@ -160,6 +189,7 @@ main {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -172,119 +202,215 @@ main {
     transform: scale(1);
     opacity: 0.35;
   }
+
   100% {
     offset-distance: 100%;
     transform: scale(0.45);
     opacity: 0.35;
   }
 }
+
 @keyframes pcbPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.3;
   }
+
   50% {
     opacity: 0.55;
   }
 }
+
 @keyframes pcbStandbyPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.12;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.32;
     transform: scale(1.08);
   }
 }
+
 @keyframes pcbTrailAnim {
   0% {
     stroke-dashoffset: 400;
     opacity: 0.8;
   }
+
   70% {
     stroke-dashoffset: 120;
     opacity: 0.8;
   }
+
   100% {
     stroke-dashoffset: 0;
     opacity: 0;
   }
 }
+
 @keyframes pcbRadarRotate {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
 }
+
 @keyframes pcbRadarRotateCounter {
   0% {
     transform: rotate(360deg);
   }
+
   100% {
     transform: rotate(0deg);
   }
 }
+
 @keyframes pcbRadarPulse {
   0% {
     transform: scale(0.6);
     opacity: 0.8;
   }
+
   100% {
     transform: scale(1.6);
     opacity: 0;
   }
 }
+
 .animate-standby-pulse {
   animation: pcbStandbyPulse 3.5s ease-in-out infinite;
 }
+
 @keyframes pcbSignalFlow {
   0% {
     stroke-dashoffset: 115;
   }
+
   100% {
     stroke-dashoffset: 0;
   }
 }
+
 @keyframes pcbSignalFlowReverse {
   0% {
     stroke-dashoffset: 0;
   }
+
   100% {
     stroke-dashoffset: 115;
   }
 }
+
 @keyframes pcbNodeMove {
   0% {
     transform: translate(0px, 0px);
   }
+
   30% {
     transform: translate(var(--move-x1), 0px);
   }
+
   50% {
     transform: translate(var(--move-x2), var(--move-y1));
   }
+
   70% {
     transform: translate(var(--move-x1), 0px);
   }
+
   100% {
     transform: translate(0px, 0px);
   }
 }
+
 @keyframes pcbCorePulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
     opacity: 0.7;
   }
+
   50% {
     transform: scale(1.6);
     opacity: 1.0;
   }
 }
+
 @keyframes pcbRingBreathe {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.4;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes pcbViaPulse {
+
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+
+  50% {
+    opacity: 1.0;
+  }
+}
+
+@keyframes panelIdleBreathe {
+
+  0%,
+  100% {
+    opacity: 0.20;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes pcbIdleSignalFlow {
+  0% {
+    stroke-dashoffset: 115;
+    opacity: 0;
+  }
+
+  5% {
+    opacity: 0.50;
+  }
+
+  30% {
+    opacity: 0.50;
+  }
+
+  38% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes pcbIdleNodePulse {
+  0%, 100% {
+    opacity: 0.35;
     transform: scale(1);
   }
   50% {
@@ -292,13 +418,79 @@ main {
     transform: scale(1.15);
   }
 }
-@keyframes pcbViaPulse {
+
+@keyframes pcbIdleTraceHighlight {
   0%, 100% {
-    opacity: 0.65;
+    opacity: 0.15;
   }
   50% {
-    opacity: 1.0;
+    opacity: 0.45;
   }
 }
 
+/* Custom hardware-compositing promotion and play-state selectors for Contact PCBs */
+#contact:not([data-typing="true"]) .pcb-via-pulse-ring {
+  animation-play-state: paused !important;
+}
 
+#contact[data-typing="true"] .pcb-via-pulse-ring {
+  animation-play-state: running !important;
+}
+
+.pcb-via-pulse-ring {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+#contact:not([data-typing="true"]) .pcb-radar-pulse-ring {
+  animation-play-state: paused !important;
+  opacity: 0 !important;
+}
+
+#contact[data-typing="true"] .pcb-radar-pulse-ring {
+  animation-play-state: running !important;
+}
+
+.pcb-radar-pulse-ring {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+#contact:not([data-typing="true"]) .pcb-signal-flow-path {
+  display: none !important;
+}
+
+#contact[data-typing="true"] .pcb-signal-flow-path {
+  display: block !important;
+}
+
+.pcb-signal-flow-path {
+  will-change: stroke-dashoffset;
+  backface-visibility: hidden;
+}
+
+/* Node groups and details play-states */
+#contact:not([data-typing="true"]) .pcb-node-group,
+#contact:not([data-typing="true"]) .pcb-radar-rotate-group,
+#contact:not([data-typing="true"]) .pcb-radar-rotate-counter-group,
+#contact:not([data-typing="true"]) .pcb-ring-breathe-ring,
+#contact:not([data-typing="true"]) .pcb-core-pulse-circle {
+  animation-play-state: paused !important;
+}
+
+#contact[data-typing="true"] .pcb-node-group,
+#contact[data-typing="true"] .pcb-radar-rotate-group,
+#contact[data-typing="true"] .pcb-radar-rotate-counter-group,
+#contact[data-typing="true"] .pcb-ring-breathe-ring,
+#contact[data-typing="true"] .pcb-core-pulse-circle {
+  animation-play-state: running !important;
+}
+
+.pcb-node-group,
+.pcb-radar-rotate-group,
+.pcb-radar-rotate-counter-group,
+.pcb-ring-breathe-ring,
+.pcb-core-pulse-circle {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}

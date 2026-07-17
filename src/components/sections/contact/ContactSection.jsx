@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, memo } from 'react'
+import { useEffect, useRef, useState, memo, useCallback } from 'react'
 import { useReducedMotion, useInView, motion } from 'framer-motion'
 import ContactHero from './ContactHero'
 import ContactForm from './ContactForm'
@@ -95,6 +95,14 @@ export default memo(function ContactSection() {
       return () => clearTimeout(timerDormant)
     }
   }, [contactSystemState])
+
+  const handleTypingChange = useCallback((typing) => {
+    setIsTyping(typing)
+    if (sectionRef.current) {
+      sectionRef.current.setAttribute('data-typing', typing ? 'true' : 'false')
+      sectionRef.current.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: typing } }))
+    }
+  }, [])
 
   return (
     <section
@@ -221,8 +229,8 @@ export default memo(function ContactSection() {
       <div className="relative w-full mt-8 lg:mt-10">
         {/* Full-width backdrop wrapper for Left and Right PCB */}
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen pointer-events-none z-0 hidden lg:block">
-          <LeftPCB formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} />
-          <RightPCB formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} formProgress={formProgress} />
+          <LeftPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} formProgress={formProgress} />
+          <RightPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} formProgress={formProgress} />
         </div>
 
         {/* Full-width flex container keeps the form and globe in their natural positions. */}
@@ -236,8 +244,7 @@ export default memo(function ContactSection() {
                   onTransmit={() => setContactSystemState('transmit')}
                   setContactSystemState={setContactSystemState}
                   setTransmissionFailed={setTransmissionFailed}
-                  setIsTyping={setIsTyping}
-                  isTyping={isTyping}
+                  onTypingChange={handleTypingChange}
                   setFormProgress={setFormProgress}
                 />
               </div>

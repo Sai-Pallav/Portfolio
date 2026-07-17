@@ -450,6 +450,31 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
 
     return (
       <React.Fragment key={`trace-${i}`}>
+        {/* Motherboard-style Negative Space Corridor Channel */}
+        {t.category !== 'ground' && (
+          <>
+            <path
+              d={t.d}
+              stroke="var(--accent)"
+              strokeWidth={t.w * 3.0 + 6.0}
+              fill="none"
+              opacity={targetOpacity * 0.05}
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+              style={getTransitionStyle()}
+            />
+            <path
+              d={t.d}
+              stroke="#080a12"
+              strokeWidth={t.w * 3.0 + 5.2}
+              fill="none"
+              opacity={targetOpacity * 0.95}
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+              style={getTransitionStyle()}
+            />
+          </>
+        )}
         {isHero && contactSystemState === 'engaged' && !isTransmit && (
           <>
             <path
@@ -652,6 +677,14 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
       </g>
     )
   }
+  const renderCadTicks = (x, y, w, h) => (
+    <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.06">
+      <path d={`M ${x},${y+4} V ${y} H ${x+4}`} fill="none" />
+      <path d={`M ${x+w-4},${y} H ${x+w} V ${y+4}`} fill="none" />
+      <path d={`M ${x},${y+h-4} V ${y+h} H ${x+4}`} fill="none" />
+      <path d={`M ${x+w-4},${y+h} H ${x+w} V ${y+h-4}`} fill="none" />
+    </g>
+  )
 
   if (shouldReduceMotion) return null
 
@@ -708,6 +741,101 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
           opacity={isTransmit ? 0 : 1}
           style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
         />
+
+        {/* Motherboard-style CAD Routing Zones & Inactive Infrastructure */}
+        <g 
+          className="pcb-zones-and-infrastructure" 
+          opacity={isTransmit ? 0 : 1}
+          style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
+        >
+          {/* Zone 1: Transmission (Input) Zone */}
+          <rect 
+            x={xStart + 2} 
+            y={10} 
+            width={60 * scale} 
+            height={H - 20} 
+            fill="rgba(8, 10, 18, 0.25)" 
+            stroke="var(--accent)" 
+            strokeWidth="0.25" 
+            opacity="0.05" 
+          />
+          {renderCadTicks(xStart + 2, 10, 60 * scale, H - 20)}
+          <text x={xStart + 8} y={22} fill="var(--accent)" fontSize="6" fontFamily="monospace" letterSpacing="1.2" opacity="0.06">TX_ZONE_L1</text>
+
+          {/* Zone 2: Branching Zone */}
+          <rect 
+            x={xStart + 65 * scale} 
+            y={10} 
+            width={85 * scale} 
+            height={H - 20} 
+            fill="rgba(8, 10, 18, 0.20)" 
+            stroke="var(--accent)" 
+            strokeWidth="0.25" 
+            opacity="0.04" 
+          />
+          {renderCadTicks(xStart + 65 * scale, 10, 85 * scale, H - 20)}
+          <text x={xStart + (65 + 6) * scale} y={22} fill="var(--accent)" fontSize="6" fontFamily="monospace" letterSpacing="1.2" opacity="0.06">BR_ZONE_L2</text>
+
+          {/* Zone 3: Buffer Zone */}
+          <rect 
+            x={xStart + 155 * scale} 
+            y={10} 
+            width={70 * scale} 
+            height={H - 20} 
+            fill="rgba(8, 10, 18, 0.30)" 
+            stroke="var(--accent)" 
+            strokeWidth="0.25" 
+            opacity="0.06" 
+          />
+          {renderCadTicks(xStart + 155 * scale, 10, 70 * scale, H - 20)}
+          <text x={xStart + (155 + 6) * scale} y={22} fill="var(--accent)" fontSize="6" fontFamily="monospace" letterSpacing="1.2" opacity="0.08">BUF_ZONE_L3</text>
+
+          {/* Zone 4: Interface Zone */}
+          <rect 
+            x={xStart + 230 * scale} 
+            y={10} 
+            width={46 * scale} 
+            height={H - 20} 
+            fill="rgba(8, 10, 18, 0.35)" 
+            stroke="var(--accent)" 
+            strokeWidth="0.25" 
+            opacity="0.07" 
+          />
+          {renderCadTicks(xStart + 230 * scale, 10, 46 * scale, H - 20)}
+          <text x={xStart + (230 + 5) * scale} y={22} fill="var(--accent)" fontSize="6" fontFamily="monospace" letterSpacing="1.2" opacity="0.09">INT_ZONE_L4</text>
+
+          {/* Inactive layered CAD tracks */}
+          <path
+            d={`M ${xStart + 20 * scale},10 V 80 L ${xStart + 80 * scale},140 H ${xStart + 160 * scale}`}
+            stroke="var(--accent)"
+            strokeWidth="0.6"
+            fill="none"
+            opacity="0.02"
+          />
+          <path
+            d={`M ${xStart + 35 * scale},${H} V ${H - 80} L ${xStart + 95 * scale},${H - 140} H ${xStart + 175 * scale}`}
+            stroke="var(--accent)"
+            strokeWidth="0.6"
+            fill="none"
+            opacity="0.02"
+          />
+          <path
+            d={`M ${xStart + 5 * scale},${CH2_Y + 12} H ${xStart + 60 * scale} L ${xStart + 90 * scale},${CH2_Y + 42} H ${xStart + 140 * scale}`}
+            stroke="var(--accent)"
+            strokeWidth="0.50"
+            fill="none"
+            opacity="0.015"
+          />
+          <path
+            d={`M ${xStart + 5 * scale},${CH3_Y - 12} H ${xStart + 60 * scale} L ${xStart + 90 * scale},${CH3_Y - 42} H ${xStart + 140 * scale}`}
+            stroke="var(--accent)"
+            strokeWidth="0.50"
+            fill="none"
+            opacity="0.015"
+          />
+          <rect x={xStart + 140 * scale} y={CH2_Y - 80} width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="0.30" strokeDasharray="2 2" opacity="0.03" />
+          <rect x={xStart + 140 * scale} y={CH3_Y + 60} width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="0.30" strokeDasharray="2 2" opacity="0.03" />
+        </g>
 
         {/* Dynamic Particles Container */}
         <g ref={particlesContainerRef} />

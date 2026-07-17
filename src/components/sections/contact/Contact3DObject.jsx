@@ -37,44 +37,7 @@ const SCENE_CONFIG = {
 }
 
 // Three-tier hierarchical orbital system (TASK 15 configuration)
-// Orbit 1 (inner): Professional Identity - GitHub, LinkedIn
-// Orbit 2 (middle): Technical Proof - LeetCode, GeeksforGeeks
-// Orbit 3 (outer): Direct Action - Email (copy), Resume (download)
-const ORBITAL_PLANES = {
-  inner: {
-    inclination: 28 * (Math.PI / 180),   // 28Â° tilt
-    radius: 2.6,                           // Closest orbit
-    period: 18,                            // 18 seconds per revolution
-    precessionPeriod: 100,                 // Axis precession over 100s
-  },
-  middle: {
-    inclination: 68 * (Math.PI / 180),   // 68Â° tilt
-    radius: 3.0,                           // Medium orbit
-    period: 26,                            // 26 seconds per revolution
-    precessionPeriod: 110,                 // Axis precession over 110s
-  },
-  outer: {
-    inclination: 115 * (Math.PI / 180),  // 115Â° tilt
-    radius: 3.3,                           // Outermost orbit
-    period: 38,                            // 38 seconds per revolution
-    precessionPeriod: 120,                 // Axis precession over 120s
-  },
-}
 
-// Icon-to-orbit mapping with phase locking for paired icons
-const ICON_ORBIT_CONFIG = {
-  // Orbit 1: Professional Identity
-  github:   { orbit: 'inner',  initialPhase: 0 },
-  linkedin: { orbit: 'inner',  initialPhase: Math.PI },  // Phase-locked 180Â° opposite
-  
-  // Orbit 2: Technical Proof
-  leetcode: { orbit: 'middle', initialPhase: 0 },
-  gfg:      { orbit: 'middle', initialPhase: Math.PI },  // Phase-locked 180Â° opposite
-  
-  // Orbit 3: Direct Action
-  email:    { orbit: 'outer',  initialPhase: 0 },
-  resume:   { orbit: 'outer',  initialPhase: Math.PI },  // Phase-locked 180Â° opposite
-}
 
 // Named constants for framerate-independent easing rates
 const LERP = {
@@ -407,7 +370,7 @@ function Globe({ distanceFactor }) {
   )
 }
 
-function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, distanceFactor, hoveredCountRef, hoveredOrbitRef }) {
+function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, hoveredCountRef }) {
   const iconGroupRef = useRef()
   const htmlRef = useRef()
   const glowRef = useRef()
@@ -463,63 +426,63 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, distanceFactor
     }
   }, [specialType, url])
 
-  useFrame((state, delta) => {
-    if (shouldReduceMotion) return
-    const hovered = hoverRef.current
+    // Combined physics loop and theme shadow synchronization
+    const lastColorVersion = useRef(-1)
 
-    const targetGlow = hovered ? 1.0 : 0.0
-    const glowSpeed = hovered ? LERP.hoverGlowIn : LERP.hoverGlowOut
-    hoverGlowFactor.current = lerpFI(hoverGlowFactor.current, targetGlow, glowSpeed, delta)
+    useFrame((state, delta) => {
+      if (shouldReduceMotion) return
+      const hovered = hoverRef.current
 
-    // Depth-based opacity, scale, and brightness
-    if (iconGroupRef.current && htmlRef.current) {
-      iconGroupRef.current.getWorldPosition(tempVec)
-      tempVec.applyMatrix4(state.camera.matrixWorldInverse)
+      const targetGlow = hovered ? 1.0 : 0.0
+      const glowSpeed = hovered ? LERP.hoverGlowIn : LERP.hoverGlowOut
+      hoverGlowFactor.current = lerpFI(hoverGlowFactor.current, targetGlow, glowSpeed, delta)
 
-      const camZ = state.camera.position.z || SCENE_CONFIG.depth.cameraZ
-      const radius = 2.45
-      const maxZ = -(camZ - radius * 1.2)
-      const minZ = -(camZ + radius * 1.2)
-      const depth = THREE.MathUtils.clamp((tempVec.z - minZ) / (maxZ - minZ), 0, 1)
+      // Depth-based opacity, scale, and brightness
+      if (iconGroupRef.current && htmlRef.current) {
+        iconGroupRef.current.getWorldPosition(tempVec)
+        tempVec.applyMatrix4(state.camera.matrixWorldInverse)
 
-      const baseScale = 0.95 + depth * 0.08
-      const scaleVal = baseScale * (1.0 + hoverGlowFactor.current * 0.03)
-      const opacityVal = 0.55 + depth * 0.45
-      const brightnessVal = 0.8 + depth * 0.2
-      const saturateVal = 0.85 + depth * 0.15
-      const reactionGlow = reactionGlowRef ? reactionGlowRef.current : 0.0
-      const glowOpacity = Math.max(hoverGlowFactor.current, reactionGlow)
+        const camZ = state.camera.position.z || SCENE_CONFIG.depth.cameraZ
+        const radius = 2.45
+        const maxZ = -(camZ - radius * 1.2)
+        const minZ = -(camZ + radius * 1.2)
+        const depth = THREE.MathUtils.clamp((tempVec.z - minZ) / (maxZ - minZ), 0, 1)
 
-      // Dirty-check style updates
-      const prev = lastStyle.current
-      if (Math.abs(opacityVal - prev.opacity) > STYLE_THRESHOLD) {
-        htmlRef.current.style.opacity = opacityVal
-        prev.opacity = opacityVal
+        const baseScale = 0.95 + depth * 0.08
+        const scaleVal = baseScale * (1.0 + hoverGlowFactor.current * 0.03)
+        const opacityVal = 0.55 + depth * 0.45
+        const brightnessVal = 0.8 + depth * 0.2
+        const saturateVal = 0.85 + depth * 0.15
+        const reactionGlow = reactionGlowRef ? reactionGlowRef.current : 0.0
+        const glowOpacity = Math.max(hoverGlowFactor.current, reactionGlow)
+
+        // Dirty-check style updates
+        const prev = lastStyle.current
+        if (Math.abs(opacityVal - prev.opacity) > STYLE_THRESHOLD) {
+          htmlRef.current.style.opacity = opacityVal
+          prev.opacity = opacityVal
+        }
+        if (Math.abs(scaleVal - prev.scaleVal) > STYLE_THRESHOLD) {
+          htmlRef.current.style.transform = `scale(${scaleVal})`
+          prev.scaleVal = scaleVal
+        }
+        if (Math.abs(brightnessVal - prev.brightnessVal) > STYLE_THRESHOLD || Math.abs(saturateVal - prev.saturateVal) > STYLE_THRESHOLD) {
+          htmlRef.current.style.filter = `brightness(${brightnessVal.toFixed(3)}) saturate(${saturateVal.toFixed(3)})`
+          prev.brightnessVal = brightnessVal
+          prev.saturateVal = saturateVal
+        }
+        if (glowRef.current && Math.abs(glowOpacity - prev.glowOpacity) > 0.01) {
+          glowRef.current.style.opacity = glowOpacity.toFixed(2)
+          prev.glowOpacity = glowOpacity
+        }
       }
-      if (Math.abs(scaleVal - prev.scaleVal) > STYLE_THRESHOLD) {
-        htmlRef.current.style.transform = `scale(${scaleVal})`
-        prev.scaleVal = scaleVal
-      }
-      if (Math.abs(brightnessVal - prev.brightnessVal) > STYLE_THRESHOLD || Math.abs(saturateVal - prev.saturateVal) > STYLE_THRESHOLD) {
-        htmlRef.current.style.filter = `brightness(${brightnessVal.toFixed(3)}) saturate(${saturateVal.toFixed(3)})`
-        prev.brightnessVal = brightnessVal
-        prev.saturateVal = saturateVal
-      }
-      if (glowRef.current && Math.abs(glowOpacity - prev.glowOpacity) > 0.01) {
-        glowRef.current.style.opacity = glowOpacity.toFixed(2)
-        prev.glowOpacity = glowOpacity
-      }
-    }
-  })
 
-  // Theme shadow synchronization
-  const lastColorVersion = useRef(-1)
-  useFrame(() => {
-    if (lastColorVersion.current !== globalTheme.version && glowRef.current) {
-      glowRef.current.style.boxShadow = `0 0 16px ${globalTheme.color}`
-      lastColorVersion.current = globalTheme.version
-    }
-  })
+      // Theme shadow synchronization (combined to reduce hook overhead)
+      if (lastColorVersion.current !== globalTheme.version && glowRef.current) {
+        glowRef.current.style.boxShadow = `0 0 16px ${globalTheme.color}`
+        lastColorVersion.current = globalTheme.version
+      }
+    })
 
   const renderLink = () => {
     const iconContent = (
@@ -600,17 +563,8 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, distanceFactor
   )
 }
 
-// Create shared geometry and material to reuse across all OrbitGroup components
-const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.035, 32, 256)
-const sharedRingMaterial = (() => {
-  const mat = new RingGlowMaterial()
-  mat.transparent = true
-  mat.blending = THREE.AdditiveBlending
-  mat.depthWrite = false
-  mat.color = new THREE.Color('#8B5CFF')
-  mat.opacity = 0.35
-  return mat
-})()
+// Create shared geometry to reuse across all OrbitGroup components (8x lower polygon count)
+const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.035, 8, 128)
 
 const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 
@@ -635,6 +589,9 @@ const OrbitalRing = memo(function OrbitalRing({
   const trailMeshARef = useRef()
   const trailMeshBRef = useRef()
 
+  const segmentMeshARef = useRef()
+  const segmentMeshBRef = useRef()
+
   const iconWrapperARef = useRef()
   const iconWrapperBRef = useRef()
 
@@ -656,12 +613,12 @@ const OrbitalRing = memo(function OrbitalRing({
   // Packet animation states
   const packetActiveA = useRef(false)
   const packetProgressA = useRef(0)
-  const packetCooldownA = useRef(6 + Math.random() * 4)
+  const packetCooldownA = useRef(8.0)
   const packetTimerA = useRef(0)
 
   const packetActiveB = useRef(false)
   const packetProgressB = useRef(0)
-  const packetCooldownB = useRef(6 + Math.random() * 4)
+  const packetCooldownB = useRef(8.0)
   const packetTimerB = useRef(0)
 
   // Reaction animation states (scale / glow jump)
@@ -746,6 +703,18 @@ const OrbitalRing = memo(function OrbitalRing({
 
   const packetMaterialA = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0 }), [])
   const packetMaterialB = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0 }), [])
+
+  useEffect(() => {
+    return () => {
+      ringMaterial.dispose()
+      segmentMaterialA.dispose()
+      segmentMaterialB.dispose()
+      trailMaterialA.dispose()
+      trailMaterialB.dispose()
+      packetMaterialA.dispose()
+      packetMaterialB.dispose()
+    }
+  }, [ringMaterial, segmentMaterialA, segmentMaterialB, trailMaterialA, trailMaterialB, packetMaterialA, packetMaterialB])
 
   useFrame((state, delta) => {
     const tGlobal = state.clock.getElapsedTime()
@@ -887,13 +856,15 @@ const OrbitalRing = memo(function OrbitalRing({
         const streakThin = 1.0 - Math.sin(progress * Math.PI) * 0.4
         packetMeshARef.current.scale.set(streakStretch, streakThin, streakThin)
         
-        packetMaterialA.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
+        if (packetMeshARef.current) {
+          packetMeshARef.current.material.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
+        }
       }
     } else {
       // Hide packet if not active and not part of the Rare Burst
       const isBurstTargetA = activeBurstRef.current && activeBurstRef.current.ringIndex === myRingIndex && activeBurstRef.current.iconIndex === 0 && activeBurstRef.current.stage === 'travel'
-      if (!isBurstTargetA) {
-        packetMaterialA.opacity = 0.0
+      if (!isBurstTargetA && packetMeshARef.current) {
+        packetMeshARef.current.material.opacity = 0.0
       }
     }
 
@@ -916,12 +887,14 @@ const OrbitalRing = memo(function OrbitalRing({
         const streakThin = 1.0 - Math.sin(progress * Math.PI) * 0.4
         packetMeshBRef.current.scale.set(streakStretch, streakThin, streakThin)
         
-        packetMaterialB.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
+        if (packetMeshBRef.current) {
+          packetMeshBRef.current.material.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
+        }
       }
     } else {
       const isBurstTargetB = activeBurstRef.current && activeBurstRef.current.ringIndex === myRingIndex && activeBurstRef.current.iconIndex === 1 && activeBurstRef.current.stage === 'travel'
-      if (!isBurstTargetB) {
-        packetMaterialB.opacity = 0.0
+      if (!isBurstTargetB && packetMeshBRef.current) {
+        packetMeshBRef.current.material.opacity = 0.0
       }
     }
 
@@ -930,7 +903,9 @@ const OrbitalRing = memo(function OrbitalRing({
     let burstReactionFactorB = 0.0
 
     // Set time uniform on ringMaterial for custom shader effects
-    ringMaterial.time = tGlobal
+    if (meshRef.current) {
+      meshRef.current.material.time = tGlobal
+    }
 
     if (activeBurstRef.current && activeBurstRef.current.ringIndex === myRingIndex) {
       const burst = activeBurstRef.current
@@ -944,7 +919,7 @@ const OrbitalRing = memo(function OrbitalRing({
             const streakStretch = 1.0 + Math.sin(progress * Math.PI) * 2.2
             const streakThin = 1.0 - Math.sin(progress * Math.PI) * 0.5
             packetMeshARef.current.scale.set(streakStretch, streakThin, streakThin)
-            packetMaterialA.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
+            packetMeshARef.current.material.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
           }
         } else {
           if (packetMeshBRef.current) {
@@ -952,7 +927,7 @@ const OrbitalRing = memo(function OrbitalRing({
             const streakStretch = 1.0 + Math.sin(progress * Math.PI) * 2.2
             const streakThin = 1.0 - Math.sin(progress * Math.PI) * 0.5
             packetMeshBRef.current.scale.set(streakStretch, streakThin, streakThin)
-            packetMaterialB.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
+            packetMeshBRef.current.material.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
           }
         }
       } else if (burst.stage === 'sync') {
@@ -967,11 +942,15 @@ const OrbitalRing = memo(function OrbitalRing({
         }
         
         // Propagate ripple along ring
-        ringMaterial.rippleProgress = progress
-        ringMaterial.rippleOrigin = burst.iconIndex === 0 ? 0.0 : 0.5
+        if (meshRef.current) {
+          meshRef.current.material.rippleProgress = progress
+          meshRef.current.material.rippleOrigin = burst.iconIndex === 0 ? 0.0 : 0.5
+        }
       }
     } else {
-      ringMaterial.rippleProgress = 0.0
+      if (meshRef.current) {
+        meshRef.current.material.rippleProgress = 0.0
+      }
     }
 
     // Update periodic reaction timers & release locks
@@ -1022,8 +1001,12 @@ const OrbitalRing = memo(function OrbitalRing({
     }
 
     // Update segment materials (20-30 degrees short energized arcs)
-    segmentMaterialA.opacity = activeReactionA
-    segmentMaterialB.opacity = activeReactionB
+    if (segmentMeshARef.current) {
+      segmentMeshARef.current.material.opacity = activeReactionA
+    }
+    if (segmentMeshBRef.current) {
+      segmentMeshBRef.current.material.opacity = activeReactionB
+    }
 
     // --- Depth Calculation & Trail Uniform Updates ---
     const camZ = state.camera.position.z || 8
@@ -1057,15 +1040,17 @@ const OrbitalRing = memo(function OrbitalRing({
     const targetLengthB = baseLengthB + hoverFactorB.current * 0.25
 
     // Update trail uniforms (depth fades trail, hover/sync extends/brightens it)
-    if (trailMaterialA) {
-      trailMaterialA.time = tGlobal
-      trailMaterialA.opacity = (0.05 + depthA * 0.25) * 0.8 + activeReactionA * 0.6
-      trailMaterialA.trailLengthFactor = THREE.MathUtils.clamp(targetLengthA * (0.6 + depthA * 0.4), 0, 1)
+    if (trailMeshARef.current) {
+      const mat = trailMeshARef.current.material
+      mat.time = tGlobal
+      mat.opacity = (0.05 + depthA * 0.25) * 0.8 + activeReactionA * 0.6
+      mat.trailLengthFactor = THREE.MathUtils.clamp(targetLengthA * (0.6 + depthA * 0.4), 0, 1)
     }
-    if (trailMaterialB) {
-      trailMaterialB.time = tGlobal
-      trailMaterialB.opacity = (0.05 + depthB * 0.25) * 0.8 + activeReactionB * 0.6
-      trailMaterialB.trailLengthFactor = THREE.MathUtils.clamp(targetLengthB * (0.6 + depthB * 0.4), 0, 1)
+    if (trailMeshBRef.current) {
+      const mat = trailMeshBRef.current.material
+      mat.time = tGlobal
+      mat.opacity = (0.05 + depthB * 0.25) * 0.8 + activeReactionB * 0.6
+      mat.trailLengthFactor = THREE.MathUtils.clamp(targetLengthB * (0.6 + depthB * 0.4), 0, 1)
     }
 
     // Sync glow values to refs so OrbitingIcon can read them
@@ -1103,6 +1088,7 @@ const OrbitalRing = memo(function OrbitalRing({
             />
             {/* Local Ring Activation segment centered around icon */}
             <mesh 
+              ref={segmentMeshARef}
               position={[0, 0, zOffset]}
               geometry={sharedRingGeometry} 
               material={segmentMaterialA} 
@@ -1145,6 +1131,7 @@ const OrbitalRing = memo(function OrbitalRing({
             />
             {/* Local Ring Activation segment centered around icon */}
             <mesh 
+              ref={segmentMeshBRef}
               position={[0, 0, zOffset]}
               geometry={sharedRingGeometry} 
               material={segmentMaterialB} 
@@ -1175,6 +1162,10 @@ const OrbitalRing = memo(function OrbitalRing({
   )
 })
 
+// Static global colors to avoid allocations inside render frames
+const tempColorA = new THREE.Color()
+const tempColorB = new THREE.Color()
+
 function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef }) {
   const { width } = useThree((state) => state.size)
 
@@ -1183,7 +1174,7 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
 
   // Rare Communication Burst coordinator
   const activeBurstRef = useRef(null)
-  const burstCooldownRef = useRef(15 + Math.random() * 5) // 15-20s
+  const burstCooldownRef = useRef(18.0) // 15-20s, initialized to safe default
   const burstTimerRef = useRef(0)
 
   // Issue #7: Continuous linear interpolation scaling instead of discrete pop-jumps
@@ -1229,8 +1220,8 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
     }
 
     if (lastColorVersion.current !== globalTheme.version) {
-      const color = new THREE.Color(globalTheme.color)
-      const secondaryColor = new THREE.Color(globalTheme.secondaryColor)
+      tempColorA.set(globalTheme.color)
+      tempColorB.set(globalTheme.secondaryColor)
       state.scene.traverse((obj) => {
         if (obj.name === 'glassCore') return
         if (obj.isMesh || obj.isPoints) {
@@ -1238,13 +1229,13 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
             const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
             mats.forEach((mat) => {
               const isSecondary = obj.geometry && obj.geometry === sharedRingGeometry
-              const activeColor = isSecondary ? secondaryColor : color
+              const activeColor = isSecondary ? tempColorB : tempColorA
               if (mat.color) mat.color.copy(activeColor)
               if (mat.uniforms && mat.uniforms.color) {
                 mat.uniforms.color.value.copy(activeColor)
               }
               if (mat.uniforms && mat.uniforms.edgeColor) {
-                mat.uniforms.edgeColor.value.copy(secondaryColor)
+                mat.uniforms.edgeColor.value.copy(tempColorB)
               }
             })
           }
@@ -1315,7 +1306,7 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
   )
 }
 
-export default function Contact3DObject({ isInView, contactSystemState }) {
+const Contact3DObject = memo(function Contact3DObject({ isInView }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const distanceFactor = useRef(1.0)
@@ -1376,11 +1367,13 @@ export default function Contact3DObject({ isInView, contactSystemState }) {
   }, [])
 
   useEffect(() => {
+    if (!isInView || shouldReduceMotion || !webglSupported) return
+
     const { maxDistance, minDistance, minFactor } = SCENE_CONFIG.proximity
     let ticking = false
 
     const handleMouseMove = (e) => {
-      if (ticking || !cachedRect.current || shouldReduceMotion || !webglSupported) return
+      if (ticking || !cachedRect.current) return
       ticking = true
 
       window.requestAnimationFrame(() => {
@@ -1404,7 +1397,7 @@ export default function Contact3DObject({ isInView, contactSystemState }) {
     }
     window.addEventListener("mousemove", handleMouseMove, { passive: true })
     return () => window.removeEventListener("mousemove", handleMouseMove)
-  }, [shouldReduceMotion, webglSupported])
+  }, [shouldReduceMotion, webglSupported, isInView])
 
   const iconsToRender = useMemo(() => {
     const icons = []
@@ -1484,8 +1477,9 @@ export default function Contact3DObject({ isInView, contactSystemState }) {
         />
 
         <div className="absolute inset-0 pointer-events-none">
-          {webglSupported && isInView ? (
+          {webglSupported ? (
             <Canvas
+              frameloop={isInView ? "always" : "never"}
               camera={SCENE_CONFIG.camera}
               onCreated={({ gl }) => {
                 const canvasEl = gl.domElement
@@ -1498,6 +1492,7 @@ export default function Contact3DObject({ isInView, contactSystemState }) {
                   canvasEl.removeEventListener('webglcontextlost', handleContextLost)
                 }
               }}
+              style={{ pointerEvents: isInView ? 'auto' : 'none', opacity: isInView ? 1 : 0, transition: 'opacity 0.5s ease' }}
             >
               <Scene 
                 iconsToRender={iconsToRender} 
@@ -1506,8 +1501,6 @@ export default function Contact3DObject({ isInView, contactSystemState }) {
                 hoveredOrbitRef={hoveredOrbitRef}
               />
             </Canvas>
-          ) : webglSupported && !isInView ? (
-            null
           ) : (
             // Robust 2D recovery fallback: elegant animated list in place of crashed WebGL canvas
             <div className="flex items-center justify-center w-full h-full pointer-events-auto">
@@ -1560,4 +1553,6 @@ export default function Contact3DObject({ isInView, contactSystemState }) {
       </motion.div>
     </>
   )
-}
+})
+
+export default Contact3DObject;
