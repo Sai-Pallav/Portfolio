@@ -174,46 +174,7 @@ export default memo(function ContactSection() {
         {/* Layer 8: Ambient Grid Structure */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.012)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.012)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_at_center,black_70%,transparent_100%)] pointer-events-none" />
 
-        {/* Layer 9: Connecting flow lines SVG */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 opacity-35" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="flowGrad1" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.01" />
-              <stop offset="35%" stopColor="var(--accent-secondary)" stopOpacity="0.06" />
-              <stop offset="65%" stopColor="var(--accent-secondary)" stopOpacity="0.06" />
-              <stop offset="100%" stopColor="var(--accent-hover)" stopOpacity="0.01" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M 10 15 C 25 22, 28 35, 42 45 C 50 51, 60 40, 70 35"
-            fill="none"
-            stroke="url(#flowGrad1)"
-            strokeWidth="0.06"
-            strokeDasharray="0.6 1.4"
-          />
-          <path
-            d="M 38 55 C 48 65, 42 75, 32 85 C 22 92, 12 88, 2 95"
-            fill="none"
-            stroke="url(#flowGrad1)"
-            strokeWidth="0.05"
-            strokeDasharray="0.4 1.2"
-          />
-          <path
-            d="M 78 40 C 82 55, 72 68, 58 78 C 48 85, 38 82, 28 90"
-            fill="none"
-            stroke="url(#flowGrad1)"
-            strokeWidth="0.05"
-            strokeDasharray="0.5 1.0"
-          />
-        </svg>
-
-        {/* Layer 10: Fine Grain SVG Noise Overlay */}
-        <svg className="absolute inset-0 w-full h-full opacity-[0.015] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-          <filter id="noiseFilterContact">
-            <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" stitchTiles="stitch" />
-          </filter>
-          <rect width="100%" height="100%" filter="url(#noiseFilterContact)" />
-        </svg>
+        {/* Layers 9 and 10 (connecting flow lines and grain noise overlay) removed as requested */}
 
         {/* Layer 11: Linear divider highlights */}
         <div className="absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(to right, transparent, var(--accent) 50%, transparent)' }} />

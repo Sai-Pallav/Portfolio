@@ -5,9 +5,9 @@ const getTraceStyleAttrs = (category) => {
   if (category === 'main') {
     return { w: 2.0, opDefault: 0.95 };
   } else if (category === 'auxiliary') {
-    return { w: 0.45, opDefault: 0.25 };
+    return { w: 0.75, opDefault: 0.70 };
   } else {
-    return { w: 0.18, opDefault: 0.08 };
+    return { w: 0.35, opDefault: 0.45 };
   }
 };
 
@@ -60,7 +60,7 @@ const drawLeftPCBPath = (x1, y1, x2, y2, category) => {
   return `M ${x1},${y1} L ${x2},${y2}`;
 };
 
-export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping }) {
+export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const particlesContainerRef = useRef(null)
@@ -148,7 +148,7 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
   // Draw intricate traces.
   const traces = useMemo(() => {
     const list = [];
-    
+
     const addTrace = (chKey, x1_unscaled, y1, x2_unscaled, y2, category, extra = {}) => {
       const x1 = xStart + x1_unscaled * scale;
       const x2 = xStart + x2_unscaled * scale;
@@ -241,8 +241,9 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
     { x: 180, y: CH4_Y + 15, id: 'A4', chKey: 'message' },
   ], [CH1_Y, CH2_Y, CH3_Y, CH4_Y])
 
-  // SMT / SMD Components with realistic footprints, solder mask openings, and silkscreen labels.
-  const getTransitionStyle = () => {
+  const isTransmit = contactSystemState === 'transmit'
+
+  const getTransitionStyle = React.useCallback(() => {
     if (contactSystemState === 'dormant') {
       return { transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1)' }
     }
@@ -250,17 +251,44 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
       return { transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }
     }
     return { transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)' }
-  }
+  }, [contactSystemState, isTransmit])
 
-  const getTargetOpacity = (chKey) => {
+  const getTargetOpacity = React.useCallback((chKey, elementType = 'trace') => {
     const isHero = ['name', 'email', 'subject', 'message'].includes(chKey)
-    return (isTransmit || (transmissionFailed && isHero)) 
-      ? 0 
-      : (contactSystemState === 'engaged' ? (isHero ? 0.85 : 0.30) : 0.40)
-  }
+    
+    if (isTransmit) return elementType === 'particle' ? 1.0 : 0
+    if (transmissionFailed && isHero) return 0
+    
+    if (contactSystemState === 'engaged') {
+      if (isHero) {
+        return {
+          trace: 1.0,
+          corridor: 0.80,
+          component: 0.90,
+          node: 1.0,
+          background: 0.45
+        }[elementType] || 0.95
+      }
+      return {
+        trace: 0.55,
+        corridor: 0.40,
+        component: 0.50,
+        node: 0.60,
+        background: 0.40
+      }[elementType] || 0.50
+    }
+    
+    return {
+      trace: 0.70,
+      corridor: 0.55,
+      component: 0.65,
+      node: 0.75,
+      background: 0.55
+    }[elementType] || 0.65
+  }, [contactSystemState, isTransmit, transmissionFailed])
 
   useEffect(() => {
-    if (shouldReduceMotion) return
+    if (!isInView || shouldReduceMotion) return
 
     const container = particlesContainerRef.current
     if (!container) return
@@ -272,22 +300,22 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
         circle.setAttribute('cx', '0')
         circle.setAttribute('cy', '0')
-        
+
         const r = isBurst ? '2.0' : '1.6'
         circle.setAttribute('r', r)
-        
+
         const colors = ['var(--accent)', 'var(--accent-secondary)', '#ffffff']
-        const randomColor = isBurst 
-          ? colors[Math.floor(Math.random() * colors.length)] 
+        const randomColor = isBurst
+          ? colors[Math.floor(Math.random() * colors.length)]
           : 'var(--accent)'
         circle.setAttribute('fill', randomColor)
-        
+
         circle.setAttribute('filter', isBurst ? 'url(#pcbGlowActive)' : 'url(#pcbHairlineGlow)')
         circle.style.offsetPath = `path('${trace.d}')`
-        
+
         const duration = isBurst ? '0.7s' : '1.2s'
         circle.style.animation = `pcbParticleTravel ${duration} linear forwards`
-        
+
         container.appendChild(circle)
 
         const cleanupTimer = setTimeout(() => {
@@ -329,35 +357,33 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
       if (intervalId) clearInterval(intervalId)
       timers.forEach((t) => clearTimeout(t))
     }
-  }, [isTyping, contactSystemState, traces, shouldReduceMotion])
+  }, [isInView, isTyping, contactSystemState, traces, shouldReduceMotion])
 
-  // Unified SMT Component Renderer (Pass 5 & 14)
-  const renderSMT = (x, y, w, h, label, chKey = null, isCap = false) => {
+  // Glassmorphic Component Block
+  const renderGlassBlock = (x, y, w, h, label, chKey) => {
     const px = xStart + x * scale
-    const dropShadowClass = contactSystemState === 'dormant' ? "" : "filter drop-shadow-[0.5px_0.8px_0.5px_rgba(0,0,0,0.85)]"
+    const dropShadowClass = contactSystemState === 'dormant' ? "" : "filter drop-shadow-[0.5px_0.8px_0.5px_rgba(0,0,0,0.8)]"
     const targetOpacity = getTargetOpacity(chKey)
 
     return (
-      <g
-        key={`smt-${label}-${px}-${y}`}
-        transform={`translate(${px}, ${y})`}
+      <g 
+        key={`comp-${label}-${x}-${y}`} 
+        transform={`translate(${px}, ${y})`} 
         className={dropShadowClass}
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
-        {/* Negative space clearance gap */}
-        <rect x={-w / 2 - 2.7} y={-h / 2 - 2.3} width={w + 5.4} height={h + 4.6} fill="#030304" />
-        <rect x={-w / 2} y={-h / 2} width={1.6} height={h} fill="#444452" stroke="#6e6e80" strokeWidth="0.25" opacity="1.0" />
-        <rect x={w / 2 - 1.6} y={-h / 2} width={1.6} height={h} fill="#444452" stroke="#6e6e80" strokeWidth="0.25" opacity="1.0" />
-        <rect x={-w / 2 + 1.4} y={-h / 2 + 0.3} width={w - 2.8} height={h - 0.6} rx={0.3} fill={isCap ? "#5c4b3c" : "#0e0e12"} stroke={isCap ? "#7d6855" : "#22222a"} strokeWidth="0.35" opacity="0.9" />
-        <rect x={-w / 2 - 1.2} y={-h / 2 - 0.8} width={w + 2.4} height={h + 1.6} fill="none" stroke="#ffffff" strokeWidth="0.25" opacity="0.4" />
-        <rect x={-w / 2 + 2} y={-h / 2 + 1} width={w - 4} height={h - 2} fill="none" stroke="var(--accent)" strokeWidth="0.25" opacity={0.6} />
+        <rect x={-w / 2 - 1} y={-h / 2 - 0.5} width={w + 2} height={h + 1} fill="#030304" />
+        <rect x={-w / 2} y={-h / 2} width={3} height={h} fill="#2f2f38" stroke="#4a4a58" strokeWidth="0.3" />
+        <rect x={w / 2 - 3} y={-h / 2} width={3} height={h} fill="#2f2f38" stroke="#4a4a58" strokeWidth="0.3" />
+        <rect x={-w / 2 - 1.5} y={-h / 2 - 1.5} width={w + 3} height={h + 3} fill="none" stroke="#ffffff" strokeWidth="0.3" opacity="0.35" />
+        <rect x={-w / 2 + 2.5} y={-h / 2 + 0.5} width={w - 5} height={h - 1} rx={0.5} fill="#0d0d10" stroke="#1c1c21" strokeWidth="0.4" />
+        <rect x={-w / 2 + 4} y={-h / 2 + 2} width={w - 8} height={h - 4} fill="none" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} />
       </g>
     )
   }
 
-
-  // Plated Through Hole / Test Pad Terminations (Refined as sockets, Pass 5)
+  // Circular Termination Landing Pad
   const renderTerminationPad = (x, y, label, chKey) => {
     const targetOpacity = getTargetOpacity(chKey)
     const ringAnimation = {
@@ -373,12 +399,6 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
-        {/* Negative space clearance gap */}
-        <circle cx="0" cy="0" r="7.5" fill="#030304" />
-        {/* Transmission socket footprint, Pass 5 */}
-        <rect x="-6" y="-6" width="12" height="12" rx="1" fill="#0b0b10" stroke="var(--accent)" strokeWidth="0.25" opacity="0.12" />
-        <rect x="-4.5" y="-4.5" width="9" height="9" fill="none" stroke="#222" strokeWidth="0.3" />
-        
         <circle cx="0" cy="0" r="3" fill="#18181f" stroke="#333" strokeWidth="0.5" />
         <circle cx="0" cy="0" r="1.8" fill="#2d2d3a" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} style={ringAnimation} />
         <circle cx="0" cy="0" r="0.8" fill="#000" />
@@ -386,8 +406,182 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
     )
   }
 
-  const isTransmit = contactSystemState === 'transmit'
+
+
+
   const isTransmitOrFailed = isTransmit || transmissionFailed
+
+  const getCorridorWidth = (traceWidth, layer) => {
+    const base = 1.5
+    const multipliers = {
+      outer: 4.5,
+      channel: 4.0,
+      inner: 3.5
+    }
+    return traceWidth * multipliers[layer] + base
+  };
+
+  const traceCorridors = React.useMemo(() => (
+    <g strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={isTransmit ? 0 : 1}>
+      {traces.filter(t => t.category === 'main').map((t, idx) => {
+        const targetOpacity = getTargetOpacity(t.chKey, 'corridor')
+        const w = t.w
+        return (
+          <React.Fragment key={`l-corridor-${idx}`}>
+            {/* Layer 1: Ambient Field (soft outer glow) */}
+            <path
+              d={t.d}
+              stroke="rgba(168, 85, 247, 0.018)"
+              strokeWidth={getCorridorWidth(w, 'outer') + 1}
+              opacity={targetOpacity * 0.7}
+              style={getTransitionStyle()}
+            />
+            {/* Layer 2: Recessed Well (gradient for depth) */}
+            <path
+              d={t.d}
+              stroke="url(#corridor-recess-gradient-l)"
+              strokeWidth={getCorridorWidth(w, 'channel')}
+              opacity={targetOpacity * 1.0}
+              style={getTransitionStyle()}
+            />
+            {/* Layer 3: Channel Base (matte substrate) */}
+            <path
+              d={t.d}
+              stroke="#06060a"
+              strokeWidth={getCorridorWidth(w, 'inner') + 0.5}
+              opacity={targetOpacity * 0.95}
+              style={getTransitionStyle()}
+            />
+            {/* Layer 4: Internal Highlight (optical depth cue) */}
+            <path
+              d={t.d}
+              stroke="rgba(255, 255, 255, 0.015)"
+              strokeWidth={getCorridorWidth(w, 'inner') - 0.2}
+              opacity={targetOpacity * 0.9}
+              transform="translate(-0.2, -0.3)"
+              style={getTransitionStyle()}
+            />
+
+            {/* Bend Clearances */}
+            {t.bends && t.bends.map((b, bIdx) => (
+              <g key={`l-bend-clear-${idx}-${bIdx}`} opacity={targetOpacity * 0.95}>
+                <circle cx={b.x} cy={b.y} r="4.2" fill="url(#radial-depth-gradient)" style={getTransitionStyle()} />
+                <circle cx={b.x} cy={b.y} r="3.8" fill="none" stroke="rgba(168, 85, 247, 0.03)" strokeWidth="0.25" style={getTransitionStyle()} />
+                <circle cx={b.x} cy={b.y} r="3.2" fill="#040407" opacity="0.9" style={getTransitionStyle()} />
+                <circle cx={b.x - 0.3} cy={b.y - 0.4} r="2.8" fill="none" stroke="rgba(255, 255, 255, 0.015)" strokeWidth="0.5" style={getTransitionStyle()} />
+              </g>
+            ))}
+          </React.Fragment>
+        )
+      })}
+    </g>
+  ), [traces, getTargetOpacity, isTransmit, getTransitionStyle])
+
+  // Ground-plane plates are derived from each channel's own trace-fan geometry
+  // (same H-D-V-H bend proportions used by drawLeftPCBPath, mirrored for symmetric
+  // channels) so every plate edge, width, and chamfer is explained by the routing
+  // it borders — the pour recedes exactly where a channel's traces fan out, and its
+  // width/thickness is whatever that channel's real fan geometry leaves behind.
+  const groundPlanes = React.useMemo(() => {
+    const marginLeft = xStart + 15
+    const marginRight = L_form_end - 15
+    const boardTop = 20
+    const boardBottom = H - 20
+
+    // Mirrors the bend math in drawLeftPCBPath for category 'auxiliary' (pCenter 0.425),
+    // offset vertically by marginY to produce a plate edge that runs parallel to the trace.
+    const fan = (y1, y2, marginY) => {
+      const x1 = xStart
+      const x2 = xStart + 280 * scale
+      const dx = x2 - x1
+      const absDy = Math.abs(y2 - y1)
+      const pCenter = 0.425
+      const px1 = x1 + (dx * pCenter - absDy / 2)
+      const px2 = px1 + absDy
+      return [px1, y1 + marginY, px2, y2 + marginY]
+    }
+
+    const ch1Top = fan(CH1_Y - 55, CH1_Y - 15, -10)
+    const ch1Bot = fan(CH1_Y + 10, CH1_Y + 30, 8)
+    const ch2Top = fan(CH2_Y - 20, CH2_Y + 10, -8)
+    const ch2Bot = fan(CH2_Y + 15, CH2_Y + 35, 8)
+    const ch3Top = fan(CH3_Y - 15, CH3_Y - 35, -8)
+    const ch3Bot = fan(CH3_Y + 20, CH3_Y - 10, 8)
+    const ch4Top = fan(CH4_Y - 20, CH4_Y - 5, -8)
+    const ch4Bot = fan(CH4_Y + 55, CH4_Y + 20, 10)
+
+    const Y_center = (CH2_Y + CH3_Y) / 2
+
+    const plates = [
+      {
+        key: 'top',
+        opacity: 0.70,
+        pts: [
+          [marginLeft, boardTop], [marginRight - 15, boardTop], [marginRight, boardTop + 15],
+          [marginRight, ch1Top[3]], [ch1Top[2], ch1Top[3]], [ch1Top[0], ch1Top[1]],
+          [marginLeft + 12, ch1Top[1]], [marginLeft, ch1Top[1] - 12]
+        ]
+      },
+      {
+        key: 'ch1-2',
+        opacity: 0.85,
+        pts: [
+          [marginLeft, ch1Bot[1]], [ch1Bot[0], ch1Bot[1]], [ch1Bot[2], ch1Bot[3]], [marginRight - 18, ch1Bot[3]], [marginRight, ch1Bot[3] + 12],
+          [marginRight, ch2Top[3]], [ch2Top[2], ch2Top[3]], [ch2Top[0], ch2Top[1]], [marginLeft, ch2Top[1]]
+        ]
+      },
+      {
+        key: 'central',
+        opacity: 1.00,
+        pts: [
+          [marginLeft, ch2Bot[1]], [ch2Bot[0], ch2Bot[1]], [ch2Bot[2], ch2Bot[3]], [marginRight - 10, ch2Bot[3]],
+          [marginRight - 10, Y_center - 10], [marginRight - 18, Y_center], [marginRight - 10, Y_center + 10],
+          [marginRight - 10, ch3Top[3]], [ch3Top[2], ch3Top[3]], [ch3Top[0], ch3Top[1]], [marginLeft, ch3Top[1]]
+        ]
+      },
+      {
+        key: 'ch3-4',
+        opacity: 0.85,
+        pts: [
+          [marginLeft, ch3Bot[1]], [ch3Bot[0], ch3Bot[1]], [ch3Bot[2], ch3Bot[3]], [marginRight, ch3Bot[3]],
+          [marginRight, ch4Top[3] - 12], [marginRight - 18, ch4Top[3]], [ch4Top[2], ch4Top[3]], [ch4Top[0], ch4Top[1]], [marginLeft, ch4Top[1]]
+        ]
+      },
+      {
+        key: 'bottom',
+        opacity: 0.70,
+        pts: [
+          [marginLeft, ch4Bot[1] + 12], [marginLeft + 12, ch4Bot[1]], [ch4Bot[0], ch4Bot[1]], [ch4Bot[2], ch4Bot[3]], [marginRight, ch4Bot[3]],
+          [marginRight, boardBottom - 15], [marginRight - 15, boardBottom], [marginLeft, boardBottom]
+        ]
+      }
+    ]
+
+    // Isolation slots — recessed manufacturing cutlines that articulate the three
+    // largest pours so they never read as flat slabs (same depth language as the
+    // Middle PCB). Each slot is derived from its plate's own solid band, and only
+    // emitted when that band is tall enough to host one with clearance.
+    const slotX = marginLeft + 8
+    const slotW = Math.max(0, marginRight - marginLeft - 16)
+    const slots = []
+    const topBand = Math.min(ch1Top[1], ch1Top[3]) - (boardTop + 15)
+    if (topBand > 26) {
+      slots.push({ x: slotX, y: Math.min(ch1Top[1], ch1Top[3]) - 12, w: slotW })
+    }
+    slots.push({ x: slotX, y: Y_center - 2, w: slotW })
+    const botBand = (boardBottom - 15) - Math.max(ch4Bot[1], ch4Bot[3])
+    if (botBand > 26) {
+      slots.push({ x: slotX, y: Math.max(ch4Bot[1], ch4Bot[3]) + 8, w: slotW })
+    }
+
+    return {
+      plates: plates.map(p => ({
+        pts: p.pts.map(pt => pt.join(',')).join(' '),
+        opacity: p.opacity
+      })),
+      slots
+    }
+  }, [xStart, scale, L_form_end, H, CH1_Y, CH2_Y, CH3_Y, CH4_Y])
 
   const getTrailPath = (chKey) => {
     const startX = xStart + 275 * scale
@@ -476,60 +670,44 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
 
   const renderTrace = (t, i) => {
     const isHero = ['name', 'email', 'subject', 'message'].includes(t.chKey)
-    const targetOpacity = getTargetOpacity(t.chKey)
+    const targetOpacity = getTargetOpacity(t.chKey, 'trace')
+    const w = t.w
 
     return (
       <React.Fragment key={`trace-${i}`}>
-        {/* Motherboard-style Negative Space Corridor Channel */}
+        {/* Material Layer 2: Groove Shadow */}
         {t.category === 'main' && (
-          <>
-            <path
-              d={t.d}
-              stroke="var(--accent)"
-              strokeWidth={t.w * 3.0 + 6.0}
-              fill="none"
-              opacity={targetOpacity * 0.05}
-              strokeLinecap="square"
-              strokeLinejoin="miter"
-              style={getTransitionStyle()}
-            />
-            <path
-              d={t.d}
-              stroke="#080a12"
-              strokeWidth={t.w * 3.0 + 5.2}
-              fill="none"
-              opacity={targetOpacity * 0.95}
-              strokeLinecap="square"
-              strokeLinejoin="miter"
-              style={getTransitionStyle()}
-            />
-            {/* Octagonal corner clearance expansions at bends */}
-            {t.bends && t.bends.map((b, bIdx) => (
-              <g key={`bend-${bIdx}`} opacity={targetOpacity}>
-                <polygon
-                  points={`${b.x - 3},${b.y} ${b.x - 2.1},${b.y - 2.1} ${b.x},${b.y - 3} ${b.x + 2.1},${b.y - 2.1} ${b.x + 3},${b.y} ${b.x + 2.1},${b.y + 2.1} ${b.x},${b.y + 3} ${b.x - 2.1},${b.y + 2.1}`}
-                  fill="#080a12"
-                  style={getTransitionStyle()}
-                />
-                <polygon
-                  points={`${b.x - 3.4},${b.y} ${b.x - 2.4},${b.y - 2.4} ${b.x},${b.y - 3.4} ${b.x + 2.4},${b.y - 2.4} ${b.x + 3.4},${b.y} ${b.x + 2.4},${b.y + 2.4} ${b.x},${b.y + 3.4} ${b.x - 2.4},${b.y + 2.4}`}
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth="0.25"
-                  opacity="0.05"
-                  style={getTransitionStyle()}
-                />
-              </g>
-            ))}
-          </>
+          <path
+            d={t.d}
+            stroke="rgba(0, 0, 0, 0.45)"
+            strokeWidth={w + 0.8}
+            fill="none"
+            opacity={targetOpacity * 0.75}
+            transform="translate(0.4, 0.4)"
+            style={getTransitionStyle()}
+          />
         )}
+
+        {/* Material Layer 2: Groove Highlight */}
+        {t.category === 'main' && (
+          <path
+            d={t.d}
+            stroke="rgba(255, 255, 255, 0.03)"
+            strokeWidth={w + 0.8}
+            fill="none"
+            opacity={targetOpacity * 0.75}
+            transform="translate(-0.4, -0.4)"
+            style={getTransitionStyle()}
+          />
+        )}
+
         {isHero && contactSystemState === 'engaged' && !isTransmit && (
           <>
             <path
               d={t.d}
               stroke="var(--accent)"
-              strokeWidth={t.w + 0.8}
-              opacity="0.35"
+              strokeWidth={w + 0.6}
+              opacity="0.22"
               filter="url(#pcbHairlineGlow)"
               style={getTransitionStyle()}
             />
@@ -537,7 +715,7 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
               <path
                 d={t.d}
                 stroke="var(--accent)"
-                strokeWidth={t.w + 1.2}
+                strokeWidth={w + 1.2}
                 fill="none"
                 opacity="1"
                 pathLength="100"
@@ -552,14 +730,65 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             )}
           </>
         )}
-        {/* Main trace core */}
+
+        {/* Material Layer 3: Trace Core */}
         <path
           d={t.d}
           stroke="var(--accent)"
-          strokeWidth={t.w}
-          opacity={targetOpacity * (t.opDefault || 0.3)}
+          strokeWidth={w}
+          opacity={0.95 * targetOpacity}
           style={getTransitionStyle()}
         />
+
+        {/* Brushed copper texture overlay */}
+        <path
+          d={t.d}
+          stroke="url(#copper-texture-l)"
+          strokeWidth={w}
+          opacity={0.12 * targetOpacity}
+          style={getTransitionStyle()}
+        />
+
+        {/* Passive Trace Idle Highlight */}
+        {t.category === 'auxiliary' && i % 3 === 0 && !isTransmit && (
+          <path
+            d={t.d}
+            stroke="var(--accent)"
+            strokeWidth={w}
+            fill="none"
+            opacity="0"
+            style={{
+              ...getTransitionStyle(),
+              animation: 'pcbIdleTraceHighlight 6s ease-in-out infinite',
+              animationDelay: `${i * 0.7}s`
+            }}
+          />
+        )}
+
+        {/* Plated Solder Joints at Bends */}
+        {t.category !== 'ground' && t.bends && t.bends.map((bend, bIdx) => {
+          const isMainBend = t.category === 'main';
+          const nodeRadius = isMainBend ? 1.5 : 1.0;
+          const ringRadius = isMainBend ? 1.0 : 0.65;
+          const coreRadius = isMainBend ? 0.35 : 0.25;
+          const usePulse = isMainBend && bIdx === 0 && isTyping;
+          const pulseStyle = usePulse ? {
+            animation: 'pcbIdleNodePulse 4s ease-in-out infinite',
+            animationDelay: `${(i * 2.5 + bIdx * 0.8 + 12) * 0.4}s`
+          } : {};
+          return (
+            <g
+              key={`l-bend-${i}-${bIdx}`}
+              transform={`translate(${bend.x}, ${bend.y})`}
+              opacity={targetOpacity * (isMainBend ? 0.85 : 0.70)}
+              style={{ ...getTransitionStyle(), ...pulseStyle }}
+            >
+              <circle cx="0" cy="0" r={nodeRadius} fill="#030304" />
+              <circle cx="0" cy="0" r={ringRadius} fill="none" stroke="url(#gold-plated)" strokeWidth="0.25" opacity={isMainBend ? 0.80 : 0.65} />
+              <circle cx="0" cy="0" r={coreRadius} fill="#030304" />
+            </g>
+          );
+        })}
       </React.Fragment>
     )
   }
@@ -584,20 +813,15 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
     }
 
     return (
-      <g 
-        key={`node-${i}`} 
+      <g
+        key={`node-${i}`}
         transform={`translate(${xStart + n.x * scale}, ${n.y})`}
         opacity={targetOpacity}
         style={getTransitionStyle()}
       >
         <g style={nodeStyle}>
           {/* Stepped CAD Docking Frame, Pass 5 */}
-          <g stroke="var(--accent)" strokeWidth="0.25" fill="none" opacity="0.08">
-            <rect x="-22" y="-22" width="44" height="44" rx="2" />
-            <path d="M -22,-16 V -22 H -16" />
-            <path d="M 22,-16 V -22 H 16" />
-            <path d="M -22,16 V 22 H -16" />
-            <path d="M 22,16 V 22 H 16" />
+          <g stroke="var(--accent)" strokeWidth="0.30" fill="none" opacity="0.35">
             <circle cx="0" cy="0" r="20.5" strokeDasharray="2 2" />
           </g>
           {/* Substrate Clearance Gap */}
@@ -605,107 +829,97 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
           {/* Solder Mask Opening */}
           <circle cx="0" cy="0" r="16" fill="#030304" opacity={0.6} />
 
-        {/* Concentric Copper Pad Ring */}
-        <circle cx="0" cy="0" r="14.5" fill="none" stroke="var(--accent)" strokeWidth="0.8" opacity={0.45} />
-        <circle cx="0" cy="0" r="12" fill="none" stroke="#4a4a58" strokeWidth="0.5" opacity={0.5} />
+          {/* Concentric Copper Pad Ring */}
+          <circle cx="0" cy="0" r="14.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.45" opacity={0.85} />
+          <circle cx="0" cy="0" r="12" fill="none" stroke="rgba(255, 255, 255, 0.25)" strokeDasharray="1.5 1.5" strokeWidth="0.35" opacity="0.75" />
+          <circle cx="0" cy="0" r="9.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.35" opacity="0.80" />
 
-        {/* Outer expanding pulse ring (Radar Effect) */}
-        <circle cx="0" cy="0" r="10" fill="none" stroke="var(--accent)" strokeWidth="0.8"
-          style={{
-            animation: 'pcbRadarPulse 1.0s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
+          {/* Outer expanding pulse ring (Radar Effect) */}
+          <circle cx="0" cy="0" r="10" fill="none" stroke="var(--accent)" strokeWidth="0.4"
+            style={{
+              animation: 'pcbRadarPulse 1.0s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
+              animationPlayState: isTyping ? 'running' : 'paused',
+              transformOrigin: '0px 0px'
+            }}
+          />
+
+          {/* Rotatable Inner Details Group (Clockwise) */}
+          <g style={{
+            animation: 'pcbRadarRotate 5s linear infinite',
             animationPlayState: isTyping ? 'running' : 'paused',
             transformOrigin: '0px 0px'
-          }}
-        />
+          }}>
 
-        {/* Rotatable Inner Details Group (Clockwise) */}
-        <g style={{ 
-          animation: 'pcbRadarRotate 5s linear infinite',
-          animationPlayState: isTyping ? 'running' : 'paused', 
-          transformOrigin: '0px 0px' 
-        }}>
-          {/* Tiny surrounding via array around node */}
-          {[0, 60, 120, 180, 240, 300].map((angle, vIdx) => {
-            const rad = (angle * Math.PI) / 180
-            const vx = 12 * Math.cos(rad)
-            const vy = 12 * Math.sin(rad)
-            return (
-              <g key={`node-via-${vIdx}`}>
-                <circle cx={vx} cy={vy} r="0.8" fill="#000" stroke="var(--accent)" strokeWidth="0.3" opacity={0.5} />
-                <circle cx={vx} cy={vy} r="0.3" fill="#000" />
-              </g>
-            )
-          })}
 
-          {/* Radial traces entering node */}
-          {[30, 90, 150, 210, 270, 330].map((angle, rIdx) => {
-            const rad = (angle * Math.PI) / 180
-            const x1 = 6 * Math.cos(rad)
-            const y1 = 6 * Math.sin(rad)
-            const x2 = 12 * Math.cos(rad)
-            const y2 = 12 * Math.sin(rad)
-            return (
-              <line
-                key={`radial-${rIdx}`}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke="var(--accent)"
-                strokeWidth="0.4"
-                opacity={0.5}
-              />
-            )
-          })}
-        </g>
+            {/* Radial traces entering node */}
+            {[30, 90, 150, 210, 270, 330].map((angle, rIdx) => {
+              const rad = (angle * Math.PI) / 180
+              const x1 = 6 * Math.cos(rad)
+              const y1 = 6 * Math.sin(rad)
+              const x2 = 12 * Math.cos(rad)
+              const y2 = 12 * Math.sin(rad)
+              return (
+                <line
+                  key={`radial-${rIdx}`}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke="var(--accent)"
+                  strokeWidth="0.5"
+                  opacity={0.70}
+                />
+              )
+            })}
+          </g>
 
-        {/* Counter-Rotatable Outer Details Group (Counter-Clockwise) */}
-        <g style={{ 
-          animation: 'pcbRadarRotateCounter 7s linear infinite',
-          animationPlayState: isTyping ? 'running' : 'paused', 
-          transformOrigin: '0px 0px' 
-        }}>
-          {/* Solder Joint Pads surrounding Node */}
-          {[45, 135, 225, 315].map((angle, sIdx) => {
-            const rad = (angle * Math.PI) / 180
-            const sx = 14.5 * Math.cos(rad)
-            const sy = 14.5 * Math.sin(rad)
-            return (
-              <rect
-                key={`node-pad-${sIdx}`}
-                x={sx - 1}
-                y={sy - 1}
-                width="2"
-                height="2"
-                fill="#2f2f38"
-                stroke="#555"
-                strokeWidth="0.25"
-                opacity={0.5}
-              />
-            )
-          })}
-        </g>
-
-        {/* Outer pulse ring */}
-        <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity={0.4} 
-          style={{
-            animation: 'pcbRingBreathe 1.5s ease-in-out infinite',
+          {/* Counter-Rotatable Outer Details Group (Counter-Clockwise) */}
+          <g style={{
+            animation: 'pcbRadarRotateCounter 7s linear infinite',
             animationPlayState: isTyping ? 'running' : 'paused',
             transformOrigin: '0px 0px'
-          }}
-        />
+          }}>
+            {/* Solder Joint Pads surrounding Node */}
+            {[45, 135, 225, 315].map((angle, sIdx) => {
+              const rad = (angle * Math.PI) / 180
+              const sx = 14.5 * Math.cos(rad)
+              const sy = 14.5 * Math.sin(rad)
+              return (
+                <rect
+                  key={`node-pad-${sIdx}`}
+                  x={sx - 1}
+                  y={sy - 1}
+                  width="2"
+                  height="2"
+                  fill="#2f2f38"
+                  stroke="#555"
+                  strokeWidth="0.25"
+                  opacity={0.5}
+                />
+              )
+            })}
+          </g>
 
-        {/* Inner Metallic Ring */}
-        <circle cx="0" cy="0" r="5" fill="none" stroke="var(--accent)" strokeWidth="1" opacity={0.65} />
+          {/* Outer pulse ring */}
+          <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity={0.4}
+            style={{
+              animation: 'pcbRingBreathe 1.5s ease-in-out infinite',
+              animationPlayState: isTyping ? 'running' : 'paused',
+              transformOrigin: '0px 0px'
+            }}
+          />
 
-        {/* Core */}
-        <circle cx="0" cy="0" r="2.5" fill="var(--accent)" opacity={0.7} 
-          style={{
-            animation: 'pcbCorePulse 0.8s ease-in-out infinite',
-            animationPlayState: isTyping ? 'running' : 'paused',
-            transformOrigin: '0px 0px'
-          }}
-        />
+          {/* Inner Metallic Ring */}
+          <circle cx="0" cy="0" r="5" fill="none" stroke="var(--accent)" strokeWidth="1.2" opacity={0.85} />
+
+          {/* Core */}
+          <circle cx="0" cy="0" r="2.5" fill="var(--accent)" opacity={0.90}
+            style={{
+              animation: 'pcbCorePulse 0.8s ease-in-out infinite',
+              animationPlayState: isTyping ? 'running' : 'paused',
+              transformOrigin: '0px 0px'
+            }}
+          />
         </g>
       </g>
     )
@@ -720,8 +934,8 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
       animationDelay: `${(275 + y) % 5 * 150}ms`
     }
     return (
-      <g 
-        key={`edge-${i}`} 
+      <g
+        key={`edge-${i}`}
         transform={`translate(${xStart + 275 * scale}, ${y})`}
         opacity={targetOpacity}
         style={getTransitionStyle()}
@@ -734,20 +948,10 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
       </g>
     )
   }
-  const renderCadTicks = (x, y, w, h) => (
-    <g stroke="var(--accent)" strokeWidth="0.35" opacity="0.06">
-      <path d={`M ${x},${y+4} V ${y} H ${x+4}`} fill="none" />
-      <path d={`M ${x+w-4},${y} H ${x+w} V ${y+4}`} fill="none" />
-      <path d={`M ${x},${y+h-4} V ${y+h} H ${x+4}`} fill="none" />
-      <path d={`M ${x+w-4},${y+h} H ${x+w} V ${y+h-4}`} fill="none" />
-    </g>
-  )
-
   if (shouldReduceMotion) return null
 
   const dormantStyles = contactSystemState === 'dormant' ? {
-    opacity: 0.40,
-    filter: 'saturate(0)'
+    opacity: 0.70
   } : {}
 
   return (
@@ -772,11 +976,28 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <filter id="pcbGlowActive" filterUnits="userSpaceOnUse" x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="2.5" result="blur" />
+          <filter id="pcbGlowActive" filterUnits="userSpaceOnUse" x="-50%" y="-50%" width="200%" height="200%">
+            {/* Ambient Glow: stdDev ~8, low opacity, slightly darker */}
+            <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blurAmbient" />
+            <feColorMatrix in="blurAmbient" type="matrix" values="0.6 0 0 0 0  0 0.6 0 0 0  0 0 0.6 0 0  0 0 0 0.2 0" result="glowAmbient" />
+
+            {/* Mid Glow: stdDev ~2.5, medium opacity, accent color */}
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blurMid" />
+            <feComponentTransfer in="blurMid" result="glowMid">
+              <feFuncA type="linear" slope="0.5" />
+            </feComponentTransfer>
+
+            {/* Hot Core: stdDev ~0.6, high opacity, white */}
+            <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0" result="whiteSource" />
+            <feGaussianBlur in="whiteSource" stdDeviation="0.6" result="blurCore" />
+            <feComponentTransfer in="blurCore" result="glowCore">
+              <feFuncA type="linear" slope="0.9" />
+            </feComponentTransfer>
+
             <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
+              <feMergeNode in="glowAmbient" />
+              <feMergeNode in="glowMid" />
+              <feMergeNode in="glowCore" />
             </feMerge>
           </filter>
 
@@ -788,182 +1009,168 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
           <pattern id="pcbDots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
             <circle cx="2" cy="2" r="1" fill="#ffffff" opacity="0.015" />
           </pattern>
+
+          {/* Substrate vignette for depth perception */}
+          <radialGradient id="substrate-vignette" cx="50%" cy="50%">
+            <stop offset="0%" stopColor="#05090c" stopOpacity="1.0" />
+            <stop offset="100%" stopColor="#030607" stopOpacity="0.7" />
+          </radialGradient>
+
+          {/* Substrate noise filters */}
+          <filter id="pcbSubstrateBlur" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="45" />
+          </filter>
+          <filter id="pcbSubstrateNoise">
+            <feTurbulence type="fractalNoise" baseFrequency="1.8" numOctaves="3" stitchTiles="stitch" />
+            <feColorMatrix type="matrix" values="0 0 0 0 0.02  0 0 0 0 0.04  0 0 0 0 0.03  0 0 0 0 0.02 0" />
+          </filter>
+
+          {/* Substrate Patterns */}
+          <pattern id="pcbFiberglassWeaveL" width="6" height="6" patternUnits="userSpaceOnUse">
+            <path d="M 0 3 L 6 3 M 3 0 L 3 6" stroke="rgba(255,255,255,0.018)" strokeWidth="0.4" />
+          </pattern>
+          <pattern id="copper-texture-l" width="8" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(3)">
+            <line x1="0" y1="1" x2="8" y2="1" stroke="rgba(255,255,255,0.025)" strokeWidth="0.4" />
+          </pattern>
+
+          {/* Copper Hatch Ground Pour Pattern */}
+          <pattern id="copper-hatch-pattern-l" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="2" x2="4" y2="2" stroke="rgba(168, 85, 247, 0.22)" strokeWidth="0.60" />
+            <line x1="2" y1="0" x2="2" y2="4" stroke="rgba(168, 85, 247, 0.22)" strokeWidth="0.60" />
+          </pattern>
+
+          {/* Recessed routing field corridors */}
+          <linearGradient id="corridor-recess-gradient-l" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#030305" />
+            <stop offset="50%" stopColor="#04040a" />
+            <stop offset="100%" stopColor="#060610" />
+          </linearGradient>
+          <pattern id="corridor-texture-l" width="3" height="3" patternUnits="userSpaceOnUse">
+            <rect width="3" height="3" fill="transparent" />
+            <circle cx="1.5" cy="1.5" r="0.35" fill="#ffffff" opacity="0.015" />
+          </pattern>
+
+          {/* Radial depth gradient for clearances */}
+          <radialGradient id="radial-depth-gradient">
+            <stop offset="0%" stopColor="#020204" />
+            <stop offset="70%" stopColor="#040408" />
+            <stop offset="100%" stopColor="#050508" />
+          </radialGradient>
+          
+          {/* Via depth well gradient */}
+          <radialGradient id="via-depth-well">
+            <stop offset="0%" stopColor="#000000" stopOpacity="0.6" />
+            <stop offset="50%" stopColor="#020204" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="transparent" />
+          </radialGradient>
+          
+          {/* Gold Plating Gradient */}
+          <linearGradient id="gold-plated" x1="0%" y1="0%" x2="1" y2="1">
+            <stop offset="0%" stopColor="#d4af37" />
+            <stop offset="50%" stopColor="#f3e5ab" />
+            <stop offset="100%" stopColor="#aa7c11" />
+          </linearGradient>
+
+          {/* Substrate Masks */}
+          <mask id="substrateMaskL" x="-100%" y="-100%" width="300%" height="300%">
+            <rect
+              x={xStart + 15}
+              y={20}
+              width={Math.max(0, L_form_end - xStart - 35)}
+              height={H - 40}
+              rx="4"
+              fill="white"
+              filter="url(#pcbSubstrateBlur)"
+            />
+          </mask>
+
+          <mask id="copperHatchMaskL" x="-100%" y="-100%" width="300%" height="300%">
+            <rect x="-100%" y="-100%" width="300%" height="300%" fill="white" />
+            
+            {/* Cut out black clearance rectangles for Left PCB components */}
+            {/* Channel 1 components */}
+            <rect x={xStart + 130 * scale - 12} y={CH1_Y - 70 - 8} width={24} height={16} fill="black" />
+            <rect x={xStart + 150 * scale - 14} y={CH1_Y - 15 - 9} width={28} height={18} fill="black" />
+            <rect x={xStart + 130 * scale - 11} y={CH1_Y + 10 - 8} width={22} height={16} fill="black" />
+            
+            {/* Channel 2 components */}
+            <rect x={xStart + 100 * scale - 13} y={CH2_Y - 8.5} width={26} height={17} fill="black" />
+            <rect x={xStart + 140 * scale - 16} y={CH2_Y + 30 - 9.5} width={32} height={19} fill="black" />
+            <rect x={xStart + 75 * scale - 11} y={CH2_Y - 20 - 8} width={22} height={16} fill="black" />
+
+            {/* Channel 3 components */}
+            <rect x={xStart + 100 * scale - 13} y={CH3_Y - 8.5} width={26} height={17} fill="black" />
+            <rect x={xStart + 140 * scale - 16} y={CH3_Y - 30 - 9.5} width={32} height={19} fill="black" />
+            <rect x={xStart + 75 * scale - 11} y={CH3_Y + 20 - 8} width={22} height={16} fill="black" />
+
+            {/* Channel 4 components */}
+            <rect x={xStart + 130 * scale - 12} y={CH4_Y + 70 - 8} width={24} height={16} fill="black" />
+            <rect x={xStart + 150 * scale - 14} y={CH4_Y + 15 - 9} width={28} height={18} fill="black" />
+            <rect x={xStart + 130 * scale - 11} y={CH4_Y - 10 - 8} width={22} height={16} fill="black" />
+
+            {/* Nodes clearance */}
+            {nodes.map((node, idx) => (
+              <circle
+                key={`hatch-clear-node-l-${idx}`}
+                cx={xStart + node.x * scale}
+                cy={node.y}
+                r="24"
+                fill="black"
+              />
+            ))}
+          </mask>
         </defs>
 
-        {/* Background Grid - Extremely faint */}
-        <rect 
-          width="100%" 
-          height="100%" 
-          fill="url(#pcbDots)" 
-          opacity={isTransmit ? 0 : 1}
-          style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
-        />
-
-        {/* Motherboard-style CAD Routing Zones & Inactive Infrastructure */}
-        <g 
-          className="pcb-zones-and-infrastructure" 
-          opacity={isTransmit ? 0 : 1}
-          style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
-        >
-          {/* ========================================================
-                TOP MARGIN CAD ZONES (Left PCB)
-             ======================================================== */}
-          {/* Registration Marks (Manufacturing details, Pass 11) */}
-          <g stroke="var(--accent)" strokeWidth="0.3" opacity="0.08" fill="none">
-            {/* Top-left registration crosshair */}
-            <circle cx={xStart + 10} cy={20} r="2.5" />
-            <line x1={xStart + 6} y1={20} x2={xStart + 14} y2={20} />
-            <line x1={xStart + 10} y1={16} x2={xStart + 10} y2={24} />
-
-            {/* Bottom-left registration crosshair */}
-            <circle cx={xStart + 10} cy={H - 20} r="2.5" />
-            <line x1={xStart + 6} y1={H - 20} x2={xStart + 14} y2={H - 20} />
-            <line x1={xStart + 10} y1={H - 24} x2={xStart + 10} y2={H - 16} />
-          </g>
-
-          {/* Zone 1: Transmission (Input) Zone */}
-          <rect 
-            x={xStart + 2} 
-            y={10} 
-            width={60 * scale} 
-            height={70} 
-            fill="rgba(8, 10, 18, 0.25)" 
-            stroke="var(--accent)" 
-            strokeWidth="0.25" 
-            opacity="0.05" 
+        {/* ========================================================
+              SUBSTRATE LAYER (Subtle Vignette Only)
+           ======================================================== */}
+        <g mask="url(#substrateMaskL)">
+          {/* Matte edge vignette to ground the board edges */}
+          <rect
+            x={xStart - 100}
+            y={0}
+            width={Math.max(0, L_form_end - xStart + 200)}
+            height={H}
+            fill="url(#substrate-vignette)"
+            opacity="0.09"
           />
-          {renderCadTicks(xStart + 2, 10, 60 * scale, 70)}
-
-          {/* Zone 2: Branching Zone */}
-          <rect 
-            x={xStart + 65 * scale} 
-            y={10} 
-            width={85 * scale} 
-            height={70} 
-            fill="rgba(8, 10, 18, 0.20)" 
-            stroke="var(--accent)" 
-            strokeWidth="0.25" 
-            opacity="0.04" 
-          />
-          {renderCadTicks(xStart + 65 * scale, 10, 85 * scale, 70)}
-
-          {/* Zone 3: Buffer Zone */}
-          <rect 
-            x={xStart + 155 * scale} 
-            y={10} 
-            width={70 * scale} 
-            height={70} 
-            fill="rgba(8, 10, 18, 0.30)" 
-            stroke="var(--accent)" 
-            strokeWidth="0.25" 
-            opacity="0.06" 
-          />
-          {renderCadTicks(xStart + 155 * scale, 10, 70 * scale, 70)}
-
-          {/* Zone 4: Interface Zone */}
-          <rect 
-            x={xStart + 230 * scale} 
-            y={10} 
-            width={46 * scale} 
-            height={70} 
-            fill="rgba(8, 10, 18, 0.35)" 
-            stroke="var(--accent)" 
-            strokeWidth="0.25" 
-            opacity="0.07" 
-          />
-          {renderCadTicks(xStart + 230 * scale, 10, 46 * scale, 70)}
-
-          {/* ========================================================
-                BOTTOM MARGIN CAD ZONES (Left PCB)
-             ======================================================== */}
-          <rect 
-            x={xStart + 2} 
-            y={H - 80} 
-            width={60 * scale} 
-            height={70} 
-            fill="rgba(8, 10, 18, 0.25)" 
-            stroke="var(--accent)" 
-            strokeWidth="0.25" 
-            opacity="0.05" 
-          />
-          {renderCadTicks(xStart + 2, H - 80, 60 * scale, 70)}
-
-          <rect 
-            x={xStart + 65 * scale} 
-            y={H - 80} 
-            width={85 * scale} 
-            height={70} 
-            fill="rgba(8, 10, 18, 0.20)" 
-            stroke="var(--accent)" 
-            strokeWidth="0.25" 
-            opacity="0.04" 
-          />
-          {renderCadTicks(xStart + 65 * scale, H - 80, 85 * scale, 70)}
-
-          <rect 
-            x={xStart + 155 * scale} 
-            y={H - 80} 
-            width={70 * scale} 
-            height={70} 
-            fill="rgba(8, 10, 18, 0.30)" 
-            stroke="var(--accent)" 
-            strokeWidth="0.25" 
-            opacity="0.06" 
-          />
-          {renderCadTicks(xStart + 155 * scale, H - 80, 70 * scale, 70)}
-
-          <rect 
-            x={xStart + 230 * scale} 
-            y={H - 80} 
-            width={46 * scale} 
-            height={70} 
-            fill="rgba(8, 10, 18, 0.35)" 
-            stroke="var(--accent)" 
-            strokeWidth="0.25" 
-            opacity="0.07" 
-          />
-          {renderCadTicks(xStart + 230 * scale, H - 80, 46 * scale, 70)}
-
-          {/* Inactive layered CAD tracks */}
-          <path
-            d={`M ${xStart + 20 * scale},10 V 80 L ${xStart + 80 * scale},140 H ${xStart + 160 * scale}`}
-            stroke="var(--accent)"
-            strokeWidth="0.6"
-            fill="none"
-            opacity="0.02"
-          />
-          <path
-            d={`M ${xStart + 35 * scale},${H} V ${H - 80} L ${xStart + 95 * scale},${H - 140} H ${xStart + 175 * scale}`}
-            stroke="var(--accent)"
-            strokeWidth="0.6"
-            fill="none"
-            opacity="0.02"
-          />
-          <path
-            d={`M ${xStart + 5 * scale},${CH2_Y + 12} H ${xStart + 60 * scale} L ${xStart + 90 * scale},${CH2_Y + 42} H ${xStart + 140 * scale}`}
-            stroke="var(--accent)"
-            strokeWidth="0.50"
-            fill="none"
-            opacity="0.015"
-          />
-          <path
-            d={`M ${xStart + 5 * scale},${CH3_Y - 12} H ${xStart + 60 * scale} L ${xStart + 90 * scale},${CH3_Y - 42} H ${xStart + 140 * scale}`}
-            stroke="var(--accent)"
-            strokeWidth="0.50"
-            fill="none"
-            opacity="0.015"
-          />
-          <rect x={xStart + 140 * scale} y={CH2_Y - 80} width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="0.30" strokeDasharray="2 2" opacity="0.03" />
-          <rect x={xStart + 140 * scale} y={CH3_Y + 60} width="20" height="20" fill="none" stroke="var(--accent)" strokeWidth="0.30" strokeDasharray="2 2" opacity="0.03" />
-          {/* Machined panel segment lines, Pass 12 */}
-          <g stroke="var(--accent)" strokeWidth="0.25" opacity="0.03" fill="none">
-            <line x1={xStart + 10} y1={CH1_Y - 45} x2={xStart + 260 * scale} y2={CH1_Y - 45} />
-            <line x1={xStart + 10} y1={CH2_Y + 15} x2={xStart + 260 * scale} y2={CH2_Y + 15} />
-            <line x1={xStart + 10} y1={CH3_Y - 15} x2={xStart + 260 * scale} y2={CH3_Y - 15} />
-            <line x1={xStart + 10} y1={CH4_Y + 45} x2={xStart + 260 * scale} y2={CH4_Y + 45} />
-          </g>
         </g>
 
+        {/* ========================================================
+              DYNAMICAL TRACE ROUTING FIELDS & CORRIDORS
+           ======================================================== */}
+        {traceCorridors}
+
+        {/* ========================================================
+              COPPER HATCH GROUND PLANES
+           ======================================================== */}
+        <g mask="url(#copperHatchMaskL)" style={{ transition: 'opacity 750ms ease-in-out' }} opacity={isTransmit ? 0.3 : 1}>
+          {groundPlanes.plates.map((plate, idx) => (
+            <polygon
+              key={`plate-${idx}`}
+              points={plate.pts}
+              fill="url(#copper-hatch-pattern-l)"
+              stroke="rgba(168, 85, 247, 0.22)"
+              strokeWidth="0.6"
+              opacity={plate.opacity}
+            />
+          ))}
+        </g>
+
+        {/* Isolation slots — recessed cutline (dark) + bevel highlight (light), the
+            same two-layer depth construction the Middle PCB uses to articulate pours */}
+        <g style={{ transition: 'opacity 750ms ease-in-out' }} opacity={isTransmit ? 0 : 1}>
+          <g fill="#020204" opacity="0.65">
+            {groundPlanes.slots.map((s, idx) => (
+              <rect key={`slot-${idx}`} x={s.x} y={s.y} width={s.w} height="4" rx="0.5" />
+            ))}
+          </g>
+          <g stroke="rgba(255,255,255,0.025)" strokeWidth="0.3" fill="none">
+            {groundPlanes.slots.map((s, idx) => (
+              <rect key={`slot-bevel-${idx}`} x={s.x} y={s.y} width={s.w} height="4" rx="0.5" transform="translate(0, 0.5)" />
+            ))}
+          </g>
+        </g>
         {/* Dynamic Particles Container */}
         <g ref={particlesContainerRef} />
 
@@ -986,29 +1193,7 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
           />
         ))}
 
-        {/* Engineering marks on grid (matte, very subtle) */}
-        <g 
-          fill="#ffffff" 
-          opacity={isTransmit ? 0 : 0.03}
-          style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
-        >
-          <circle cx={xStart + 30} cy={H - 50} r="0.8" />
-          <circle cx={xStart + 45} cy={H - 50} r="0.8" />
-          <circle cx={xStart + 30} cy={H - 35} r="0.8" />
-          <circle cx={xStart + 45} cy={H - 35} r="0.8" />
-          <circle cx={xStart + 60} cy={H - 50} r="0.8" />
-          <circle cx={xStart + 60} cy={H - 35} r="0.8" />
-        </g>
 
-        <g 
-          fill="#ffffff" 
-          opacity={isTransmit ? 0 : 0.03}
-          style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}
-        >
-          <circle cx={xStart + 260} cy={100} r="0.8" />
-          <circle cx={xStart + 260} cy={115} r="0.8" />
-          <circle cx={xStart + 260} cy={130} r="0.8" />
-        </g>
 
         {/* CHANNEL 1 (NAME) GROUP */}
         <g style={getChannelGroupStyle('name', 0)}>
@@ -1017,11 +1202,12 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             {traces.filter(t => t.chKey === 'name').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderSMT(130, CH1_Y - 70, 16, 8, 'R12', 'name', false)}
-          {renderSMT(150, CH1_Y - 15, 20, 10, 'C08', 'name', true)}
-          {renderSMT(130, CH1_Y + 10, 14, 8, 'R15', 'name', false)}
+          {renderGlassBlock(130, CH1_Y - 70, 16, 8, 'R12', 'name')}
+          {renderGlassBlock(150, CH1_Y - 15, 20, 10, 'C08', 'name')}
+          {renderGlassBlock(130, CH1_Y + 10, 14, 8, 'R15', 'name')}
           {renderTerminationPad(0, CH1_Y - 90, 'TP1_S1', 'name')}
           {renderTerminationPad(0, CH1_Y - 55, 'TP1_S2', 'name')}
+
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'name').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
@@ -1035,11 +1221,12 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             {traces.filter(t => t.chKey === 'email').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderSMT(100, CH2_Y, 18, 9, 'R21', 'email', false)}
-          {renderSMT(140, CH2_Y + 30, 24, 11, 'C14', 'email', true)}
-          {renderSMT(75, CH2_Y - 20, 14, 8, 'R22', 'email', false)}
+          {renderGlassBlock(100, CH2_Y, 18, 9, 'R21', 'email')}
+          {renderGlassBlock(140, CH2_Y + 30, 24, 11, 'C14', 'email')}
+          {renderGlassBlock(75, CH2_Y - 20, 14, 8, 'R22', 'email')}
           {renderTerminationPad(0, CH2_Y - 20, 'TP2_S1', 'email')}
           {renderTerminationPad(0, CH2_Y, 'TP2_S2', 'email')}
+
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'email').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
@@ -1053,11 +1240,12 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             {traces.filter(t => t.chKey === 'subject').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderSMT(100, CH3_Y, 18, 9, 'R31', 'subject', false)}
-          {renderSMT(140, CH3_Y - 30, 24, 11, 'C31', 'subject', true)}
-          {renderSMT(75, CH3_Y + 20, 14, 8, 'R32', 'subject', false)}
+          {renderGlassBlock(100, CH3_Y, 18, 9, 'R31', 'subject')}
+          {renderGlassBlock(140, CH3_Y - 30, 24, 11, 'C31', 'subject')}
+          {renderGlassBlock(75, CH3_Y + 20, 14, 8, 'R32', 'subject')}
           {renderTerminationPad(0, CH3_Y + 20, 'TP3_S1', 'subject')}
           {renderTerminationPad(0, CH3_Y, 'TP3_S2', 'subject')}
+
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'subject').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
@@ -1071,11 +1259,12 @@ export default memo(function LeftPCB({ formRef, globeRef, contactSystemState = '
             {traces.filter(t => t.chKey === 'message').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderSMT(130, CH4_Y + 70, 16, 8, 'R41', 'message', false)}
-          {renderSMT(150, CH4_Y + 15, 20, 10, 'C41', 'message', true)}
-          {renderSMT(130, CH4_Y - 10, 14, 8, 'R42', 'message', false)}
+          {renderGlassBlock(130, CH4_Y + 70, 16, 8, 'R41', 'message')}
+          {renderGlassBlock(150, CH4_Y + 15, 20, 10, 'C41', 'message')}
+          {renderGlassBlock(130, CH4_Y - 10, 14, 8, 'R42', 'message')}
           {renderTerminationPad(0, CH4_Y + 90, 'TP4_S1', 'message')}
           {renderTerminationPad(0, CH4_Y + 55, 'TP4_S2', 'message')}
+
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'message').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
