@@ -137,18 +137,18 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
         }}
       >
         <div
-          className="relative rounded-2xl border overflow-hidden transition-all duration-500"
+          className="relative rounded-2xl border overflow-hidden transition-all duration-250 bg-gradient-to-br from-zinc-900/[0.35] to-zinc-950/[0.05] border-white/[0.05] shadow-[0_8px_30px_-4px_rgba(0,0,0,0.5)] hover:border-white/[0.12] hover:shadow-[0_20px_45px_-12px_rgba(0,0,0,0.85),_0_0_20px_-5px_color-mix(in srgb,_var(--accent)_15%,_transparent)]"
           style={{
-            background: "linear-gradient(135deg, rgba(24, 24, 27, 0.35) 0%, rgba(24, 24, 27, 0.05) 100%)",
-            borderColor: "rgba(255, 255, 255, 0.05)",
-            boxShadow: "0 4px 20px -5px rgba(0, 0, 0, 0.3)",
             backdropFilter: "blur(12px)",
           }}
         >
           {/* Connection edge accent line */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 -left-0.75 w-1.5 h-5 rounded-full z-10"
-            style={{ background: "var(--accent)", opacity: 0.5 }}
+            className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-6 rounded-full z-10 border border-[var(--accent)]/30 transition-all duration-250"
+            style={{
+              background: "linear-gradient(to bottom, var(--accent), var(--accent-hover))",
+              boxShadow: "inset 0 1px 1px rgba(255, 255, 255, 0.3)",
+            }}
           />
 
           {/* Category badge */}
@@ -178,14 +178,14 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
             <div className="absolute top-0 left-0 right-0 h-7 bg-black/40 backdrop-blur-md border-b border-white/[0.03] flex items-center justify-between px-3 z-20">
               {/* macOS Window dots */}
               <div className="flex items-center gap-1.2" aria-hidden="true">
-                <span className="w-2 h-2 rounded-full bg-[#ff5f56]" />
-                <span className="w-2 h-2 rounded-full bg-[#ffbd2e]" />
-                <span className="w-2 h-2 rounded-full bg-[#27c93f]" />
+                <span className="w-2 h-2 rounded-full border border-black/10 shadow-sm" style={{ background: "radial-gradient(circle at 30% 30%, #ff7b72, #ff5f56)" }} />
+                <span className="w-2 h-2 rounded-full border border-black/10 shadow-sm" style={{ background: "radial-gradient(circle at 30% 30%, #ffde6a, #ffbd2e)" }} />
+                <span className="w-2 h-2 rounded-full border border-black/10 shadow-sm" style={{ background: "radial-gradient(circle at 30% 30%, #46e35c, #27c93f)" }} />
               </div>
 
               {/* Secure URL Bar Capsule */}
-              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded border border-white/[0.04] bg-white/[0.01] text-[8px] font-mono text-white/30 max-w-[60%] truncate">
-                <svg className="w-2 h-2 text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="flex items-center gap-1.5 px-3 py-0.5 rounded border border-white/[0.06] text-white/30 bg-[#070708]/30 text-[8px] font-mono max-w-[60%] truncate">
+                <svg className="w-2.5 h-2.5 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
@@ -199,7 +199,7 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
             <img
               src={project.image}
               alt={`Screenshot of ${project.title}`}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover/item:scale-105"
               loading="lazy"
               decoding="async"
               onError={(e) => {
@@ -232,15 +232,14 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
               PROJECT {String(index + 1).padStart(2, "0")} — {project.date}
             </span>
             <h3
-              className="font-heading text-lg font-bold mt-1 mb-1.5"
-              style={{ color: "var(--text-primary)" }}
+              className="font-heading text-lg font-bold mt-1 mb-1.5 text-[var(--text-primary)] group-hover/item:text-[var(--accent)] transition-colors duration-300"
             >
               {project.title}
             </h3>
 
             {/* Mobile Case-Study Outcome Pill */}
             <div className="flex flex-wrap items-center gap-1.5 mt-1.5 mb-3">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[var(--accent)]/20 bg-[var(--accent-dim)] text-[8px] font-mono font-bold uppercase tracking-wider text-[var(--accent)]">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded border border-[var(--accent)]/30 bg-[var(--accent-dim)] text-[8px] font-mono font-bold uppercase tracking-wider text-[var(--accent)] shadow-[0_0_8px_var(--accent-dim)]">
                 Outcome: {project.highlights[0]}
               </span>
             </div>
@@ -256,11 +255,11 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
               {project.tags.slice(0, 4).map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 text-[9px] font-mono rounded border"
+                  className="px-2 py-0.5 text-[9px] font-mono rounded border transition-colors duration-300"
                   style={{
                     color: "var(--text-secondary)",
-                    background: "rgba(255, 255, 255, 0.02)",
-                    borderColor: "rgba(255, 255, 255, 0.05)",
+                    background: "rgba(255, 255, 255, 0.015)",
+                    borderColor: "rgba(255, 255, 255, 0.06)",
                   }}
                 >
                   {tag}
@@ -278,11 +277,11 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
                   href={project.github}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-300 border border-white/[0.05] hover:border-white/15 text-center flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2"
+                  className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-200 border border-white/[0.05] hover:border-white/20 text-center flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 active:scale-95 shadow-[0_4px_12px_rgba(0,0,0,0.2)]"
                   style={{
                     background: "rgba(255, 255, 255, 0.02)",
                     color: "var(--text-secondary)",
-                    borderColor: "rgba(255,255,255,0.05)",
+                    borderColor: "rgba(255,255,255,0.06)",
                   }}
                   aria-label={`View source code for ${project.title}`}
                 >
@@ -297,11 +296,10 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
                   href={project.live}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-300 text-center flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2"
+                  className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-200 text-center flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 active:scale-95 shadow-[0_4px_12px_rgba(0,0,0,0.2)] active:shadow-[0_4px_8px_var(--accent-dim)]"
                   style={{
                     background: "var(--accent)",
                     color: "var(--accent-contrast)",
-                    boxShadow: "0 2px 8px var(--accent-dim)",
                   }}
                   aria-label={`View live demo of ${project.title}`}
                 >

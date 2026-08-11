@@ -31,9 +31,9 @@ export const themes = [
     dark:    true,
   },
   {
-    key:     'cyberpunk-neon',
-    label:   'Cyberpunk Neon',
-    preview: '#06b6d4',
+    key:     'graphite',
+    label:   'Graphite',
+    preview: '#9ca3af',
     dark:    true,
   },
   {

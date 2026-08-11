@@ -184,6 +184,28 @@
   --hero-noise-opacity: 0.08;
   --hero-shadow-opacity: 0.8;
   --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+
+  /* ========================================
+     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
+     Single source of truth for all accent gradients, glows, and highlights
+     ======================================== */
+  
+  /* Primary Gradient - Headlines, CTAs, Primary Elements */
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
+  
+  /* Glow Gradient - Card hovers, Icon badges, Ambient glows */
+  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
+  
+  /* Accent Colors - Consistent accent variations */
+  --accent-primary: var(--accent);
+  --accent-secondary: #6366f1;  /* Blue-indigo midpoint (theme-appropriate for blue) */
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --accent-glow-strong: rgba(99, 102, 241, 0.25);
+
+  /* Ambient Intensity Multiplier - Controls large decorative glow/wash opacity
+     Cool hues (blue, cyan, green, purple) use 1.0 (full intensity)
+     Warm hues (red, orange) use lower values to avoid "alert" perception */
+  --ambient-intensity: 1.0;
 }
 
 [data-theme="obsidian"] {
@@ -228,6 +250,26 @@
   --hero-noise-opacity: 0.06;
   --hero-shadow-opacity: 0.9;
   --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 65%);
+
+  /* ========================================
+     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
+     Single source of truth for all accent gradients, glows, and highlights
+     ======================================== */
+  
+  /* Primary Gradient - Headlines, CTAs, Primary Elements */
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
+  
+  /* Glow Gradient - Card hovers, Icon badges, Ambient glows */
+  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
+  
+  /* Accent Colors - Consistent accent variations */
+  --accent-primary: var(--accent);
+  --accent-secondary: #6366f1;  /* Blue-indigo midpoint (theme-appropriate for blue) */
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --accent-glow-strong: rgba(99, 102, 241, 0.25);
+
+  /* Ambient Intensity Multiplier */
+  --ambient-intensity: 1.0;
 }
 
 [data-theme="warm-slate"] {
@@ -272,6 +314,21 @@
   --hero-noise-opacity: 0.08;
   --hero-shadow-opacity: 0.9;
   --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+
+  /* ========================================
+     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
+     ======================================== */
+  
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
+  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
+  
+  --accent-primary: var(--accent);
+  --accent-secondary: #fb923c;  /* Warm amber midpoint (stays in orange-yellow range, no cool shift) */
+  --accent-glow: rgba(249, 115, 22, 0.12);
+  --accent-glow-strong: rgba(249, 115, 22, 0.2);
+
+  /* Ambient Intensity Multiplier - WARM HUE (orange #f97316 at 25°) */
+  --ambient-intensity: 0.5;
 }
 
 [data-theme="midnight-violet"] {
@@ -316,6 +373,21 @@
   --hero-noise-opacity: 0.08;
   --hero-shadow-opacity: 0.85;
   --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+
+  /* ========================================
+     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
+     ======================================== */
+  
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
+  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
+  
+  --accent-primary: var(--accent);
+  --accent-secondary: #9f7aea;  /* Purple-violet midpoint (stays in purple range, slightly warmer than indigo) */
+  --accent-glow: rgba(167, 139, 250, 0.15);
+  --accent-glow-strong: rgba(167, 139, 250, 0.25);
+
+  /* Ambient Intensity Multiplier - COOL HUE (purple #a78bfa at 255°) */
+  --ambient-intensity: 1.0;
 }
 
 [data-theme="steel-flame"] {
@@ -360,6 +432,21 @@
   --hero-noise-opacity: 0.09;
   --hero-shadow-opacity: 0.9;
   --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+
+  /* ========================================
+     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
+     ======================================== */
+  
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
+  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
+  
+  --accent-primary: var(--accent);
+  --accent-secondary: #ff6b9d;  /* Warm pink-coral midpoint (stays in red-pink range, avoids indigo cool shift) */
+  --accent-glow: rgba(255, 60, 60, 0.12);
+  --accent-glow-strong: rgba(255, 60, 60, 0.2);
+
+  /* Ambient Intensity Multiplier - WARM HUE (red #ff3c3c at 0°) */
+  --ambient-intensity: 0.45;
 }
 
 [data-theme="emerald-noir"] {
@@ -404,23 +491,38 @@
   --hero-noise-opacity: 0.07;
   --hero-shadow-opacity: 0.9;
   --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+
+  /* ========================================
+     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
+     ======================================== */
+  
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
+  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
+  
+  --accent-primary: var(--accent);
+  --accent-secondary: #14b8a6;  /* Teal midpoint (green→cyan transition, stays in cool-green range) */
+  --accent-glow: rgba(16, 185, 129, 0.15);
+  --accent-glow-strong: rgba(16, 185, 129, 0.25);
+
+  /* Ambient Intensity Multiplier - COOL HUE (green #10b981 at 160°) */
+  --ambient-intensity: 1.0;
 }
 
-[data-theme="cyberpunk-neon"] {
+[data-theme="graphite"] {
   --bg:              #030712;
   --bg-surface:      #0b1329;
   --bg-raised:       #111d3a;
   --border:          rgba(255, 255, 255, 0.05);
-  --border-glow:     rgba(6, 182, 212, 0.20);
+  --border-glow:     rgba(156, 163, 175, 0.15);
 
   --text-primary:    #f0f9ff;
-  --text-heading:    #e0f7ff;
-  --text-secondary:  #8daac0;
-  --text-muted:      #4a6478;
+  --text-heading:    #f8fafc;
+  --text-secondary:  #94a3b8;
+  --text-muted:      #475569;
 
-  --accent:          #06b6d4;
-  --accent-dim:      rgba(6, 182, 212, 0.07);
-  --accent-hover:    #22d3ee;
+  --accent:          #9ca3af;
+  --accent-dim:      rgba(156, 163, 175, 0.06);
+  --accent-hover:    #d1d5db;
   --accent-contrast: #030712;
 
   --nav-bg:          rgba(3, 7, 18, 0.80);
@@ -432,9 +534,9 @@
   --warning:  #fbbf24;
   --success:  #34d399;
 
-  --hover-color-about:    rgba(6, 182, 212, 0.05);
-  --hover-color-skills:   rgba(34, 211, 238, 0.04);
-  --hover-color-projects: rgba(6, 182, 212, 0.07);
+  --hover-color-about:    rgba(156, 163, 175, 0.04);
+  --hover-color-skills:   rgba(209, 213, 219, 0.03);
+  --hover-color-projects: rgba(156, 163, 175, 0.05);
   --hover-color-contact:  rgba(248, 113, 113, 0.04);
 
   --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
@@ -448,6 +550,21 @@
   --hero-noise-opacity: 0.1;
   --hero-shadow-opacity: 0.85;
   --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+
+  /* ========================================
+     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
+     ======================================== */
+  
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
+  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(107, 114, 128, 0.4) 50%, transparent 100%);
+  
+  --accent-primary: var(--accent);
+  --accent-secondary: #6b7280;  /* Darker gray midpoint (monochrome gradient, no color bleed) */
+  --accent-glow: rgba(156, 163, 175, 0.12);
+  --accent-glow-strong: rgba(156, 163, 175, 0.20);
+
+  /* Ambient Intensity Multiplier - MONOCHROME (muted gray accent, reduced to prevent muddy/flat appearance) */
+  --ambient-intensity: 0.5;
 }
 
 [data-theme="nordic-frost"] {
@@ -492,6 +609,21 @@
   --hero-noise-opacity: 0.07;
   --hero-shadow-opacity: 0.85;
   --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+
+  /* ========================================
+     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
+     ======================================== */
+  
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
+  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
+  
+  --accent-primary: var(--accent);
+  --accent-secondary: #6366f1;  /* Blue-indigo midpoint (theme-appropriate for blue) */
+  --accent-glow: rgba(59, 130, 246, 0.15);
+  --accent-glow-strong: rgba(59, 130, 246, 0.25);
+
+  /* Ambient Intensity Multiplier - COOL HUE (blue #3b82f6 at 217°) */
+  --ambient-intensity: 1.0;
 }
 
 /* ========================================================

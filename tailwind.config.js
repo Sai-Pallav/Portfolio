@@ -30,6 +30,8 @@ export default {
         'spin-slow':  'spin 4s linear infinite',
         'gradient-x': 'gradient-x 3s ease infinite',
         'glow-pulse': 'glow-pulse 3s ease-in-out infinite',
+        'sweep':      'sweep 8s ease-in-out infinite',
+        'shake':      'shake 0.5s ease-in-out',
       },
       keyframes: {
         fadeUp:    { from: { opacity: '0', transform: 'translateY(24px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
@@ -45,6 +47,15 @@ export default {
         'glow-pulse': {
           '0%, 100%': { opacity: '0.5' },
           '50%': { opacity: '1' },
+        },
+        'sweep': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+        'shake': {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-2px)' },
+          '20%, 40%, 60%, 80%': { transform: 'translateX(2px)' },
         },
       },
     },
