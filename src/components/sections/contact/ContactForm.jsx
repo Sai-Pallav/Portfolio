@@ -1,26 +1,26 @@
 import { useState, useCallback, useEffect, useRef, memo } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import emailjs from '@emailjs/browser'
-import { 
-  Send, 
-  Loader2, 
-  CheckCircle2, 
-  AlertCircle, 
+import {
+  Send,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
   ChevronDown,
-  User, 
-  Mail, 
-  PenTool, 
-  MessageSquare, 
-  HelpCircle 
+  User,
+  Mail,
+  PenTool,
+  MessageSquare,
+  HelpCircle
 } from 'lucide-react'
 import { personal } from '@/data/personal'
 
 const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID
 const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
 const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-const isConfigured = !!(serviceId && templateId && publicKey && 
-  !serviceId.includes('your_') && 
-  !templateId.includes('your_') && 
+const isConfigured = !!(serviceId && templateId && publicKey &&
+  !serviceId.includes('your_') &&
+  !templateId.includes('your_') &&
   !publicKey.includes('your_')
 )
 
@@ -30,9 +30,8 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${
-        focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/35'
-      }`}>
+      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/35'
+        }`}>
         {Icon && <Icon className="h-4 w-4" strokeWidth={1.75} />}
       </div>
       <input
@@ -51,26 +50,23 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
         }}
         placeholder=" "
         aria-required="true"
-        className={`peer w-full rounded-[8px] border border-white/[0.06] bg-black/35 pl-10 pr-4 pt-[24px] pb-[10px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 ${
-          touched && error
-            ? 'border-amber-500/30 focus:border-amber-500/50 shadow-[0_0_0_1px_rgba(245,158,11,0.25)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.08),0_0_0_1px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.01]'
-            : ''
-        }`}
+        className={`peer w-full rounded-[8px] border border-white/[0.06] bg-black/35 pl-10 pr-4 pt-[24px] pb-[10px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 ${touched && error
+          ? 'border-amber-500/30 focus:border-amber-500/50 shadow-[0_0_0_1px_rgba(245,158,11,0.25)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.08),0_0_0_1px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.01]'
+          : ''
+          }`}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute left-10 top-3 origin-[0] duration-300 transform pointer-events-none transition-all ease-[cubic-bezier(0.16,1,0.3,1)] font-medium ${
-          touched && error ? 'peer-focus:text-amber-500/90' : 'peer-focus:text-[var(--accent)]'
-        } ${
-          focused || hasValue
+        className={`absolute left-10 top-3 origin-[0] duration-300 transform pointer-events-none transition-all ease-[cubic-bezier(0.16,1,0.3,1)] font-medium ${touched && error ? 'peer-focus:text-amber-500/90' : 'peer-focus:text-[var(--accent)]'
+          } ${focused || hasValue
             ? '-translate-y-[14px] scale-75 text-[9px] uppercase tracking-[0.15em] text-[var(--text-secondary)] bg-raised px-2 -mx-2 rounded'
             : 'translate-y-0 scale-100 text-xs md:text-sm capitalize tracking-wide text-white/50'
-        }`}
+          }`}
       >
         {label}
       </label>
-      
+
       <div className="h-4 relative mt-1 overflow-visible">
         <AnimatePresence initial={false}>
           {touched && error && (
@@ -110,9 +106,8 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${
-        focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/35'
-      }`}>
+      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/35'
+        }`}>
         {Icon && <Icon className="h-4 w-4" strokeWidth={1.75} />}
       </div>
       <textarea
@@ -131,27 +126,24 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
         placeholder=" "
         rows={rows}
         aria-required="true"
-        className={`peer w-full rounded-[8px] border border-white/[0.06] bg-black/35 pl-10 pr-4 pt-[24px] pb-[12px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl resize-none shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 leading-relaxed ${
-          touched && error
-            ? 'border-amber-500/30 focus:border-amber-500/50 shadow-[0_0_0_1px_rgba(245,158,11,0.25)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.08),0_0_0_1px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.01]'
-            : ''
-        }`}
+        className={`peer w-full rounded-[8px] border border-white/[0.06] bg-black/35 pl-10 pr-4 pt-[24px] pb-[12px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl resize-none shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 leading-relaxed ${touched && error
+          ? 'border-amber-500/30 focus:border-amber-500/50 shadow-[0_0_0_1px_rgba(245,158,11,0.25)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.08),0_0_0_1px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.01]'
+          : ''
+          }`}
         style={{ minHeight: '150px' }}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute left-10 top-3 origin-[0] duration-300 transform pointer-events-none transition-all ease-[cubic-bezier(0.16,1,0.3,1)] font-medium ${
-          touched && error ? 'peer-focus:text-amber-500/90' : 'peer-focus:text-[var(--accent)]'
-        } ${
-          focused || hasValue
+        className={`absolute left-10 top-3 origin-[0] duration-300 transform pointer-events-none transition-all ease-[cubic-bezier(0.16,1,0.3,1)] font-medium ${touched && error ? 'peer-focus:text-amber-500/90' : 'peer-focus:text-[var(--accent)]'
+          } ${focused || hasValue
             ? '-translate-y-[14px] scale-75 text-[9px] uppercase tracking-[0.15em] text-[var(--text-secondary)] bg-raised px-2 -mx-2 rounded'
             : 'translate-y-0 scale-100 text-xs md:text-sm capitalize tracking-wide text-white/50'
-        }`}
+          }`}
       >
         {label}
       </label>
-      
+
       <span className="absolute bottom-3 right-4 text-[9px] font-mono tracking-wider transition-all duration-300 pointer-events-none opacity-40"
         style={{ color: characterCount > characterLimit ? 'rgba(245,158,11,0.8)' : 'rgba(255,255,255,0.3)' }}>
         {characterCount} / {characterLimit}
@@ -200,9 +192,9 @@ const INQUIRY_OPTIONS = [
 ]
 
 const FORM_CARD_VARIANTS = {
-  hidden: { 
-    opacity: 0, 
-    y: 25, 
+  hidden: {
+    opacity: 0,
+    y: 25,
     scale: 0.99,
     boxShadow: '0 20px 40px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.01), inset 0 1px 0 0 rgba(255,255,255,0.06)'
   },
@@ -377,7 +369,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
   }, [])
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState({ type: '', message: '' })
-  const [subState, setSubState] = useState('idle') 
+  const [subState, setSubState] = useState('idle')
   const [isBtnHovered, setIsBtnHovered] = useState(false)
   const [ripples, setRipples] = useState([])
 
@@ -421,14 +413,14 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     typingTimeoutRef.current = setTimeout(() => {
       setLocalIsTyping(false)
       if (onTypingChange) onTypingChange(false)
-    }, 800)
+    }, 500)
   }, [resetErrorState, onTypingChange])
 
   const handleBlur = useCallback((e) => {
     const { name, value } = e.target
     setTouched(prev => ({ ...prev, [name]: true }))
     resetErrorState()
-    
+
     if (value.trim() || errors[name]) {
       const err = validateField(name, value)
       setErrors(prev => ({ ...prev, [name]: err }))
@@ -520,28 +512,28 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       }
     } catch (error) {
       console.error('EmailJS Error:', error)
-      
+
       if (setContactSystemState) {
         setContactSystemState('engaged')
       }
-      
+
       setSubState('api_error')
       setStatus({ type: '', message: '' })
-      
+
       if (setTransmissionFailed) {
         setTransmissionFailed(true)
       }
-      
+
       setTimeout(() => {
         if (setTransmissionFailed) {
           setTransmissionFailed(false)
         }
       }, 400)
-      
+
       const errorTimer = setTimeout(() => {
         setSubState(curr => curr === 'api_error' ? 'idle' : curr)
       }, 3000)
-      
+
       apiErrorTimeoutRef.current = errorTimer
     }
   }
@@ -579,21 +571,21 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       viewport={{ once: true, margin: '-100px' }}
       animate={
         isTransmit
-          ? { 
-              scale: 0.975, 
-              opacity: 1, 
-              y: -8,
-              transition: { duration: 0.15, ease: [0.22, 1, 0.36, 1] } 
-            }
+          ? {
+            scale: 0.975,
+            opacity: 1,
+            y: -8,
+            transition: { duration: 0.15, ease: [0.22, 1, 0.36, 1] }
+          }
           : contactSystemState === 'dormant'
             ? {
-                scale: 1.0,
-                opacity: 1,
-                y: 0,
-                transition: { duration: 0.8, ease: [0.4, 0, 0.2, 1] }
-              }
-            : isInteracting 
-              ? "interacting" 
+              scale: 1.0,
+              opacity: 1,
+              y: 0,
+              transition: { duration: 0.8, ease: [0.4, 0, 0.2, 1] }
+            }
+            : isInteracting
+              ? "interacting"
               : "visible"
       }
       onMouseEnter={() => setIsHovered(true)}
@@ -656,11 +648,11 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       {/* Ambient theme-based glow */}
       <div className="absolute -top-32 -right-32 w-64 h-64 rounded-full blur-[100px] pointer-events-none"
         style={{ background: 'var(--accent)', opacity: 0.08 }} />
-      
+
       {/* Subtle noise texture */}
       <div className="absolute inset-0 opacity-[0.015] pointer-events-none rounded-[16px]"
         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
-      
+
       {/* Animated light sweep */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[16px]">
         <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/[0.02] to-transparent animate-[sweep_8s_ease-in-out_infinite]" />
@@ -672,7 +664,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
         <motion.div custom={1} variants={DOT_VARIANTS} animate={activeDotState} className="w-2 h-2 rounded-full border-[1.5px] border-[var(--accent)] bg-black/90" />
         <motion.div custom={2} variants={DOT_VARIANTS} animate={activeDotState} className="w-2 h-2 rounded-full border-[1.5px] border-[var(--accent)] bg-black/90" />
       </div>
-      
+
       <motion.div variants={FORM_CHILD_VARIANTS} className="mb-6 relative z-10">
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[10px] font-mono tracking-[0.2em] font-semibold text-[var(--accent)] uppercase">
@@ -691,8 +683,8 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       </motion.div>
 
       <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
-        <div 
-          style={{ 
+        <div
+          style={{
             filter: isTransmit ? 'blur(1.5px)' : 'blur(0px)',
             transition: contactSystemState === 'dormant'
               ? 'filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
@@ -700,141 +692,139 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
           }}
           className="space-y-4"
         >
-          <motion.div 
-            variants={FORM_CHILD_VARIANTS} 
-            className="space-y-2 relative z-30" 
+          <motion.div
+            variants={FORM_CHILD_VARIANTS}
+            className="space-y-2 relative z-30"
             ref={dropdownRef}
             onBlur={handleDropdownBlur}
           >
-          <label htmlFor="inquiry-type" className="sr-only text-[10px] font-mono tracking-[0.08em] font-medium text-[var(--text-muted)] uppercase">
-            What brings you here?
-          </label>
-          <label className="text-[10px] font-mono tracking-[0.08em] font-medium text-[var(--text-muted)] uppercase">
-            What brings you here?
-          </label>
-          <div className="relative">
-            <div className={`absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${
-              isDropdownOpen ? 'text-[var(--accent)] scale-110' : 'text-white/35'
-            }`}>
-              <HelpCircle className="h-4 w-4" strokeWidth={1.75} />
-            </div>
-            <button
-              type="button"
-              id="inquiry-type"
-              onClick={() => setIsDropdownOpen(prev => !prev)}
-              onKeyDown={handleDropdownKeyDown}
-              className="w-full rounded-[6px] border border-white/[0.06] bg-black/35 pl-10 pr-4 py-3 text-xs md:text-sm text-[var(--text-primary)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-              aria-haspopup="listbox"
-              aria-expanded={isDropdownOpen}
-              aria-activedescendant={isDropdownOpen ? `option-${INQUIRY_OPTIONS.indexOf(inquiryType)}` : undefined}
-            >
-              <span>{inquiryType}</span>
-              <ChevronDown 
-                className={`h-4 w-4 text-[var(--text-secondary)] transition-transform duration-150 ${isDropdownOpen ? 'rotate-180' : ''}`} 
-              />
-            </button>
+            <label htmlFor="inquiry-type" className="sr-only text-[10px] font-mono tracking-[0.08em] font-medium text-[var(--text-muted)] uppercase">
+              What brings you here?
+            </label>
+            <label className="text-[10px] font-mono tracking-[0.08em] font-medium text-[var(--text-muted)] uppercase">
+              What brings you here?
+            </label>
+            <div className="relative">
+              <div className={`absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${isDropdownOpen ? 'text-[var(--accent)] scale-110' : 'text-white/35'
+                }`}>
+                <HelpCircle className="h-4 w-4" strokeWidth={1.75} />
+              </div>
+              <button
+                type="button"
+                id="inquiry-type"
+                onClick={() => setIsDropdownOpen(prev => !prev)}
+                onKeyDown={handleDropdownKeyDown}
+                className="w-full rounded-[6px] border border-white/[0.06] bg-black/35 pl-10 pr-4 py-3 text-xs md:text-sm text-[var(--text-primary)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                aria-haspopup="listbox"
+                aria-expanded={isDropdownOpen}
+                aria-activedescendant={isDropdownOpen ? `option-${INQUIRY_OPTIONS.indexOf(inquiryType)}` : undefined}
+              >
+                <span>{inquiryType}</span>
+                <ChevronDown
+                  className={`h-4 w-4 text-[var(--text-secondary)] transition-transform duration-150 ${isDropdownOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
 
-            <AnimatePresence>
-              {isDropdownOpen && (
-                <motion.ul
-                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute z-50 left-0 right-0 mt-2 rounded-[6px] border border-white/[0.06] bg-raised/95 backdrop-blur-3xl py-1.5 shadow-[0_16px_32px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.02)] overflow-hidden"
-                  role="listbox"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setIsDropdownOpen(false)
-                    }
-                  }}
-                >
-                  {INQUIRY_OPTIONS.map((option, index) => {
-                    const isSelected = inquiryType === option
-                    return (
-                      <li
-                        key={option}
-                        id={`option-${index}`}
-                        onClick={() => {
-                          setInquiryType(option)
-                          setIsDropdownOpen(false)
-                        }}
-                        className={`px-4 py-2 text-xs cursor-pointer transition-all duration-200 flex items-center justify-between border-l-2 ${
-                          isSelected 
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <motion.ul
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute z-50 left-0 right-0 mt-2 rounded-[6px] border border-white/[0.06] bg-raised/95 backdrop-blur-3xl py-1.5 shadow-[0_16px_32px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.02)] overflow-hidden"
+                    role="listbox"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setIsDropdownOpen(false)
+                      }
+                    }}
+                  >
+                    {INQUIRY_OPTIONS.map((option, index) => {
+                      const isSelected = inquiryType === option
+                      return (
+                        <li
+                          key={option}
+                          id={`option-${index}`}
+                          onClick={() => {
+                            setInquiryType(option)
+                            setIsDropdownOpen(false)
+                          }}
+                          className={`px-4 py-2 text-xs cursor-pointer transition-all duration-200 flex items-center justify-between border-l-2 ${isSelected
                             ? 'text-[var(--accent)] font-semibold bg-white/[0.03] border-[var(--accent)]'
                             : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/[0.015] border-transparent'
-                        }`}
-                        role="option"
-                        aria-selected={isSelected}
-                      >
-                        {option}
-                      </li>
-                    )
-                  })}
-                </motion.ul>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
+                            }`}
+                          role="option"
+                          aria-selected={isSelected}
+                        >
+                          {option}
+                        </li>
+                      )
+                    })}
+                  </motion.ul>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
 
-        <motion.div variants={FORM_CHILD_VARIANTS} className="grid gap-4 sm:grid-cols-2">
-          <FloatingInput
-            id="name"
-            label="Your Name *"
-            type="text"
-            value={formData.name}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            onFocus={resetErrorState}
-            error={errors.name}
-            touched={touched.name}
-            icon={User}
-          />
-          <FloatingInput
-            id="email"
-            label="Your Email *"
-            type="email"
-            value={formData.email}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            onFocus={resetErrorState}
-            error={errors.email}
-            touched={touched.email}
-            icon={Mail}
-          />
-        </motion.div>
+          <motion.div variants={FORM_CHILD_VARIANTS} className="grid gap-4 sm:grid-cols-2">
+            <FloatingInput
+              id="name"
+              label="Your Name *"
+              type="text"
+              value={formData.name}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              onFocus={resetErrorState}
+              error={errors.name}
+              touched={touched.name}
+              icon={User}
+            />
+            <FloatingInput
+              id="email"
+              label="Your Email *"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              onFocus={resetErrorState}
+              error={errors.email}
+              touched={touched.email}
+              icon={Mail}
+            />
+          </motion.div>
 
-        <motion.div variants={FORM_CHILD_VARIANTS}>
-          <FloatingInput
-            id="subject"
-            label="Subject *"
-            type="text"
-            value={formData.subject}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            onFocus={resetErrorState}
-            error={errors.subject}
-            touched={touched.subject}
-            icon={PenTool}
-          />
-        </motion.div>
+          <motion.div variants={FORM_CHILD_VARIANTS}>
+            <FloatingInput
+              id="subject"
+              label="Subject *"
+              type="text"
+              value={formData.subject}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              onFocus={resetErrorState}
+              error={errors.subject}
+              touched={touched.subject}
+              icon={PenTool}
+            />
+          </motion.div>
 
-        <motion.div variants={FORM_CHILD_VARIANTS}>
-          <FloatingTextarea
-            id="message"
-            label="Message *"
-            value={formData.message}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            onFocus={resetErrorState}
-            error={errors.message}
-            touched={touched.message}
-            rows={4}
-            characterCount={formData.message.length}
-            characterLimit={1000}
-            icon={MessageSquare}
-          />
-        </motion.div>
+          <motion.div variants={FORM_CHILD_VARIANTS}>
+            <FloatingTextarea
+              id="message"
+              label="Message *"
+              value={formData.message}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              onFocus={resetErrorState}
+              error={errors.message}
+              touched={touched.message}
+              rows={4}
+              characterCount={formData.message.length}
+              characterLimit={1000}
+              icon={MessageSquare}
+            />
+          </motion.div>
 
         </div>
 
@@ -843,11 +833,10 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             variants={FORM_CHILD_VARIANTS}
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`rounded-[6px] border p-3 text-xs flex items-center gap-2.5 ${
-              status.type === 'success'
-                ? 'border-green-500/20 bg-green-500/5 text-green-400'
-                : 'border-red-500/20 bg-red-500/5 text-red-400 animate-shake'
-            }`}
+            className={`rounded-[6px] border p-3 text-xs flex items-center gap-2.5 ${status.type === 'success'
+              ? 'border-green-500/20 bg-green-500/5 text-green-400'
+              : 'border-red-500/20 bg-red-500/5 text-red-400 animate-shake'
+              }`}
           >
             {status.type === 'success' && <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} />}
             {status.type === 'error' && <AlertCircle className="h-3.5 w-3.5" strokeWidth={2} />}
@@ -868,10 +857,10 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             onMouseEnter={() => setIsBtnHovered(true)}
             onMouseLeave={() => setIsBtnHovered(false)}
             className="group/btn relative overflow-hidden w-full rounded-[6px] py-3.5 px-6 text-xs font-semibold tracking-wide flex items-center justify-center gap-2.5 select-none outline-none border border-white/[0.08] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform active:translate-y-[1px] active:shadow-inner focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
-            style={{ 
+            style={{
               background: ['idle', 'success', 'validation_error', 'api_error'].includes(subState) ? 'linear-gradient(to bottom, var(--accent) 0%, var(--accent-hover) 100%)' : undefined,
-              boxShadow: ['idle', 'success', 'validation_error', 'api_error'].includes(subState) 
-                ? '0 1px 0 rgba(255,255,255,0.22) inset, 0 -1px 0 rgba(0,0,0,0.3) inset, 0 4px 12px rgba(0,0,0,0.45)' 
+              boxShadow: ['idle', 'success', 'validation_error', 'api_error'].includes(subState)
+                ? '0 1px 0 rgba(255,255,255,0.22) inset, 0 -1px 0 rgba(0,0,0,0.3) inset, 0 4px 12px rgba(0,0,0,0.45)'
                 : '0 1px 0 rgba(255,255,255,0.05) inset, 0 -1px 0 rgba(0,0,0,0.25) inset'
             }}
           >
@@ -879,10 +868,10 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             {['idle', 'validation_error', 'api_error'].includes(subState) && (
               <div className="absolute inset-0 bg-gradient-to-b from-white/[0.06] to-transparent opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300 pointer-events-none" />
             )}
-            
+
             {/* Animated Sheen/Shine Effect (Only on Hover, Idle/Error States) */}
             {['idle', 'validation_error', 'api_error'].includes(subState) && (
-              <span 
+              <span
                 className="absolute inset-0 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300 pointer-events-none"
                 style={{
                   background: 'linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, 0.10) 50%, transparent 80%)',

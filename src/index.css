@@ -442,55 +442,10 @@ main {
   backface-visibility: hidden;
 }
 
-#contact:not([data-typing="true"]) .pcb-radar-pulse-ring {
-  animation-play-state: paused !important;
-  opacity: 0 !important;
-}
-
-#contact[data-typing="true"] .pcb-radar-pulse-ring {
-  animation-play-state: running !important;
-}
-
-.pcb-radar-pulse-ring {
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-}
-
-#contact:not([data-typing="true"]) .pcb-signal-flow-path {
-  display: none !important;
-}
-
-#contact[data-typing="true"] .pcb-signal-flow-path {
-  display: block !important;
-}
-
-.pcb-signal-flow-path {
-  will-change: stroke-dashoffset;
-  backface-visibility: hidden;
-}
-
-/* Node groups and details play-states */
-#contact:not([data-typing="true"]) .pcb-node-group,
-#contact:not([data-typing="true"]) .pcb-radar-rotate-group,
-#contact:not([data-typing="true"]) .pcb-radar-rotate-counter-group,
-#contact:not([data-typing="true"]) .pcb-ring-breathe-ring,
-#contact:not([data-typing="true"]) .pcb-core-pulse-circle {
-  animation-play-state: paused !important;
-}
-
-#contact[data-typing="true"] .pcb-node-group,
-#contact[data-typing="true"] .pcb-radar-rotate-group,
-#contact[data-typing="true"] .pcb-radar-rotate-counter-group,
-#contact[data-typing="true"] .pcb-ring-breathe-ring,
-#contact[data-typing="true"] .pcb-core-pulse-circle {
-  animation-play-state: running !important;
-}
-
-.pcb-node-group,
-.pcb-radar-rotate-group,
-.pcb-radar-rotate-counter-group,
-.pcb-ring-breathe-ring,
-.pcb-core-pulse-circle {
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-}
+/* Animation classes to avoid inline style resets */
+.anim-pcb-radar-pulse { animation: pcbRadarPulse 1.0s cubic-bezier(0.1, 0.8, 0.3, 1) infinite; }
+.anim-pcb-radar-rotate { animation: pcbRadarRotate 5s linear infinite; }
+.anim-pcb-radar-rotate-counter { animation: pcbRadarRotateCounter 7s linear infinite; }
+.anim-pcb-ring-breathe { animation: pcbRingBreathe 1.5s ease-in-out infinite; }
+.anim-pcb-core-pulse { animation: pcbCorePulse 0.8s ease-in-out infinite; }
+.anim-pcb-via-pulse { animation: pcbViaPulse 1.5s ease-in-out infinite; }

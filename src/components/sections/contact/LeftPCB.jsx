@@ -717,12 +717,14 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
                 stroke="var(--accent)"
                 strokeWidth={w + 1.2}
                 fill="none"
-                opacity="1"
                 pathLength="100"
                 filter="url(#pcbGlowActive)"
                 style={{
+                  opacity: isTyping ? 1 : 0,
+                  transition: 'opacity 0.4s ease',
                   strokeDasharray: '15 100',
                   animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
+                  animationPlayState: isTyping ? 'running' : 'paused',
                   willChange: 'stroke-dashoffset',
                   transform: 'translate3d(0, 0, 0)'
                 }}
@@ -836,16 +838,15 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
           {/* Outer expanding pulse ring (Radar Effect) */}
           <circle cx="0" cy="0" r="10" fill="none" stroke="var(--accent)" strokeWidth="0.4"
+            className="anim-pcb-radar-pulse"
             style={{
-              animation: 'pcbRadarPulse 1.0s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
               animationPlayState: isTyping ? 'running' : 'paused',
               transformOrigin: '0px 0px'
             }}
           />
 
           {/* Rotatable Inner Details Group (Clockwise) */}
-          <g style={{
-            animation: 'pcbRadarRotate 5s linear infinite',
+          <g className="anim-pcb-radar-rotate" style={{
             animationPlayState: isTyping ? 'running' : 'paused',
             transformOrigin: '0px 0px'
           }}>
@@ -874,8 +875,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           </g>
 
           {/* Counter-Rotatable Outer Details Group (Counter-Clockwise) */}
-          <g style={{
-            animation: 'pcbRadarRotateCounter 7s linear infinite',
+          <g className="anim-pcb-radar-rotate-counter" style={{
             animationPlayState: isTyping ? 'running' : 'paused',
             transformOrigin: '0px 0px'
           }}>
@@ -902,8 +902,8 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
           {/* Outer pulse ring */}
           <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity={0.4}
+            className="anim-pcb-ring-breathe"
             style={{
-              animation: 'pcbRingBreathe 1.5s ease-in-out infinite',
               animationPlayState: isTyping ? 'running' : 'paused',
               transformOrigin: '0px 0px'
             }}
@@ -914,8 +914,8 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
           {/* Core */}
           <circle cx="0" cy="0" r="2.5" fill="var(--accent)" opacity={0.90}
+            className="anim-pcb-core-pulse"
             style={{
-              animation: 'pcbCorePulse 0.8s ease-in-out infinite',
               animationPlayState: isTyping ? 'running' : 'paused',
               transformOrigin: '0px 0px'
             }}
@@ -929,7 +929,6 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     const keys = ['name', 'email', 'subject', 'message']
     const targetOpacity = getTargetOpacity(keys[i])
     const ringAnimation = {
-      animation: 'pcbViaPulse 1.5s ease-in-out infinite',
       animationPlayState: isTyping ? 'running' : 'paused',
       animationDelay: `${(275 + y) % 5 * 150}ms`
     }
@@ -943,7 +942,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         {/* Negative space clearance gap */}
         <circle cx="0" cy="0" r="4.5" fill="#030304" />
         <circle cx="0" cy="0" r="3" fill="#18181f" stroke="#333" strokeWidth="0.5" />
-        <circle cx="0" cy="0" r="1.8" fill="#2d2d3a" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} style={ringAnimation} />
+        <circle cx="0" cy="0" r="1.8" fill="#2d2d3a" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} className="anim-pcb-via-pulse" style={ringAnimation} />
         <circle cx="0" cy="0" r="0.8" fill="#000" />
       </g>
     )

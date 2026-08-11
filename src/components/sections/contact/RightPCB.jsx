@@ -308,7 +308,7 @@ const getCorridorWidth = (traceWidth, layer) => {
   return traceWidth * multipliers[layer] + base
 };
 
-export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, formProgress = 0 }) {
+export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, formProgress = 0, isTyping }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const particlesContainerRef = useRef(null)
@@ -1743,13 +1743,15 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                               stroke="var(--accent)"
                               strokeWidth={w + 1.2}
                               fill="none"
-                              opacity="1"
                               pathLength="100"
                               filter="url(#pcbGlowActive)"
                               className="pcb-signal-flow-path"
                               style={{
+                                opacity: isTyping ? 1 : 0,
+                                transition: 'opacity 0.4s ease',
                                 strokeDasharray: '15 100',
                                 animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
+                                animationPlayState: isTyping ? 'running' : 'paused',
                                 willChange: 'stroke-dashoffset',
                                 transform: 'translate3d(0, 0, 0)'
                               }}
@@ -1787,6 +1789,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                           style={{
                             ...getTransitionStyle(),
                             animation: 'pcbIdleTraceHighlight 6s ease-in-out infinite',
+                            animationPlayState: isTyping ? 'running' : 'paused',
                             animationDelay: `${idx * 0.7}s`
                           }}
                         />
@@ -1801,6 +1804,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                         const usePulse = isMainBend && bIdx === 0 && !isTransmit;
                         const pulseStyle = usePulse ? {
                           animation: 'pcbIdleNodePulse 4s ease-in-out infinite',
+                          animationPlayState: isTyping ? 'running' : 'paused',
                           animationDelay: `${(idx * 2.5 + bIdx * 0.8) * 0.4}s`
                         } : {};
                         return (
@@ -1857,6 +1861,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                       className="pcb-radar-pulse-ring"
                       style={{
                         animation: 'pcbRadarPulse 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
+                        animationPlayState: isTyping ? 'running' : 'paused',
                         transformOrigin: '0px 0px'
                       }}
                     />
@@ -1918,13 +1923,15 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                         stroke="var(--accent)"
                         strokeWidth={w + 1.2}
                         fill="none"
-                        opacity="1"
                         pathLength="100"
                         filter="url(#pcbGlowActive)"
                         className="pcb-signal-flow-path"
                         style={{
+                          opacity: isTyping ? 1 : 0,
+                          transition: 'opacity 0.4s ease',
                           strokeDasharray: '15 100',
                           animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
+                          animationPlayState: isTyping ? 'running' : 'paused',
                           willChange: 'stroke-dashoffset',
                           transform: 'translate3d(0, 0, 0)'
                         }}
@@ -1962,6 +1969,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                     style={{
                       ...getTransitionStyle(),
                       animation: 'pcbIdleTraceHighlight 6s ease-in-out infinite',
+                      animationPlayState: isTyping ? 'running' : 'paused',
                       animationDelay: `${(idx + 5) * 0.7}s`
                     }}
                   />
@@ -1976,6 +1984,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                   const usePulse = isMainBend && bIdx === 0 && !isTransmit;
                   const pulseStyle = usePulse ? {
                     animation: 'pcbIdleNodePulse 4s ease-in-out infinite',
+                    animationPlayState: isTyping ? 'running' : 'paused',
                     animationDelay: `${(idx * 2.5 + bIdx * 0.8 + 12) * 0.4}s`
                   } : {};
                   return (
@@ -2037,6 +2046,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                 className="pcb-radar-pulse-ring"
                 style={{
                   animation: 'pcbRadarPulse 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
+                  animationPlayState: isTyping ? 'running' : 'paused',
                   transformOrigin: '0px 0px'
                 }}
               />
