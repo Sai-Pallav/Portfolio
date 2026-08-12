@@ -286,7 +286,7 @@ main {
 }
 
 .animate-standby-pulse {
-  animation: pcbStandbyPulse 3.5s ease-in-out infinite;
+  animation: pcbStandbyPulse 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 @keyframes pcbSignalFlow {
@@ -446,6 +446,6 @@ main {
 .anim-pcb-radar-pulse { animation: pcbRadarPulse 1.0s cubic-bezier(0.1, 0.8, 0.3, 1) infinite; }
 .anim-pcb-radar-rotate { animation: pcbRadarRotate 5s linear infinite; }
 .anim-pcb-radar-rotate-counter { animation: pcbRadarRotateCounter 7s linear infinite; }
-.anim-pcb-ring-breathe { animation: pcbRingBreathe 1.5s ease-in-out infinite; }
-.anim-pcb-core-pulse { animation: pcbCorePulse 0.8s ease-in-out infinite; }
-.anim-pcb-via-pulse { animation: pcbViaPulse 1.5s ease-in-out infinite; }
+.anim-pcb-ring-breathe { animation: pcbRingBreathe 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.anim-pcb-core-pulse { animation: pcbCorePulse 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.anim-pcb-via-pulse { animation: pcbViaPulse 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }

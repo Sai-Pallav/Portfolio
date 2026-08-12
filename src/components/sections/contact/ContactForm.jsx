@@ -285,12 +285,10 @@ function validateField(name, value) {
   return err
 }
 
-export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, onTypingChange, setFormProgress }) {
+export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, setFormProgress }) {
   const shouldReduceMotion = useReducedMotion()
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
-  const [localIsTyping, setLocalIsTyping] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
-  const typingTimeoutRef = useRef(null)
   const [isHovered, setIsHovered] = useState(false)
   const [inquiryType, setInquiryType] = useState('Internship')
   const [touched, setTouched] = useState({ name: false, email: false, subject: false, message: false })
@@ -407,14 +405,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       }
       return prev
     })
-    setLocalIsTyping(true)
-    if (onTypingChange) onTypingChange(true)
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-    typingTimeoutRef.current = setTimeout(() => {
-      setLocalIsTyping(false)
-      if (onTypingChange) onTypingChange(false)
-    }, 500)
-  }, [resetErrorState, onTypingChange])
+  }, [resetErrorState])
 
   const handleBlur = useCallback((e) => {
     const { name, value } = e.target
@@ -425,14 +416,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       const err = validateField(name, value)
       setErrors(prev => ({ ...prev, [name]: err }))
     }
-
-    setLocalIsTyping(false)
-    if (onTypingChange) onTypingChange(false)
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current)
-      typingTimeoutRef.current = null
-    }
-  }, [errors, resetErrorState, onTypingChange])
+  }, [errors, resetErrorState])
 
   const handleRipple = useCallback((e) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -449,6 +433,18 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       return () => clearTimeout(timer)
     }
   }, [ripples])
+
+  const typingTimeoutRef = useRef(null)
+  const handleTypingEvent = useCallback(() => {
+    const sectionEl = document.getElementById('contact')
+    if (sectionEl) {
+      sectionEl.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: true }, bubbles: true }))
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = setTimeout(() => {
+        sectionEl.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: false }, bubbles: true }))
+      }, 500)
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -561,7 +557,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
 
   const isInteracting = isFocused || isHovered
   const isTransmit = contactSystemState === 'transmit'
-  const activeDotState = subState === 'submitting' ? 'submitting' : localIsTyping ? 'submitting' : 'idle'
+  const activeDotState = subState === 'submitting' ? 'submitting' : 'idle'
 
   return (
     <motion.div
@@ -624,7 +620,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
           }}
         />
         {/* Idle Breathing Border */}
-        {contactSystemState === 'dormant' && !localIsTyping && !isInteracting && !shouldReduceMotion && (
+        {contactSystemState === 'dormant' && !isInteracting && !shouldReduceMotion && (
           <rect
             x="1" y="1"
             width="calc(100% - 2px)" height="calc(100% - 2px)"
@@ -682,7 +678,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
         </p>
       </motion.div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
+      <form onSubmit={handleSubmit} onKeyDown={handleTypingEvent} className="space-y-4 relative z-10">
         <div
           style={{
             filter: isTransmit ? 'blur(1.5px)' : 'blur(0px)',

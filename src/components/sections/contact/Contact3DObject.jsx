@@ -70,147 +70,31 @@ const FresnelGlowMaterial = shaderMaterial(
    void main() { vec3 normal = normalize(vNormal); vec3 viewDir = normalize(vViewPosition); float intensity = pow(1.0 - max(dot(normal, viewDir), 0.0), glowPower) * glowIntensity; gl_FragColor = vec4(color, intensity); }`
 )
 extend({ FresnelGlowMaterial })
-// Ring Glow Custom Neon Material - calm infrastructure look with burst ripples
+// Ring Glow Custom Neon Material - clean, calm infrastructure look
 const RingGlowMaterial = shaderMaterial(
   { 
     color: new THREE.Color('#8B5CFF'), 
-    opacity: 0.8,
-    time: 0,
-    rippleProgress: 0.0,
-    rippleOrigin: 0.0
+    opacity: 0.8
   },
   `varying vec3 vNormal; varying vec3 vViewPosition; varying vec2 vUv;
    void main() { vUv = uv; vNormal = normalize(normalMatrix * normal); vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); vViewPosition = -mvPosition.xyz; gl_Position = projectionMatrix * mvPosition; }`,
-  `uniform vec3 color; uniform float opacity; uniform float time; uniform float rippleProgress; uniform float rippleOrigin; varying vec3 vNormal; varying vec3 vViewPosition; varying vec2 vUv;
+  `uniform vec3 color; uniform float opacity; varying vec3 vNormal; varying vec3 vViewPosition; varying vec2 vUv;
    void main() { 
      vec3 normal = normalize(vNormal); vec3 viewDir = normalize(vViewPosition); 
      float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.5); 
      
-     // Subtle base glow without pulses
      vec3 baseColor = color * 0.35;
      vec3 edgeGlow = color * fresnel * 1.5;
-     
-     // Propagating ripple from chosen origin (Rare Burst)
-     float rippleGlow = 0.0;
-     if (rippleProgress > 0.0 && rippleProgress < 1.0) {
-       float dist = abs(vUv.x - rippleOrigin);
-       if (dist > 0.5) dist = 1.0 - dist;
-       float angleDist = dist * 2.0 * 3.14159265;
-       float waveFront = rippleProgress * 3.14159265;
-       float wavePeak = exp(-pow(angleDist - waveFront, 2.0) / 0.08);
-       rippleGlow = wavePeak * (1.0 - rippleProgress) * 0.8;
-     }
-     
-     vec3 finalColor = baseColor + edgeGlow + color * rippleGlow * 1.5;
+     vec3 finalColor = baseColor + edgeGlow;
      
      // Camera space Z depth fade to enhance volumetric hologram depth
      float depthFade = clamp((vViewPosition.z + 10.45) / 4.9, 0.2, 1.0);
-     float finalOpacity = opacity * (0.2 + fresnel * 0.8 + rippleGlow) * depthFade;
+     float finalOpacity = opacity * (0.2 + fresnel * 0.8) * depthFade;
      
      gl_FragColor = vec4(finalColor, finalOpacity); 
    }`
 )
 extend({ RingGlowMaterial })
-
-// Comet Trail Glow Shader Material - Flowing Plasma look
-const TrailGlowMaterial = shaderMaterial(
-  {
-    coreColor: new THREE.Color('#ffffff'),
-    edgeColor: new THREE.Color('#8B5CFF'),
-    opacity: 0.0,
-    isReverse: 0.0,
-    trailLengthFactor: 1.0,
-    time: 0.0
-  },
-  `varying vec2 vUv; varying vec3 vNormal; varying vec3 vViewPosition;
-   void main() { 
-     vUv = uv; 
-     vNormal = normalize(normalMatrix * normal); 
-     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); 
-     vViewPosition = -mvPosition.xyz; 
-     gl_Position = projectionMatrix * mvPosition; 
-   }`,
-  `uniform vec3 coreColor; uniform vec3 edgeColor; uniform float opacity; uniform float isReverse; uniform float trailLengthFactor; uniform float time; varying vec2 vUv; varying vec3 vNormal; varying vec3 vViewPosition;
-   void main() {
-     // Maximum trail length is 20% of the circumference
-     float maxFraction = 0.20; 
-     
-     // Slight internal turbulence/noise in the plasma tail
-     float noise = sin(vUv.y * 12.0 + time * 6.0) * cos(vUv.x * 24.0 - time * 4.0) * 0.02;
-     float distortedUvX = clamp(vUv.x + noise, 0.0, 1.0);
-     
-     float tailFade = 0.0;
-     if (isReverse > 0.5) {
-       // Clockwise rotation: trail is in range [0.0, maxFraction]
-       if (distortedUvX <= maxFraction) {
-         float progress = 1.0 - (distortedUvX / maxFraction); // 1.0 at head (0.0), 0.0 at tail (maxFraction)
-         float activeProgress = (progress - (1.0 - trailLengthFactor)) / trailLengthFactor;
-         tailFade = activeProgress > 0.0 ? pow(activeProgress, 1.8) : 0.0;
-       }
-     } else {
-       // Counter-clockwise rotation: trail is in range [1.0 - maxFraction, 1.0]
-       if (distortedUvX >= 1.0 - maxFraction) {
-         float progress = (distortedUvX - (1.0 - maxFraction)) / maxFraction; // 0.0 at tail (1.0 - maxFraction), 1.0 at head (1.0)
-         float activeProgress = (progress - (1.0 - trailLengthFactor)) / trailLengthFactor;
-         tailFade = activeProgress > 0.0 ? pow(activeProgress, 1.8) : 0.0;
-       }
-     }
-
-     // Core vs Edge ratio
-     vec3 normal = normalize(vNormal);
-     vec3 viewDir = normalize(vViewPosition);
-     float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.2);
-     
-     // Cross-section coordinate to make center white, edges violet with UV waving distortion
-     float waveDistortion = sin(distortedUvX * 16.0 + time * 5.0) * 0.04;
-     float centerFactor = sin(clamp(vUv.y + waveDistortion, 0.0, 1.0) * 3.14159265);
-     float coreFactor = pow(centerFactor, 5.0) * (1.0 - fresnel * 0.4);
-     
-     vec3 finalColor = mix(edgeColor, coreColor, coreFactor);
-     float edgeFade = smoothstep(0.0, 0.15, centerFactor) * (0.4 + 0.6 * fresnel);
-     
-     // Camera space Z depth fade
-     float depthFade = clamp((vViewPosition.z + 10.45) / 4.9, 0.2, 1.0);
-     
-     gl_FragColor = vec4(finalColor, opacity * tailFade * edgeFade * depthFade);
-   }`
-)
-extend({ TrailGlowMaterial })
-
-// Local Segment Activation Material (20-30 degrees short energized arc)
-const SegmentGlowMaterial = shaderMaterial(
-  {
-    color: new THREE.Color('#ffffff'),
-    opacity: 0.0
-  },
-  `varying vec3 vNormal; varying vec3 vViewPosition; varying vec2 vUv;
-   void main() { vUv = uv; vNormal = normalize(normalMatrix * normal); vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); vViewPosition = -mvPosition.xyz; gl_Position = projectionMatrix * mvPosition; }`,
-  `uniform vec3 color; uniform float opacity; varying vec3 vNormal; varying vec3 vViewPosition; varying vec2 vUv;
-   void main() {
-     // Show 25 degrees around the icon (25 / 360 = 0.07 fraction)
-     float fraction = 0.07;
-     float mask = 0.0;
-     if (vUv.x <= fraction) {
-       mask = 1.0 - (vUv.x / fraction);
-     } else if (vUv.x >= 1.0 - fraction) {
-       mask = (vUv.x - (1.0 - fraction)) / fraction;
-     }
-     
-     if (mask <= 0.0) discard;
-     
-     vec3 normal = normalize(vNormal); vec3 viewDir = normalize(vViewPosition); 
-     float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.5); 
-     
-     vec3 finalColor = color * (1.0 + fresnel * 2.0);
-     float finalOpacity = opacity * mask * (0.3 + fresnel * 0.7);
-     
-     // Apply depth fade
-     float depthFade = clamp((vViewPosition.z + 10.45) / 4.9, 0.2, 1.0);
-     
-     gl_FragColor = vec4(finalColor, finalOpacity * depthFade);
-   }`
-)
-extend({ SegmentGlowMaterial })
 // â”€â”€â”€ CameraRig â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Issue #7: Camera drift respects distanceFactor.
 // Issue #18: lookAt cached and only calculated on subpixel movement.
@@ -551,7 +435,7 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, hoveredCountRe
       <Html center transform sprite distanceFactor={8} pointerEvents="auto">
         <div className="relative group/tooltip pointer-events-auto">
           {renderLink()}
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 px-3 py-1.5 rounded-lg bg-bg-raised/95 border border-white/[0.08] backdrop-blur-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-300 pointer-events-none shadow-[0_4px_16px_rgba(0,0,0,0.5)] scale-90 group-hover/tooltip:scale-100">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 px-3 py-1.5 rounded-lg bg-bg-raised/95 border border-white/[0.08] backdrop-blur-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-300 pointer-events-none shadow-[0_4px_16px_rgba(0,0,0,0.5)] scale-90 group-hover/tooltip:scale-100">
             <span className="text-[10px] font-bold tracking-wider uppercase text-[var(--text-heading)] whitespace-nowrap">
               {specialType === 'email' && copied ? 'Copied!' : platform}
             </span>
@@ -563,15 +447,10 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, hoveredCountRe
   )
 }
 
-// Create shared geometry to reuse across all OrbitGroup components (8x lower polygon count)
 const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.035, 8, 128)
-
-const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 
 const OrbitalRing = memo(function OrbitalRing({ 
   myRingIndex,
-  activeTransmissionRef,
-  activeBurstRef,
   angle, 
   ringSpeed, 
   iconSpeed, 
@@ -586,17 +465,8 @@ const OrbitalRing = memo(function OrbitalRing({
   const pivotARef = useRef()
   const pivotBRef = useRef()
 
-  const trailMeshARef = useRef()
-  const trailMeshBRef = useRef()
-
-  const segmentMeshARef = useRef()
-  const segmentMeshBRef = useRef()
-
   const iconWrapperARef = useRef()
   const iconWrapperBRef = useRef()
-
-  const packetMeshARef = useRef()
-  const packetMeshBRef = useRef()
 
   const orbitGroupPhase = useRef(0)
   const pivotAPhase = useRef(0)
@@ -606,39 +476,9 @@ const OrbitalRing = memo(function OrbitalRing({
   const isHoveredBRef = useRef(false)
   const hoverFactorA = useRef(0)
   const hoverFactorB = useRef(0)
+  const easedDistance = useRef(1.0)
 
-  const wasHoveredA = useRef(false)
-  const wasHoveredB = useRef(false)
-
-  // Packet animation states
-  const packetActiveA = useRef(false)
-  const packetProgressA = useRef(0)
-  const packetCooldownA = useRef(8.0)
-  const packetTimerA = useRef(0)
-
-  const packetActiveB = useRef(false)
-  const packetProgressB = useRef(0)
-  const packetCooldownB = useRef(8.0)
-  const packetTimerB = useRef(0)
-
-  // Reaction animation states (scale / glow jump)
-  const reactionActiveA = useRef(false)
-  const reactionTimeA = useRef(0)
-  const reactionFactorA = useRef(0.0)
-
-  const reactionActiveB = useRef(false)
-  const reactionTimeB = useRef(0)
-  const reactionFactorB = useRef(0.0)
-
-  const driftRef = useRef({ x: 0, y: 0 })
-
-  const tempVecA = useMemo(() => new THREE.Vector3(), [])
-  const tempVecB = useMemo(() => new THREE.Vector3(), [])
-
-  // Dynamic radius ref
-  const radiusRef = useRef(2.45)
-
-  // Create ring and segment materials per ring instance to support independent ripple uniforms
+  // Create ring material per ring instance
   const ringMaterial = useMemo(() => {
     const mat = new RingGlowMaterial()
     mat.transparent = true
@@ -646,78 +486,20 @@ const OrbitalRing = memo(function OrbitalRing({
     mat.depthWrite = false
     mat.color = new THREE.Color('#8B5CFF')
     mat.opacity = 0.35
-    mat.rippleProgress = 0.0
-    mat.rippleOrigin = 0.0
-    mat.time = 0.0
     return mat
   }, [])
-
-  const segmentMaterialA = useMemo(() => {
-    const mat = new SegmentGlowMaterial()
-    mat.transparent = true
-    mat.blending = THREE.AdditiveBlending
-    mat.depthWrite = false
-    mat.color = new THREE.Color('#ffffff')
-    mat.opacity = 0.0
-    return mat
-  }, [])
-
-  const segmentMaterialB = useMemo(() => {
-    const mat = new SegmentGlowMaterial()
-    mat.transparent = true
-    mat.blending = THREE.AdditiveBlending
-    mat.depthWrite = false
-    mat.color = new THREE.Color('#ffffff')
-    mat.opacity = 0.0
-    return mat
-  }, [])
-
-  // Memoize trail materials per icon
-  const trailMaterialA = useMemo(() => {
-    const mat = new TrailGlowMaterial()
-    mat.transparent = true
-    mat.blending = THREE.AdditiveBlending
-    mat.depthWrite = false
-    mat.coreColor = new THREE.Color('#ffffff')
-    mat.edgeColor = new THREE.Color('#8B5CFF')
-    mat.isReverse = iconSpeed < 0 ? 1.0 : 0.0
-    mat.trailLengthFactor = 1.0
-    mat.opacity = 0.0
-    mat.time = 0.0
-    return mat
-  }, [iconSpeed])
-
-  const trailMaterialB = useMemo(() => {
-    const mat = new TrailGlowMaterial()
-    mat.transparent = true
-    mat.blending = THREE.AdditiveBlending
-    mat.depthWrite = false
-    mat.coreColor = new THREE.Color('#ffffff')
-    mat.edgeColor = new THREE.Color('#8B5CFF')
-    mat.isReverse = iconSpeed < 0 ? 1.0 : 0.0
-    mat.trailLengthFactor = 1.0
-    mat.opacity = 0.0
-    mat.time = 0.0
-    return mat
-  }, [iconSpeed])
-
-  const packetMaterialA = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0 }), [])
-  const packetMaterialB = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0 }), [])
 
   useEffect(() => {
     return () => {
       ringMaterial.dispose()
-      segmentMaterialA.dispose()
-      segmentMaterialB.dispose()
-      trailMaterialA.dispose()
-      trailMaterialB.dispose()
-      packetMaterialA.dispose()
-      packetMaterialB.dispose()
     }
-  }, [ringMaterial, segmentMaterialA, segmentMaterialB, trailMaterialA, trailMaterialB, packetMaterialA, packetMaterialB])
+  }, [ringMaterial])
 
   useFrame((state, delta) => {
-    const tGlobal = state.clock.getElapsedTime()
+    // Eased distance factor (smooth deceleration as cursor moves closer)
+    const targetDist = distanceFactor ? distanceFactor.current : 1.0
+    easedDistance.current = lerpFI(easedDistance.current, targetDist, LERP.proximitySpeed, delta)
+    const proximitySpeedFactor = easedDistance.current
 
     // Smooth hover factor lerping
     const targetHoverA = isHoveredARef.current ? 1.0 : 0.0
@@ -726,25 +508,10 @@ const OrbitalRing = memo(function OrbitalRing({
     const targetHoverB = isHoveredBRef.current ? 1.0 : 0.0
     hoverFactorB.current = lerpFI(hoverFactorB.current, targetHoverB, 6.0, delta)
 
-    // Dynamic radius expansion on hover
-    const activeHover = Math.max(hoverFactorA.current, hoverFactorB.current)
-    const targetRadius = 2.45 + activeHover * 0.08
-    radiusRef.current = lerpFI(radiusRef.current, targetRadius, 6.0, delta)
-    const currentRadius = radiusRef.current
+    // Fixed orbital radius (prevents ring expansion or shift on hover)
+    const currentRadius = 2.45
 
-    // Scale the Torus meshes to expand radius dynamically
-    const scaleFactor = currentRadius / 2.45
-    if (meshRef.current) {
-      meshRef.current.scale.set(scaleFactor, scaleFactor, 1.0)
-    }
-    if (trailMeshARef.current) {
-      trailMeshARef.current.scale.set(scaleFactor, scaleFactor, 1.0)
-    }
-    if (trailMeshBRef.current) {
-      trailMeshBRef.current.scale.set(scaleFactor, scaleFactor, 1.0)
-    }
-
-    // Set dynamic positions of icon wrappers
+    // Set static positions of icon wrappers
     if (iconWrapperARef.current) {
       iconWrapperARef.current.position.set(currentRadius, 0, zOffset)
     }
@@ -752,28 +519,18 @@ const OrbitalRing = memo(function OrbitalRing({
       iconWrapperBRef.current.position.set(currentRadius, 0, zOffset)
     }
 
-    // Orbital Speed Easing: Reduce speed by 10% when hovered
-    const speedMultiplier = 1.0 - activeHover * 0.10
-    const activeIconSpeed = iconSpeed * speedMultiplier
+    // Orbital speed governed smoothly by cursor proximity
+    const activeIconSpeed = iconSpeed * proximitySpeedFactor
+    const activeRingSpeed = ringSpeed * proximitySpeedFactor
 
-    // 1. Rotate the OrbitGroup itself slowly (carrying the RingMesh and both IconPivots)
-    orbitGroupPhase.current = (orbitGroupPhase.current + delta * ringSpeed) % (2 * Math.PI)
-    
-    // Wave float/tilt drift when hovered (organic physics-based bobbing)
-    const floatTime = state.clock.getElapsedTime()
-    const targetDriftX = activeHover * Math.sin(floatTime * 2.0) * 0.08
-    const targetDriftY = activeHover * Math.cos(floatTime * 1.6) * 0.08
-    
-    driftRef.current.x = lerpFI(driftRef.current.x, targetDriftX, 4.0, delta)
-    driftRef.current.y = lerpFI(driftRef.current.y, targetDriftY, 4.0, delta)
+    // 1. Rotate the OrbitGroup itself slowly according to cursor distance
+    orbitGroupPhase.current = (orbitGroupPhase.current + delta * activeRingSpeed) % (2 * Math.PI)
     
     if (orbitGroupRef.current) {
       orbitGroupRef.current.rotation.z = orbitGroupPhase.current
-      orbitGroupRef.current.rotation.x = driftRef.current.x
-      orbitGroupRef.current.rotation.y = driftRef.current.y
     }
 
-    // 2. Rotate the IconPivots (making the icons revolve along the ring)
+    // 2. Rotate the IconPivots (making the icons revolve along the ring according to cursor distance)
     pivotAPhase.current = (pivotAPhase.current + delta * activeIconSpeed) % (2 * Math.PI)
     pivotBPhase.current = (pivotBPhase.current + delta * activeIconSpeed) % (2 * Math.PI)
 
@@ -784,325 +541,34 @@ const OrbitalRing = memo(function OrbitalRing({
       pivotBRef.current.rotation.z = pivotBPhase.current
     }
 
-    // --- Packet Event triggers ---
-    const hoveredA = isHoveredARef.current
-    const hoveredB = isHoveredBRef.current
-
-    // Hover triggers: requests sync if no other transmission is active
-    if (hoveredA && !wasHoveredA.current) {
-      if (!packetActiveA.current && !packetActiveB.current && !activeTransmissionRef.current) {
-        packetActiveA.current = true
-        packetProgressA.current = 0.0
-        activeTransmissionRef.current = `packet-r${myRingIndex}-a`
-      }
-    }
-    wasHoveredA.current = hoveredA
-
-    if (hoveredB && !wasHoveredB.current) {
-      if (!packetActiveA.current && !packetActiveB.current && !activeTransmissionRef.current) {
-        packetActiveB.current = true
-        packetProgressB.current = 0.0
-        activeTransmissionRef.current = `packet-r${myRingIndex}-b`
-      }
-    }
-    wasHoveredB.current = hoveredB
-
-    // Transmission frequency temporarily doubles on hover (timer speed = 2.0)
-    const timerSpeedA = hoveredA ? 2.0 : 1.0
-    const timerSpeedB = hoveredB ? 2.0 : 1.0
-
-    // Trigger on periodic cooldown: only if no transmission is active anywhere
-    if (!packetActiveA.current && !packetActiveB.current && (!activeBurstRef.current || activeBurstRef.current.ringIndex !== myRingIndex)) {
-      if (!activeTransmissionRef.current) {
-        packetTimerA.current += delta * timerSpeedA
-        if (packetTimerA.current >= packetCooldownA.current) {
-          packetActiveA.current = true
-          packetProgressA.current = 0.0
-          packetTimerA.current = 0
-          packetCooldownA.current = 6 + Math.random() * 4
-          activeTransmissionRef.current = `packet-r${myRingIndex}-a`
-        }
-      }
-    }
-    if (!packetActiveA.current && !packetActiveB.current && (!activeBurstRef.current || activeBurstRef.current.ringIndex !== myRingIndex)) {
-      if (!activeTransmissionRef.current) {
-        packetTimerB.current += delta * timerSpeedB
-        if (packetTimerB.current >= packetCooldownB.current) {
-          packetActiveB.current = true
-          packetProgressB.current = 0.0
-          packetTimerB.current = 0
-          packetCooldownB.current = 6 + Math.random() * 4
-          activeTransmissionRef.current = `packet-r${myRingIndex}-b`
-        }
-      }
-    }
-
-    // Update periodic packet A
-    if (packetActiveA.current) {
-      packetProgressA.current += delta / 1.2 // 1.2s travel time
-      if (packetProgressA.current >= 1.0) {
-        packetActiveA.current = false
-        packetProgressA.current = 1.0
-        reactionActiveA.current = true
-        reactionTimeA.current = 0.0
-      }
-      if (packetMeshARef.current) {
-        const progress = packetProgressA.current
-        const easedProgress = easeInOutCubic(progress)
-        packetMeshARef.current.position.set(currentRadius * easedProgress, 0, zOffset)
-        
-        // Streak motion blur (elongation during transit)
-        const streakStretch = 1.0 + Math.sin(progress * Math.PI) * 1.5
-        const streakThin = 1.0 - Math.sin(progress * Math.PI) * 0.4
-        packetMeshARef.current.scale.set(streakStretch, streakThin, streakThin)
-        
-        if (packetMeshARef.current) {
-          packetMeshARef.current.material.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
-        }
-      }
-    } else {
-      // Hide packet if not active and not part of the Rare Burst
-      const isBurstTargetA = activeBurstRef.current && activeBurstRef.current.ringIndex === myRingIndex && activeBurstRef.current.iconIndex === 0 && activeBurstRef.current.stage === 'travel'
-      if (!isBurstTargetA && packetMeshARef.current) {
-        packetMeshARef.current.material.opacity = 0.0
-      }
-    }
-
-    // Update periodic packet B
-    if (packetActiveB.current) {
-      packetProgressB.current += delta / 1.2 // 1.2s travel time
-      if (packetProgressB.current >= 1.0) {
-        packetActiveB.current = false
-        packetProgressB.current = 1.0
-        reactionActiveB.current = true
-        reactionTimeB.current = 0.0
-      }
-      if (packetMeshBRef.current) {
-        const progress = packetProgressB.current
-        const easedProgress = easeInOutCubic(progress)
-        packetMeshBRef.current.position.set(currentRadius * easedProgress, 0, zOffset)
-        
-        // Streak motion blur (elongation during transit)
-        const streakStretch = 1.0 + Math.sin(progress * Math.PI) * 1.5
-        const streakThin = 1.0 - Math.sin(progress * Math.PI) * 0.4
-        packetMeshBRef.current.scale.set(streakStretch, streakThin, streakThin)
-        
-        if (packetMeshBRef.current) {
-          packetMeshBRef.current.material.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
-        }
-      }
-    } else {
-      const isBurstTargetB = activeBurstRef.current && activeBurstRef.current.ringIndex === myRingIndex && activeBurstRef.current.iconIndex === 1 && activeBurstRef.current.stage === 'travel'
-      if (!isBurstTargetB && packetMeshBRef.current) {
-        packetMeshBRef.current.material.opacity = 0.0
-      }
-    }
-
-    // --- Rare Communication Burst Sync Stage & Propagation ---
-    let burstReactionFactorA = 0.0
-    let burstReactionFactorB = 0.0
-
-    // Set time uniform on ringMaterial for custom shader effects
-    if (meshRef.current) {
-      meshRef.current.material.time = tGlobal
-    }
-
-    if (activeBurstRef.current && activeBurstRef.current.ringIndex === myRingIndex) {
-      const burst = activeBurstRef.current
-      const progress = burst.progress
-      
-      if (burst.stage === 'travel') {
-        const easedProgress = easeInOutCubic(progress)
-        if (burst.iconIndex === 0) {
-          if (packetMeshARef.current) {
-            packetMeshARef.current.position.set(currentRadius * easedProgress, 0, zOffset)
-            const streakStretch = 1.0 + Math.sin(progress * Math.PI) * 2.2
-            const streakThin = 1.0 - Math.sin(progress * Math.PI) * 0.5
-            packetMeshARef.current.scale.set(streakStretch, streakThin, streakThin)
-            packetMeshARef.current.material.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
-          }
-        } else {
-          if (packetMeshBRef.current) {
-            packetMeshBRef.current.position.set(currentRadius * easedProgress, 0, zOffset)
-            const streakStretch = 1.0 + Math.sin(progress * Math.PI) * 2.2
-            const streakThin = 1.0 - Math.sin(progress * Math.PI) * 0.5
-            packetMeshBRef.current.scale.set(streakStretch, streakThin, streakThin)
-            packetMeshBRef.current.material.opacity = THREE.MathUtils.clamp(Math.min(progress / 0.15, (1.0 - progress) / 0.05), 0, 1)
-          }
-        }
-      } else if (burst.stage === 'sync') {
-        // Sync envelope lasts first 380ms of the 800ms stage (0.475 fraction of progress)
-        const pSync = Math.min(progress / 0.475, 1.0)
-        const syncFactor = pSync < 0.15 ? (pSync / 0.15) : Math.pow((1.0 - pSync) / 0.85, 2.0)
-        
-        if (burst.iconIndex === 0) {
-          burstReactionFactorA = syncFactor
-        } else {
-          burstReactionFactorB = syncFactor
-        }
-        
-        // Propagate ripple along ring
-        if (meshRef.current) {
-          meshRef.current.material.rippleProgress = progress
-          meshRef.current.material.rippleOrigin = burst.iconIndex === 0 ? 0.0 : 0.5
-        }
-      }
-    } else {
-      if (meshRef.current) {
-        meshRef.current.material.rippleProgress = 0.0
-      }
-    }
-
-    // Update periodic reaction timers & release locks
-    if (reactionActiveA.current) {
-      reactionTimeA.current += delta
-      const p = reactionTimeA.current / 0.38 // 380ms duration
-      if (p >= 1.0) {
-        reactionActiveA.current = false
-        reactionFactorA.current = 0.0
-        if (activeTransmissionRef.current === `packet-r${myRingIndex}-a`) {
-          activeTransmissionRef.current = null // Release lock
-        }
-      } else {
-        // Fast attack, smooth decay envelope
-        reactionFactorA.current = p < 0.15 ? (p / 0.15) : Math.pow((1.0 - p) / 0.85, 2.0)
-      }
-    }
-
-    if (reactionActiveB.current) {
-      reactionTimeB.current += delta
-      const p = reactionTimeB.current / 0.38 // 380ms duration
-      if (p >= 1.0) {
-        reactionActiveB.current = false
-        reactionFactorB.current = 0.0
-        if (activeTransmissionRef.current === `packet-r${myRingIndex}-b`) {
-          activeTransmissionRef.current = null // Release lock
-        }
-      } else {
-        reactionFactorB.current = p < 0.15 ? (p / 0.15) : Math.pow((1.0 - p) / 0.85, 2.0)
-      }
-    }
-
-    // Combine periodic reaction and burst reaction factors
-    const activeReactionA = Math.max(reactionFactorA.current, burstReactionFactorA)
-    const activeReactionB = Math.max(reactionFactorB.current, burstReactionFactorB)
-
-    // Feed combined reaction to wrapper scales
+    // Feed hover scale to icon wrapper
     const hoverScaleA = 1.0 + hoverFactorA.current * 0.05
-    const syncScaleA = 1.0 + activeReactionA * 0.08
     if (iconWrapperARef.current) {
-      iconWrapperARef.current.scale.set(hoverScaleA * syncScaleA, hoverScaleA * syncScaleA, hoverScaleA * syncScaleA)
+      iconWrapperARef.current.scale.set(hoverScaleA, hoverScaleA, hoverScaleA)
     }
 
     const hoverScaleB = 1.0 + hoverFactorB.current * 0.05
-    const syncScaleB = 1.0 + activeReactionB * 0.08
     if (iconWrapperBRef.current) {
-      iconWrapperBRef.current.scale.set(hoverScaleB * syncScaleB, hoverScaleB * syncScaleB, hoverScaleB * syncScaleB)
+      iconWrapperBRef.current.scale.set(hoverScaleB, hoverScaleB, hoverScaleB)
     }
-
-    // Update segment materials (20-30 degrees short energized arcs)
-    if (segmentMeshARef.current) {
-      segmentMeshARef.current.material.opacity = activeReactionA
-    }
-    if (segmentMeshBRef.current) {
-      segmentMeshBRef.current.material.opacity = activeReactionB
-    }
-
-    // --- Depth Calculation & Trail Uniform Updates ---
-    const camZ = state.camera.position.z || 8
-    const maxZ = -(camZ - currentRadius * 1.2)
-    const minZ = -(camZ + currentRadius * 1.2)
-
-    // Depth A
-    let depthA = 1.0
-    if (iconWrapperARef.current) {
-      iconWrapperARef.current.getWorldPosition(tempVecA)
-      tempVecA.applyMatrix4(state.camera.matrixWorldInverse)
-      depthA = THREE.MathUtils.clamp((tempVecA.z - minZ) / (maxZ - minZ), 0, 1)
-    }
-
-    // Depth B
-    let depthB = 1.0
-    if (iconWrapperBRef.current) {
-      iconWrapperBRef.current.getWorldPosition(tempVecB)
-      tempVecB.applyMatrix4(state.camera.matrixWorldInverse)
-      depthB = THREE.MathUtils.clamp((tempVecB.z - minZ) / (maxZ - minZ), 0, 1)
-    }
-
-    // Dynamic organic breathing for trail ribbon lengths (between 12% and 18%)
-    const breatheA = Math.sin(tGlobal * 0.37) * 0.5 + Math.cos(tGlobal * 0.13) * 0.3
-    const breatheB = Math.sin(tGlobal * 0.41) * 0.5 + Math.cos(tGlobal * 0.17) * 0.3
-
-    const baseLengthA = 0.72 + breatheA * 0.08
-    const baseLengthB = 0.72 + breatheB * 0.08
-
-    const targetLengthA = baseLengthA + hoverFactorA.current * 0.25
-    const targetLengthB = baseLengthB + hoverFactorB.current * 0.25
-
-    // Update trail uniforms (depth fades trail, hover/sync extends/brightens it)
-    if (trailMeshARef.current) {
-      const mat = trailMeshARef.current.material
-      mat.time = tGlobal
-      mat.opacity = (0.05 + depthA * 0.25) * 0.8 + activeReactionA * 0.6
-      mat.trailLengthFactor = THREE.MathUtils.clamp(targetLengthA * (0.6 + depthA * 0.4), 0, 1)
-    }
-    if (trailMeshBRef.current) {
-      const mat = trailMeshBRef.current.material
-      mat.time = tGlobal
-      mat.opacity = (0.05 + depthB * 0.25) * 0.8 + activeReactionB * 0.6
-      mat.trailLengthFactor = THREE.MathUtils.clamp(targetLengthB * (0.6 + depthB * 0.4), 0, 1)
-    }
-
-    // Sync glow values to refs so OrbitingIcon can read them
-    reactionFactorA.current = activeReactionA
-    reactionFactorB.current = activeReactionB
   })
 
   const radTilt = 65 * (Math.PI / 180)
   const radZ = angle * (Math.PI / 180)
   const radius = 2.45
-  const DEBUG = false
 
   return (
     <group rotation={[0, 0, radZ]}>
       <group rotation={[radTilt, 0, 0]}>
-        {/* OrbitGroup contains the RingMesh, both IconPivots, and trails */}
         <group ref={orbitGroupRef}>
-          {/* RingMesh with localized material for independent ripple wave propagation */}
           <mesh ref={meshRef} position={[0, 0, zOffset]} geometry={sharedRingGeometry} material={ringMaterial} />
 
           {/* IconPivot A */}
           <group ref={pivotARef}>
-            {DEBUG && (
-              <mesh position={[0, 0, zOffset]}>
-                <sphereGeometry args={[0.08, 8, 8]} />
-                <meshBasicMaterial color="red" wireframe />
-              </mesh>
-            )}
-            {/* Trail segment covering exact orbit path */}
-            <mesh 
-              ref={trailMeshARef}
-              position={[0, 0, zOffset]}
-              geometry={sharedRingGeometry} 
-              material={trailMaterialA} 
-            />
-            {/* Local Ring Activation segment centered around icon */}
-            <mesh 
-              ref={segmentMeshARef}
-              position={[0, 0, zOffset]}
-              geometry={sharedRingGeometry} 
-              material={segmentMaterialA} 
-            />
-            {/* Emerging data packet */}
-            <mesh ref={packetMeshARef} material={packetMaterialA}>
-              <sphereGeometry args={[0.05, 8, 8]} />
-            </mesh>
-            {/* Connected endpoint */}
             <group ref={iconWrapperARef} position={[radius, 0, zOffset]}>
               {icons[0] && (
                 <OrbitingIcon
                   iconData={icons[0]}
-                  reactionGlowRef={reactionFactorA}
                   onHoverChange={(hovered) => {
                     isHoveredARef.current = hovered
                   }}
@@ -1116,36 +582,10 @@ const OrbitalRing = memo(function OrbitalRing({
 
           {/* IconPivot B */}
           <group ref={pivotBRef}>
-            {DEBUG && (
-              <mesh position={[0, 0, zOffset]}>
-                <sphereGeometry args={[0.08, 8, 8]} />
-                <meshBasicMaterial color="blue" wireframe />
-              </mesh>
-            )}
-            {/* Trail segment covering exact orbit path */}
-            <mesh 
-              ref={trailMeshBRef}
-              position={[0, 0, zOffset]}
-              geometry={sharedRingGeometry} 
-              material={trailMaterialB} 
-            />
-            {/* Local Ring Activation segment centered around icon */}
-            <mesh 
-              ref={segmentMeshBRef}
-              position={[0, 0, zOffset]}
-              geometry={sharedRingGeometry} 
-              material={segmentMaterialB} 
-            />
-            {/* Emerging data packet */}
-            <mesh ref={packetMeshBRef} material={packetMaterialB}>
-              <sphereGeometry args={[0.05, 8, 8]} />
-            </mesh>
-            {/* Connected endpoint */}
             <group ref={iconWrapperBRef} position={[radius, 0, zOffset]}>
               {icons[1] && (
                 <OrbitingIcon
                   iconData={icons[1]}
-                  reactionGlowRef={reactionFactorB}
                   onHoverChange={(hovered) => {
                     isHoveredBRef.current = hovered
                   }}
@@ -1162,23 +602,12 @@ const OrbitalRing = memo(function OrbitalRing({
   )
 })
 
-// Static global colors to avoid allocations inside render frames
 const tempColorA = new THREE.Color()
 const tempColorB = new THREE.Color()
 
 function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef }) {
   const { width } = useThree((state) => state.size)
 
-  // Concurrency lock to respect Premium Constraint: at most ONE major animation at a time
-  const activeTransmissionRef = useRef(null)
-
-  // Rare Communication Burst coordinator
-  const activeBurstRef = useRef(null)
-  const burstCooldownRef = useRef(18.0) // 15-20s, initialized to safe default
-  const burstTimerRef = useRef(0)
-
-  // Issue #7: Continuous linear interpolation scaling instead of discrete pop-jumps
-  // Scale reduced to 0.78 max so globe+orbits fit within 420px container without visual bleed
   const scale = useMemo(() => {
     if (width < 300) return 0.55
     if (width > 380) return 0.78
@@ -1188,37 +617,7 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
   // Imperative scene color update on theme state transitions
   const lastColorVersion = useRef(-1)
   
-  useFrame((state, delta) => {
-    // --- Rare Communication Burst Coordinator ---
-    if (!activeBurstRef.current) {
-      if (!activeTransmissionRef.current) {
-        burstTimerRef.current += delta
-        if (burstTimerRef.current >= burstCooldownRef.current) {
-          const r = Math.floor(Math.random() * 3)
-          const i = Math.floor(Math.random() * 2)
-          activeBurstRef.current = { ringIndex: r, iconIndex: i, progress: 0.0, stage: 'travel' }
-          activeTransmissionRef.current = 'burst' // Acquire lock
-          burstTimerRef.current = 0
-          burstCooldownRef.current = 15 + Math.random() * 5
-        }
-      }
-    } else {
-      const burst = activeBurstRef.current
-      if (burst.stage === 'travel') {
-        burst.progress += delta / 1.2 // 1.2s travel
-        if (burst.progress >= 1.0) {
-          burst.progress = 0.0
-          burst.stage = 'sync'
-        }
-      } else if (burst.stage === 'sync') {
-        burst.progress += delta / 0.8 // 800ms sync & ripple propagation
-        if (burst.progress >= 1.0) {
-          activeBurstRef.current = null
-          activeTransmissionRef.current = null // Release lock
-        }
-      }
-    }
-
+  useFrame((state) => {
     if (lastColorVersion.current !== globalTheme.version) {
       tempColorA.set(globalTheme.color)
       tempColorB.set(globalTheme.secondaryColor)
@@ -1265,8 +664,6 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
       {/* 3 Premium-looking 3D Orbital Rings */}
       <OrbitalRing 
         myRingIndex={0}
-        activeTransmissionRef={activeTransmissionRef}
-        activeBurstRef={activeBurstRef}
         angle={0} 
         ringSpeed={0.02} 
         iconSpeed={0.35}
@@ -1278,8 +675,6 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
       />
       <OrbitalRing 
         myRingIndex={1}
-        activeTransmissionRef={activeTransmissionRef}
-        activeBurstRef={activeBurstRef}
         angle={60} 
         ringSpeed={-0.016} 
         iconSpeed={-0.28}
@@ -1291,8 +686,6 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
       />
       <OrbitalRing 
         myRingIndex={2}
-        activeTransmissionRef={activeTransmissionRef}
-        activeBurstRef={activeBurstRef}
         angle={120} 
         ringSpeed={0.013} 
         iconSpeed={0.22}
@@ -1320,8 +713,10 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
   // Issue #13: MutationObserver on <html> (retains theme synchronization, bypassing React renders)
   useEffect(() => {
     const readTheme = () => {
-      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()
-      const secondary = getComputedStyle(document.documentElement).getPropertyValue("--accent-secondary").trim()
+      if (typeof document === 'undefined') return
+      const styles = getComputedStyle(document.documentElement)
+      const accent = styles.getPropertyValue("--accent").trim() || '#3b82f6'
+      const secondary = styles.getPropertyValue("--accent-secondary").trim() || styles.getPropertyValue("--accent-hover").trim() || accent
       let updated = false
       if (accent && accent !== globalTheme.color) {
         globalTheme.color = accent
@@ -1469,11 +864,11 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full aspect-square max-w-[380px] lg:max-w-[420px] z-10 pointer-events-none hidden md:flex items-center justify-center"
+        className="relative w-full aspect-square max-w-[380px] lg:max-w-[420px] z-10 pointer-events-none flex items-center justify-center"
       >
         <div
           className="absolute w-[60%] h-[60%] rounded-full blur-[100px] pointer-events-none -z-10 transition-colors duration-500"
-          style={{ background: `radial-gradient(circle, ${globalTheme.color} 0%, transparent 70%)`, opacity: 0.08 }}
+          style={{ background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)', opacity: 0.08 }}
         />
 
         <div className="absolute inset-0 pointer-events-none">
@@ -1492,7 +887,7 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
                   canvasEl.removeEventListener('webglcontextlost', handleContextLost)
                 }
               }}
-              style={{ pointerEvents: isInView ? 'auto' : 'none', opacity: isInView ? 1 : 0, transition: 'opacity 0.5s ease' }}
+              style={{ pointerEvents: 'auto', opacity: 1 }}
             >
               <Scene 
                 iconsToRender={iconsToRender} 

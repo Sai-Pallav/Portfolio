@@ -211,7 +211,7 @@ export default memo(function ContactSection() {
               </div>
             </div>
             {/* Globe Container */}
-            <div className="hidden md:flex items-center justify-center relative z-20 lg:translate-x-16">
+            <div className="flex items-center justify-center relative z-20 lg:translate-x-16">
               <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] overflow-visible flex items-center justify-center pointer-events-none z-10">
                 <div className="absolute w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] rounded-full blur-[80px] pointer-events-none -z-10 animate-pulse duration-[8000ms]" style={{ background: 'var(--gradient-glow)', opacity: 0.10 }} />
                 <Contact3DObject isInView={isInViewRepeat} contactSystemState={contactSystemState} />

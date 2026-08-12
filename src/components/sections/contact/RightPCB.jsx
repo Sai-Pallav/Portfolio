@@ -308,12 +308,15 @@ const getCorridorWidth = (traceWidth, layer) => {
   return traceWidth * multipliers[layer] + base
 };
 
-export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, formProgress = 0, isTyping }) {
+export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, formProgress = 0, isTyping: propsIsTyping }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const particlesContainerRef = useRef(null)
   const particlePoolRef = useRef([])
   const poolIndexRef = useRef(0)
+  const [isTypingActive, setIsTypingActive] = useState(false)
+  const isTyping = Boolean(propsIsTyping || isTypingActive)
+  const activationLevel = isTyping ? 3 : 0
 
   const [layout, setLayout] = useState({
     G: 600,
@@ -878,7 +881,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
       }
     }
 
-    const sectionEl = containerRef.current?.closest('#contact')
+    const sectionEl = document.getElementById('contact')
 
     // Initial check
     if (sectionEl && sectionEl.getAttribute('data-typing') === 'true') {
@@ -886,7 +889,9 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     }
 
     const handleTypingEvent = (e) => {
-      if (e.detail.isTyping) {
+      const typing = !!(e.detail && e.detail.isTyping)
+      setIsTypingActive(typing)
+      if (typing) {
         startTypingInterval()
       } else {
         stopTypingInterval()
@@ -1171,7 +1176,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
       {/* ========================================================
             SOLID GROUND PLANE POURS & ISOLATION ZONES
          ======================================================== */}
-      <g mask="url(#copperHatchMask)" style={{ transition: 'opacity 750ms ease-in-out' }} opacity={isTransmit ? 0.3 : 1}>
+      <g mask="url(#copperHatchMask)" style={{ transition: 'opacity 750ms cubic-bezier(0.4, 0, 0.2, 1)' }} opacity={isTransmit ? 0.3 : 1}>
         {/* Middle Top Ground Plane */}
         <polygon
           points={`${midStart},${Y_center - 180} ${middleTargetLimit - 15},${Y_center - 180} ${middleTargetLimit},${Y_center - 165} ${middleTargetLimit},${Y_center - 120} ${midStart},${Y_center - 120}`}
@@ -1184,7 +1189,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <rect
           x={midStart}
           y={Y_center - 78}
-          width={middleTargetLimit - midStart}
+          width={Math.max(0, middleTargetLimit - midStart)}
           height={10}
           fill="url(#copper-hatch-pattern)"
           stroke="rgba(168, 85, 247, 0.22)"
@@ -1203,7 +1208,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <rect
           x={midStart}
           y={Y_center + 68}
-          width={middleTargetLimit - midStart}
+          width={Math.max(0, middleTargetLimit - midStart)}
           height={10}
           fill="url(#copper-hatch-pattern)"
           stroke="rgba(168, 85, 247, 0.22)"
@@ -1251,12 +1256,12 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
       <g opacity={isTransmit ? 0 : 1} style={{ transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }}>
         {/* Isolation slots with inner bevels */}
         <g fill="#020204" opacity="0.65">
-          <rect x={midStart + 5} y={Y_center - 84} width={middleTargetLimit - midStart - 10} height="4" rx="0.5" />
-          <rect x={midStart + 5} y={Y_center + 80} width={middleTargetLimit - midStart - 10} height="4" rx="0.5" />
+          <rect x={midStart + 5} y={Y_center - 84} width={Math.max(0, middleTargetLimit - midStart - 10)} height="4" rx="0.5" />
+          <rect x={midStart + 5} y={Y_center + 80} width={Math.max(0, middleTargetLimit - midStart - 10)} height="4" rx="0.5" />
         </g>
         <g stroke="rgba(255,255,255,0.025)" strokeWidth="0.3" fill="none">
-          <rect x={midStart + 5} y={Y_center - 84} width={middleTargetLimit - midStart - 10} height="4" rx="0.5" transform="translate(0, 0.5)" />
-          <rect x={midStart + 5} y={Y_center + 80} width={middleTargetLimit - midStart - 10} height="4" rx="0.5" transform="translate(0, 0.5)" />
+          <rect x={midStart + 5} y={Y_center - 84} width={Math.max(0, middleTargetLimit - midStart - 10)} height="4" rx="0.5" transform="translate(0, 0.5)" />
+          <rect x={midStart + 5} y={Y_center + 80} width={Math.max(0, middleTargetLimit - midStart - 10)} height="4" rx="0.5" transform="translate(0, 0.5)" />
         </g>
       </g>
     </>
@@ -1747,11 +1752,11 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                               filter="url(#pcbGlowActive)"
                               className="pcb-signal-flow-path"
                               style={{
-                                opacity: isTyping ? 1 : 0,
+                                opacity: activationLevel >= 2 ? 1 : 0,
                                 transition: 'opacity 0.4s ease',
                                 strokeDasharray: '15 100',
                                 animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
-                                animationPlayState: isTyping ? 'running' : 'paused',
+                                animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
                                 willChange: 'stroke-dashoffset',
                                 transform: 'translate3d(0, 0, 0)'
                               }}
@@ -1788,8 +1793,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                           opacity="0"
                           style={{
                             ...getTransitionStyle(),
-                            animation: 'pcbIdleTraceHighlight 6s ease-in-out infinite',
-                            animationPlayState: isTyping ? 'running' : 'paused',
+                            animation: 'pcbIdleTraceHighlight 6s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+                            animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
                             animationDelay: `${idx * 0.7}s`
                           }}
                         />
@@ -1803,8 +1808,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                         const coreRadius = isMainBend ? 0.35 : 0.25;
                         const usePulse = isMainBend && bIdx === 0 && !isTransmit;
                         const pulseStyle = usePulse ? {
-                          animation: 'pcbIdleNodePulse 4s ease-in-out infinite',
-                          animationPlayState: isTyping ? 'running' : 'paused',
+                          animation: 'pcbIdleNodePulse 4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+                          animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
                           animationDelay: `${(idx * 2.5 + bIdx * 0.8) * 0.4}s`
                         } : {};
                         return (
@@ -1861,7 +1866,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                       className="pcb-radar-pulse-ring"
                       style={{
                         animation: 'pcbRadarPulse 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
-                        animationPlayState: isTyping ? 'running' : 'paused',
+                        animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
                         transformOrigin: '0px 0px'
                       }}
                     />
@@ -1927,11 +1932,12 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                         filter="url(#pcbGlowActive)"
                         className="pcb-signal-flow-path"
                         style={{
-                          opacity: isTyping ? 1 : 0,
+                          opacity: activationLevel >= 3 ? 1 : 0,
                           transition: 'opacity 0.4s ease',
                           strokeDasharray: '15 100',
                           animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
-                          animationPlayState: isTyping ? 'running' : 'paused',
+                          animationDirection: 'reverse',
+                          animationPlayState: activationLevel >= 3 ? 'running' : 'paused',
                           willChange: 'stroke-dashoffset',
                           transform: 'translate3d(0, 0, 0)'
                         }}
@@ -1968,8 +1974,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                     opacity="0"
                     style={{
                       ...getTransitionStyle(),
-                      animation: 'pcbIdleTraceHighlight 6s ease-in-out infinite',
-                      animationPlayState: isTyping ? 'running' : 'paused',
+                      animation: 'pcbIdleTraceHighlight 6s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+                      animationPlayState: activationLevel >= 3 ? 'running' : 'paused',
                       animationDelay: `${(idx + 5) * 0.7}s`
                     }}
                   />
@@ -1983,8 +1989,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                   const coreRadius = isMainBend ? 0.35 : 0.25;
                   const usePulse = isMainBend && bIdx === 0 && !isTransmit;
                   const pulseStyle = usePulse ? {
-                    animation: 'pcbIdleNodePulse 4s ease-in-out infinite',
-                    animationPlayState: isTyping ? 'running' : 'paused',
+                    animation: 'pcbIdleNodePulse 4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+                    animationPlayState: activationLevel >= 3 ? 'running' : 'paused',
                     animationDelay: `${(idx * 2.5 + bIdx * 0.8 + 12) * 0.4}s`
                   } : {};
                   return (
@@ -2046,7 +2052,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                 className="pcb-radar-pulse-ring"
                 style={{
                   animation: 'pcbRadarPulse 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
-                  animationPlayState: isTyping ? 'running' : 'paused',
+                  animationPlayState: activationLevel >= 3 ? 'running' : 'paused',
                   transformOrigin: '0px 0px'
                 }}
               />

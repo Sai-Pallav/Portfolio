@@ -60,10 +60,24 @@ const drawLeftPCBPath = (x1, y1, x2, y2, category) => {
   return `M ${x1},${y1} L ${x2},${y2}`;
 };
 
-export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping }) {
+export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping: propsIsTyping, formProgress }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const particlesContainerRef = useRef(null)
+  const [isTypingActive, setIsTypingActive] = useState(false)
+  const isTyping = Boolean(propsIsTyping || isTypingActive)
+  const activationLevel = isTyping ? 3 : 0
+
+  useEffect(() => {
+    const sectionEl = document.getElementById('contact')
+    const handleTypingEvent = (e) => {
+      setIsTypingActive(!!(e.detail && e.detail.isTyping))
+    }
+    if (sectionEl) {
+      sectionEl.addEventListener('contact-typing', handleTypingEvent)
+      return () => sectionEl.removeEventListener('contact-typing', handleTypingEvent)
+    }
+  }, [])
 
   const [layout, setLayout] = useState({
     G: 600,
@@ -102,13 +116,24 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           gy = rectGlobe.top - rectGrid.top + rectGlobe.height / 2
         }
 
-        setLayout({
-          G: G_val,
-          H: H_val,
-          xStart: 5,
-          L_form_end: L_form_val - 12,
-          globeCenterX: gx,
-          globeCenterY: gy
+        setLayout(prev => {
+          if (
+            Math.abs(prev.G - G_val) < 2 &&
+            Math.abs(prev.H - H_val) < 2 &&
+            Math.abs(prev.L_form_end - (L_form_val - 12)) < 2 &&
+            Math.abs(prev.globeCenterX - gx) < 2 &&
+            Math.abs(prev.globeCenterY - gy) < 2
+          ) {
+            return prev
+          }
+          return {
+            G: G_val,
+            H: H_val,
+            xStart: 5,
+            L_form_end: L_form_val - 12,
+            globeCenterX: gx,
+            globeCenterY: gy
+          }
         })
       }
     }
@@ -341,7 +366,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           timers.push(spawnParticle(t, true, 360))
         }
       })
-    } else if (isTyping) {
+    } else if (activationLevel >= 1) {
       const runSpawn = () => {
         traces.forEach((t) => {
           if (t.main) {
@@ -357,7 +382,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
       if (intervalId) clearInterval(intervalId)
       timers.forEach((t) => clearTimeout(t))
     }
-  }, [isInView, isTyping, contactSystemState, traces, shouldReduceMotion])
+  }, [isInView, activationLevel, contactSystemState, traces, shouldReduceMotion])
 
   // Glassmorphic Component Block
   const renderGlassBlock = (x, y, w, h, label, chKey) => {
@@ -387,8 +412,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   const renderTerminationPad = (x, y, label, chKey) => {
     const targetOpacity = getTargetOpacity(chKey)
     const ringAnimation = {
-      animation: 'pcbViaPulse 1.5s ease-in-out infinite',
-      animationPlayState: isTyping ? 'running' : 'paused',
+      animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
       animationDelay: `${(x + y) % 5 * 150}ms`
     }
 
@@ -507,8 +531,8 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     const ch2Bot = fan(CH2_Y + 15, CH2_Y + 35, 8)
     const ch3Top = fan(CH3_Y - 15, CH3_Y - 35, -8)
     const ch3Bot = fan(CH3_Y + 20, CH3_Y - 10, 8)
-    const ch4Top = fan(CH4_Y - 20, CH4_Y - 5, -8)
-    const ch4Bot = fan(CH4_Y + 55, CH4_Y + 20, 10)
+    const ch4Top = fan(CH4_Y - 10, CH4_Y - 30, -8)
+    const ch4Bot = fan(CH4_Y + 55, CH4_Y + 15, 10)
 
     const Y_center = (CH2_Y + CH3_Y) / 2
 
@@ -701,36 +725,37 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           />
         )}
 
-        {isHero && contactSystemState === 'engaged' && !isTransmit && (
-          <>
-            <path
-              d={t.d}
-              stroke="var(--accent)"
-              strokeWidth={w + 0.6}
-              opacity="0.22"
-              filter="url(#pcbHairlineGlow)"
-              style={getTransitionStyle()}
-            />
-            {(t.main || t.pulse) && isTyping && (
-              <path
-                d={t.d}
-                stroke="var(--accent)"
-                strokeWidth={w + 1.2}
-                fill="none"
-                pathLength="100"
-                filter="url(#pcbGlowActive)"
-                style={{
-                  opacity: isTyping ? 1 : 0,
-                  transition: 'opacity 0.4s ease',
-                  strokeDasharray: '15 100',
-                  animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
-                  animationPlayState: isTyping ? 'running' : 'paused',
-                  willChange: 'stroke-dashoffset',
-                  transform: 'translate3d(0, 0, 0)'
-                }}
-              />
-            )}
-          </>
+        <path
+          d={t.d}
+          stroke="var(--accent)"
+          strokeWidth={w + 0.6}
+          opacity="0.22"
+          filter="url(#pcbHairlineGlow)"
+          style={{
+            ...getTransitionStyle(),
+            opacity: (isHero && contactSystemState === 'engaged' && !isTransmit) ? 0.22 : 0,
+            transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)'
+          }}
+        />
+        
+        {(t.main || t.pulse) && (
+          <path
+            d={t.d}
+            stroke="var(--accent)"
+            strokeWidth={w + 1.2}
+            fill="none"
+            pathLength="100"
+            filter="url(#pcbGlowActive)"
+            style={{
+              opacity: activationLevel >= 2 ? 1 : 0,
+              transition: 'opacity 400ms ease',
+              strokeDasharray: '15 100',
+              animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
+              animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
+              willChange: 'opacity, stroke-dashoffset',
+              transform: 'translate3d(0, 0, 0)'
+            }}
+          />
         )}
 
         {/* Material Layer 3: Trace Core */}
@@ -761,7 +786,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             opacity="0"
             style={{
               ...getTransitionStyle(),
-              animation: 'pcbIdleTraceHighlight 6s ease-in-out infinite',
+              animation: 'pcbIdleTraceHighlight 6s cubic-bezier(0.4, 0, 0.2, 1) infinite',
               animationDelay: `${i * 0.7}s`
             }}
           />
@@ -773,9 +798,9 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           const nodeRadius = isMainBend ? 1.5 : 1.0;
           const ringRadius = isMainBend ? 1.0 : 0.65;
           const coreRadius = isMainBend ? 0.35 : 0.25;
-          const usePulse = isMainBend && bIdx === 0 && isTyping;
+          const usePulse = isMainBend && bIdx === 0 && activationLevel >= 1;
           const pulseStyle = usePulse ? {
-            animation: 'pcbIdleNodePulse 4s ease-in-out infinite',
+            animation: 'pcbIdleNodePulse 4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
             animationDelay: `${(i * 2.5 + bIdx * 0.8 + 12) * 0.4}s`
           } : {};
           return (
@@ -810,8 +835,8 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     }
 
     if (contactSystemState === 'engaged') {
-      nodeStyle.animation = 'pcbNodeMove 6s ease-in-out infinite'
-      nodeStyle.animationPlayState = isTyping ? 'running' : 'paused'
+      nodeStyle.animation = 'pcbNodeMove 6s cubic-bezier(0.4, 0, 0.2, 1) infinite'
+      nodeStyle.animationPlayState = activationLevel >= 2 ? 'running' : 'paused'
     }
 
     return (
@@ -840,14 +865,14 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           <circle cx="0" cy="0" r="10" fill="none" stroke="var(--accent)" strokeWidth="0.4"
             className="anim-pcb-radar-pulse"
             style={{
-              animationPlayState: isTyping ? 'running' : 'paused',
+              animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
               transformOrigin: '0px 0px'
             }}
           />
 
           {/* Rotatable Inner Details Group (Clockwise) */}
           <g className="anim-pcb-radar-rotate" style={{
-            animationPlayState: isTyping ? 'running' : 'paused',
+            animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
             transformOrigin: '0px 0px'
           }}>
 
@@ -876,7 +901,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
           {/* Counter-Rotatable Outer Details Group (Counter-Clockwise) */}
           <g className="anim-pcb-radar-rotate-counter" style={{
-            animationPlayState: isTyping ? 'running' : 'paused',
+            animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
             transformOrigin: '0px 0px'
           }}>
             {/* Solder Joint Pads surrounding Node */}
@@ -904,7 +929,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity={0.4}
             className="anim-pcb-ring-breathe"
             style={{
-              animationPlayState: isTyping ? 'running' : 'paused',
+              animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
               transformOrigin: '0px 0px'
             }}
           />
@@ -916,7 +941,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           <circle cx="0" cy="0" r="2.5" fill="var(--accent)" opacity={0.90}
             className="anim-pcb-core-pulse"
             style={{
-              animationPlayState: isTyping ? 'running' : 'paused',
+              animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
               transformOrigin: '0px 0px'
             }}
           />
@@ -929,7 +954,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     const keys = ['name', 'email', 'subject', 'message']
     const targetOpacity = getTargetOpacity(keys[i])
     const ringAnimation = {
-      animationPlayState: isTyping ? 'running' : 'paused',
+      animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
       animationDelay: `${(275 + y) % 5 * 150}ms`
     }
     return (
@@ -1143,7 +1168,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         {/* ========================================================
               COPPER HATCH GROUND PLANES
            ======================================================== */}
-        <g mask="url(#copperHatchMaskL)" style={{ transition: 'opacity 750ms ease-in-out' }} opacity={isTransmit ? 0.3 : 1}>
+        <g mask="url(#copperHatchMaskL)" style={{ transition: 'opacity 750ms cubic-bezier(0.4, 0, 0.2, 1)' }} opacity={isTransmit ? 0.3 : 1}>
           {groundPlanes.plates.map((plate, idx) => (
             <polygon
               key={`plate-${idx}`}
@@ -1158,15 +1183,15 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
         {/* Isolation slots — recessed cutline (dark) + bevel highlight (light), the
             same two-layer depth construction the Middle PCB uses to articulate pours */}
-        <g style={{ transition: 'opacity 750ms ease-in-out' }} opacity={isTransmit ? 0 : 1}>
+        <g style={{ transition: 'opacity 750ms cubic-bezier(0.4, 0, 0.2, 1)' }} opacity={isTransmit ? 0 : 1}>
           <g fill="#020204" opacity="0.65">
             {groundPlanes.slots.map((s, idx) => (
-              <rect key={`slot-${idx}`} x={s.x} y={s.y} width={s.w} height="4" rx="0.5" />
+              <rect key={`slot-${idx}`} x={s.x} y={s.y} width={Math.max(0, s.w)} height="4" rx="0.5" />
             ))}
           </g>
           <g stroke="rgba(255,255,255,0.025)" strokeWidth="0.3" fill="none">
             {groundPlanes.slots.map((s, idx) => (
-              <rect key={`slot-bevel-${idx}`} x={s.x} y={s.y} width={s.w} height="4" rx="0.5" transform="translate(0, 0.5)" />
+              <rect key={`slot-bevel-${idx}`} x={s.x} y={s.y} width={Math.max(0, s.w)} height="4" rx="0.5" transform="translate(0, 0.5)" />
             ))}
           </g>
         </g>
