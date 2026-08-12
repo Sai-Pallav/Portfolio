@@ -501,7 +501,7 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
                     style={{ top: `${topPos}px`, opacity: hoveredSkill ? 0 : 1 }}
                   >
                     <div 
-                      className="flex items-center gap-2.5 px-5 py-2 rounded-full text-[10px] font-mono font-bold tracking-[0.2em] uppercase whitespace-nowrap border transition-all duration-300"
+                      className="flex items-center justify-center px-5 py-2 rounded-full text-[10px] font-mono font-bold tracking-[0.2em] uppercase whitespace-nowrap border transition-all duration-300"
                       style={{
                         background: "rgba(12, 12, 16, 0.98)",
                         color: "var(--text-primary)",
@@ -512,7 +512,6 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
                         MozOsxFontSmoothing: "grayscale",
                       }}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]" />
                       {header}
                     </div>
                   </div>

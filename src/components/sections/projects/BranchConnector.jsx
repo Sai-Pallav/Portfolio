@@ -25,33 +25,17 @@ const BranchConnector = memo(function BranchConnector({ isLeft, isHovered = fals
               }
               .bg-guide-line {
                 opacity: 0.2;
-                transition: opacity 0.25s ease;
-              }
-              .group\\/item:hover .bg-guide-line {
-                opacity: 0.35;
               }
               .flowing-signal {
                 stroke-dasharray: 6 10;
                 animation: flow 1.5s linear infinite;
                 stroke-width: 2.2px;
                 filter: drop-shadow(0 0 2px var(--accent));
-                transition: stroke-width 0.25s ease, filter 0.25s ease;
-              }
-              .group\\/item:hover .flowing-signal {
-                animation-duration: 0.7s;
-                stroke-width: 3.2px;
-                filter: drop-shadow(0 0 5px var(--accent));
               }
               .endpoint-circle {
                 r: 2.5px;
                 opacity: 0.9;
                 filter: drop-shadow(0 0 3px var(--accent));
-                transition: r 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
-              }
-              .group\\/item:hover .endpoint-circle {
-                r: 3.2px;
-                opacity: 1;
-                filter: drop-shadow(0 0 6px var(--accent));
               }
             `}
           </style>
@@ -85,7 +69,7 @@ const BranchConnector = memo(function BranchConnector({ isLeft, isHovered = fals
           cx={isLeft ? 0 : BRANCH_WIDTH}
           cy="3"
           fill="var(--accent)"
-          className="endpoint-circle animate-pulse"
+          className="endpoint-circle"
         />
       </svg>
     </div>
