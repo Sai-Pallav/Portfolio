@@ -30,9 +30,9 @@ const TimelineNode = memo(function TimelineNode({ scrollYProgress, hasAwakened, 
   const baseHaloOpacity = useTransform(focusStrength, v => v * 0.15);
   const haloOpacity = useTransform(
     [baseHaloOpacity, awakenedOpacity],
-    ([base, ao]) => (base * ao) * ao
+    ([base, ao]) => ((base * ao) + (isHovered ? 0.25 : 0)) * ao
   );
-  const haloScale = useTransform(focusStrength, v => (0.9 + v * 0.35));
+  const haloScale = useTransform(focusStrength, v => (0.9 + v * 0.35) * (isHovered ? 1.15 : 1));
 
   if (!hasAwakened) return null;
 
@@ -64,12 +64,25 @@ const TimelineNode = memo(function TimelineNode({ scrollYProgress, hasAwakened, 
           }
           .outer-dashed-ring {
             animation: spin-ring 22s linear infinite;
+            transition: animation-duration 0.25s ease;
+          }
+          .group\\/item:hover .outer-dashed-ring {
+            animation-duration: 5s;
           }
           .core-glow {
             animation: breathe-core 3.5s ease-in-out infinite;
+            transition: animation-duration 0.25s ease;
+          }
+          .group\\/item:hover .core-glow {
+            animation-duration: 1.2s;
           }
           .core-pin {
             animation: breathe-pin 3.5s ease-in-out infinite;
+            transition: all 0.25s ease;
+          }
+          .group\\/item:hover .core-pin {
+            animation-duration: 1.2s;
+            box-shadow: 0 0 14px var(--accent);
           }
         `}
       </style>
@@ -85,21 +98,21 @@ const TimelineNode = memo(function TimelineNode({ scrollYProgress, hasAwakened, 
 
       {/* 2. Outer Ring: Thin precision dashed ring */}
       <motion.div
-        className="absolute inset-0 rounded-full"
+        className="absolute inset-0 rounded-full transition-transform duration-250 group-hover/item:scale-108"
         initial={{ opacity: 0, scale: 0.85 }}
         animate={hasAwakened ? { opacity: 1 } : { opacity: 0 }}
         transition={{ duration: 0.4 }}
       >
         <div className="w-full h-full outer-dashed-ring">
           <div
-            className="w-full h-full rounded-full border border-dashed border-[var(--accent)]/35"
+            className="w-full h-full rounded-full border border-dashed border-[var(--accent)]/35 transition-colors duration-250 group-hover/item:border-[var(--accent)]"
           />
         </div>
       </motion.div>
 
       {/* 3. Middle Ring: Soft translucent glass-like ring with slight blur */}
       <motion.div
-        className="absolute inset-2 rounded-full border bg-white/[0.02] backdrop-blur-[2px] border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]"
+        className="absolute inset-2 rounded-full border bg-white/[0.02] backdrop-blur-[2px] border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] transition-all duration-250 group-hover/item:scale-105 group-hover/item:border-[var(--accent)] group-hover/item:shadow-[0_0_12px_var(--accent-dim),_inset_0_1px_1px_rgba(255,255,255,0.12)]"
         initial={{ opacity: 0, scale: 0.85 }}
         animate={hasAwakened ? { opacity: 1 } : { opacity: 0 }}
         transition={{ duration: 0.4 }}
@@ -128,7 +141,7 @@ const TimelineNode = memo(function TimelineNode({ scrollYProgress, hasAwakened, 
         >
           {/* Specular high-contrast center pin dot */}
           <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white shadow-[0_0_4px_#ffffff]"
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white transition-all duration-250 shadow-[0_0_4px_#ffffff] group-hover/item:shadow-[0_0_6px_2px_#ffffff]"
           />
         </motion.div>
       </div>
