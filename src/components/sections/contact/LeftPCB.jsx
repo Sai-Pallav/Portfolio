@@ -72,6 +72,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   const [activatedNodes, setActivatedNodes] = useState({})
   const [isIlluminated, setIsIlluminated] = useState(false)
 
+
   useEffect(() => {
     if (isInView || contactSystemState === 'engaged' || isTyping) {
       setHasWokenUp(true)
@@ -976,11 +977,21 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   }
   if (shouldReduceMotion) return null
 
-  const pcbContainerStyle = useMemo(() => ({
-    opacity: contactSystemState === 'dormant' ? (isIlluminated ? 1.0 : 0.65) : 1.0,
-    filter: isIlluminated ? 'brightness(1.15) contrast(1.05)' : 'brightness(0.90) contrast(0.95)',
-    transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
-  }), [contactSystemState, isIlluminated])
+  const pcbContainerStyle = useMemo(() => {
+    if (contactSystemState !== 'dormant') return {}
+    if (!isIlluminated) {
+      return {
+        opacity: 0.65,
+        filter: 'brightness(0.85) saturate(0.35) hue-rotate(-25deg)',
+        transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
+      }
+    }
+    return {
+      opacity: 1.0,
+      filter: 'brightness(1.05) saturate(1.05)',
+      transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
+    }
+  }, [contactSystemState, isIlluminated])
 
   return (
     <div

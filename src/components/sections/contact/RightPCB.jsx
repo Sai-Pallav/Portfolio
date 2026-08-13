@@ -318,6 +318,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
   const isTyping = Boolean(propsIsTyping || isTypingActive)
   const activationLevel = isTyping ? 3 : 0
 
+
   const [layout, setLayout] = useState({
     G: 600,
     H: 600,
@@ -1445,9 +1446,11 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
   if (shouldReduceMotion) return null
 
+  // Before activation: desaturated cool-blue tint (clearly dim & cold)
+  // After activation: settles to natural warm accent tone
   const dormantStyles = contactSystemState === 'dormant' ? {
     opacity: isMiddleActive ? 1.0 : 0.65,
-    filter: isMiddleActive ? 'brightness(1.15) contrast(1.05)' : 'brightness(0.90) contrast(0.95)',
+    filter: isMiddleActive ? 'brightness(1.05) saturate(1.05)' : 'brightness(0.85) saturate(0.35) hue-rotate(-25deg)',
     transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
   } : {}
 
