@@ -413,41 +413,68 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
           translateX: "-50%",
           translateY: "-120%",
         }}
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.94 }}
         animate={{
           opacity: hoveredSkill ? 1 : 0,
-          scale: hoveredSkill ? 1 : 0.9,
+          scale: hoveredSkill ? 1 : 0.94,
           filter: hoveredSkill ? "blur(0px)" : "blur(4px)"
         }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div
-          className="px-4 py-3 rounded-2xl min-w-[220px] bg-[rgba(10,10,12,0.85)] border border-white/[0.08] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_24px_48px_-12px_rgba(0,0,0,0.7)]"
+        <div 
+          className="relative p-4 rounded-2xl min-w-[230px] max-w-[275px] border border-white/10 backdrop-blur-[12px] overflow-hidden transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-white/[0.18]"
+          style={{
+            background: `
+              radial-gradient(
+                circle at 20% 10%,
+                rgba(110, 80, 180, 0.12),
+                transparent 45%
+              ),
+              linear-gradient(
+                135deg,
+                rgba(27, 25, 38, 0.94),
+                rgba(12, 13, 18, 0.92)
+              )
+            `,
+            WebkitBackdropFilter: "blur(12px)",
+            boxShadow: `
+              0 18px 45px rgba(0, 0, 0, 0.35),
+              inset 0 1px 0 rgba(255, 255, 255, 0.07)
+            `,
+          }}
         >
           {hoveredSkill && (
-            <div className="flex flex-col gap-2 font-body text-left">
-              <div className="flex items-center justify-between gap-4 border-b border-white/5 pb-2">
-                <span className="font-bold text-sm tracking-tight text-white/95">{hoveredSkill.name}</span>
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-[8px] font-mono font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
-                    hoveredSkill.level === "primary"
-                      ? "bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30"
-                      : "bg-white/5 text-white/40 border border-white/10"
-                  }`}>
-                    {hoveredSkill.level === "primary" ? "Core" : "Familiar"}
-                  </span>
-                  <span className="text-[9px] font-mono font-medium px-2 py-0.5 rounded-full bg-white/5 border border-white/10 uppercase tracking-widest text-[var(--text-secondary)]">
-                    {hoveredSkill.years} {hoveredSkill.years === 1 ? 'yr' : 'yrs'}
-                  </span>
+            <div className="relative z-10 flex flex-col gap-2.5 font-body text-left">
+              {/* Header: Skill Name & Badges */}
+              <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-white/[0.08]">
+                <div className="flex items-center gap-2 min-w-0">
+                  {hoveredSkill.icon && (
+                    <div className="w-6.5 h-6.5 rounded-lg bg-white/[0.05] border border-white/10 p-1 flex items-center justify-center shrink-0 shadow-inner">
+                      <img
+                        src={hoveredSkill.icon === "framer" 
+                          ? "https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0/icons/framermotion/framermotion-original.svg"
+                          : `https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0/icons/${hoveredSkill.icon}/${hoveredSkill.icon}-original.svg`}
+                        alt=""
+                        className="w-full h-full object-contain opacity-95"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      />
+                    </div>
+                  )}
+                  <span className="font-semibold text-sm tracking-tight text-white/95 truncate">{hoveredSkill.name}</span>
                 </div>
               </div>
-              <div className="flex flex-col gap-0.5">
-                <div className="text-[10px] text-[var(--accent)] font-semibold uppercase tracking-wider font-mono">
-                  #{hoveredSkill.tag.split(',')[0]}
-                </div>
+
+              {/* Bottom Metadata: Tag & Focus */}
+              <div className="flex flex-col gap-1 pt-0.5">
+                {hoveredSkill.tag && (
+                  <div className="text-[10px] font-mono text-[var(--accent)] font-medium uppercase tracking-wider opacity-90">
+                    #{hoveredSkill.tag.split(',')[0]}
+                  </div>
+                )}
                 {hoveredSkill.project && (
-                  <div className="text-[10px] text-white/45 leading-relaxed font-light mt-0.5">
-                    Focus: <span className="text-white/75 italic">{hoveredSkill.project}</span>
+                  <div className="text-xs truncate leading-tight">
+                    <span className="text-white/40 text-[10px] font-mono uppercase tracking-wider mr-1.5">FOCUS:</span>
+                    <span className="font-medium text-white/90">{hoveredSkill.project}</span>
                   </div>
                 )}
               </div>

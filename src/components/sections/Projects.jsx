@@ -119,49 +119,17 @@ const Projects = memo(function Projects() {
 
       {/* ─── Section Header ─── */}
       <div className="max-w-7xl mx-auto px-6 pt-28 md:pt-32 pb-8 text-center animate-fade-in">
-        {/* Animated badge */}
-        <div className="inline-flex items-center gap-2.5 mb-6">
-          <div
-            className="h-[1px] rounded-full opacity-20"
-            style={{ width: '30px', background: 'linear-gradient(90deg, transparent, var(--accent))' }}
-          />
-          <span
-            className="font-mono text-[10px] md:text-xs tracking-[0.2em] uppercase px-4 py-1.5 rounded-full border flex items-center gap-2"
-            style={{
-              color: "var(--accent)",
-              borderColor: 'rgba(255,255,255,0.06)',
-              background: 'rgba(255,255,255,0.01)',
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[var(--accent)]"></span>
-            </span>
-            Featured Work
-          </span>
-          <div
-            className="h-[1px] rounded-full opacity-20"
-            style={{ width: '30px', background: 'linear-gradient(90deg, var(--accent), transparent)' }}
-          />
-        </div>
 
         <h2
           id="projects-heading"
-          className="font-heading text-4xl md:text-5xl lg:text-7xl font-bold mb-5 tracking-tight"
+          className="font-heading text-5xl md:text-6xl lg:text-7xl font-bold mb-6 tracking-tight"
         >
-          <span style={{ color: "var(--text-primary)" }}>
-            Projects{' '}
+          <span className="bg-gradient-to-r from-primary via-accent to-accent-hover bg-clip-text text-transparent">
+            Projects
           </span>
-          <span className="relative inline-block" style={{ color: "var(--accent)" }}>
+          <br />
+          <span className="bg-gradient-to-r from-accent-hover via-accent to-primary bg-clip-text text-transparent">
             Timeline
-            <span
-              className="absolute -bottom-1 left-0 h-[1px] rounded-full"
-              style={{
-                width: '100%',
-                background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
-              }}
-            />
           </span>
         </h2>
         <p

@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react'
 import Footer from '@/components/layout/Footer'
 import Navbar from '@/components/layout/Navbar'
-import ThemeToggle from '@/components/ui/ThemeToggle'
 import BackToTop from '@/components/ui/BackToTop'
 import CustomCursor from '@/components/ui/CustomCursor'
+import ThemeToggle from '@/components/ui/ThemeToggle'
 import SmoothScroll from '@/components/layout/SmoothScroll'
 import Hero from '@/components/sections/Hero'
-import About from '@/components/sections/about/About'
 import Skills from '@/components/sections/Skills'
 import Projects from '@/components/sections/Projects'
 import Experience from '@/components/sections/Experience'
@@ -14,9 +13,9 @@ import Contact from '@/components/sections/Contact'
 import { useScrollTrigger } from '@/hooks/useScrollTrigger'
 
 function App() {
-  const sectionIds = useMemo(() => ['hero', 'about', 'skills', 'projects', 'experience', 'contact'], [])
+  const sectionIds = useMemo(() => ['hero', 'skills', 'projects', 'experience', 'contact'], [])
   const activeSection = useScrollTrigger(sectionIds)
-  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false)
+  const [showThemePicker, setShowThemePicker] = useState(false)
 
   return (
     <div className="relative">
@@ -27,15 +26,14 @@ function App() {
         Skip to main content
       </a>
 
-      <ThemeToggle showPicker={isThemePickerOpen} setShowPicker={setIsThemePickerOpen} />
-      <BackToTop isThemePickerOpen={isThemePickerOpen} />
+      <BackToTop isThemePickerOpen={showThemePicker} />
+      <ThemeToggle showPicker={showThemePicker} setShowPicker={setShowThemePicker} />
       <CustomCursor />
       <Navbar activeSection={activeSection} />
 
       <SmoothScroll>
         <main id="main-content" className="relative">
           <Hero />
-          <About />
           <Skills />
           <Projects />
           <Experience />

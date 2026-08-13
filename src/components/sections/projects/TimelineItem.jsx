@@ -65,7 +65,7 @@ const TimelineItem = memo(function TimelineItem({
       >
         {/* Symmetrical Date Marker next to spine node (perfectly vertically centered with card center) */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 font-mono text-[10px] md:text-xs tracking-[0.25em] uppercase select-none transition-all duration-300 ease-out z-10 text-[var(--text-secondary)] opacity-40 group-hover/item:text-[var(--accent)] group-hover/item:opacity-95 ${
+          className={`absolute top-1/2 -translate-y-1/2 font-mono text-[10px] md:text-xs tracking-[0.25em] uppercase select-none transition-all duration-300 ease-out z-10 text-[var(--text-secondary)] opacity-0 pointer-events-none ${
             isLeft ? "text-left" : "text-right"
           }`}
           style={{
@@ -73,8 +73,8 @@ const TimelineItem = memo(function TimelineItem({
             ...(isLeft
               ? { left: `calc(100% + ${BRANCH_WIDTH}px + 28px)` }
               : { right: `calc(100% + ${BRANCH_WIDTH}px + 28px)` }),
-            textShadow: isHovered ? "0 0 12px var(--accent-dim)" : "none",
           }}
+          aria-hidden="true"
         >
           {project.date}
         </div>

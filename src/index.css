@@ -449,3 +449,122 @@ main {
 .anim-pcb-ring-breathe { animation: pcbRingBreathe 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 .anim-pcb-core-pulse { animation: pcbCorePulse 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 .anim-pcb-via-pulse { animation: pcbViaPulse 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+
+@keyframes pcbPulseForward {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+
+@keyframes pcbPulseBackward {
+  0% {
+    stroke-dashoffset: -100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pcbRadarRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pcbRadarRotateCounter {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes pcbRadarPulse {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+/* Middle PCB Group Pulse Animations */
+@keyframes pcbMiddleGroupPulse {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  3% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  6% {
+    transform: scale(1);
+  }
+  48% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    offset-distance: 100%;
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  54%, 100% {
+    offset-distance: 100%;
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* Right End PCB Group Pulse Animations (Travels from Right to Left) */
+@keyframes pcbRightGroupPulseReverse {
+  0% {
+    offset-distance: 100%;
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  3% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  6% {
+    transform: scale(1);
+  }
+  48% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    offset-distance: 0%;
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  54%, 100% {
+    offset-distance: 0%;
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* Left PCB Continuous Line Pulse Animation (100% Seamless Periodicity) */
+@keyframes pcbLeftLinePulse {
+  0% {
+    stroke-dashoffset: 135;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+

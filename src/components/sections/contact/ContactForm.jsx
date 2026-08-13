@@ -240,28 +240,34 @@ const FORM_CHILD_VARIANTS = {
 
 const DOT_VARIANTS = {
   idle: () => ({
-    opacity: 0.15,
+    opacity: 0.2,
+    scale: 1,
     backgroundColor: "rgba(0,0,0,0.9)",
+    boxShadow: "0 0 0px transparent",
     transition: { duration: 0.3 }
   }),
   focused: (i) => ({
-    opacity: [0.15, 1, 0.15],
-    backgroundColor: "rgba(0,0,0,0.9)",
+    opacity: [0.25, 1, 0.25],
+    scale: [0.95, 1.2, 0.95],
+    backgroundColor: ["rgba(0,0,0,0.9)", "var(--accent)", "rgba(0,0,0,0.9)"],
+    boxShadow: ["0 0 0px var(--accent)", "0 0 8px var(--accent)", "0 0 0px var(--accent)"],
     transition: {
-      duration: 1.5,
+      duration: 1.8,
       repeat: Infinity,
       ease: "easeInOut",
-      delay: i * 0.2
+      delay: i * 0.32
     }
   }),
   submitting: (i) => ({
     opacity: [0.3, 1, 0.3],
-    backgroundColor: ["rgba(0,0,0,0.9)", "rgba(255,255,255,0.9)", "rgba(0,0,0,0.9)"],
+    scale: [1, 1.25, 1],
+    backgroundColor: ["rgba(0,0,0,0.9)", "var(--accent-hover)", "rgba(0,0,0,0.9)"],
+    boxShadow: ["0 0 0px var(--accent-hover)", "0 0 10px var(--accent-hover)", "0 0 0px var(--accent-hover)"],
     transition: {
-      duration: 1.5,
+      duration: 1.6,
       repeat: Infinity,
       ease: "easeInOut",
-      delay: i * 0.2
+      delay: i * 0.28
     }
   })
 }
@@ -285,16 +291,18 @@ function validateField(name, value) {
   return err
 }
 
-export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, setFormProgress }) {
+export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, setFormProgress, onTypingChange }) {
   const shouldReduceMotion = useReducedMotion()
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
   const [isFocused, setIsFocused] = useState(false)
+  const [isTypingState, setIsTypingState] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   const [inquiryType, setInquiryType] = useState('Internship')
   const [touched, setTouched] = useState({ name: false, email: false, subject: false, message: false })
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
   const clearFieldsTimeoutRef = useRef(null)
+  const typingTimerRef = useRef(null)
 
   const apiErrorTimeoutRef = useRef(null)
 
@@ -305,6 +313,9 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       }
       if (apiErrorTimeoutRef.current) {
         clearTimeout(apiErrorTimeoutRef.current)
+      }
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current)
       }
     }
   }, [])
@@ -398,6 +409,15 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
     resetErrorState()
+
+    if (onTypingChange) {
+      onTypingChange(true)
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+      typingTimerRef.current = setTimeout(() => {
+        onTypingChange(false)
+      }, 2500)
+    }
+
     setErrors(prev => {
       if (prev[name]) {
         const err = validateField(name, value)
@@ -405,7 +425,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       }
       return prev
     })
-  }, [resetErrorState])
+  }, [resetErrorState, onTypingChange])
 
   const handleBlur = useCallback((e) => {
     const { name, value } = e.target
@@ -436,13 +456,15 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
 
   const typingTimeoutRef = useRef(null)
   const handleTypingEvent = useCallback(() => {
+    setIsTypingState(true)
     const sectionEl = document.getElementById('contact')
     if (sectionEl) {
       sectionEl.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: true }, bubbles: true }))
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
       typingTimeoutRef.current = setTimeout(() => {
+        setIsTypingState(false)
         sectionEl.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: false }, bubbles: true }))
-      }, 500)
+      }, 600)
     }
   }, [])
 
@@ -557,7 +579,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
 
   const isInteracting = isFocused || isHovered
   const isTransmit = contactSystemState === 'transmit'
-  const activeDotState = subState === 'submitting' ? 'submitting' : 'idle'
+  const activeDotState = subState === 'submitting' ? 'submitting' : isTypingState ? 'focused' : 'idle'
 
   return (
     <motion.div
@@ -678,7 +700,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
         </p>
       </motion.div>
 
-      <form onSubmit={handleSubmit} onKeyDown={handleTypingEvent} className="space-y-4 relative z-10">
+      <form onSubmit={handleSubmit} onKeyDown={handleTypingEvent} onInput={handleTypingEvent} className="space-y-4 relative z-10">
         <div
           style={{
             filter: isTransmit ? 'blur(1.5px)' : 'blur(0px)',

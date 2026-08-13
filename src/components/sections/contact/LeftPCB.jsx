@@ -60,13 +60,20 @@ const drawLeftPCBPath = (x1, y1, x2, y2, category) => {
   return `M ${x1},${y1} L ${x2},${y2}`;
 };
 
-export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping: propsIsTyping, formProgress }) {
+export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping: propsIsTyping, formProgress, beamActive }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const particlesContainerRef = useRef(null)
   const [isTypingActive, setIsTypingActive] = useState(false)
   const isTyping = Boolean(propsIsTyping || isTypingActive)
+  const [hasWokenUp, setHasWokenUp] = useState(false)
   const activationLevel = isTyping ? 3 : 0
+
+  useEffect(() => {
+    if (isInView || contactSystemState === 'engaged' || isTyping) {
+      setHasWokenUp(true)
+    }
+  }, [isInView, contactSystemState, isTyping])
 
   useEffect(() => {
     const sectionEl = document.getElementById('contact')
@@ -258,6 +265,11 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     return list;
   }, [scale, xStart, CH1_Y, CH2_Y, CH3_Y, CH4_Y])
 
+  const mainBeamTraces = useMemo(() => {
+    return traces.filter(t => t.main)
+  }, [traces])
+
+
   // Nodes (Mirrored Y coordinates)
   const nodes = useMemo(() => [
     { x: 180, y: CH1_Y - 15, id: 'A1', chKey: 'name' },
@@ -267,6 +279,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   ], [CH1_Y, CH2_Y, CH3_Y, CH4_Y])
 
   const isTransmit = contactSystemState === 'transmit'
+  const isFormInteracting = Boolean(isTyping)
 
   const getTransitionStyle = React.useCallback(() => {
     if (contactSystemState === 'dormant') {
@@ -738,25 +751,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           }}
         />
         
-        {(t.main || t.pulse) && (
-          <path
-            d={t.d}
-            stroke="var(--accent)"
-            strokeWidth={w + 1.2}
-            fill="none"
-            pathLength="100"
-            filter="url(#pcbGlowActive)"
-            style={{
-              opacity: activationLevel >= 2 ? 1 : 0,
-              transition: 'opacity 400ms ease',
-              strokeDasharray: '15 100',
-              animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
-              animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
-              willChange: 'opacity, stroke-dashoffset',
-              transform: 'translate3d(0, 0, 0)'
-            }}
-          />
-        )}
+        {/* Material Layer 2: Groove Shadow */}
 
         {/* Material Layer 3: Trace Core */}
         <path
@@ -798,17 +793,12 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           const nodeRadius = isMainBend ? 1.5 : 1.0;
           const ringRadius = isMainBend ? 1.0 : 0.65;
           const coreRadius = isMainBend ? 0.35 : 0.25;
-          const usePulse = isMainBend && bIdx === 0 && activationLevel >= 1;
-          const pulseStyle = usePulse ? {
-            animation: 'pcbIdleNodePulse 4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-            animationDelay: `${(i * 2.5 + bIdx * 0.8 + 12) * 0.4}s`
-          } : {};
           return (
             <g
               key={`l-bend-${i}-${bIdx}`}
               transform={`translate(${bend.x}, ${bend.y})`}
               opacity={targetOpacity * (isMainBend ? 0.85 : 0.70)}
-              style={{ ...getTransitionStyle(), ...pulseStyle }}
+              style={getTransitionStyle()}
             >
               <circle cx="0" cy="0" r={nodeRadius} fill="#030304" />
               <circle cx="0" cy="0" r={ringRadius} fill="none" stroke="url(#gold-plated)" strokeWidth="0.25" opacity={isMainBend ? 0.80 : 0.65} />
@@ -828,15 +818,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     const moveY1 = isUpper ? -20 : 20
 
     const nodeStyle = {
-      '--move-x1': `${moveX1}px`,
-      '--move-x2': `${moveX2}px`,
-      '--move-y1': `${moveY1}px`,
       transition: 'transform 1.2s cubic-bezier(0.25, 1, 0.5, 1)'
-    }
-
-    if (contactSystemState === 'engaged') {
-      nodeStyle.animation = 'pcbNodeMove 6s cubic-bezier(0.4, 0, 0.2, 1) infinite'
-      nodeStyle.animationPlayState = activationLevel >= 2 ? 'running' : 'paused'
     }
 
     return (
@@ -865,14 +847,14 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           <circle cx="0" cy="0" r="10" fill="none" stroke="var(--accent)" strokeWidth="0.4"
             className="anim-pcb-radar-pulse"
             style={{
-              animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
+              animationPlayState: 'running',
               transformOrigin: '0px 0px'
             }}
           />
 
           {/* Rotatable Inner Details Group (Clockwise) */}
           <g className="anim-pcb-radar-rotate" style={{
-            animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
+            animationPlayState: 'running',
             transformOrigin: '0px 0px'
           }}>
 
@@ -901,7 +883,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
           {/* Counter-Rotatable Outer Details Group (Counter-Clockwise) */}
           <g className="anim-pcb-radar-rotate-counter" style={{
-            animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
+            animationPlayState: 'running',
             transformOrigin: '0px 0px'
           }}>
             {/* Solder Joint Pads surrounding Node */}
@@ -929,7 +911,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity={0.4}
             className="anim-pcb-ring-breathe"
             style={{
-              animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
+              animationPlayState: 'running',
               transformOrigin: '0px 0px'
             }}
           />
@@ -941,7 +923,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           <circle cx="0" cy="0" r="2.5" fill="var(--accent)" opacity={0.90}
             className="anim-pcb-core-pulse"
             style={{
-              animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
+              animationPlayState: 'running',
               transformOrigin: '0px 0px'
             }}
           />
@@ -954,7 +936,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     const keys = ['name', 'email', 'subject', 'message']
     const targetOpacity = getTargetOpacity(keys[i])
     const ringAnimation = {
-      animationPlayState: activationLevel >= 1 ? 'running' : 'paused',
+      animationPlayState: 'running',
       animationDelay: `${(275 + y) % 5 * 150}ms`
     }
     return (
@@ -1218,6 +1200,63 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         ))}
 
 
+
+
+        {/* ========================================================
+            LEFT PCB CONTINUOUS TRAVELING LINE PULSE ANIMATION
+           ======================================================== */}
+        {beamActive && mainBeamTraces.length > 0 && (
+          <g className="left-pcb-light-beams" style={{ pointerEvents: 'none' }}>
+            {mainBeamTraces.map((trace, idx) => (
+              <g key={`left-beam-${idx}`}>
+                {/* Layer 1: Ambient Outer Glow Line Pulse */}
+                <path
+                  d={trace.d}
+                  pathLength="100"
+                  stroke="var(--accent)"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                  opacity="0.35"
+                  strokeDasharray="15 120"
+                  style={{
+                    animation: 'pcbLeftLinePulse 2.4s linear infinite'
+                  }}
+                />
+                {/* Layer 2: Mid Laser Line Pulse */}
+                <path
+                  d={trace.d}
+                  pathLength="100"
+                  stroke="var(--accent)"
+                  strokeWidth="3.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                  opacity="0.85"
+                  strokeDasharray="15 120"
+                  style={{
+                    animation: 'pcbLeftLinePulse 2.4s linear infinite'
+                  }}
+                />
+                {/* Layer 3: Hot Laser Core Line Pulse */}
+                <path
+                  d={trace.d}
+                  pathLength="100"
+                  stroke="#ffffff"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                  strokeDasharray="15 120"
+                  style={{
+                    animation: 'pcbLeftLinePulse 2.4s linear infinite'
+                  }}
+                />
+              </g>
+            ))}
+          </g>
+        )}
 
         {/* CHANNEL 1 (NAME) GROUP */}
         <g style={getChannelGroupStyle('name', 0)}>

@@ -294,7 +294,7 @@ const generateRightBusPaths = (x1, y1, x2, y2, category, components) => {
 
 // TIER 1 REFACTOR — Issue #1: Enhanced trace width hierarchy with better contrast
 const getWidthForCategory = (category) => {
-  return category === 'main' ? 2.2 : category === 'auxiliary' ? 0.85 : 0.50;
+  return category === 'main' ? 2.2 : category === 'auxiliary' ? 0.90 : 0.55;
 };
 
 // TIER 1 REFACTOR — Issue #1: Proportional corridor scaling system
@@ -308,7 +308,7 @@ const getCorridorWidth = (traceWidth, layer) => {
   return traceWidth * multipliers[layer] + base
 };
 
-export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, formProgress = 0, isTyping: propsIsTyping }) {
+export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, formProgress = 0, isTyping: propsIsTyping, isMiddleActive = true, isRightActive = true }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const particlesContainerRef = useRef(null)
@@ -432,6 +432,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
   const endX = G - 15
   const isTransmit = contactSystemState === 'transmit'
   const isTransmitOrFailed = isTransmit || transmissionFailed
+  const isFormInteracting = Boolean(isTyping)
 
   const getTransitionStyle = useCallback(() => {
     if (contactSystemState === 'dormant') {
@@ -533,6 +534,11 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
   const midStart = M_form
   const W_mid = Math.max(50, middleTargetLimit - midStart)
   const W_right = Math.max(50, endX - rightTargetLimit)
+
+  const speedRatio = Math.max(0.2, W_right / W_mid)
+  const rightDuration = (3.2 * speedRatio).toFixed(2)
+  const rightDashPulse = (10 / speedRatio).toFixed(1)
+  const rightDashGap = (40 / speedRatio).toFixed(1)
 
   const pcbComponentsData = useMemo(() => {
     // Hardware Components (Aligned horizontally on trace flat sections)
@@ -762,6 +768,67 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     ...pcbComponentsData,
     ...pcbTracesData
   }), [pcbComponentsData, pcbTracesData]);
+
+  // Group pulse animation data for middle PCB traces:
+  // Group 1: 2nd (email) & 3rd (subject) -> start at starting point together & reach end together
+  // Group 2: 1st (name) & 4th (message) -> start at starting point together & reach end together
+  const middlePulseElements = useMemo(() => {
+    if (!pcbData?.middleTraces) return []
+
+    const channels = [
+      { chKey: 'name', index: 1, group: 2 },
+      { chKey: 'email', index: 2, group: 1 },
+      { chKey: 'subject', index: 3, group: 1 },
+      { chKey: 'message', index: 4, group: 2 }
+    ]
+
+    return channels.map(({ chKey, index, group }) => {
+      const mainTrace = pcbData.middleTraces.find(t => t.chKey === chKey && t.main)
+      if (!mainTrace) return null
+
+      // Group 1 delay: 0s, Group 2 delay: 0.6s
+      const delay = group === 1 ? '0s' : '0.6s'
+
+      return {
+        chKey,
+        index,
+        group,
+        d: mainTrace.d,
+        delay
+      }
+    }).filter(Boolean)
+  }, [pcbData.middleTraces]);
+
+  // Group pulse animation data for Right PCB traces (exiting globe):
+  // Group 1: 2nd & 3rd -> start together & reach end together
+  // Group 2: 1st & 4th -> start together & reach end together
+  const rightPulseElements = useMemo(() => {
+    if (!pcbData?.rightTraces) return []
+
+    const mainTraces = pcbData.rightTraces.filter(t => t.main)
+    if (mainTraces.length < 4) return []
+
+    // 1st (index 0) & 4th (index 3) -> Group 2
+    // 2nd (index 1) & 3rd (index 2) -> Group 1
+    const mappings = [
+      { trace: mainTraces[0], id: 'r1', group: 2 },
+      { trace: mainTraces[1], id: 'r2', group: 1 },
+      { trace: mainTraces[2], id: 'r3', group: 1 },
+      { trace: mainTraces[3], id: 'r4', group: 2 }
+    ]
+
+    return mappings.map(({ trace, id, group }) => {
+      const delay = group === 1 ? '0s' : '0.6s'
+      return {
+        id,
+        group,
+        d: trace.d,
+        delay
+      }
+    })
+  }, [pcbData.rightTraces]);
+
+
 
 
   // Enhanced opacity hierarchy — clear visual depth at all states
@@ -1271,7 +1338,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     <g strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={isTransmit ? 0 : 1}>
       {/* Middle Trace Corridors */}
       {pcbData.middleTraces.filter(t => t.category === 'main').map((t, idx) => {
-        const targetOpacity = getTargetOpacity(t.chKey, 'corridor')
+        const targetOpacity = 1.0
         const w = getWidthForCategory(t.category)
         return (
           <React.Fragment key={`m-corridor-${idx}`}>
@@ -1335,7 +1402,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
       {/* Right Trace Corridors */}
       {pcbData.rightTraces.filter(t => t.category === 'main').map((t, idx) => {
-        const targetOpacity = getTargetOpacity(null, 'corridor')
+        const targetOpacity = 1.0
         const w = getWidthForCategory(t.category)
         return (
           <React.Fragment key={`r-corridor-${idx}`}>
@@ -1693,6 +1760,58 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         ))}
 
         {/* ========================================================
+            MIDDLE PCB GROUP PULSE ANIMATIONS
+           ======================================================== */}
+        {!shouldReduceMotion && isInView && !isTransmit && isFormInteracting && isMiddleActive && (
+          <g className="middle-pcb-group-pulses" style={{ pointerEvents: 'none' }}>
+            {middlePulseElements.map((item) => (
+              <g
+                key={`middle-pulse-${item.chKey}`}
+                style={{
+                  offsetPath: `path('${item.d}')`,
+                  animation: 'pcbMiddleGroupPulse 2.4s linear infinite',
+                  animationDelay: item.delay,
+                  willChange: 'transform, opacity'
+                }}
+              >
+                {/* Glow aura */}
+                <circle cx="0" cy="0" r="4.5" fill="var(--accent)" opacity="0.65" filter="url(#pcbGlowActive)" />
+                {/* Main pulse head */}
+                <circle cx="0" cy="0" r="2.4" fill="#ffffff" stroke="var(--accent)" strokeWidth="0.8" />
+                {/* Core dot */}
+                <circle cx="0" cy="0" r="1.1" fill="var(--accent)" />
+              </g>
+            ))}
+          </g>
+        )}
+
+        {/* ========================================================
+            RIGHT PCB GROUP PULSE ANIMATIONS
+           ======================================================== */}
+        {!shouldReduceMotion && isInView && !isTransmit && isFormInteracting && isRightActive && (
+          <g className="right-pcb-group-pulses" style={{ pointerEvents: 'none' }}>
+            {rightPulseElements.map((item) => (
+              <g
+                key={`right-pulse-${item.id}`}
+                style={{
+                  offsetPath: `path('${item.d}')`,
+                  animation: 'pcbRightGroupPulseReverse 2.4s linear infinite',
+                  animationDelay: item.delay,
+                  willChange: 'transform, opacity'
+                }}
+              >
+                {/* Glow aura */}
+                <circle cx="0" cy="0" r="4.5" fill="var(--accent)" opacity="0.65" filter="url(#pcbGlowActive)" />
+                {/* Main pulse head */}
+                <circle cx="0" cy="0" r="2.4" fill="#ffffff" stroke="var(--accent)" strokeWidth="0.8" />
+                {/* Core dot */}
+                <circle cx="0" cy="0" r="1.1" fill="var(--accent)" />
+              </g>
+            ))}
+          </g>
+        )}
+
+        {/* ========================================================
             HERO TRANSMISSION CHANNELS
            ======================================================== */}
         {['name', 'email', 'subject', 'message'].map((chKey, chIdx) => {
@@ -1702,8 +1821,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
               {/* Traces for this channel */}
               <g strokeLinecap="round" strokeLinejoin="round" fill="none">
                 {pcbData.middleTraces.filter(t => t.chKey === chKey).map((t, idx) => {
-                  const targetOpacity = getTargetOpacity(t.chKey, 'trace')
                   const w = getWidthForCategory(t.category)
+                  const classOpacity = t.category === 'main' ? 0.95 : t.category === 'auxiliary' ? 0.80 : 0.60
                   return (
                     <React.Fragment key={`m-trace-${idx}`}>
                       {/* Material Layer 2: Groove Shadow */}
@@ -1713,7 +1832,9 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                           stroke="rgba(0, 0, 0, 0.45)"
                           strokeWidth={w + 0.8}
                           fill="none"
-                          opacity={targetOpacity * 0.75}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          opacity={classOpacity * 0.75}
                           transform="translate(0.4, 0.4)"
                           style={getTransitionStyle()}
                         />
@@ -1726,43 +1847,25 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                           stroke="rgba(255, 255, 255, 0.03)"
                           strokeWidth={w + 0.8}
                           fill="none"
-                          opacity={targetOpacity * 0.75}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          opacity={classOpacity * 0.75}
                           transform="translate(-0.4, -0.4)"
                           style={getTransitionStyle()}
                         />
                       )}
 
-                      {contactSystemState === 'engaged' && !isTransmit && (
-                        <>
-                          <path
-                            d={t.d}
-                            stroke="var(--accent)"
-                            strokeWidth={w + 0.6}
-                            opacity="0.22"
-                            filter="url(#pcbHairlineGlow)"
-                            style={getTransitionStyle()}
-                          />
-                          {(t.main || t.pulse) && (
-                            <path
-                              d={t.d}
-                              stroke="var(--accent)"
-                              strokeWidth={w + 1.2}
-                              fill="none"
-                              pathLength="100"
-                              filter="url(#pcbGlowActive)"
-                              className="pcb-signal-flow-path"
-                              style={{
-                                opacity: activationLevel >= 2 ? 1 : 0,
-                                transition: 'opacity 0.4s ease',
-                                strokeDasharray: '15 100',
-                                animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
-                                animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
-                                willChange: 'stroke-dashoffset',
-                                transform: 'translate3d(0, 0, 0)'
-                              }}
-                            />
-                          )}
-                        </>
+                      {contactSystemState === 'engaged' && !isTransmit && t.category === 'main' && (
+                        <path
+                          d={t.d}
+                          stroke="var(--accent)"
+                          strokeWidth={w * 1.25}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          opacity="0.22"
+                          filter="url(#pcbHairlineGlow)"
+                          style={getTransitionStyle()}
+                        />
                       )}
 
                       {/* Material Layer 3: Trace Core */}
@@ -1770,7 +1873,9 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                         d={t.d}
                         stroke="var(--accent)"
                         strokeWidth={w}
-                        opacity={0.95 * targetOpacity}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity={classOpacity}
                         style={getTransitionStyle()}
                       />
 
@@ -1779,7 +1884,9 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                         d={t.d}
                         stroke="url(#copper-texture)"
                         strokeWidth={w}
-                        opacity={0.12 * targetOpacity}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity={classOpacity * 0.12}
                         style={getTransitionStyle()}
                       />
 
@@ -1816,7 +1923,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                           <g
                             key={`m-bend-${idx}-${bIdx}`}
                             transform={`translate(${bend.x}, ${bend.y})`}
-                            opacity={targetOpacity * (isMainBend ? 0.85 : 0.70)}
+                            opacity={classOpacity * (isMainBend ? 0.85 : 0.70)}
                             style={{ ...getTransitionStyle(), ...pulseStyle }}
                           >
                             <circle cx="0" cy="0" r={nodeRadius} fill="#030304" />
@@ -1882,8 +1989,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
            ======================================================== */}
         <g strokeLinecap="round" strokeLinejoin="round" fill="none">
           {pcbData.rightTraces.map((t, idx) => {
-            const targetOpacity = getTargetOpacity(null, 'trace')
             const w = getWidthForCategory(t.category)
+            const classOpacity = t.category === 'main' ? 0.95 : t.category === 'auxiliary' ? 0.80 : 0.60
             return (
               <React.Fragment key={`r-trace-${idx}`}>
                 {/* Material Layer 2: Groove Shadow */}
@@ -1893,7 +2000,9 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                     stroke="rgba(0, 0, 0, 0.45)"
                     strokeWidth={w + 0.8}
                     fill="none"
-                    opacity={targetOpacity * 0.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={classOpacity * 0.75}
                     transform="translate(0.4, 0.4)"
                     style={getTransitionStyle()}
                   />
@@ -1906,44 +2015,25 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                     stroke="rgba(255, 255, 255, 0.03)"
                     strokeWidth={w + 0.8}
                     fill="none"
-                    opacity={targetOpacity * 0.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={classOpacity * 0.75}
                     transform="translate(-0.4, -0.4)"
                     style={getTransitionStyle()}
                   />
                 )}
 
-                {contactSystemState === 'engaged' && !isTransmit && (
-                  <>
-                    <path
-                      d={t.d}
-                      stroke="var(--accent)"
-                      strokeWidth={w + 0.6}
-                      opacity="0.22"
-                      filter="url(#pcbHairlineGlow)"
-                      style={getTransitionStyle()}
-                    />
-                    {(t.main || t.pulse) && (
-                      <path
-                        d={t.d}
-                        stroke="var(--accent)"
-                        strokeWidth={w + 1.2}
-                        fill="none"
-                        pathLength="100"
-                        filter="url(#pcbGlowActive)"
-                        className="pcb-signal-flow-path"
-                        style={{
-                          opacity: activationLevel >= 3 ? 1 : 0,
-                          transition: 'opacity 0.4s ease',
-                          strokeDasharray: '15 100',
-                          animation: `pcbSignalFlow 1.8s linear infinite ${t.main ? '0s' : '0.6s'}`,
-                          animationDirection: 'reverse',
-                          animationPlayState: activationLevel >= 3 ? 'running' : 'paused',
-                          willChange: 'stroke-dashoffset',
-                          transform: 'translate3d(0, 0, 0)'
-                        }}
-                      />
-                    )}
-                  </>
+                {contactSystemState === 'engaged' && !isTransmit && t.category === 'main' && (
+                  <path
+                    d={t.d}
+                    stroke="var(--accent)"
+                    strokeWidth={w * 1.25}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity="0.22"
+                    filter="url(#pcbHairlineGlow)"
+                    style={getTransitionStyle()}
+                  />
                 )}
 
                 {/* Material Layer 3: Trace Core */}
@@ -1951,7 +2041,9 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                   d={t.d}
                   stroke="var(--accent)"
                   strokeWidth={w}
-                  opacity={0.95 * targetOpacity}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={classOpacity}
                   style={getTransitionStyle()}
                 />
 
@@ -1960,26 +2052,11 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                   d={t.d}
                   stroke="url(#copper-texture)"
                   strokeWidth={w}
-                  opacity={0.12 * targetOpacity}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={classOpacity * 0.12}
                   style={getTransitionStyle()}
                 />
-
-                {/* Passive Trace Idle Highlight */}
-                {t.category === 'auxiliary' && idx % 3 === 0 && !isTransmit && (
-                  <path
-                    d={t.d}
-                    stroke="var(--accent)"
-                    strokeWidth={w}
-                    fill="none"
-                    opacity="0"
-                    style={{
-                      ...getTransitionStyle(),
-                      animation: 'pcbIdleTraceHighlight 6s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-                      animationPlayState: activationLevel >= 3 ? 'running' : 'paused',
-                      animationDelay: `${(idx + 5) * 0.7}s`
-                    }}
-                  />
-                )}
 
                 {/* Plated Solder Joints at Bends */}
                 {t.category !== 'ground' && t.bends && t.bends.map((bend, bIdx) => {
@@ -1997,7 +2074,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                     <g
                       key={`r-bend-${idx}-${bIdx}`}
                       transform={`translate(${bend.x}, ${bend.y})`}
-                      opacity={targetOpacity * (isMainBend ? 0.85 : 0.70)}
+                      opacity={classOpacity * (isMainBend ? 0.85 : 0.70)}
                       style={{ ...getTransitionStyle(), ...pulseStyle }}
                     >
                       <circle cx="0" cy="0" r={nodeRadius} fill="#030304" />

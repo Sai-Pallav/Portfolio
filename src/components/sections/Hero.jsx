@@ -7,27 +7,31 @@ const heroPortrait = '/hero-portrait.webp'
 const heroPortraitMobile = '/hero-portrait-mobile.webp'
 const heroPortraitAlternate = '/hero-portrait-alternate.webp'
 
+// Premium editorial ease-out curve
+const EDITORIAL_EASE = [0.22, 1, 0.36, 1]
+
 /**
- * Ultra-Optimized Cinematic Premium Hero Section
+ * Editorial Refined Hero / About Section
  * 
- * Performance & Rendering Tuning:
- * - Suspends floats, sweeps, and active animations when scrolled out of view using useInView.
- * - Extracts and memoizes all inline style objects to guarantee referential stability and prevent GC pressure.
- * - Promotes portrait and parallax elements to GPU hardware-accelerated layers (will-change).
- * - Implements responsive WebP loading via standard HTML5 <picture> serving static, preloaded assets.
- * - Full prefers-reduced-motion accessibility integration.
- * - Wrapped in React.memo() to insulate the Hero from parent layout updates.
+ * Hierarchy & Motion Refinements:
+ * - Section label increased (14-15px) with refined tracking and muted white presence.
+ * - Name reduced ~10-15% (text-4xl sm:text-5xl md:text-6xl) for confident editorial proportion.
+ * - Role strengthened (text-xl sm:text-2xl) and grouped tightly with Name (Group 1).
+ * - Positioning statement elevated (text-[16px] sm:text-[18px]) with increased contrast (Group 2).
+ * - Supporting metadata grouped quietly with restrained typography (Group 3).
+ * - CTA micro-interaction refined with smooth arrow offset and brightness shift (Group 4).
+ * - Staggered entrance sequence (~900-1100ms total) with zero continuous looping animations.
  */
 function Hero() {
   const containerRef = useRef(null)
   const { scrollY } = useScroll()
   const shouldReduceMotion = useReducedMotion()
 
-  // Track if the Hero is in the active viewport (suspends loops when off-screen)
+  // Track if the Hero is in the active viewport
   const isInView = useInView(containerRef, { amount: 0.05 })
 
   // Parallax translation (suspended/static if OS prefers reduced motion)
-  const yRaw = useTransform(scrollY, [0, 800], [0, shouldReduceMotion ? 0 : -100])
+  const yRaw = useTransform(scrollY, [0, 800], [0, shouldReduceMotion ? 0 : -80])
   const opacityRaw = useTransform(scrollY, [0, 600], [1, 0])
 
   // Apply smooth spring physics to scroll transitions for professional momentum
@@ -102,21 +106,8 @@ function Hero() {
             }}
           />
 
-          {/* Nested Motion Div to prevent transform conflicts between Parallax scroll and Floating animations */}
-          <motion.div
-            animate={isInView && !shouldReduceMotion ? {
-              y: [0, -12, 0],
-            } : {}}
-            transition={isInView && !shouldReduceMotion ? {
-              y: {
-                duration: 12,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }
-            } : {}}
-            style={{ willChange: 'transform' }}
-            className="w-full h-full flex items-end justify-center z-10"
-          >
+          {/* Stable image container - No continuous floating animation per Section 16 */}
+          <div className="w-full h-full flex items-end justify-center z-10">
             <picture className="w-full h-full object-cover">
               <source srcSet={heroPortraitMobile} media="(max-width: 768px)" type="image/webp" />
               <source srcSet={heroPortrait} type="image/webp" />
@@ -129,14 +120,14 @@ function Hero() {
                 decoding="async"
                 data-portal-portrait="true"
                 data-portal-image={heroPortraitAlternate}
-                initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 1.05 }}
+                initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 1.03 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 2.0, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 1.1, ease: EDITORIAL_EASE }}
                 className="w-full h-full object-cover object-center hero-portrait-img pointer-events-auto"
                 style={imageStyle}
               />
             </picture>
-          </motion.div>
+          </div>
           
           {/* Subtle bottom gradient to blend image edge into background */}
           <div 
@@ -155,106 +146,94 @@ function Hero() {
       />
 
       {/* Secondary Layer: Personal Branding Content */}
-      <div className="relative z-20 max-w-7xl w-full mx-auto px-6 md:px-12 lg:px-20 py-20 flex items-center justify-start pointer-events-none">
+      <div className="relative z-20 max-w-7xl w-full mx-auto px-6 md:px-12 lg:px-20 py-16 md:py-24 flex items-center justify-start pointer-events-none">
         <div className="flex flex-col justify-center h-full max-w-xl md:max-w-2xl relative pointer-events-none">
           
-          {/* Top Branding / Logo */}
+          {/* Stage 1: Section Label — Clear editorial presence */}
           <motion.div
-            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 20 }}
+            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-            className="mb-4 md:mb-5 font-mono text-[10px] md:text-xs tracking-[0.25em] font-medium uppercase pointer-events-auto"
-            style={{ color: 'var(--accent)' }}
+            transition={{ duration: 0.5, ease: EDITORIAL_EASE, delay: 0.10 }}
+            className="mb-4 sm:mb-5 font-mono text-[13px] sm:text-[14px] md:text-[15px] tracking-[0.18em] font-medium uppercase text-white/65 pointer-events-auto"
           >
-            {personal.firstName} // Portfolio 2026
+            01 — ABOUT
           </motion.div>
 
-          {/* Name - Elegant Big Typography */}
-          <motion.h1
-            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
-            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl font-bold font-heading leading-[1.0] md:leading-[0.95] tracking-tight md:tracking-tighter pointer-events-auto"
-            style={{ color: 'var(--text-heading)' }}
-          >
-            {personal.name}
-          </motion.h1>
-
-          {/* Role */}
-          <motion.p
-            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
-            className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight mt-4 md:mt-5 mb-2 pointer-events-auto"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {personal.role}
-          </motion.p>
-
-          {/* Short Positioning Statement */}
-          <motion.p
-            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
-            className="text-sm sm:text-base md:text-lg leading-relaxed max-w-md md:max-w-lg font-body pointer-events-auto"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            {personal.tagline}
-          </motion.p>
-          
-          {/* Subtle CTA link */}
-          <motion.div
-            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.55 }}
-            className="mt-8 md:mt-10 flex items-center gap-4 pointer-events-auto"
-          >
-            <motion.a 
-              href="#about"
-              whileHover={shouldReduceMotion ? {} : { scale: 1.03, x: 2 }}
-              whileTap={shouldReduceMotion ? {} : { scale: 0.98 }}
-              className="group flex items-center gap-3 text-xs uppercase tracking-[0.25em] font-semibold font-mono hover:text-[var(--accent)] transition-all duration-300 ease-out"
-              style={{ color: 'var(--text-secondary)' }}
+          {/* Group 1: Identity (Name + Role) */}
+          <div className="pointer-events-auto">
+            {/* Stage 2: Name — Confident editorial proportion */}
+            <motion.h1
+              initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: EDITORIAL_EASE, delay: 0.18 }}
+              className="text-4xl sm:text-5xl md:text-6xl font-bold font-heading leading-[1.06] tracking-tight text-white/95"
             >
-              <span>Explore Identity</span>
-              <div className="relative flex items-center">
-                <span 
-                  className="w-8 h-[1px] group-hover:w-12 group-hover:bg-[var(--accent)] transition-all duration-300 ease-out" 
-                  style={{ background: 'var(--text-muted)' }}
-                />
-                <span className="opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-1 text-[var(--accent)] transition-all duration-300 ease-out text-[10px]">
-                  →
-                </span>
-              </div>
-            </motion.a>
+              {personal.name}
+            </motion.h1>
+
+            {/* Stage 3: Professional Role — Strengthened title case */}
+            <motion.div
+              initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: EDITORIAL_EASE, delay: 0.26 }}
+              className="text-xl sm:text-2xl font-semibold font-heading text-white/90 mt-2 sm:mt-2.5"
+            >
+              Full-Stack Engineer
+            </motion.div>
+          </div>
+
+          {/* Group 2: Stage 4: Description — Elevated presence & bridge to proof */}
+          <motion.p
+            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EDITORIAL_EASE, delay: 0.36 }}
+            className="text-[16px] sm:text-[17.5px] md:text-[18.5px] leading-relaxed max-w-lg md:max-w-[580px] font-body text-white/80 mt-6 sm:mt-7 pointer-events-auto"
+          >
+            I build production web applications and AI-powered systems, working across the frontend, backend, and deployment stack.
+          </motion.p>
+
+          {/* Group 3: Stage 5: Supporting Credentials & Metadata — Kept quiet */}
+          <motion.div
+            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EDITORIAL_EASE, delay: 0.46 }}
+            className="mt-7 sm:mt-8 space-y-2 pointer-events-auto"
+          >
+            {/* Evidence Proof Line */}
+            <div className="text-xs sm:text-[13.5px] font-body text-white/55 tracking-wide">
+              Built for 300+ campus users · production web applications
+            </div>
+
+            {/* Compressed Credential Line */}
+            <div className="text-xs sm:text-[13.5px] font-body text-white/45 tracking-wide">
+              BITS Pilani · CSE · {personal.cgpa} CGPA
+            </div>
+
+            {/* Informational Availability */}
+            <div className="pt-1 flex items-center gap-2 text-xs sm:text-[13px] font-body text-white/50">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shrink-0" />
+              <span>Open to software engineering internships</span>
+            </div>
           </motion.div>
+
+          {/* Group 4: Stage 6: Technical Stack CTA with restrained micro-interaction */}
+          <motion.div
+            initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: EDITORIAL_EASE, delay: 0.56 }}
+            className="mt-8 sm:mt-9 pointer-events-auto"
+          >
+            <a 
+              href="#skills"
+              className="inline-flex items-center gap-2.5 text-xs sm:text-[13px] font-mono font-medium tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors duration-300 group"
+            >
+              <span>EXPLORE THE STACK</span>
+              <span className="text-white/40 group-hover:text-white group-hover:translate-x-1.5 transition-transform duration-300">→</span>
+            </a>
+          </motion.div>
+
         </div>
       </div>
-
-      {/* Minimal Scroll-Down Indicator */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7, duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
-        className="absolute bottom-12 left-6 md:left-12 lg:left-20 z-20 flex items-center gap-4 text-[10px] font-mono tracking-[0.3em] uppercase select-none pointer-events-none"
-        style={{ color: 'var(--text-muted)' }}
-      >
-        <span>Scroll</span>
-        <div className="w-[1px] h-12 bg-white/10 relative overflow-hidden">
-          <motion.div 
-            animate={isInView && !shouldReduceMotion ? {
-              y: [-48, 48]
-            } : {}}
-            transition={isInView && !shouldReduceMotion ? {
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut"
-            } : {}}
-            className="absolute top-0 left-0 w-full h-1/2"
-            style={{ background: 'var(--accent)' }}
-          />
-        </div>
-      </motion.div>
     </section>
   )
 }

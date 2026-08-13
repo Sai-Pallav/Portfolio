@@ -105,8 +105,7 @@ function Skills() {
             variants={badgeVariants}
             className="inline-flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_8px_30px_rgb(0,0,0,0.2)]"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)] animate-pulse" />
-            <span className="text-[10px] md:text-xs font-mono font-semibold text-[var(--text-secondary)] tracking-[0.25em] uppercase pl-0.5">
+            <span className="text-[10px] md:text-xs font-mono font-semibold text-[var(--text-secondary)] tracking-[0.25em] uppercase">
               Expertise
             </span>
           </motion.div>
@@ -139,7 +138,7 @@ function Skills() {
           >
             <button
               onClick={() => setView("3d")}
-              className="relative z-10 px-5 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 rounded-full cursor-pointer flex items-center gap-2"
+              className="relative z-10 px-5 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 rounded-full cursor-pointer"
               style={{ color: view === "3d" ? "var(--bg)" : "var(--text-secondary)" }}
             >
               {view === "3d" && (
@@ -149,12 +148,11 @@ function Skills() {
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
               )}
-              <span className={`w-1 h-1 rounded-full transition-colors duration-300 ${view === "3d" ? "bg-[var(--accent)]" : "bg-white/20"}`} />
               3D Canvas
             </button>
             <button
               onClick={() => setView("grid")}
-              className="relative z-10 px-5 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 rounded-full cursor-pointer flex items-center gap-2"
+              className="relative z-10 px-5 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors duration-300 rounded-full cursor-pointer"
               style={{ color: view === "grid" ? "var(--bg)" : "var(--text-secondary)" }}
             >
               {view === "grid" && (
@@ -164,7 +162,6 @@ function Skills() {
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
               )}
-              <span className={`w-1 h-1 rounded-full transition-colors duration-300 ${view === "grid" ? "bg-[var(--accent)]" : "bg-white/20"}`} />
               Grid View
             </button>
           </motion.div>

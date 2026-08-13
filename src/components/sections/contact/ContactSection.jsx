@@ -19,6 +19,39 @@ export default memo(function ContactSection() {
   const shouldReduceMotion = useReducedMotion()
   const rectRef = useRef(null)
 
+  // Master Orchestration Timeline
+  // Sequence: idle (0-2s) -> Left PCB pulse (2.0s-4.4s) -> Form lights up 1st (4.4s) -> Middle PCB lights up 2nd (4.8s) -> Right End PCB lights up 3rd (5.2s)
+  const [orchestrationStage, setOrchestrationStage] = useState('idle')
+
+  useEffect(() => {
+    if (!isInViewRepeat) {
+      setOrchestrationStage('idle')
+      return
+    }
+
+    if (shouldReduceMotion) {
+      setOrchestrationStage('complete')
+      return
+    }
+
+    const t1 = setTimeout(() => setOrchestrationStage('beam'), 2000)
+    const t2 = setTimeout(() => setOrchestrationStage('form-active'), 4400)
+    const t3 = setTimeout(() => setOrchestrationStage('middle-active'), 4800)
+    const t4 = setTimeout(() => setOrchestrationStage('right-active'), 5200)
+
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
+      clearTimeout(t4)
+    }
+  }, [isInViewRepeat, shouldReduceMotion])
+
+  const isBeamActive = orchestrationStage !== 'idle'
+  const isFormActive = orchestrationStage === 'form-active' || orchestrationStage === 'middle-active' || orchestrationStage === 'right-active' || orchestrationStage === 'complete'
+  const isMiddleActive = orchestrationStage === 'middle-active' || orchestrationStage === 'right-active' || orchestrationStage === 'complete'
+  const isRightActive = orchestrationStage === 'right-active' || orchestrationStage === 'complete'
+
   // Mouse tracking listener for cursor-driven ambient light (Throttled using requestAnimationFrame)
   useEffect(() => {
     if (shouldReduceMotion) return
@@ -190,15 +223,24 @@ export default memo(function ContactSection() {
       <div className="relative w-full mt-8 lg:mt-10">
         {/* Full-width backdrop wrapper for Left and Right PCB */}
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen pointer-events-none z-0 hidden lg:block">
-          <LeftPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} formProgress={formProgress} />
-          <RightPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} formProgress={formProgress} isTyping={isTyping} />
+          <LeftPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} formProgress={formProgress} beamActive={isBeamActive} />
+          <RightPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} formProgress={formProgress} isTyping={isTyping} isMiddleActive={isMiddleActive} isRightActive={isRightActive} />
         </div>
 
         {/* Full-width flex container keeps the form and globe in their natural positions. */}
         <div className="w-full px-6 md:px-12 lg:px-0 relative z-10">
           <div className="relative flex flex-col lg:flex-row items-center justify-evenly w-full gap-12 lg:gap-0">
             {/* Form Container */}
-            <div id="contact-form-container" ref={formContainerRef} className="w-full max-w-[474px] relative z-20 flex flex-col items-start lg:items-center lg:translate-x-20">
+            <div
+              id="contact-form-container"
+              ref={formContainerRef}
+              className="w-full max-w-[474px] relative z-20 flex flex-col items-start lg:items-center lg:translate-x-20 transition-all duration-700 ease-out"
+              style={{
+                opacity: isFormActive ? 1 : 0,
+                transform: isFormActive ? 'translateY(0)' : 'translateY(16px)',
+                pointerEvents: isFormActive ? 'auto' : 'none'
+              }}
+            >
               <div className="w-full max-w-[474px]">
                 <ContactForm 
                   contactSystemState={contactSystemState}
