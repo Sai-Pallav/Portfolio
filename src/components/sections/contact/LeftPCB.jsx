@@ -70,6 +70,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   const activationLevel = isTyping ? 3 : 0
 
   const [activatedNodes, setActivatedNodes] = useState({})
+  const [isIlluminated, setIsIlluminated] = useState(false)
 
   useEffect(() => {
     if (isInView || contactSystemState === 'engaged' || isTyping) {
@@ -78,18 +79,25 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   }, [isInView, contactSystemState, isTyping])
 
   useEffect(() => {
-    if (!isInView) return
+    if (!isInView && !isIlluminated) {
+      setIsIlluminated(false)
+      setActivatedNodes({})
+      return
+    }
 
-    // Pulse traveling along trace takes ~1.3s - 1.5s to reach nodes A1-A4
-    // Once pulse passes through them, they activate permanently and run independently
-    const t1 = setTimeout(() => setActivatedNodes(prev => ({ ...prev, A2: true, A3: true })), 1350)
-    const t2 = setTimeout(() => setActivatedNodes(prev => ({ ...prev, A1: true, A4: true })), 1480)
+    if (isIlluminated) return
+
+    // 0s - 5s: Baseline state - all PCB components are properly visible at 85% opacity & static
+    // At 5.0s: Illumination power-up! Opacity jumps to 100%, brightness lifts, nodes animate & pulse
+    const tIllum = setTimeout(() => {
+      setIsIlluminated(true)
+      setActivatedNodes({ A1: true, A2: true, A3: true, A4: true })
+    }, 5000)
 
     return () => {
-      clearTimeout(t1)
-      clearTimeout(t2)
+      clearTimeout(tIllum)
     }
-  }, [isInView])
+  }, [isInView, isIlluminated])
 
   useEffect(() => {
     const sectionEl = document.getElementById('contact')
@@ -313,17 +321,21 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     if (isTransmit) return elementType === 'particle' ? 1.0 : 0
     if (transmissionFailed && isHero) return 0
     
-    return {
+    const illumFactor = isIlluminated ? 1.0 : 0.65 // 65% opacity before 5s, 100% after 5s
+
+    const baseOp = {
       trace: isHero ? 1.0 : 0.85,
       corridor: 0.85,
       component: 0.95,
       node: 1.0,
       background: 0.75
     }[elementType] || 0.85
-  }, [isTransmit, transmissionFailed])
+
+    return baseOp * illumFactor
+  }, [isTransmit, transmissionFailed, isIlluminated])
 
   useEffect(() => {
-    if (!isInView || shouldReduceMotion) return
+    if (!isInView || !isIlluminated || shouldReduceMotion) return
 
     const container = particlesContainerRef.current
     if (!container) return
@@ -819,35 +831,35 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
       <g
         key={`node-${i}`}
         transform={`translate(${xStart + n.x * scale}, ${n.y})`}
-        opacity={isNodeActive ? targetOpacity : targetOpacity * 0.7}
+        opacity={isNodeActive ? targetOpacity : targetOpacity * 0.9}
         style={getTransitionStyle()}
       >
         <g style={nodeStyle}>
-          {/* Stepped CAD Docking Frame, Pass 5 */}
-          <g stroke="var(--accent)" strokeWidth="0.30" fill="none" opacity={isNodeActive ? 0.45 : 0.25}>
+          {/* Stepped CAD Docking Frame */}
+          <g stroke="var(--accent)" strokeWidth="0.45" fill="none" opacity="0.65">
             <circle cx="0" cy="0" r="20.5" strokeDasharray="2 2" />
           </g>
           {/* Substrate Clearance Gap */}
           <circle cx="0" cy="0" r="17.5" fill="#030304" />
           {/* Solder Mask Opening */}
-          <circle cx="0" cy="0" r="16" fill="#030304" opacity={0.6} />
+          <circle cx="0" cy="0" r="16" fill="#030304" opacity={0.8} />
 
-          {/* Concentric Copper Pad Ring */}
-          <circle cx="0" cy="0" r="14.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.45" opacity={isNodeActive ? 0.95 : 0.70} />
-          <circle cx="0" cy="0" r="12" fill="none" stroke="rgba(255, 255, 255, 0.25)" strokeDasharray="1.5 1.5" strokeWidth="0.35" opacity="0.75" />
-          <circle cx="0" cy="0" r="9.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.35" opacity={isNodeActive ? 0.90 : 0.65} />
+          {/* Concentric Copper Pad Rings */}
+          <circle cx="0" cy="0" r="14.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.6" opacity="1.0" />
+          <circle cx="0" cy="0" r="12" fill="none" stroke="rgba(255, 255, 255, 0.45)" strokeDasharray="1.5 1.5" strokeWidth="0.45" opacity="0.95" />
+          <circle cx="0" cy="0" r="9.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.5" opacity="1.0" />
 
-          {/* Outer expanding pulse ring (Radar Effect) - runs independently after pulse passes */}
-          <circle cx="0" cy="0" r="10" fill="none" stroke="var(--accent)" strokeWidth={isNodeActive ? 0.5 : 0.2}
+          {/* Outer expanding pulse ring (Radar Effect) - activates after 5s */}
+          <circle cx="0" cy="0" r="10" fill="none" stroke="var(--accent)" strokeWidth="0.8"
             className="anim-pcb-radar-pulse"
             style={{
               animationPlayState: isNodeActive ? 'running' : 'paused',
-              opacity: isNodeActive ? 1 : 0.2,
+              opacity: isNodeActive ? 1 : 0.85, // properly visible when paused
               transformOrigin: '0px 0px'
             }}
           />
 
-          {/* Rotatable Inner Details Group (Clockwise) - runs independently after pulse passes */}
+          {/* Rotatable Inner Details Group (Clockwise) */}
           <g className="anim-pcb-radar-rotate" style={{
             animationPlayState: isNodeActive ? 'running' : 'paused',
             transformOrigin: '0px 0px'
@@ -867,8 +879,8 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
                   x2={x2}
                   y2={y2}
                   stroke="var(--accent)"
-                  strokeWidth={isNodeActive ? 0.6 : 0.4}
-                  opacity={isNodeActive ? 0.85 : 0.40}
+                  strokeWidth="0.8"
+                  opacity="0.95"
                 />
               )
             })}
@@ -891,17 +903,17 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
                   y={sy - 1}
                   width="2"
                   height="2"
-                  fill="#2f2f38"
-                  stroke="#555"
-                  strokeWidth="0.25"
-                  opacity={isNodeActive ? 0.75 : 0.4}
+                  fill="#3d3d48"
+                  stroke="#777"
+                  strokeWidth="0.35"
+                  opacity="0.90"
                 />
               )
             })}
           </g>
 
           {/* Outer pulse ring */}
-          <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity={isNodeActive ? 0.6 : 0.2}
+          <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" strokeWidth="0.9" opacity="0.75"
             className="anim-pcb-ring-breathe"
             style={{
               animationPlayState: isNodeActive ? 'running' : 'paused',
@@ -910,10 +922,10 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           />
 
           {/* Inner Metallic Ring */}
-          <circle cx="0" cy="0" r="5" fill="none" stroke="var(--accent)" strokeWidth="1.2" opacity={isNodeActive ? 0.95 : 0.6} />
+          <circle cx="0" cy="0" r="5" fill="none" stroke="var(--accent)" strokeWidth="1.4" opacity="1.0" />
 
           {/* Core - Glows & Pulses independently after pulse passes */}
-          <circle cx="0" cy="0" r="2.5" fill="var(--accent)" opacity={isNodeActive ? 1.0 : 0.50}
+          <circle cx="0" cy="0" r="2.5" fill="var(--accent)" opacity="1.0"
             className="anim-pcb-core-pulse"
             style={{
               animationPlayState: isNodeActive ? 'running' : 'paused',
@@ -944,7 +956,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     const keys = ['name', 'email', 'subject', 'message']
     const targetOpacity = getTargetOpacity(keys[i])
     const ringAnimation = {
-      animationPlayState: 'running',
+      animationPlayState: isIlluminated ? 'running' : 'paused',
       animationDelay: `${(275 + y) % 5 * 150}ms`
     }
     return (
@@ -964,15 +976,17 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   }
   if (shouldReduceMotion) return null
 
-  const dormantStyles = contactSystemState === 'dormant' ? {
-    opacity: 0.70
-  } : {}
+  const pcbContainerStyle = useMemo(() => ({
+    opacity: contactSystemState === 'dormant' ? (isIlluminated ? 1.0 : 0.65) : 1.0,
+    filter: isIlluminated ? 'brightness(1.15) contrast(1.05)' : 'brightness(0.90) contrast(0.95)',
+    transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
+  }), [contactSystemState, isIlluminated])
 
   return (
     <div
       ref={containerRef}
       className="absolute top-0 bottom-0 left-0 w-full pointer-events-none z-0 hidden lg:block"
-      style={{ ...dormantStyles, transition: 'opacity 800ms cubic-bezier(0.4,0,0.2,1)' }}
+      style={pcbContainerStyle}
     >
 
 
@@ -1136,7 +1150,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         </defs>
 
         {/* ========================================================
-              SUBSTRATE LAYER (Subtle Vignette Only)
+              SUBSTRATE LAYER
            ======================================================== */}
         <g mask="url(#substrateMaskL)">
           {/* Matte edge vignette to ground the board edges */}
@@ -1146,7 +1160,16 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             width={Math.max(0, L_form_end - xStart + 200)}
             height={H}
             fill="url(#substrate-vignette)"
-            opacity="0.09"
+            opacity="0.45"
+          />
+          {/* Substrate fiberglass weave grid pattern */}
+          <rect
+            x={xStart - 100}
+            y={0}
+            width={Math.max(0, L_form_end - xStart + 200)}
+            height={H}
+            fill="url(#pcbFiberglassWeaveL)"
+            opacity="0.65"
           />
         </g>
 
@@ -1213,7 +1236,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         {/* ========================================================
             LEFT PCB CONTINUOUS TRAVELING LINE PULSE ANIMATION
            ======================================================== */}
-        {beamActive && mainBeamTraces.length > 0 && (
+        {beamActive && isIlluminated && mainBeamTraces.length > 0 && (
           <g className="left-pcb-light-beams" style={{ pointerEvents: 'none' }}>
             {mainBeamTraces.map((trace, idx) => (
               <g key={`left-beam-${idx}`}>

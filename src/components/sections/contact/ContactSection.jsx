@@ -34,10 +34,10 @@ export default memo(function ContactSection() {
       return
     }
 
-    const t1 = setTimeout(() => setOrchestrationStage('beam'), 2000)
-    const t2 = setTimeout(() => setOrchestrationStage('form-active'), 4400)
-    const t3 = setTimeout(() => setOrchestrationStage('middle-active'), 4800)
-    const t4 = setTimeout(() => setOrchestrationStage('right-active'), 5200)
+    const t1 = setTimeout(() => setOrchestrationStage('beam'), 5000)
+    const t2 = setTimeout(() => setOrchestrationStage('form-active'), 7400)
+    const t3 = setTimeout(() => setOrchestrationStage('middle-active'), 7800)
+    const t4 = setTimeout(() => setOrchestrationStage('right-active'), 8200)
 
     return () => {
       clearTimeout(t1)
@@ -220,11 +220,12 @@ export default memo(function ContactSection() {
             <div
               id="contact-form-container"
               ref={formContainerRef}
-              className="w-full max-w-[474px] relative z-20 flex flex-col items-start lg:items-center lg:translate-x-20 transition-all duration-700 ease-out"
+              className="w-full max-w-[474px] relative z-20 flex flex-col items-start lg:items-center lg:translate-x-20"
               style={{
-                opacity: isFormActive ? 1 : 0,
-                transform: isFormActive ? 'translateY(0)' : 'translateY(16px)',
-                pointerEvents: isFormActive ? 'auto' : 'none'
+                opacity: isFormActive ? 1 : 0.50,
+                transform: 'translateY(0)',
+                pointerEvents: 'auto',
+                transition: 'opacity 700ms ease-out, transform 700ms ease-out'
               }}
             >
               <div className="w-full max-w-[474px]">

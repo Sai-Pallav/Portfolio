@@ -832,7 +832,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
 
   // Enhanced opacity hierarchy — clear visual depth at all states
-  const getTargetOpacity = useCallback((chKey, elementType = 'trace') => {
+  const getTargetOpacity = useCallback((chKey, elementType = 'trace', isRightSection = false) => {
     const isHero = ['name', 'email', 'subject', 'message'].includes(chKey)
     
     // Transmit state: Everything fades except particles
@@ -841,15 +841,17 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     // Failed state: Heroes fade, infrastructure remains
     if (transmissionFailed && isHero) return 0
     
-    // Default state: All elements clearly visible, subtle hierarchy
-    return {
+    const sectionActive = isRightSection ? isRightActive : isMiddleActive
+    const illumFactor = sectionActive ? 1.0 : 0.65
+
+    return ({
       trace: isHero ? 1.0 : 0.85,
       corridor: 0.85,
       component: 0.95,
       node: 1.0,
       background: 0.75
-    }[elementType] || 0.85
-  }, [transmissionFailed, isTransmit])
+    }[elementType] || 0.85) * illumFactor
+  }, [transmissionFailed, isTransmit, isMiddleActive, isRightActive])
 
   useEffect(() => {
     if (!isInView || shouldReduceMotion) return
@@ -1444,7 +1446,9 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
   if (shouldReduceMotion) return null
 
   const dormantStyles = contactSystemState === 'dormant' ? {
-    opacity: 0.70
+    opacity: isMiddleActive ? 1.0 : 0.65,
+    filter: isMiddleActive ? 'brightness(1.15) contrast(1.05)' : 'brightness(0.90) contrast(0.95)',
+    transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
   } : {}
 
   return (

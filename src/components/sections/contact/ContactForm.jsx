@@ -193,9 +193,9 @@ const INQUIRY_OPTIONS = [
 
 const FORM_CARD_VARIANTS = {
   hidden: {
-    opacity: 0,
-    y: 25,
-    scale: 0.99,
+    opacity: 1,
+    y: 0,
+    scale: 1,
     boxShadow: '0 20px 40px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.01), inset 0 1px 0 0 rgba(255,255,255,0.06)'
   },
   visible: {
@@ -206,8 +206,6 @@ const FORM_CARD_VARIANTS = {
     transition: {
       duration: 0.6,
       ease: [0.16, 1, 0.3, 1],
-      staggerChildren: 0.08,
-      delayChildren: 0.1,
     }
   },
   interacting: {
@@ -223,12 +221,12 @@ const FORM_CARD_VARIANTS = {
 }
 
 const FORM_CHILD_VARIANTS = {
-  hidden: { opacity: 0, y: 15, filter: 'blur(3px)' },
+  hidden: { opacity: 1, y: 0, filter: 'blur(0px)' },
   visible: {
     opacity: 1,
     y: 0,
     filter: 'blur(0px)',
-    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] }
+    transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] }
   },
   interacting: {
     opacity: 1,
@@ -582,7 +580,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
   return (
     <motion.div
       variants={FORM_CARD_VARIANTS}
-      initial="hidden"
+      initial="visible"
       whileInView="visible"
       viewport={{ once: true, margin: '-100px' }}
       animate={
