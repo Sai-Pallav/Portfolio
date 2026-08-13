@@ -30,7 +30,7 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/35'
+      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/55'
         }`}>
         {Icon && <Icon className="h-4 w-4" strokeWidth={1.75} />}
       </div>
@@ -50,8 +50,8 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
         }}
         placeholder=" "
         aria-required="true"
-        className={`peer w-full rounded-[8px] border border-white/[0.06] bg-black/35 pl-10 pr-4 pt-[24px] pb-[10px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 ${touched && error
-          ? 'border-amber-500/30 focus:border-amber-500/50 shadow-[0_0_0_1px_rgba(245,158,11,0.25)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.08),0_0_0_1px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.01]'
+        className={`peer w-full rounded-[8px] border border-white/[0.12] bg-black/45 pl-10 pr-4 pt-[24px] pb-[10px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.02)] hover:border-[var(--accent)]/30 focus:border-[var(--accent)]/70 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),0_0_12px_var(--accent-dim)] focus:bg-black/60 ${touched && error
+          ? 'border-amber-500/40 focus:border-amber-500/70 shadow-[0_0_0_1px_rgba(245,158,11,0.3)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.12),0_0_10px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.02]'
           : ''
           }`}
         aria-describedby={error ? `${id}-error` : undefined}
@@ -61,7 +61,7 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
         className={`absolute left-10 top-3 origin-[0] duration-300 transform pointer-events-none transition-all ease-[cubic-bezier(0.16,1,0.3,1)] font-medium ${touched && error ? 'peer-focus:text-amber-500/90' : 'peer-focus:text-[var(--accent)]'
           } ${focused || hasValue
             ? '-translate-y-[14px] scale-75 text-[9px] uppercase tracking-[0.15em] text-[var(--text-secondary)] bg-raised px-2 -mx-2 rounded'
-            : 'translate-y-0 scale-100 text-xs md:text-sm capitalize tracking-wide text-white/50'
+            : 'translate-y-0 scale-100 text-xs md:text-sm capitalize tracking-wide text-white/65'
           }`}
       >
         {label}
@@ -76,7 +76,7 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               id={`${id}-error`}
-              className="absolute left-1 block text-[10px] text-amber-500/80 tracking-normal font-normal px-1"
+              className="absolute left-1 block text-[10px] text-amber-400 tracking-normal font-medium px-1"
               role="alert"
             >
               ⚠ {error}
@@ -88,7 +88,7 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute left-1 block text-[10px] tracking-normal font-normal px-1"
+              className="absolute left-1 block text-[10px] tracking-normal font-medium px-1"
               style={{ color: 'var(--accent)' }}
             >
               ✓ Valid {label.replace(' *', '').replace('Your ', '').toLowerCase()}
@@ -106,7 +106,7 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/35'
+      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/55'
         }`}>
         {Icon && <Icon className="h-4 w-4" strokeWidth={1.75} />}
       </div>
@@ -126,8 +126,8 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
         placeholder=" "
         rows={rows}
         aria-required="true"
-        className={`peer w-full rounded-[8px] border border-white/[0.06] bg-black/35 pl-10 pr-4 pt-[24px] pb-[12px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl resize-none shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 leading-relaxed ${touched && error
-          ? 'border-amber-500/30 focus:border-amber-500/50 shadow-[0_0_0_1px_rgba(245,158,11,0.25)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.08),0_0_0_1px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.01]'
+        className={`peer w-full rounded-[8px] border border-white/[0.12] bg-black/45 pl-10 pr-4 pt-[24px] pb-[12px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl resize-none shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.02)] hover:border-[var(--accent)]/30 focus:border-[var(--accent)]/70 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),0_0_12px_var(--accent-dim)] focus:bg-black/60 leading-relaxed ${touched && error
+          ? 'border-amber-500/40 focus:border-amber-500/70 shadow-[0_0_0_1px_rgba(245,158,11,0.3)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.12),0_0_10px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.02]'
           : ''
           }`}
         style={{ minHeight: '150px' }}
@@ -138,14 +138,14 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
         className={`absolute left-10 top-3 origin-[0] duration-300 transform pointer-events-none transition-all ease-[cubic-bezier(0.16,1,0.3,1)] font-medium ${touched && error ? 'peer-focus:text-amber-500/90' : 'peer-focus:text-[var(--accent)]'
           } ${focused || hasValue
             ? '-translate-y-[14px] scale-75 text-[9px] uppercase tracking-[0.15em] text-[var(--text-secondary)] bg-raised px-2 -mx-2 rounded'
-            : 'translate-y-0 scale-100 text-xs md:text-sm capitalize tracking-wide text-white/50'
+            : 'translate-y-0 scale-100 text-xs md:text-sm capitalize tracking-wide text-white/65'
           }`}
       >
         {label}
       </label>
 
-      <span className="absolute bottom-3 right-4 text-[9px] font-mono tracking-wider transition-all duration-300 pointer-events-none opacity-40"
-        style={{ color: characterCount > characterLimit ? 'rgba(245,158,11,0.8)' : 'rgba(255,255,255,0.3)' }}>
+      <span className="absolute bottom-3 right-4 text-[9px] font-mono tracking-wider transition-all duration-300 pointer-events-none opacity-80"
+        style={{ color: characterCount > characterLimit ? 'rgba(245,158,11,0.95)' : 'rgba(255,255,255,0.60)' }}>
         {characterCount} / {characterLimit}
       </span>
 
@@ -158,7 +158,7 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               id={`${id}-error`}
-              className="absolute left-1 block text-[10px] text-amber-500/80 tracking-normal font-normal px-1"
+              className="absolute left-1 block text-[10px] text-amber-400 tracking-normal font-medium px-1"
               role="alert"
             >
               ⚠ {error}
@@ -170,7 +170,7 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute left-1 block text-[10px] tracking-normal font-normal px-1"
+              className="absolute left-1 block text-[10px] tracking-normal font-medium px-1"
               style={{ color: 'var(--accent)' }}
             >
               ✓ Valid message
@@ -199,7 +199,7 @@ const FORM_CARD_VARIANTS = {
     boxShadow: '0 20px 40px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.01), inset 0 1px 0 0 rgba(255,255,255,0.06)'
   },
   visible: {
-    opacity: 0.65,
+    opacity: 1,
     y: 0,
     scale: 1,
     boxShadow: '0 20px 40px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.01), inset 0 1px 0 0 rgba(255,255,255,0.06)',
@@ -531,11 +531,9 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     } catch (error) {
       console.error('EmailJS Error:', error)
 
-      if (setContactSystemState) {
-        setContactSystemState('engaged')
+      if (setSubState) {
+        setSubState('api_error')
       }
-
-      setSubState('api_error')
       setStatus({ type: '', message: '' })
 
       if (setTransmissionFailed) {
@@ -595,16 +593,12 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             y: -8,
             transition: { duration: 0.15, ease: [0.22, 1, 0.36, 1] }
           }
-          : contactSystemState === 'dormant'
-            ? {
-              scale: 1.0,
-              opacity: 1,
-              y: 0,
-              transition: { duration: 0.8, ease: [0.4, 0, 0.2, 1] }
-            }
-            : isInteracting
-              ? "interacting"
-              : "visible"
+          : {
+            scale: 1.0,
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.8, ease: [0.4, 0, 0.2, 1] }
+          }
       }
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -614,14 +608,14 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
           setIsFocused(false)
         }
       }}
-      className="relative rounded-[16px] border border-white/[0.06] bg-gradient-to-br from-surface/75 via-raised/55 to-surface/75 backdrop-blur-2xl p-6 sm:p-8 md:p-8 w-full overflow-hidden"
+      className="relative rounded-[16px] border border-white/[0.12] bg-gradient-to-br from-surface/90 via-raised/75 to-surface/90 backdrop-blur-2xl p-6 sm:p-8 md:p-8 w-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)]"
     >
       {/* Interactive Border Beam */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none rounded-[16px] z-10">
         <defs>
           <linearGradient id="borderBeamGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="var(--accent-secondary)" stopOpacity="0" />
-            <stop offset="50%" stopColor="var(--accent)" stopOpacity={isFocused ? 0.9 : isHovered ? 0.6 : 0.25} />
+            <stop offset="50%" stopColor="var(--accent)" stopOpacity="0.55" />
             <stop offset="100%" stopColor="var(--accent-hover)" stopOpacity="0" />
           </linearGradient>
         </defs>
@@ -633,16 +627,16 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
           rx="16"
           fill="none"
           stroke="url(#borderBeamGradient)"
-          strokeWidth={isFocused ? 1.75 : 1.25}
+          strokeWidth="1.25"
           pathLength="100"
           className="stroke-dasharray-[25_75] animate-border-beam"
           style={{
             transition: 'stroke-width 0.3s ease, stroke-opacity 0.3s ease',
-            animationDuration: isFocused ? '3s' : '6s'
+            animationDuration: '6s'
           }}
         />
         {/* Idle Breathing Border */}
-        {contactSystemState === 'dormant' && !isInteracting && !shouldReduceMotion && (
+        {contactSystemState === 'dormant' && !shouldReduceMotion && (
           <rect
             x="1" y="1"
             width="calc(100% - 2px)" height="calc(100% - 2px)"
@@ -657,15 +651,15 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
         )}
       </svg>
 
-      {/* Pulsing Cyber Corner Brackets */}
-      <div className={`absolute top-3 left-3 w-3 h-3 border-t-2 border-l-2 transition-all duration-500 pointer-events-none ${isFocused ? 'border-accent animate-pulse scale-105' : 'border-white/[0.18]'}`} />
-      <div className={`absolute top-3 right-3 w-3 h-3 border-t-2 border-r-2 transition-all duration-500 pointer-events-none ${isFocused ? 'border-accent animate-pulse scale-105' : 'border-white/[0.18]'}`} />
-      <div className={`absolute bottom-3 left-3 w-3 h-3 border-b-2 border-l-2 transition-all duration-500 pointer-events-none ${isFocused ? 'border-accent animate-pulse scale-105' : 'border-white/[0.18]'}`} />
-      <div className={`absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2 transition-all duration-500 pointer-events-none ${isFocused ? 'border-accent animate-pulse scale-105' : 'border-white/[0.18]'}`} />
+      {/* Cyber Corner Brackets */}
+      <div className="absolute top-3 left-3 w-3 h-3 border-t-2 border-l-2 transition-all duration-500 pointer-events-none border-[var(--accent)]/45" />
+      <div className="absolute top-3 right-3 w-3 h-3 border-t-2 border-r-2 transition-all duration-500 pointer-events-none border-[var(--accent)]/45" />
+      <div className="absolute bottom-3 left-3 w-3 h-3 border-b-2 border-l-2 transition-all duration-500 pointer-events-none border-[var(--accent)]/45" />
+      <div className="absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2 transition-all duration-500 pointer-events-none border-[var(--accent)]/45" />
 
       {/* Ambient theme-based glow */}
       <div className="absolute -top-32 -right-32 w-64 h-64 rounded-full blur-[100px] pointer-events-none"
-        style={{ background: 'var(--accent)', opacity: 0.08 }} />
+        style={{ background: 'var(--accent)', opacity: 0.18 }} />
 
       {/* Subtle noise texture */}
       <div className="absolute inset-0 opacity-[0.015] pointer-events-none rounded-[16px]"
@@ -673,7 +667,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
 
       {/* Animated light sweep */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[16px]">
-        <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/[0.02] to-transparent animate-[sweep_8s_ease-in-out_infinite]" />
+        <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/[0.04] to-transparent animate-[sweep_8s_ease-in-out_infinite]" />
       </div>
 
       {/* 3 Loading Dots (Top Right) */}
@@ -723,7 +717,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
               What brings you here?
             </label>
             <div className="relative">
-              <div className={`absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${isDropdownOpen ? 'text-[var(--accent)] scale-110' : 'text-white/35'
+              <div className={`absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${isDropdownOpen ? 'text-[var(--accent)] scale-110' : 'text-white/55'
                 }`}>
                 <HelpCircle className="h-4 w-4" strokeWidth={1.75} />
               </div>
@@ -732,7 +726,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                 id="inquiry-type"
                 onClick={() => setIsDropdownOpen(prev => !prev)}
                 onKeyDown={handleDropdownKeyDown}
-                className="w-full rounded-[6px] border border-white/[0.06] bg-black/35 pl-10 pr-4 py-3 text-xs md:text-sm text-[var(--text-primary)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.01)] hover:border-white/[0.10] focus:border-[var(--accent)]/45 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(255,255,255,0.02)] focus:bg-black/50 flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                className="w-full rounded-[6px] border border-white/[0.12] bg-black/45 pl-10 pr-4 py-3 text-xs md:text-sm text-[var(--text-primary)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.02)] hover:border-[var(--accent)]/30 focus:border-[var(--accent)]/70 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),0_0_12px_var(--accent-dim)] focus:bg-black/60 flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 aria-haspopup="listbox"
                 aria-expanded={isDropdownOpen}
                 aria-activedescendant={isDropdownOpen ? `option-${INQUIRY_OPTIONS.indexOf(inquiryType)}` : undefined}
@@ -750,7 +744,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -8, scale: 0.98 }}
                     transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute z-50 left-0 right-0 mt-2 rounded-[6px] border border-white/[0.06] bg-raised/95 backdrop-blur-3xl py-1.5 shadow-[0_16px_32px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.02)] overflow-hidden"
+                    className="absolute z-50 left-0 right-0 mt-2 rounded-[6px] border border-white/[0.15] bg-surface/98 backdrop-blur-3xl py-1.5 shadow-[0_20px_45px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.04)] overflow-hidden"
                     role="listbox"
                     onKeyDown={(e) => {
                       if (e.key === 'Escape') {
@@ -769,8 +763,8 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                             setIsDropdownOpen(false)
                           }}
                           className={`px-4 py-2 text-xs cursor-pointer transition-all duration-200 flex items-center justify-between border-l-2 ${isSelected
-                            ? 'text-[var(--accent)] font-semibold bg-white/[0.03] border-[var(--accent)]'
-                            : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/[0.015] border-transparent'
+                            ? 'text-[var(--accent)] font-semibold bg-white/[0.05] border-[var(--accent)]'
+                            : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/[0.025] border-transparent'
                             }`}
                           role="option"
                           aria-selected={isSelected}
@@ -874,11 +868,11 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             disabled={subState === 'submitting' || subState === 'success'}
             onMouseEnter={() => setIsBtnHovered(true)}
             onMouseLeave={() => setIsBtnHovered(false)}
-            className="group/btn relative overflow-hidden w-full rounded-[6px] py-3.5 px-6 text-xs font-semibold tracking-wide flex items-center justify-center gap-2.5 select-none outline-none border border-white/[0.08] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform active:translate-y-[1px] active:shadow-inner focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
+            className="group/btn relative overflow-hidden w-full rounded-[6px] py-3.5 px-6 text-xs font-semibold tracking-wide flex items-center justify-center gap-2.5 select-none outline-none border border-white/[0.22] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform active:translate-y-[1px] active:shadow-inner focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
             style={{
               background: ['idle', 'success', 'validation_error', 'api_error'].includes(subState) ? 'linear-gradient(to bottom, var(--accent) 0%, var(--accent-hover) 100%)' : undefined,
               boxShadow: ['idle', 'success', 'validation_error', 'api_error'].includes(subState)
-                ? '0 1px 0 rgba(255,255,255,0.22) inset, 0 -1px 0 rgba(0,0,0,0.3) inset, 0 4px 12px rgba(0,0,0,0.45)'
+                ? '0 1px 0 rgba(255,255,255,0.30) inset, 0 -1px 0 rgba(0,0,0,0.3) inset, 0 4px 16px var(--accent-dim)'
                 : '0 1px 0 rgba(255,255,255,0.05) inset, 0 -1px 0 rgba(0,0,0,0.25) inset'
             }}
           >

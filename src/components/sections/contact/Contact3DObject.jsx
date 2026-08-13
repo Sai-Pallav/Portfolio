@@ -20,9 +20,9 @@ const SCENE_CONFIG = {
     radius: 2.0,
     glassRadius: 1.96,
     haloRadius: 2.08,
-    wireframeOpacity: 0.06,
-    pointsOpacity: 0.35,
-    glowIntensity: 0.5,
+    wireframeOpacity: 0.12,
+    pointsOpacity: 0.50,
+    glowIntensity: 0.75,
     glowPower: 4.8,
   },
   orbit: {
@@ -95,7 +95,7 @@ const RingGlowMaterial = shaderMaterial(
    }`
 )
 extend({ RingGlowMaterial })
-// â”€â”€â”€ CameraRig â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 // Issue #7: Camera drift respects distanceFactor.
 // Issue #18: lookAt cached and only calculated on subpixel movement.
 // Issue #4: Wrap timer accumulator to prevent precision loss.
@@ -143,10 +143,10 @@ function Lights() {
   })
   return (
     <>
-      <ambientLight intensity={0.1} />
-      <hemisphereLight args={['#ffffff', '#090913', 0.2]} />
-      <directionalLight position={[5, 4, 4]} intensity={1.0} color="#ffffff" />
-      <pointLight ref={lightRef} position={[-4, -1, -4]} intensity={1.5} color={globalTheme.color} distance={12} decay={2.2} />
+      <ambientLight intensity={0.25} />
+      <hemisphereLight args={['#ffffff', '#090913', 0.3]} />
+      <directionalLight position={[5, 4, 4]} intensity={1.2} color="#ffffff" />
+      <pointLight ref={lightRef} position={[-4, -1, -4]} intensity={2.2} color={globalTheme.color} distance={12} decay={2.2} />
     </>
   )
 }

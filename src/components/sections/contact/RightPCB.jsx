@@ -841,36 +841,15 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     // Failed state: Heroes fade, infrastructure remains
     if (transmissionFailed && isHero) return 0
     
-    // Engaged state: Strong hierarchy by element type
-    if (contactSystemState === 'engaged') {
-      if (isHero) {
-        return {
-          trace: 1.0,         // Hero traces at full brightness
-          corridor: 0.80,     // Corridors clearly visible
-          component: 0.90,    // Components very visible
-          node: 1.0,          // Nodes fully bright
-          background: 0.45    // Infrastructure present but subordinate
-        }[elementType] || 0.95
-      }
-      // Non-hero elements in engaged state
-      return {
-        trace: 0.55,        // Ambient traces visible
-        corridor: 0.40,     // Ambient corridors readable
-        component: 0.50,    // Ambient components clear
-        node: 0.60,         // Ambient nodes moderate-bright
-        background: 0.40    // Infrastructure readable
-      }[elementType] || 0.50
-    }
-    
-    // Dormant state: All elements clearly visible, subtle hierarchy
+    // Default state: All elements clearly visible, subtle hierarchy
     return {
-      trace: 0.70,
-      corridor: 0.55,
-      component: 0.65,
-      node: 0.75,
-      background: 0.55
-    }[elementType] || 0.65
-  }, [contactSystemState, transmissionFailed, isTransmit])
+      trace: isHero ? 1.0 : 0.85,
+      corridor: 0.85,
+      component: 0.95,
+      node: 1.0,
+      background: 0.75
+    }[elementType] || 0.85
+  }, [transmissionFailed, isTransmit])
 
   useEffect(() => {
     if (!isInView || shouldReduceMotion) return
@@ -1855,14 +1834,16 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                         />
                       )}
 
-                      {contactSystemState === 'engaged' && !isTransmit && t.category === 'main' && (
+
+
+                      {!isTransmit && t.category === 'main' && (
                         <path
                           d={t.d}
                           stroke="var(--accent)"
                           strokeWidth={w * 1.25}
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          opacity="0.22"
+                          opacity="0.30"
                           filter="url(#pcbHairlineGlow)"
                           style={getTransitionStyle()}
                         />
@@ -2023,18 +2004,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                   />
                 )}
 
-                {contactSystemState === 'engaged' && !isTransmit && t.category === 'main' && (
-                  <path
-                    d={t.d}
-                    stroke="var(--accent)"
-                    strokeWidth={w * 1.25}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    opacity="0.22"
-                    filter="url(#pcbHairlineGlow)"
-                    style={getTransitionStyle()}
-                  />
-                )}
+
 
                 {/* Material Layer 3: Trace Core */}
                 <path
@@ -2057,6 +2027,19 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                   opacity={classOpacity * 0.12}
                   style={getTransitionStyle()}
                 />
+
+                {!isTransmit && t.category === 'main' && (
+                  <path
+                    d={t.d}
+                    stroke="var(--accent)"
+                    strokeWidth={w * 1.25}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity="0.30"
+                    filter="url(#pcbHairlineGlow)"
+                    style={getTransitionStyle()}
+                  />
+                )}
 
                 {/* Plated Solder Joints at Bends */}
                 {t.category !== 'ground' && t.bends && t.bends.map((bend, bIdx) => {

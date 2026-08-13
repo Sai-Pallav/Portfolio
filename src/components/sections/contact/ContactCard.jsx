@@ -77,11 +77,11 @@ export default memo(function ContactCard({
   const accentConfigs = {
     default: {
       glow: 'var(--accent-glow)',
-      borderHover: 'hover:border-[var(--accent)]/25',
+      borderHover: 'hover:border-[var(--accent)]/30',
       iconText: 'text-[var(--accent)]',
-      iconBg: 'bg-[var(--accent)]/10 border-[var(--accent)]/10',
-      iconGlow: 'group-hover:shadow-[0_0_16px_var(--accent-glow)]',
-      textAccent: 'text-[var(--accent)]/80',
+      iconBg: 'bg-[var(--accent)]/15 border-[var(--accent)]/25',
+      iconGlow: 'group-hover:shadow-[0_0_20px_var(--accent-glow)]',
+      textAccent: 'text-[var(--accent)]/90',
     }
   }
 
@@ -178,7 +178,7 @@ export default memo(function ContactCard({
     }
 
     return (
-      <span className="text-xs font-normal text-secondary/50 tracking-normal mt-4">
+      <span className="text-xs font-normal text-secondary/80 tracking-normal mt-4">
         {footer}
       </span>
     )
@@ -192,16 +192,16 @@ export default memo(function ContactCard({
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-surface/80 via-raised/60 to-surface/80 backdrop-blur-2xl p-6 md:p-8 min-h-[240px] h-full flex flex-col justify-between transition-all duration-200 ease-out select-none shadow-[0_4px_20px_-8px_rgba(0,0,0,0.3),0_1px_2px_rgba(168,85,247,0.08)] ${
+      className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-surface/90 via-raised/70 to-surface/90 backdrop-blur-2xl p-6 md:p-8 min-h-[240px] h-full flex flex-col justify-between transition-all duration-200 ease-out select-none shadow-[0_6px_24px_-8px_rgba(0,0,0,0.5),0_1px_2px_rgba(168,85,247,0.12)] ${
         effectiveHovered
           ? hasAction
-            ? 'border-[var(--accent)]/40 -translate-y-[2px] shadow-[0_8px_28px_-8px_rgba(0,0,0,0.4),0_1px_2px_rgba(168,85,247,0.12)]'
-            : 'border-white/20'
-          : 'border-white/10'
+            ? 'border-[var(--accent)]/65 -translate-y-[2px] shadow-[0_12px_36px_-6px_rgba(0,0,0,0.65),0_0_20px_var(--accent-dim)]'
+            : 'border-white/30'
+          : 'border-white/[0.15]'
       }`}
     >
       {/* Glossy top highlight */}
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/[0.005] to-white/[0.03] pointer-events-none" />
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/[0.015] to-white/[0.06] pointer-events-none" />
 
       {/* Local mouse glow radial overlay */}
       {!shouldReduceMotion && (
@@ -217,7 +217,7 @@ export default memo(function ContactCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           {/* Rounded Glass Icon Box with Soft Accents */}
-          <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border transition-all duration-500 shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.05)] ${config.iconBg} ${config.iconText} ${config.iconGlow} ${
+          <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border transition-all duration-500 shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.08)] ${config.iconBg} ${config.iconText} ${config.iconGlow} ${
             effectiveHovered ? 'scale-105' : ''
           }`}>
             {typeof icon === 'function' ? icon(effectiveHovered) : icon}
@@ -226,7 +226,7 @@ export default memo(function ContactCard({
             {label}
           </p>
         </div>
-        <span className="font-mono text-[9px] text-secondary/20 tracking-wider">0{index}</span>
+        <span className="font-mono text-[9px] text-secondary/40 tracking-wider">0{index}</span>
       </div>
 
       {/* Content Area */}
@@ -234,13 +234,13 @@ export default memo(function ContactCard({
         <h4 className="text-base md:text-lg font-bold text-[var(--text-heading)] font-heading tracking-tight mb-2 text-left">
           {title}
         </h4>
-        <p className="text-sm md:text-[15px] leading-[1.55] text-secondary/65 font-normal text-left">
+        <p className="text-sm md:text-[15px] leading-[1.55] text-secondary/85 font-normal text-left">
           {description}
         </p>
       </div>
 
       {/* Footer / CTA Area */}
-      <div className="flex items-center justify-between border-t border-white/[0.03] mt-4 pt-3.5 w-full">
+      <div className="flex items-center justify-between border-t border-white/[0.06] mt-4 pt-3.5 w-full">
         {renderFooter()}
       </div>
     </motion.div>

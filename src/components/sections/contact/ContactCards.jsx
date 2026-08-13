@@ -57,7 +57,7 @@ export default React.memo(function ContactCards() {
       viewport={{ once: true, margin: '-100px' }}
       className="w-full relative z-20"
     >
-      <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent w-full" aria-hidden="true" />
+      <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent)]/55 to-transparent w-full" aria-hidden="true" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-10">
         {/* Availability Status Card */}
         <motion.div variants={CARD_VARIANTS}>

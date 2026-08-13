@@ -5,9 +5,9 @@ const getTraceStyleAttrs = (category) => {
   if (category === 'main') {
     return { w: 2.0, opDefault: 0.95 };
   } else if (category === 'auxiliary') {
-    return { w: 0.75, opDefault: 0.70 };
+    return { w: 0.75, opDefault: 0.82 };
   } else {
-    return { w: 0.35, opDefault: 0.45 };
+    return { w: 0.35, opDefault: 0.60 };
   }
 };
 
@@ -69,11 +69,27 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   const [hasWokenUp, setHasWokenUp] = useState(false)
   const activationLevel = isTyping ? 3 : 0
 
+  const [activatedNodes, setActivatedNodes] = useState({})
+
   useEffect(() => {
     if (isInView || contactSystemState === 'engaged' || isTyping) {
       setHasWokenUp(true)
     }
   }, [isInView, contactSystemState, isTyping])
+
+  useEffect(() => {
+    if (!isInView) return
+
+    // Pulse traveling along trace takes ~1.3s - 1.5s to reach nodes A1-A4
+    // Once pulse passes through them, they activate permanently and run independently
+    const t1 = setTimeout(() => setActivatedNodes(prev => ({ ...prev, A2: true, A3: true })), 1350)
+    const t2 = setTimeout(() => setActivatedNodes(prev => ({ ...prev, A1: true, A4: true })), 1480)
+
+    return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+    }
+  }, [isInView])
 
   useEffect(() => {
     const sectionEl = document.getElementById('contact')
@@ -297,33 +313,14 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     if (isTransmit) return elementType === 'particle' ? 1.0 : 0
     if (transmissionFailed && isHero) return 0
     
-    if (contactSystemState === 'engaged') {
-      if (isHero) {
-        return {
-          trace: 1.0,
-          corridor: 0.80,
-          component: 0.90,
-          node: 1.0,
-          background: 0.45
-        }[elementType] || 0.95
-      }
-      return {
-        trace: 0.55,
-        corridor: 0.40,
-        component: 0.50,
-        node: 0.60,
-        background: 0.40
-      }[elementType] || 0.50
-    }
-    
     return {
-      trace: 0.70,
-      corridor: 0.55,
-      component: 0.65,
-      node: 0.75,
-      background: 0.55
-    }[elementType] || 0.65
-  }, [contactSystemState, isTransmit, transmissionFailed])
+      trace: isHero ? 1.0 : 0.85,
+      corridor: 0.85,
+      component: 0.95,
+      node: 1.0,
+      background: 0.75
+    }[elementType] || 0.85
+  }, [isTransmit, transmissionFailed])
 
   useEffect(() => {
     if (!isInView || shouldReduceMotion) return
@@ -742,11 +739,11 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           d={t.d}
           stroke="var(--accent)"
           strokeWidth={w + 0.6}
-          opacity="0.22"
+          opacity="0.30"
           filter="url(#pcbHairlineGlow)"
           style={{
             ...getTransitionStyle(),
-            opacity: (isHero && contactSystemState === 'engaged' && !isTransmit) ? 0.22 : 0,
+            opacity: !isTransmit ? 0.30 : 0,
             transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)'
           }}
         />
@@ -758,7 +755,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           d={t.d}
           stroke="var(--accent)"
           strokeWidth={w}
-          opacity={0.95 * targetOpacity}
+          opacity={targetOpacity}
           style={getTransitionStyle()}
         />
 
@@ -812,10 +809,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
   const renderNode = (n, i) => {
     const targetOpacity = getTargetOpacity(n.chKey)
-    const isUpper = n.id === 'A1' || n.id === 'A2'
-    const moveX1 = -60 * scale
-    const moveX2 = -80 * scale
-    const moveY1 = isUpper ? -20 : 20
+    const isNodeActive = Boolean(activatedNodes[n.id] || shouldReduceMotion)
 
     const nodeStyle = {
       transition: 'transform 1.2s cubic-bezier(0.25, 1, 0.5, 1)'
@@ -825,12 +819,12 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
       <g
         key={`node-${i}`}
         transform={`translate(${xStart + n.x * scale}, ${n.y})`}
-        opacity={targetOpacity}
+        opacity={isNodeActive ? targetOpacity : targetOpacity * 0.7}
         style={getTransitionStyle()}
       >
         <g style={nodeStyle}>
           {/* Stepped CAD Docking Frame, Pass 5 */}
-          <g stroke="var(--accent)" strokeWidth="0.30" fill="none" opacity="0.35">
+          <g stroke="var(--accent)" strokeWidth="0.30" fill="none" opacity={isNodeActive ? 0.45 : 0.25}>
             <circle cx="0" cy="0" r="20.5" strokeDasharray="2 2" />
           </g>
           {/* Substrate Clearance Gap */}
@@ -839,26 +833,25 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           <circle cx="0" cy="0" r="16" fill="#030304" opacity={0.6} />
 
           {/* Concentric Copper Pad Ring */}
-          <circle cx="0" cy="0" r="14.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.45" opacity={0.85} />
+          <circle cx="0" cy="0" r="14.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.45" opacity={isNodeActive ? 0.95 : 0.70} />
           <circle cx="0" cy="0" r="12" fill="none" stroke="rgba(255, 255, 255, 0.25)" strokeDasharray="1.5 1.5" strokeWidth="0.35" opacity="0.75" />
-          <circle cx="0" cy="0" r="9.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.35" opacity="0.80" />
+          <circle cx="0" cy="0" r="9.5" fill="none" stroke="url(#gold-plated)" strokeWidth="0.35" opacity={isNodeActive ? 0.90 : 0.65} />
 
-          {/* Outer expanding pulse ring (Radar Effect) */}
-          <circle cx="0" cy="0" r="10" fill="none" stroke="var(--accent)" strokeWidth="0.4"
+          {/* Outer expanding pulse ring (Radar Effect) - runs independently after pulse passes */}
+          <circle cx="0" cy="0" r="10" fill="none" stroke="var(--accent)" strokeWidth={isNodeActive ? 0.5 : 0.2}
             className="anim-pcb-radar-pulse"
             style={{
-              animationPlayState: 'running',
+              animationPlayState: isNodeActive ? 'running' : 'paused',
+              opacity: isNodeActive ? 1 : 0.2,
               transformOrigin: '0px 0px'
             }}
           />
 
-          {/* Rotatable Inner Details Group (Clockwise) */}
+          {/* Rotatable Inner Details Group (Clockwise) - runs independently after pulse passes */}
           <g className="anim-pcb-radar-rotate" style={{
-            animationPlayState: 'running',
+            animationPlayState: isNodeActive ? 'running' : 'paused',
             transformOrigin: '0px 0px'
           }}>
-
-
             {/* Radial traces entering node */}
             {[30, 90, 150, 210, 270, 330].map((angle, rIdx) => {
               const rad = (angle * Math.PI) / 180
@@ -874,8 +867,8 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
                   x2={x2}
                   y2={y2}
                   stroke="var(--accent)"
-                  strokeWidth="0.5"
-                  opacity={0.70}
+                  strokeWidth={isNodeActive ? 0.6 : 0.4}
+                  opacity={isNodeActive ? 0.85 : 0.40}
                 />
               )
             })}
@@ -883,7 +876,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
           {/* Counter-Rotatable Outer Details Group (Counter-Clockwise) */}
           <g className="anim-pcb-radar-rotate-counter" style={{
-            animationPlayState: 'running',
+            animationPlayState: isNodeActive ? 'running' : 'paused',
             transformOrigin: '0px 0px'
           }}>
             {/* Solder Joint Pads surrounding Node */}
@@ -901,32 +894,47 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
                   fill="#2f2f38"
                   stroke="#555"
                   strokeWidth="0.25"
-                  opacity={0.5}
+                  opacity={isNodeActive ? 0.75 : 0.4}
                 />
               )
             })}
           </g>
 
           {/* Outer pulse ring */}
-          <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity={0.4}
+          <circle cx="0" cy="0" r="8" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity={isNodeActive ? 0.6 : 0.2}
             className="anim-pcb-ring-breathe"
             style={{
-              animationPlayState: 'running',
+              animationPlayState: isNodeActive ? 'running' : 'paused',
               transformOrigin: '0px 0px'
             }}
           />
 
           {/* Inner Metallic Ring */}
-          <circle cx="0" cy="0" r="5" fill="none" stroke="var(--accent)" strokeWidth="1.2" opacity={0.85} />
+          <circle cx="0" cy="0" r="5" fill="none" stroke="var(--accent)" strokeWidth="1.2" opacity={isNodeActive ? 0.95 : 0.6} />
 
-          {/* Core */}
-          <circle cx="0" cy="0" r="2.5" fill="var(--accent)" opacity={0.90}
+          {/* Core - Glows & Pulses independently after pulse passes */}
+          <circle cx="0" cy="0" r="2.5" fill="var(--accent)" opacity={isNodeActive ? 1.0 : 0.50}
             className="anim-pcb-core-pulse"
             style={{
-              animationPlayState: 'running',
+              animationPlayState: isNodeActive ? 'running' : 'paused',
               transformOrigin: '0px 0px'
             }}
           />
+
+          {/* Activation Flare Ring when pulse passes */}
+          {isNodeActive && (
+            <circle
+              cx="0" cy="0" r="16"
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth="0.8"
+              filter="url(#pcbHairlineGlow)"
+              style={{
+                animation: 'pcbRadarPulse 1.8s ease-out infinite',
+                transformOrigin: '0px 0px'
+              }}
+            />
+          )}
         </g>
       </g>
     )

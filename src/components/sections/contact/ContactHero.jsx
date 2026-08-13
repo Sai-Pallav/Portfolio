@@ -33,10 +33,10 @@ export default React.memo(function ContactHero() {
         viewport={{ once: true, margin: '-100px' }}
         className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight mb-6"
       >
-        <span className="bg-gradient-to-r from-primary via-accent to-accent-hover bg-clip-text text-transparent filter drop-shadow-[0_0_20px_var(--accent-dim)]">
+        <span className="bg-gradient-to-r from-primary via-accent to-accent-hover bg-clip-text text-transparent filter drop-shadow-[0_0_25px_var(--accent-dim)]">
           Engineering Scalable Systems{' '}
         </span>
-        <span className="bg-gradient-to-r from-accent-hover via-accent to-primary bg-clip-text text-transparent filter drop-shadow-[0_0_20px_var(--accent-dim)]">
+        <span className="bg-gradient-to-r from-accent-hover via-accent to-primary bg-clip-text text-transparent filter drop-shadow-[0_0_25px_var(--accent-dim)]">
           into Reality
         </span>
       </motion.h2>
@@ -46,7 +46,7 @@ export default React.memo(function ContactHero() {
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, margin: '-100px' }}
-        className="text-[15px] md:text-[16px] leading-relaxed text-white/50 font-normal w-full text-justify md:text-left max-w-3xl"
+        className="text-[15px] md:text-[16px] leading-relaxed text-white/75 font-normal w-full text-justify md:text-left max-w-3xl"
       >
         {DECORATIVE_TEXT}
       </motion.p>
