@@ -268,21 +268,20 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     addTrace('subject', 50, CH3_Y - 24, 176, CH3_Y - 44, 'ground');
 
     // --- CHANNEL 4 (MESSAGE) ---
-    addTrace('message', 0, CH4_Y + 90, 280, CH4_Y + 30, 'auxiliary', { pulse: true });
-    addTrace('message', 0, CH4_Y + 75, 280, CH4_Y + 20, 'auxiliary');
-    addTrace('message', 0, CH4_Y + 55, 280, CH4_Y + 5, 'main', { main: true });
-    addTrace('message', 0, CH4_Y + 45, 280, CH4_Y - 5, 'auxiliary');
-    addTrace('message', 0, CH4_Y + 62, 168, CH4_Y + 22, 'ground');
+    addTrace('message', 0, CH4_Y + 70, 280, CH4_Y + 25, 'auxiliary', { pulse: true });
+    addTrace('message', 0, CH4_Y + 50, 280, CH4_Y + 8, 'main', { main: true });
+    addTrace('message', 0, CH4_Y + 38, 280, CH4_Y - 8, 'auxiliary');
+    addTrace('message', 0, CH4_Y + 56, 200, CH4_Y + 18, 'ground');
 
-    addTrace('message', 0, CH4_Y, 130, CH4_Y - 10, 'auxiliary');
-    addTrace('message', 60, CH4_Y - 20, 280, CH4_Y - 40, 'auxiliary');
-    addTrace('message', 140, CH4_Y - 10, 280, CH4_Y - 30, 'auxiliary');
+    addTrace('message', 0, CH4_Y - 2, 130, CH4_Y - 12, 'auxiliary');
+    addTrace('message', 60, CH4_Y - 22, 280, CH4_Y - 40, 'auxiliary');
+    addTrace('message', 140, CH4_Y - 12, 280, CH4_Y - 30, 'auxiliary');
 
     // Edge Connectors on the far right
     addTrace('name', 260, CH1_Y - 33, 280, CH1_Y - 33, 'main');
     addTrace('email', 260, CH2_Y + 20, 280, CH2_Y + 20, 'main');
     addTrace('subject', 260, CH3_Y - 20, 280, CH3_Y - 20, 'main');
-    addTrace('message', 260, CH4_Y + 40, 280, CH4_Y + 40, 'main');
+    addTrace('message', 260, CH4_Y + 33, 280, CH4_Y + 33, 'main');
 
     return list;
   }, [scale, xStart, CH1_Y, CH2_Y, CH3_Y, CH4_Y])
@@ -297,7 +296,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     { x: 180, y: CH1_Y - 12, id: 'A1', chKey: 'name' },
     { x: 170, y: CH2_Y + 30, id: 'A2', chKey: 'email' },
     { x: 170, y: CH3_Y - 30, id: 'A3', chKey: 'subject' },
-    { x: 180, y: CH4_Y + 15, id: 'A4', chKey: 'message' },
+    { x: 180, y: CH4_Y + 12, id: 'A4', chKey: 'message' },
   ], [CH1_Y, CH2_Y, CH3_Y, CH4_Y])
 
   const isTransmit = contactSystemState === 'transmit'
@@ -1161,16 +1160,16 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             {traces.filter(t => t.chKey === 'message').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderGlassBlock(130, CH4_Y + 70, 16, 8, 'R41', 'message')}
-          {renderGlassBlock(150, CH4_Y + 15, 20, 10, 'C41', 'message')}
-          {renderGlassBlock(130, CH4_Y - 10, 14, 8, 'R42', 'message')}
-          {renderTerminationPad(0, CH4_Y + 90, 'TP4_S1', 'message')}
-          {renderTerminationPad(0, CH4_Y + 55, 'TP4_S2', 'message')}
+          {renderGlassBlock(120, CH4_Y + 52, 16, 8, 'R41', 'message')}
+          {renderGlassBlock(148, CH4_Y + 12, 20, 10, 'C41', 'message')}
+          {renderGlassBlock(130, CH4_Y - 12, 14, 8, 'R42', 'message')}
+          {renderTerminationPad(0, CH4_Y + 70, 'TP4_S1', 'message')}
+          {renderTerminationPad(0, CH4_Y + 50, 'TP4_S2', 'message')}
 
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'message').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
-          {renderEdgeConnector(CH4_Y + 40, 3)}
+          {renderEdgeConnector(CH4_Y + 33, 3)}
         </g>
 
       </svg>
