@@ -1230,7 +1230,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <polygon
           points={`${midStart},${Y_center - 180} ${middleTargetLimit - 15},${Y_center - 180} ${middleTargetLimit},${Y_center - 165} ${middleTargetLimit},${Y_center - 120} ${midStart},${Y_center - 120}`}
           fill="url(#copper-hatch-pattern)"
-          stroke="rgba(168, 85, 247, 0.22)"
+          stroke="color-mix(in srgb, var(--accent) 22%, transparent)"
           strokeWidth="0.6"
         />
 
@@ -1241,7 +1241,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
           width={Math.max(0, middleTargetLimit - midStart)}
           height={10}
           fill="url(#copper-hatch-pattern)"
-          stroke="rgba(168, 85, 247, 0.22)"
+          stroke="color-mix(in srgb, var(--accent) 22%, transparent)"
           strokeWidth="0.6"
         />
 
@@ -1249,7 +1249,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <polygon
           points={`${midStart},${Y_center - 32} ${middleTargetLimit - 15},${Y_center - 32} ${middleTargetLimit},${Y_center - 17} ${middleTargetLimit},${Y_center + 17} ${middleTargetLimit - 15},${Y_center + 32} ${midStart},${Y_center + 32}`}
           fill="url(#copper-hatch-pattern)"
-          stroke="rgba(168, 85, 247, 0.22)"
+          stroke="color-mix(in srgb, var(--accent) 22%, transparent)"
           strokeWidth="0.6"
         />
 
@@ -1260,7 +1260,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
           width={Math.max(0, middleTargetLimit - midStart)}
           height={10}
           fill="url(#copper-hatch-pattern)"
-          stroke="rgba(168, 85, 247, 0.22)"
+          stroke="color-mix(in srgb, var(--accent) 22%, transparent)"
           strokeWidth="0.6"
         />
 
@@ -1268,7 +1268,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <polygon
           points={`${midStart},${Y_center + 120} ${middleTargetLimit},${Y_center + 120} ${middleTargetLimit},${Y_center + 165} ${middleTargetLimit - 15},${Y_center + 180} ${midStart + 15},${Y_center + 180} ${midStart},${Y_center + 165}`}
           fill="url(#copper-hatch-pattern)"
-          stroke="rgba(168, 85, 247, 0.22)"
+          stroke="color-mix(in srgb, var(--accent) 22%, transparent)"
           strokeWidth="0.6"
         />
 
@@ -1276,7 +1276,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <polygon
           points={`${rightTargetLimit},${Y_center - 180} ${endX},${Y_center - 180} ${endX},${Y_center - 165} ${rightTargetLimit + (endX - rightTargetLimit) * 0.4},${Y_center - 60} ${rightTargetLimit},${Y_center - 60}`}
           fill="url(#copper-hatch-pattern)"
-          stroke="rgba(168, 85, 247, 0.22)"
+          stroke="color-mix(in srgb, var(--accent) 22%, transparent)"
           strokeWidth="0.6"
         />
 
@@ -1284,7 +1284,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <polygon
           points={`${rightTargetLimit},${Y_center - 10} ${rightTargetLimit + (endX - rightTargetLimit) * 0.5},${Y_center - 50} ${endX},${Y_center - 50} ${endX},${Y_center + 50} ${rightTargetLimit + (endX - rightTargetLimit) * 0.5},${Y_center + 50} ${rightTargetLimit},${Y_center + 10}`}
           fill="url(#copper-hatch-pattern)"
-          stroke="rgba(168, 85, 247, 0.22)"
+          stroke="color-mix(in srgb, var(--accent) 22%, transparent)"
           strokeWidth="0.6"
         />
 
@@ -1292,7 +1292,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <polygon
           points={`${rightTargetLimit},${Y_center + 60} ${rightTargetLimit + (endX - rightTargetLimit) * 0.4},${Y_center + 60} ${endX},${Y_center + 165} ${endX},${Y_center + 180} ${rightTargetLimit},${Y_center + 180}`}
           fill="url(#copper-hatch-pattern)"
-          stroke="rgba(168, 85, 247, 0.22)"
+          stroke="color-mix(in srgb, var(--accent) 22%, transparent)"
           strokeWidth="0.6"
         />
 
@@ -1386,7 +1386,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             {/* Layer 1: Ambient Field (soft outer glow) */}
             <path
               d={t.d}
-              stroke="rgba(168, 85, 247, 0.018)"
+              stroke="color-mix(in srgb, var(--accent) 18%, transparent)"
               strokeWidth={getCorridorWidth(w, 'outer') + 1}
               opacity={targetOpacity * 0.7}
               style={getTransitionStyle()}
@@ -1424,7 +1424,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             {t.bends && t.bends.map((b, bIdx) => (
               <g key={`m-bend-clear-${idx}-${bIdx}`} opacity={targetOpacity * 0.95}>
                 <circle cx={b.x} cy={b.y} r="4.2" fill="url(#radial-depth-gradient)" style={getTransitionStyle()} />
-                <circle cx={b.x} cy={b.y} r="3.8" fill="none" stroke="rgba(168, 85, 247, 0.03)" strokeWidth="0.25" style={getTransitionStyle()} />
+                <circle cx={b.x} cy={b.y} r="3.8" fill="none" stroke="color-mix(in srgb, var(--accent) 30%, transparent)" strokeWidth="0.25" style={getTransitionStyle()} />
                 <circle cx={b.x} cy={b.y} r="3.2" fill="#040407" opacity="0.9" style={getTransitionStyle()} />
                 <circle cx={b.x - 0.3} cy={b.y - 0.4} r="2.8" fill="none" stroke="rgba(255, 255, 255, 0.015)" strokeWidth="0.5" style={getTransitionStyle()} />
               </g>
@@ -1442,7 +1442,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             {/* Layer 1: Ambient Field */}
             <path
               d={t.d}
-              stroke="rgba(168, 85, 247, 0.018)"
+              stroke="color-mix(in srgb, var(--accent) 18%, transparent)"
               strokeWidth={getCorridorWidth(w, 'outer') + 1}
               opacity={targetOpacity * 0.7}
               style={getTransitionStyle()}
@@ -1480,7 +1480,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             {t.bends && t.bends.map((b, bIdx) => (
               <g key={`r-bend-clear-${idx}-${bIdx}`} opacity={targetOpacity * 0.95}>
                 <circle cx={b.x} cy={b.y} r="4.2" fill="url(#radial-depth-gradient)" style={getTransitionStyle()} />
-                <circle cx={b.x} cy={b.y} r="3.8" fill="none" stroke="rgba(168, 85, 247, 0.03)" strokeWidth="0.25" style={getTransitionStyle()} />
+                <circle cx={b.x} cy={b.y} r="3.8" fill="none" stroke="color-mix(in srgb, var(--accent) 30%, transparent)" strokeWidth="0.25" style={getTransitionStyle()} />
                 <circle cx={b.x} cy={b.y} r="3.2" fill="#040407" opacity="0.9" style={getTransitionStyle()} />
                 <circle cx={b.x - 0.3} cy={b.y - 0.4} r="2.8" fill="none" stroke="rgba(255, 255, 255, 0.015)" strokeWidth="0.5" style={getTransitionStyle()} />
               </g>
@@ -1501,8 +1501,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
       }
     }
     return {
-      opacity: 1.0,
-      filter: 'brightness(1.05) saturate(1.05)',
+      opacity: 0.95,
+      filter: 'brightness(1.0) saturate(1.0)',
       transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
     }
   }, [contactSystemState, isMiddleActive])
@@ -1615,7 +1615,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             </feMerge>
           </filter>
           <linearGradient id="pcbTrailGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(168, 85, 247, 0)" />
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.8" />
           </linearGradient>
           
@@ -1627,8 +1627,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
           
           {/* Routing field grid pattern for negative space */}
           <pattern id="routing-field-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-            <circle cx="0" cy="0" r="0.3" fill="rgba(168, 85, 247, 0.0)" />
-            <circle cx="10" cy="10" r="0.3" fill="rgba(168, 85, 247, 0.0)" />
+            <circle cx="0" cy="0" r="0.3" fill="var(--accent)" fillOpacity="0" />
+            <circle cx="10" cy="10" r="0.3" fill="var(--accent)" fillOpacity="0" />
           </pattern>
           
           {/* TIER 2 REFACTOR — Issue #5: Multi-layer corridor gradients */}
@@ -1679,8 +1679,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
           {/* Copper Hatch Ground Pour Pattern (High fidelity industrial mesh) */}
           <pattern id="copper-hatch-pattern" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="2" x2="4" y2="2" stroke="rgba(168, 85, 247, 0.22)" strokeWidth="0.60" />
-            <line x1="2" y1="0" x2="2" y2="4" stroke="rgba(168, 85, 247, 0.22)" strokeWidth="0.60" />
+            <line x1="0" y1="2" x2="4" y2="2" stroke="color-mix(in srgb, var(--accent) 22%, transparent)" strokeWidth="0.60" />
+            <line x1="2" y1="0" x2="2" y2="4" stroke="color-mix(in srgb, var(--accent) 22%, transparent)" strokeWidth="0.60" />
           </pattern>
 
           {/* Diagonal Scanline Sweep Gradient (Refined & Restrained) */}

@@ -32,8 +32,8 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-3.5 top-[23px] -translate-y-1/2 pointer-events-none transition-colors duration-200 z-10 ${
-        focused ? 'text-[var(--accent)]' : hasValue ? 'text-white/60' : 'text-white/35'
+      <div className={`absolute left-3.5 top-[23px] -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 ${
+        focused ? 'text-[var(--accent)]/90' : hasValue ? 'text-white/60' : 'text-white/40 group-hover:text-white/60'
       }`}>
         {Icon && <Icon className="h-4 w-4" strokeWidth={1.5} />}
       </div>
@@ -53,23 +53,27 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
         }}
         placeholder=" "
         aria-required={isRequired ? "true" : "false"}
-        className={`peer w-full h-[46px] rounded-[6px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#090a14]/90 via-[#05060b]/95 to-[#020205]/98 pl-10 pr-3.5 pt-3.5 pb-1 text-xs sm:text-[13px] text-white/95 placeholder-transparent outline-none transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.02)] hover:border-white/[0.16] focus:border-[var(--accent)]/60 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.9),0_0_12px_var(--accent-dim)] focus:bg-[#030307] ${
+        className={`peer w-full h-[46px] rounded-[8px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#0a0b15]/95 via-[#06070c]/98 to-[#030306]/98 pl-10 pr-3.5 pt-3.5 pb-1 text-xs sm:text-[13px] text-white/95 font-medium placeholder-transparent outline-none transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.015)] hover:border-white/[0.14] hover:border-t-white/[0.18] hover:from-[#0d0e19]/95 hover:via-[#07080e]/98 hover:to-[#030306]/98 focus:border-[var(--accent)]/70 focus:border-t-[var(--accent)]/85 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.92),inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_8px_color-mix(in_srgb,var(--accent)_14%,transparent)] focus:bg-[#040509] ${
           touched && error
             ? 'border-amber-500/40 focus:border-amber-500/70 focus:shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-            : hasValue ? 'border-white/[0.09]' : ''
+            : hasValue ? 'border-white/[0.10] border-t-white/[0.14] border-b-white/[0.04]' : ''
         }`}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute transition-all duration-200 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${
+        className={`absolute transition-all duration-150 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${
           focused || hasValue
-            ? 'top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] text-[var(--accent)]/85 bg-[#080912] px-1.5 rounded-[2px] border border-white/[0.07] shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
-            : 'top-1/2 -translate-y-1/2 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40'
+            ? `top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] px-1.5 rounded-[2px] shadow-[0_1px_2px_rgba(0,0,0,0.8)] bg-[#080912] ${
+                focused
+                  ? 'text-[var(--accent)]/90 border border-[var(--accent)]/30'
+                  : 'text-white/60 border border-white/[0.08]'
+              }`
+            : 'top-1/2 -translate-y-1/2 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40 group-hover:text-white/55'
         }`}
       >
         <span>{displayLabel}</span>
-        {isRequired && <span className="text-white/30 text-[9px] ml-1 font-normal select-none">*</span>}
+        {isRequired && <span className="text-white/25 text-[9px] ml-1 font-normal select-none">*</span>}
       </label>
 
       <div className="h-3.5 relative mt-0.5 overflow-visible">
@@ -112,8 +116,8 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-3.5 top-4 pointer-events-none transition-colors duration-200 z-10 ${
-        focused ? 'text-[var(--accent)]' : hasValue ? 'text-white/60' : 'text-white/35'
+      <div className={`absolute left-3.5 top-4 pointer-events-none transition-colors duration-150 z-10 ${
+        focused ? 'text-[var(--accent)]/90' : hasValue ? 'text-white/60' : 'text-white/40 group-hover:text-white/60'
       }`}>
         {Icon && <Icon className="h-4 w-4" strokeWidth={1.5} />}
       </div>
@@ -133,29 +137,38 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
         placeholder=" "
         rows={rows}
         aria-required={isRequired ? "true" : "false"}
-        className={`peer w-full rounded-[6px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#090a14]/90 via-[#05060b]/95 to-[#020205]/98 pl-10 pr-4 pt-4 pb-8 text-xs sm:text-[13px] text-white/95 placeholder-transparent outline-none transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] resize-none shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.02)] hover:border-white/[0.16] focus:border-[var(--accent)]/60 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.9),0_0_12px_var(--accent-dim)] focus:bg-[#030307] leading-relaxed ${
+        className={`peer w-full rounded-[8px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#0a0b15]/95 via-[#06070c]/98 to-[#030306]/98 pl-10 pr-4 pt-4 pb-8 text-xs sm:text-[13px] text-white/95 font-medium placeholder-transparent outline-none transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] resize-none shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.015)] hover:border-white/[0.14] hover:border-t-white/[0.18] hover:from-[#0d0e19]/95 hover:via-[#07080e]/98 hover:to-[#030306]/98 focus:border-[var(--accent)]/70 focus:border-t-[var(--accent)]/85 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.92),inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_8px_color-mix(in_srgb,var(--accent)_14%,transparent)] focus:bg-[#040509] leading-relaxed ${
           touched && error
             ? 'border-amber-500/40 focus:border-amber-500/70 focus:shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-            : hasValue ? 'border-white/[0.09]' : ''
+            : hasValue ? 'border-white/[0.10] border-t-white/[0.14] border-b-white/[0.04]' : ''
         }`}
         style={{ minHeight: '140px' }}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute transition-all duration-200 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${
+        className={`absolute transition-all duration-150 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${
           focused || hasValue
-            ? 'top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] text-[var(--accent)]/85 bg-[#080912] px-1.5 rounded-[2px] border border-white/[0.07] shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
-            : 'top-4 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40'
+            ? `top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] px-1.5 rounded-[2px] shadow-[0_1px_2px_rgba(0,0,0,0.8)] bg-[#080912] ${
+                focused
+                  ? 'text-[var(--accent)]/90 border border-[var(--accent)]/30'
+                  : 'text-white/60 border border-white/[0.08]'
+              }`
+            : 'top-4 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40 group-hover:text-white/55'
         }`}
       >
         <span>{displayLabel}</span>
-        {isRequired && <span className="text-white/30 text-[9px] ml-1 font-normal select-none">*</span>}
+        {isRequired && <span className="text-white/25 text-[9px] ml-1 font-normal select-none">*</span>}
       </label>
 
       <span
-        className="absolute bottom-2.5 right-3 text-[10px] font-mono tracking-widest transition-colors duration-200 pointer-events-none select-none text-white/35"
-        style={{ color: characterCount > characterLimit ? 'rgba(245,158,11,0.95)' : undefined }}
+        className={`absolute bottom-2.5 right-3 text-[10px] font-mono tracking-widest transition-colors duration-150 pointer-events-none select-none ${
+          characterCount > characterLimit
+            ? 'text-amber-400/90 font-medium'
+            : hasValue
+            ? 'text-white/45'
+            : 'text-white/30'
+        }`}
       >
         {characterCount} / {characterLimit}
       </span>
@@ -621,24 +634,24 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
           setIsFocused(false)
         }
       }}
-      className="relative rounded-[16px] border-t border-t-white/[0.14] border-x border-x-white/[0.07] border-b border-b-white/[0.03] bg-gradient-to-b from-[#0d0e1a] via-[#080912] to-[#040509] p-6 sm:p-7 md:p-8 w-full overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.02),inset_0_1px_0_0_rgba(255,255,255,0.07),inset_0_-2px_6px_rgba(0,0,0,0.8)]"
+      className="relative rounded-[14px] border-t border-t-white/[0.14] border-x border-x-white/[0.07] border-b border-b-white/[0.03] bg-[radial-gradient(ellipse_130%_90%_at_50%_0%,color-mix(in_srgb,var(--accent)_4%,#0d0f19)_0%,#07080d_55%,#030407_100%)] p-6 sm:p-7 md:p-8 w-full overflow-hidden shadow-[0_28px_56px_-14px_rgba(0,0,0,0.96),0_10px_20px_-5px_rgba(0,0,0,0.75),inset_0_1px_0_0_rgba(255,255,255,0.08),inset_0_0_0_1px_rgba(255,255,255,0.025),inset_0_-1px_3px_rgba(0,0,0,0.92)]"
     >
       {/* Top Edge Specular Rim Highlight (Directional Ambient Light Chamfer) */}
-      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.16] to-transparent pointer-events-none z-10" />
-      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--accent)]/15 to-transparent pointer-events-none z-10" />
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.14] to-transparent pointer-events-none z-10" />
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--accent)]/12 to-transparent pointer-events-none z-10" />
 
-      {/* Internal Upper Illumination Wash (Theme-Aware Reflected Device Light) */}
+      {/* Internal Upper Illumination Wash (Subtle Theme-Aware Reflected Device Light) */}
       <div
-        className="absolute -top-16 left-1/2 -translate-x-1/2 w-4/5 h-36 pointer-events-none"
+        className="absolute -top-16 left-1/2 -translate-x-1/2 w-4/5 h-32 pointer-events-none"
         style={{
           background: 'radial-gradient(ellipse at top, var(--accent-dim) 0%, transparent 75%)',
-          opacity: 'calc(0.6 * var(--ambient-intensity, 1))'
+          opacity: 'calc(0.35 * var(--ambient-intensity, 1))'
         }}
       />
 
       {/* Subtle micro-texture */}
       <div
-        className="absolute inset-0 opacity-[0.012] pointer-events-none rounded-[16px]"
+        className="absolute inset-0 opacity-[0.012] pointer-events-none rounded-[14px]"
         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }}
       />
 
@@ -680,12 +693,12 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             ref={dropdownRef}
             onBlur={handleDropdownBlur}
           >
-            <label htmlFor="inquiry-type" className="block text-[9px] font-mono tracking-[0.14em] font-semibold text-[var(--accent)]/65 uppercase">
+            <label htmlFor="inquiry-type" className="block text-[9px] font-mono tracking-[0.14em] font-medium text-white/50 uppercase mb-1.5">
               WHAT BRINGS YOU HERE?
             </label>
-            <div className="relative">
-              <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 z-10 ${
-                isDropdownOpen ? 'text-[var(--accent)]' : 'text-white/35'
+            <div className="relative group/dd">
+              <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 ${
+                isDropdownOpen ? 'text-[var(--accent)]/90' : 'text-white/40 group-hover/dd:text-white/60'
               }`}>
                 <HelpCircle className="h-4 w-4" strokeWidth={1.5} />
               </div>
@@ -694,14 +707,14 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                 id="inquiry-type"
                 onClick={() => setIsDropdownOpen(prev => !prev)}
                 onKeyDown={handleDropdownKeyDown}
-                className="w-full h-[46px] rounded-[6px] border border-white/[0.08] border-t-white/[0.15] border-b-white/[0.03] bg-gradient-to-b from-[#0d0e1b]/95 via-[#080913]/98 to-[#040409]/98 pl-10 pr-3.5 text-xs sm:text-[13px] text-white/95 outline-none transition-all duration-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06),0_2px_8px_rgba(0,0,0,0.5)] hover:border-white/[0.20] focus:border-[var(--accent)]/65 focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.9),0_0_12px_var(--accent-dim)] flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                className="w-full h-[46px] rounded-[8px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#0a0b15]/95 via-[#06070c]/98 to-[#030306]/98 pl-10 pr-3.5 text-xs sm:text-[13px] text-white/95 outline-none transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.015)] hover:border-white/[0.14] hover:border-t-white/[0.18] hover:from-[#0d0e19]/95 hover:via-[#07080e]/98 hover:to-[#030306]/98 focus:border-[var(--accent)]/70 focus:border-t-[var(--accent)]/85 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.92),inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_8px_color-mix(in_srgb,var(--accent)_14%,transparent)] focus:bg-[#040509] flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 aria-haspopup="listbox"
                 aria-expanded={isDropdownOpen}
                 aria-activedescendant={isDropdownOpen ? `option-${INQUIRY_OPTIONS.indexOf(inquiryType)}` : undefined}
               >
                 <span className="font-medium text-white/95 tracking-wide">{inquiryType}</span>
                 <ChevronDown
-                  className={`h-3.5 w-3.5 text-white/40 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[var(--accent)]' : ''}`}
+                  className={`h-3.5 w-3.5 text-white/40 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[var(--accent)]' : 'group-hover/dd:text-white/60'}`}
                 />
               </button>
 
@@ -712,7 +725,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -6, scale: 0.99 }}
                     transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute z-50 left-0 right-0 mt-1.5 rounded-[6px] border border-white/[0.09] bg-[#080913]/98 backdrop-blur-2xl py-1 shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.04)] overflow-hidden"
+                    className="absolute z-50 left-0 right-0 mt-1.5 rounded-[8px] border border-white/[0.08] bg-[#070810]/98 backdrop-blur-2xl py-1 shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.03)] overflow-hidden"
                     role="listbox"
                     onKeyDown={(e) => {
                       if (e.key === 'Escape') {

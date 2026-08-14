@@ -3,9 +3,9 @@ import { useReducedMotion } from 'framer-motion'
 
 const getTraceStyleAttrs = (category) => {
   if (category === 'main') {
-    return { w: 2.2, opDefault: 0.68 };
+    return { w: 2.2, opDefault: 0.58 };
   } else {
-    return { w: 0.65, opDefault: 0.48 };
+    return { w: 0.65, opDefault: 0.42 };
   }
 };
 
@@ -474,7 +474,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             {/* Layer 1: Ambient Field (soft outer glow) */}
             <path
               d={t.d}
-              stroke="rgba(168, 85, 247, 0.018)"
+              stroke="color-mix(in srgb, var(--accent) 18%, transparent)"
               strokeWidth={getCorridorWidth(w, 'outer') + 1}
               opacity={targetOpacity * 0.7}
               style={getTransitionStyle()}
@@ -509,7 +509,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             {t.bends && t.bends.map((b, bIdx) => (
               <g key={`l-bend-clear-${idx}-${bIdx}`} opacity={targetOpacity * 0.95}>
                 <circle cx={b.x} cy={b.y} r="4.2" fill="url(#radial-depth-gradient)" style={getTransitionStyle()} />
-                <circle cx={b.x} cy={b.y} r="3.8" fill="none" stroke="rgba(168, 85, 247, 0.03)" strokeWidth="0.25" style={getTransitionStyle()} />
+                <circle cx={b.x} cy={b.y} r="3.8" fill="none" stroke="color-mix(in srgb, var(--accent) 30%, transparent)" strokeWidth="0.25" style={getTransitionStyle()} />
                 <circle cx={b.x} cy={b.y} r="3.2" fill="#040407" opacity="0.9" style={getTransitionStyle()} />
                 <circle cx={b.x - 0.3} cy={b.y - 0.4} r="2.8" fill="none" stroke="rgba(255, 255, 255, 0.015)" strokeWidth="0.5" style={getTransitionStyle()} />
               </g>
@@ -905,8 +905,8 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
       }
     }
     return {
-      opacity: 1.0,
-      filter: 'brightness(1.05) saturate(1.05)',
+      opacity: 0.88,
+      filter: 'brightness(0.96) saturate(0.98)',
       transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
     }
   }, [contactSystemState, isIlluminated])
@@ -959,7 +959,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           </filter>
 
           <linearGradient id="pcbTrailGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(168, 85, 247, 0)" />
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.8" />
           </linearGradient>
 

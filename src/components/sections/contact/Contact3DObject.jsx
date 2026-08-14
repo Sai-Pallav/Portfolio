@@ -8,8 +8,8 @@ import SocialIcon from '@/components/ui/SocialIcon'
 
 // --- Global Theme Ref for Imperative Material Updates (No React Re-renders) ---
 const globalTheme = {
-  color: '#3b82f6',
-  secondaryColor: '#8b5cff',
+  color: '#8b5cf6',
+  secondaryColor: '#a855f7',
   version: 0,
 }
 
@@ -63,7 +63,7 @@ const lerpFI = (current, target, factor, delta) =>
 
 // Fresnel Atmospheric Glow
 const FresnelGlowMaterial = shaderMaterial(
-  { color: new THREE.Color('#3b82f6'), glowPower: SCENE_CONFIG.globe.glowPower, glowIntensity: SCENE_CONFIG.globe.glowIntensity },
+  { color: new THREE.Color('#8b5cf6'), glowPower: SCENE_CONFIG.globe.glowPower, glowIntensity: SCENE_CONFIG.globe.glowIntensity },
   `varying vec3 vNormal; varying vec3 vViewPosition;
    void main() { vNormal = normalize(normalMatrix * normal); vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); vViewPosition = -mvPosition.xyz; gl_Position = projectionMatrix * mvPosition; }`,
   `uniform vec3 color; uniform float glowPower; uniform float glowIntensity; varying vec3 vNormal; varying vec3 vViewPosition;
@@ -228,7 +228,7 @@ function Globe({ distanceFactor }) {
   return (
     <group>
       <mesh geometry={geomGlass} name="glassCore">
-        <meshStandardMaterial color="#0a0f1e" roughness={0.25} metalness={0.6}
+        <meshStandardMaterial color="#0a0814" roughness={0.25} metalness={0.6}
           transparent opacity={0.35} depthWrite={false} />
       </mesh>
       <mesh ref={wireRef} geometry={geomWire}>
@@ -622,7 +622,13 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
       tempColorA.set(globalTheme.color)
       tempColorB.set(globalTheme.secondaryColor)
       state.scene.traverse((obj) => {
-        if (obj.name === 'glassCore') return
+        if (obj.name === 'glassCore') {
+          if (obj.material) {
+            // Synchronize inner glass core with active theme hue (deep dark theme undertone)
+            obj.material.color.set(globalTheme.color).multiplyScalar(0.10).add(new THREE.Color('#05060a'))
+          }
+          return
+        }
         if (obj.isMesh || obj.isPoints) {
           if (obj.material) {
             const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
@@ -715,7 +721,7 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
     const readTheme = () => {
       if (typeof document === 'undefined') return
       const styles = getComputedStyle(document.documentElement)
-      const accent = styles.getPropertyValue("--accent").trim() || '#3b82f6'
+      const accent = styles.getPropertyValue("--accent").trim() || '#8b5cf6'
       const secondary = styles.getPropertyValue("--accent-secondary").trim() || styles.getPropertyValue("--accent-hover").trim() || accent
       let updated = false
       if (accent && accent !== globalTheme.color) {

@@ -131,8 +131,13 @@ export default memo(function ContactSection() {
     >
       {/* Background Layers Stack (God-Tier Ambient Atmosphere System) */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
-        {/* Layer 1: Base Canvas with deep obsidian foundation */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#010204] via-bg to-[#010204] transition-colors duration-500" />
+        {/* Layer 1: Master Luminance Foundation (Calibrated baseline: -10% micro environmental luminance) */}
+        <div
+          className="absolute inset-0 transition-colors duration-500"
+          style={{
+            background: 'radial-gradient(ellipse 140% 80% at 50% 50%, color-mix(in srgb, var(--accent) 2.8%, #0e1017) 0%, color-mix(in srgb, var(--accent) 1.5%, #07090e) 50%, #020305 100%)'
+          }}
+        />
 
         {/* Layer 1b: Low-Frequency Animated Grain Overlay (kills flat-gradient banding without visual noise) */}
         <div
@@ -143,45 +148,54 @@ export default memo(function ContactSection() {
           }}
         />
 
-        {/* Layer 1c: Deep Drifting Color Fields (75s - 85s slow organic drift biased toward center-right transition) */}
+        {/* Layer 1c: Deep Drifting Color Fields (Zone B & C: Micro-reduced -9% luminance for deeper background contrast) */}
         {!shouldReduceMotion && (
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {/* Transition field bridging PCB to Globe in center-right */}
             <div
-              className="absolute top-[16%] left-[32%] lg:left-[38%] w-[560px] h-[500px] rounded-full blur-[130px] will-change-transform"
+              className="absolute top-[14%] left-[30%] lg:left-[34%] w-[600px] h-[520px] rounded-full blur-[110px] will-change-transform"
               style={{
-                background: 'radial-gradient(ellipse 65% 55% at 52% 48%, var(--accent-dim) 0%, rgba(12,6,28,0.32) 48%, transparent 70%)',
-                animation: 'voidDriftField1 80s ease-in-out infinite',
-                opacity: 'calc(0.32 * var(--ambient-intensity, 1))'
+                background: 'radial-gradient(ellipse 70% 60% at 50% 50%, color-mix(in srgb, var(--accent) 10.5%, #0e121c) 0%, color-mix(in srgb, var(--accent) 5.2%, #090b14) 46%, color-mix(in srgb, var(--accent) 1.5%, transparent) 70%, transparent 88%)',
+                animation: 'voidDriftField1 80s ease-in-out infinite'
               }}
             />
-            {/* Globe environment field in upper-right */}
+            {/* Globe environment field in upper-right (Zone C focused atmospheric field) */}
             <div
-              className="absolute top-[22%] right-[-4%] lg:right-[0%] w-[540px] h-[540px] rounded-full blur-[140px] will-change-transform"
+              className="absolute top-[18%] right-[-4%] lg:right-[0%] w-[540px] h-[540px] rounded-full blur-[110px] will-change-transform"
               style={{
-                background: 'radial-gradient(circle, var(--accent-secondary, var(--accent-dim)) 0%, rgba(10,5,24,0.28) 50%, transparent 72%)',
-                animation: 'voidDriftField2 75s ease-in-out infinite',
-                opacity: 'calc(0.26 * var(--ambient-intensity, 1))'
+                background: 'radial-gradient(circle at 48% 48%, color-mix(in srgb, var(--accent-secondary, var(--accent)) 9.8%, #0c101a) 0%, color-mix(in srgb, var(--accent) 4.4%, #070910) 48%, color-mix(in srgb, var(--accent) 1.3%, transparent) 68%, transparent 88%)',
+                animation: 'voidDriftField2 75s ease-in-out infinite'
               }}
             />
           </div>
         )}
 
-        {/* Layer 2: Left-side localized environmental field (restrained to protect the form and maintain dark buffer) */}
-        <div className="absolute top-[22%] left-[0%] lg:left-[2%] w-[360px] h-[360px] lg:w-[400px] lg:h-[400px] rounded-full blur-[120px] pointer-events-none" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.035 * var(--ambient-intensity, 1))' }} />
+        {/* Layer 2: Form-side subtle dark buffer (creates organic embedding and visual crispness around the form) */}
+        <div className="absolute top-[22%] left-[0%] lg:left-[2%] w-[360px] h-[360px] lg:w-[400px] lg:h-[400px] rounded-full blur-[120px] pointer-events-none" style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 3%, #05070c) 0%, color-mix(in srgb, var(--accent) 1%, #020305) 55%, transparent 72%)', opacity: 'calc(0.27 * var(--ambient-intensity, 1))' }} />
 
-        {/* Layer 3: Controlled globe environmental illumination (supporting the 3-zone depth structure) */}
-        <div className="absolute top-[20%] right-[2%] lg:right-[8%] w-[420px] h-[420px] lg:w-[500px] lg:h-[500px] rounded-full blur-[110px] pointer-events-none" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.09 * var(--ambient-intensity, 1))' }} />
+        {/* Layer 3: Controlled globe environmental illumination (Tightened Zone C focus) */}
+        <div
+          className="absolute top-[18%] right-[0%] lg:right-[6%] w-[420px] h-[420px] lg:w-[480px] lg:h-[480px] rounded-full blur-[95px] pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 16%, transparent) 0%, color-mix(in srgb, var(--accent) 4.5%, transparent) 42%, transparent 68%)',
+            opacity: 'calc(0.32 * var(--ambient-intensity, 1))'
+          }}
+        />
 
         {/* Layer 4: Soft ambient accent glow supporting the lower foundation */}
-        <div className="absolute bottom-[-6%] left-[18%] w-[350px] h-[350px] lg:w-[400px] lg:h-[400px] rounded-full blur-[120px] pointer-events-none" style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.035 * var(--ambient-intensity, 1))' }} />
+        <div className="absolute bottom-[-6%] left-[18%] w-[350px] h-[350px] lg:w-[400px] lg:h-[400px] rounded-full blur-[120px] pointer-events-none" style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 4.5%, transparent) 0%, transparent 68%)', opacity: 'calc(0.21 * var(--ambient-intensity, 1))' }} />
 
-        {/* Layer 5: Tightened multi-stop elliptical vignette for rich natural perimeter falloff */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_75%_at_50%_48%,transparent_28%,rgba(1,2,5,0.45)_60%,rgba(0,1,3,0.92)_100%)] pointer-events-none" />
+        {/* Layer 5: Spatial Vignette & Edge Luminance Zoning (Zone A: Deep perimeter falloff) */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse 84% 72% at 54% 50%, transparent 44%, rgba(3, 4, 8, 0.32) 68%, rgba(2, 3, 6, 0.92) 100%), linear-gradient(to bottom, rgba(2, 3, 6, 0.72) 0%, transparent 18%, transparent 82%, rgba(2, 3, 6, 0.85) 100%)'
+          }}
+        />
 
         {/* Layer 6: Volumetric Atmospheric Float */}
         {!shouldReduceMotion && (
-          <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-14">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[0.19]">
             <motion.div
               animate={{
                 x: [0, 20, -10, 0],
@@ -192,8 +206,8 @@ export default memo(function ContactSection() {
                 repeat: Infinity,
                 ease: 'easeInOut'
               }}
-              className="absolute top-1/4 left-1/4 w-[280px] h-[200px] rounded-full blur-[95px] will-change-transform"
-              style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.06 * var(--ambient-intensity, 1))' }}
+              className="absolute top-1/4 left-1/4 w-[300px] h-[200px] rounded-full blur-[90px] will-change-transform"
+              style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%)' }}
             />
             <motion.div
               animate={{
@@ -206,8 +220,8 @@ export default memo(function ContactSection() {
                 ease: 'easeInOut',
                 delay: -5
               }}
-              className="absolute top-1/2 right-1/4 w-[300px] h-[220px] rounded-full blur-[105px] will-change-transform"
-              style={{ background: 'var(--gradient-glow)', opacity: 'calc(0.06 * var(--ambient-intensity, 1))' }}
+              className="absolute top-1/2 right-1/4 w-[320px] h-[220px] rounded-full blur-[100px] will-change-transform"
+              style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%)' }}
             />
           </div>
         )}
@@ -217,8 +231,8 @@ export default memo(function ContactSection() {
           <div
             className="pointer-events-none absolute inset-0 transition-opacity duration-300 opacity-0 group-hover/section:opacity-100"
             style={{
-              background: 'var(--gradient-glow)',
-              opacity: 'calc(0.035 * var(--ambient-intensity, 1))'
+              background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 70%)',
+              opacity: 'calc(0.28 * var(--ambient-intensity, 1))'
             }}
           />
         )}
@@ -260,7 +274,7 @@ export default memo(function ContactSection() {
               }}
             >
               <div className="w-full max-w-[474px]">
-                <ContactForm 
+                <ContactForm
                   contactSystemState={contactSystemState}
                   onTransmit={() => setContactSystemState('transmit')}
                   setContactSystemState={setContactSystemState}
@@ -273,23 +287,23 @@ export default memo(function ContactSection() {
             {/* Globe Container */}
             <div className="flex items-center justify-center relative z-20 lg:translate-x-16">
               <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] overflow-visible flex items-center justify-center pointer-events-none z-10">
-                {/* Zone B: Globe Environment (Medium-strength asymmetrical atmospheric field extending toward PCB transition) */}
+                {/* Zone B: Globe Environment (Soft localized outer halo: -5% micro-reduction) */}
                 <div
-                  className="absolute w-[320px] h-[320px] md:w-[420px] md:h-[420px] lg:w-[500px] lg:h-[500px] rounded-full blur-[64px] pointer-events-none -z-10"
+                  className="absolute w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[440px] lg:h-[440px] rounded-full blur-[52px] pointer-events-none -z-10"
                   style={{
-                    background: 'radial-gradient(ellipse 65% 58% at 46% 52%, var(--accent-dim) 0%, rgba(12,6,28,0.30) 46%, transparent 72%)',
+                    background: 'radial-gradient(ellipse 65% 58% at 46% 52%, color-mix(in srgb, var(--accent) 14%, #0b0d18) 0%, color-mix(in srgb, var(--accent) 4%, transparent) 45%, transparent 68%)',
                     animation: shouldReduceMotion ? 'none' : 'globeAtmosphereBreathe 7.5s ease-in-out infinite',
-                    opacity: 'calc(0.17 * var(--ambient-intensity, 1))'
+                    opacity: 'calc(0.15 * var(--ambient-intensity, 1))'
                   }}
                 />
-                {/* Zone A: Globe Core (Strong localized illumination immediately behind globe, rapid dark falloff) */}
+                {/* Zone A: Globe Core (Strong crisp localized core illumination, UNCHANGED) */}
                 <div
-                  className="absolute w-[190px] h-[190px] md:w-[250px] md:h-[250px] lg:w-[310px] lg:h-[310px] rounded-full blur-[36px] pointer-events-none -z-10"
+                  className="absolute w-[190px] h-[190px] md:w-[250px] md:h-[250px] lg:w-[310px] lg:h-[310px] rounded-full blur-[32px] pointer-events-none -z-10"
                   style={{
-                    background: 'radial-gradient(circle, var(--accent) 0%, rgba(168, 85, 247, 0.40) 35%, transparent 68%)',
+                    background: 'radial-gradient(circle, var(--accent) 0%, color-mix(in srgb, var(--accent) 32%, transparent) 34%, transparent 64%)',
                     animation: shouldReduceMotion ? 'none' : 'globeAtmosphereBreathe 7.5s ease-in-out infinite',
                     animationDelay: '-3.75s',
-                    opacity: 'calc(0.22 * var(--ambient-intensity, 1))'
+                    opacity: 'calc(0.24 * var(--ambient-intensity, 1))'
                   }}
                 />
                 <Contact3DObject isInView={isInViewRepeat} contactSystemState={contactSystemState} />
