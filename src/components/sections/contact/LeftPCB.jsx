@@ -244,15 +244,14 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     };
 
     // --- CHANNEL 1 (NAME) & ITS TOP Zone ---
-    addTrace('name', 0, CH1_Y - 90, 280, CH1_Y - 30, 'auxiliary', { pulse: true });
-    addTrace('name', 0, CH1_Y - 75, 280, CH1_Y - 20, 'auxiliary');
-    addTrace('name', 0, CH1_Y - 55, 280, CH1_Y - 5, 'main', { main: true });
-    addTrace('name', 0, CH1_Y - 45, 280, CH1_Y + 5, 'auxiliary');
-    addTrace('name', 0, CH1_Y - 62, 168, CH1_Y - 22, 'ground');
+    addTrace('name', 0, CH1_Y - 70, 280, CH1_Y - 25, 'auxiliary', { pulse: true });
+    addTrace('name', 0, CH1_Y - 50, 280, CH1_Y - 8, 'main', { main: true });
+    addTrace('name', 0, CH1_Y - 38, 280, CH1_Y + 8, 'auxiliary');
+    addTrace('name', 0, CH1_Y - 56, 200, CH1_Y - 18, 'ground');
 
-    addTrace('name', 0, CH1_Y, 130, CH1_Y + 10, 'auxiliary');
-    addTrace('name', 60, CH1_Y + 20, 280, CH1_Y + 40, 'auxiliary');
-    addTrace('name', 140, CH1_Y + 10, 280, CH1_Y + 30, 'auxiliary');
+    addTrace('name', 0, CH1_Y + 2, 130, CH1_Y + 12, 'auxiliary');
+    addTrace('name', 60, CH1_Y + 22, 280, CH1_Y + 40, 'auxiliary');
+    addTrace('name', 140, CH1_Y + 12, 280, CH1_Y + 30, 'auxiliary');
 
     // --- CHANNEL 2 (EMAIL) ---
     addTrace('email', 0, CH2_Y - 20, 280, CH2_Y + 40, 'auxiliary', { pulse: true });
@@ -280,7 +279,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     addTrace('message', 140, CH4_Y - 10, 280, CH4_Y - 30, 'auxiliary');
 
     // Edge Connectors on the far right
-    addTrace('name', 260, CH1_Y - 40, 280, CH1_Y - 40, 'main');
+    addTrace('name', 260, CH1_Y - 33, 280, CH1_Y - 33, 'main');
     addTrace('email', 260, CH2_Y + 20, 280, CH2_Y + 20, 'main');
     addTrace('subject', 260, CH3_Y - 20, 280, CH3_Y - 20, 'main');
     addTrace('message', 260, CH4_Y + 40, 280, CH4_Y + 40, 'main');
@@ -295,7 +294,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
   // Nodes (Mirrored Y coordinates)
   const nodes = useMemo(() => [
-    { x: 180, y: CH1_Y - 15, id: 'A1', chKey: 'name' },
+    { x: 180, y: CH1_Y - 12, id: 'A1', chKey: 'name' },
     { x: 170, y: CH2_Y + 30, id: 'A2', chKey: 'email' },
     { x: 170, y: CH3_Y - 30, id: 'A3', chKey: 'subject' },
     { x: 180, y: CH4_Y + 15, id: 'A4', chKey: 'message' },
@@ -1105,16 +1104,16 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             {traces.filter(t => t.chKey === 'name').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
-          {renderGlassBlock(130, CH1_Y - 70, 16, 8, 'R12', 'name')}
-          {renderGlassBlock(150, CH1_Y - 15, 20, 10, 'C08', 'name')}
-          {renderGlassBlock(130, CH1_Y + 10, 14, 8, 'R15', 'name')}
-          {renderTerminationPad(0, CH1_Y - 90, 'TP1_S1', 'name')}
-          {renderTerminationPad(0, CH1_Y - 55, 'TP1_S2', 'name')}
+          {renderGlassBlock(120, CH1_Y - 52, 16, 8, 'R12', 'name')}
+          {renderGlassBlock(148, CH1_Y - 12, 20, 10, 'C08', 'name')}
+          {renderGlassBlock(130, CH1_Y + 12, 14, 8, 'R15', 'name')}
+          {renderTerminationPad(0, CH1_Y - 70, 'TP1_S1', 'name')}
+          {renderTerminationPad(0, CH1_Y - 50, 'TP1_S2', 'name')}
 
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'name').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
-          {renderEdgeConnector(CH1_Y - 40, 0)}
+          {renderEdgeConnector(CH1_Y - 33, 0)}
         </g>
 
         {/* CHANNEL 2 (EMAIL) GROUP */}
