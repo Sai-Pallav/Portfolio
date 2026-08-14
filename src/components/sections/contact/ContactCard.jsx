@@ -192,7 +192,7 @@ export default memo(function ContactCard({
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-surface/90 via-raised/70 to-surface/90 backdrop-blur-2xl p-6 md:p-8 min-h-[240px] h-full flex flex-col justify-between transition-all duration-200 ease-out select-none shadow-[0_6px_24px_-8px_rgba(0,0,0,0.5),0_1px_2px_rgba(168,85,247,0.12)] ${
+      className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-surface/90 via-raised/70 to-surface/90 backdrop-blur-2xl p-6 md:p-8 min-h-[240px] h-full flex flex-col justify-between transition-all duration-200 ease-out select-none shadow-[0_6px_24px_-8px_rgba(0,0,0,0.5),0_1px_2px_var(--accent-dim)] ${
         effectiveHovered
           ? hasAction
             ? 'border-[var(--accent)]/65 -translate-y-[2px] shadow-[0_12px_36px_-6px_rgba(0,0,0,0.65),0_0_20px_var(--accent-dim)]'

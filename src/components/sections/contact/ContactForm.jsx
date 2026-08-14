@@ -27,12 +27,15 @@ const isConfigured = !!(serviceId && templateId && publicKey &&
 const FloatingInput = memo(function FloatingInput({ id, label, type, value, onChange, onBlur, error, touched, icon: Icon, onFocus }) {
   const [focused, setFocused] = useState(false)
   const hasValue = value && value.length > 0
+  const isRequired = label.includes('*')
+  const displayLabel = label.replace(' *', '').replace('Your ', '')
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/55'
-        }`}>
-        {Icon && <Icon className="h-4 w-4" strokeWidth={1.75} />}
+      <div className={`absolute left-3.5 top-[23px] -translate-y-1/2 pointer-events-none transition-colors duration-200 z-10 ${
+        focused ? 'text-[var(--accent)]' : hasValue ? 'text-white/60' : 'text-white/35'
+      }`}>
+        {Icon && <Icon className="h-4 w-4" strokeWidth={1.5} />}
       </div>
       <input
         type={type}
@@ -49,34 +52,36 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
           if (onBlur) onBlur(e)
         }}
         placeholder=" "
-        aria-required="true"
-        className={`peer w-full rounded-[8px] border border-white/[0.12] bg-black/45 pl-10 pr-4 pt-[24px] pb-[10px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.02)] hover:border-[var(--accent)]/30 focus:border-[var(--accent)]/70 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),0_0_12px_var(--accent-dim)] focus:bg-black/60 ${touched && error
-          ? 'border-amber-500/40 focus:border-amber-500/70 shadow-[0_0_0_1px_rgba(245,158,11,0.3)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.12),0_0_10px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.02]'
-          : ''
-          }`}
+        aria-required={isRequired ? "true" : "false"}
+        className={`peer w-full h-[46px] rounded-[6px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#090a14]/90 via-[#05060b]/95 to-[#020205]/98 pl-10 pr-3.5 pt-3.5 pb-1 text-xs sm:text-[13px] text-white/95 placeholder-transparent outline-none transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.02)] hover:border-white/[0.16] focus:border-[var(--accent)]/60 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.9),0_0_12px_var(--accent-dim)] focus:bg-[#030307] ${
+          touched && error
+            ? 'border-amber-500/40 focus:border-amber-500/70 focus:shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+            : hasValue ? 'border-white/[0.09]' : ''
+        }`}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute left-10 top-3 origin-[0] duration-300 transform pointer-events-none transition-all ease-[cubic-bezier(0.16,1,0.3,1)] font-medium ${touched && error ? 'peer-focus:text-amber-500/90' : 'peer-focus:text-[var(--accent)]'
-          } ${focused || hasValue
-            ? '-translate-y-[14px] scale-75 text-[9px] uppercase tracking-[0.15em] text-[var(--text-secondary)] bg-raised px-2 -mx-2 rounded'
-            : 'translate-y-0 scale-100 text-xs md:text-sm capitalize tracking-wide text-white/65'
-          }`}
+        className={`absolute transition-all duration-200 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${
+          focused || hasValue
+            ? 'top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] text-[var(--accent)]/85 bg-[#080912] px-1.5 rounded-[2px] border border-white/[0.07] shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
+            : 'top-1/2 -translate-y-1/2 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40'
+        }`}
       >
-        {label}
+        <span>{displayLabel}</span>
+        {isRequired && <span className="text-white/30 text-[9px] ml-1 font-normal select-none">*</span>}
       </label>
 
-      <div className="h-4 relative mt-1 overflow-visible">
+      <div className="h-3.5 relative mt-0.5 overflow-visible">
         <AnimatePresence initial={false}>
           {touched && error && (
             <motion.span
-              initial={{ opacity: 0, y: -4 }}
+              initial={{ opacity: 0, y: -2 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              exit={{ opacity: 0, y: -2 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
               id={`${id}-error`}
-              className="absolute left-1 block text-[10px] text-amber-400 tracking-normal font-medium px-1"
+              className="absolute left-0.5 block text-[10px] font-mono text-amber-400/90 tracking-tight font-medium px-0.5"
               role="alert"
             >
               ⚠ {error}
@@ -84,14 +89,13 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
           )}
           {touched && !error && hasValue && (
             <motion.span
-              initial={{ opacity: 0, y: -4 }}
+              initial={{ opacity: 0, y: -2 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute left-1 block text-[10px] tracking-normal font-medium px-1"
-              style={{ color: 'var(--accent)' }}
+              exit={{ opacity: 0, y: -2 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute left-0.5 block text-[10px] font-mono text-[var(--accent)]/80 tracking-tight font-medium px-0.5"
             >
-              ✓ Valid {label.replace(' *', '').replace('Your ', '').toLowerCase()}
+              ✓ Valid {displayLabel.toLowerCase()}
             </motion.span>
           )}
         </AnimatePresence>
@@ -100,15 +104,18 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
   )
 })
 
-const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onChange, onBlur, error, touched, rows = 5, characterCount, characterLimit, icon: Icon, onFocus }) {
+const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onChange, onBlur, error, touched, rows = 4, characterCount, characterLimit, icon: Icon, onFocus }) {
   const [focused, setFocused] = useState(false)
   const hasValue = value && value.length > 0
+  const isRequired = label.includes('*')
+  const displayLabel = label.replace(' *', '')
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-4 top-[24px] -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${focused ? 'text-[var(--accent)] scale-110' : hasValue ? 'text-[var(--text-secondary)]' : 'text-white/55'
-        }`}>
-        {Icon && <Icon className="h-4 w-4" strokeWidth={1.75} />}
+      <div className={`absolute left-3.5 top-4 pointer-events-none transition-colors duration-200 z-10 ${
+        focused ? 'text-[var(--accent)]' : hasValue ? 'text-white/60' : 'text-white/35'
+      }`}>
+        {Icon && <Icon className="h-4 w-4" strokeWidth={1.5} />}
       </div>
       <textarea
         id={id}
@@ -125,40 +132,44 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
         }}
         placeholder=" "
         rows={rows}
-        aria-required="true"
-        className={`peer w-full rounded-[8px] border border-white/[0.12] bg-black/45 pl-10 pr-4 pt-[24px] pb-[12px] text-xs md:text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl resize-none shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.02)] hover:border-[var(--accent)]/30 focus:border-[var(--accent)]/70 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),0_0_12px_var(--accent-dim)] focus:bg-black/60 leading-relaxed ${touched && error
-          ? 'border-amber-500/40 focus:border-amber-500/70 shadow-[0_0_0_1px_rgba(245,158,11,0.3)] focus:shadow-[inset_0_2px_4px_rgba(245,158,11,0.12),0_0_10px_rgba(245,158,11,0.3)] focus:bg-amber-500/[0.02]'
-          : ''
-          }`}
-        style={{ minHeight: '150px' }}
+        aria-required={isRequired ? "true" : "false"}
+        className={`peer w-full rounded-[6px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#090a14]/90 via-[#05060b]/95 to-[#020205]/98 pl-10 pr-4 pt-4 pb-8 text-xs sm:text-[13px] text-white/95 placeholder-transparent outline-none transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] resize-none shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.02)] hover:border-white/[0.16] focus:border-[var(--accent)]/60 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.9),0_0_12px_var(--accent-dim)] focus:bg-[#030307] leading-relaxed ${
+          touched && error
+            ? 'border-amber-500/40 focus:border-amber-500/70 focus:shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+            : hasValue ? 'border-white/[0.09]' : ''
+        }`}
+        style={{ minHeight: '140px' }}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute left-10 top-3 origin-[0] duration-300 transform pointer-events-none transition-all ease-[cubic-bezier(0.16,1,0.3,1)] font-medium ${touched && error ? 'peer-focus:text-amber-500/90' : 'peer-focus:text-[var(--accent)]'
-          } ${focused || hasValue
-            ? '-translate-y-[14px] scale-75 text-[9px] uppercase tracking-[0.15em] text-[var(--text-secondary)] bg-raised px-2 -mx-2 rounded'
-            : 'translate-y-0 scale-100 text-xs md:text-sm capitalize tracking-wide text-white/65'
-          }`}
+        className={`absolute transition-all duration-200 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${
+          focused || hasValue
+            ? 'top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] text-[var(--accent)]/85 bg-[#080912] px-1.5 rounded-[2px] border border-white/[0.07] shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
+            : 'top-4 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40'
+        }`}
       >
-        {label}
+        <span>{displayLabel}</span>
+        {isRequired && <span className="text-white/30 text-[9px] ml-1 font-normal select-none">*</span>}
       </label>
 
-      <span className="absolute bottom-3 right-4 text-[9px] font-mono tracking-wider transition-all duration-300 pointer-events-none opacity-80"
-        style={{ color: characterCount > characterLimit ? 'rgba(245,158,11,0.95)' : 'rgba(255,255,255,0.60)' }}>
+      <span
+        className="absolute bottom-2.5 right-3 text-[10px] font-mono tracking-widest transition-colors duration-200 pointer-events-none select-none text-white/35"
+        style={{ color: characterCount > characterLimit ? 'rgba(245,158,11,0.95)' : undefined }}
+      >
         {characterCount} / {characterLimit}
       </span>
 
-      <div className="h-4 relative mt-1 overflow-visible">
+      <div className="h-3.5 relative mt-0.5 overflow-visible">
         <AnimatePresence initial={false}>
           {touched && error && (
             <motion.span
-              initial={{ opacity: 0, y: -4 }}
+              initial={{ opacity: 0, y: -2 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              exit={{ opacity: 0, y: -2 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
               id={`${id}-error`}
-              className="absolute left-1 block text-[10px] text-amber-400 tracking-normal font-medium px-1"
+              className="absolute left-0.5 block text-[10px] font-mono text-amber-400/90 tracking-tight font-medium px-0.5"
               role="alert"
             >
               ⚠ {error}
@@ -166,12 +177,11 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
           )}
           {touched && !error && hasValue && (
             <motion.span
-              initial={{ opacity: 0, y: -4 }}
+              initial={{ opacity: 0, y: -2 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute left-1 block text-[10px] tracking-normal font-medium px-1"
-              style={{ color: 'var(--accent)' }}
+              exit={{ opacity: 0, y: -2 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute left-0.5 block text-[10px] font-mono text-[var(--accent)]/80 tracking-tight font-medium px-0.5"
             >
               ✓ Valid message
             </motion.span>
@@ -196,13 +206,11 @@ const FORM_CARD_VARIANTS = {
     opacity: 1,
     y: 0,
     scale: 1,
-    boxShadow: '0 20px 40px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.01), inset 0 1px 0 0 rgba(255,255,255,0.06)'
   },
   visible: {
     opacity: 1,
     y: 0,
     scale: 1,
-    boxShadow: '0 20px 40px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.01), inset 0 1px 0 0 rgba(255,255,255,0.06)',
     transition: {
       duration: 0.6,
       ease: [0.16, 1, 0.3, 1],
@@ -210,11 +218,10 @@ const FORM_CARD_VARIANTS = {
   },
   interacting: {
     opacity: 1,
-    y: -8,
+    y: 0,
     scale: 1,
-    boxShadow: '0 32px 64px -12px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.03), inset 0 1px 0 0 rgba(255,255,255,0.12)',
     transition: {
-      duration: 0.4,
+      duration: 0.3,
       ease: [0.16, 1, 0.3, 1]
     }
   }
@@ -238,34 +245,42 @@ const FORM_CHILD_VARIANTS = {
 
 const DOT_VARIANTS = {
   idle: () => ({
-    opacity: 0.2,
+    opacity: 0.85,
     scale: 1,
-    backgroundColor: "rgba(0,0,0,0.9)",
-    boxShadow: "0 0 0px transparent",
+    backgroundColor: "#04050a",
+    boxShadow: "inset 0 1px 1px rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.9)",
     transition: { duration: 0.3 }
   }),
   focused: (i) => ({
-    opacity: [0.25, 1, 0.25],
-    scale: [0.95, 1.2, 0.95],
-    backgroundColor: ["rgba(0,0,0,0.9)", "var(--accent)", "rgba(0,0,0,0.9)"],
-    boxShadow: ["0 0 0px var(--accent)", "0 0 8px var(--accent)", "0 0 0px var(--accent)"],
+    opacity: [0.75, 1, 0.75],
+    scale: [0.95, 1.1, 0.95],
+    backgroundColor: ["#04050a", "var(--accent)", "#04050a"],
+    boxShadow: [
+      "inset 0 1px 1px rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.9)",
+      "0 0 6px var(--accent)",
+      "inset 0 1px 1px rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.9)"
+    ],
     transition: {
       duration: 1.8,
       repeat: Infinity,
       ease: "easeInOut",
-      delay: i * 0.32
+      delay: i * 0.25
     }
   }),
   submitting: (i) => ({
-    opacity: [0.3, 1, 0.3],
-    scale: [1, 1.25, 1],
-    backgroundColor: ["rgba(0,0,0,0.9)", "var(--accent-hover)", "rgba(0,0,0,0.9)"],
-    boxShadow: ["0 0 0px var(--accent-hover)", "0 0 10px var(--accent-hover)", "0 0 0px var(--accent-hover)"],
+    opacity: [0.8, 1, 0.8],
+    scale: [1, 1.15, 1],
+    backgroundColor: ["#04050a", "var(--accent)", "#04050a"],
+    boxShadow: [
+      "inset 0 1px 1px rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.9)",
+      "0 0 8px var(--accent)",
+      "inset 0 1px 1px rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.9)"
+    ],
     transition: {
-      duration: 1.6,
+      duration: 1.5,
       repeat: Infinity,
       ease: "easeInOut",
-      delay: i * 0.28
+      delay: i * 0.22
     }
   })
 }
@@ -606,93 +621,50 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
           setIsFocused(false)
         }
       }}
-      className="relative rounded-[16px] border border-white/[0.12] bg-gradient-to-br from-surface/90 via-raised/75 to-surface/90 backdrop-blur-2xl p-6 sm:p-8 md:p-8 w-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)]"
+      className="relative rounded-[16px] border-t border-t-white/[0.14] border-x border-x-white/[0.07] border-b border-b-white/[0.03] bg-gradient-to-b from-[#0d0e1a] via-[#080912] to-[#040509] p-6 sm:p-7 md:p-8 w-full overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.02),inset_0_1px_0_0_rgba(255,255,255,0.07),inset_0_-2px_6px_rgba(0,0,0,0.8)]"
     >
-      {/* Interactive Border Beam */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none rounded-[16px] z-10">
-        <defs>
-          <linearGradient id="borderBeamGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="var(--accent-secondary)" stopOpacity="0" />
-            <stop offset="50%" stopColor="var(--accent)" stopOpacity="0.55" />
-            <stop offset="100%" stopColor="var(--accent-hover)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <rect
-          x="0.5"
-          y="0.5"
-          width="calc(100% - 1px)"
-          height="calc(100% - 1px)"
-          rx="16"
-          fill="none"
-          stroke="url(#borderBeamGradient)"
-          strokeWidth="1.25"
-          pathLength="100"
-          className="stroke-dasharray-[25_75] animate-border-beam"
-          style={{
-            transition: 'stroke-width 0.3s ease, stroke-opacity 0.3s ease',
-            animationDuration: '6s'
-          }}
-        />
-        {/* Idle Breathing Border */}
-        {contactSystemState === 'dormant' && !shouldReduceMotion && (
-          <rect
-            x="1" y="1"
-            width="calc(100% - 2px)" height="calc(100% - 2px)"
-            rx="15"
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth="1.5"
-            style={{
-              animation: 'panelIdleBreathe 4s ease-in-out infinite'
-            }}
-          />
-        )}
-      </svg>
+      {/* Top Edge Specular Rim Highlight (Directional Ambient Light Chamfer) */}
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.16] to-transparent pointer-events-none z-10" />
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--accent)]/15 to-transparent pointer-events-none z-10" />
 
-      {/* Cyber Corner Brackets */}
-      <div className="absolute top-3 left-3 w-3 h-3 border-t-2 border-l-2 transition-all duration-500 pointer-events-none border-[var(--accent)]/45" />
-      <div className="absolute top-3 right-3 w-3 h-3 border-t-2 border-r-2 transition-all duration-500 pointer-events-none border-[var(--accent)]/45" />
-      <div className="absolute bottom-3 left-3 w-3 h-3 border-b-2 border-l-2 transition-all duration-500 pointer-events-none border-[var(--accent)]/45" />
-      <div className="absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2 transition-all duration-500 pointer-events-none border-[var(--accent)]/45" />
+      {/* Internal Upper Illumination Wash (Theme-Aware Reflected Device Light) */}
+      <div
+        className="absolute -top-16 left-1/2 -translate-x-1/2 w-4/5 h-36 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at top, var(--accent-dim) 0%, transparent 75%)',
+          opacity: 'calc(0.6 * var(--ambient-intensity, 1))'
+        }}
+      />
 
-      {/* Ambient theme-based glow */}
-      <div className="absolute -top-32 -right-32 w-64 h-64 rounded-full blur-[100px] pointer-events-none"
-        style={{ background: 'var(--accent)', opacity: 0.18 }} />
+      {/* Subtle micro-texture */}
+      <div
+        className="absolute inset-0 opacity-[0.012] pointer-events-none rounded-[16px]"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }}
+      />
 
-      {/* Subtle noise texture */}
-      <div className="absolute inset-0 opacity-[0.015] pointer-events-none rounded-[16px]"
-        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")` }} />
-
-      {/* Animated light sweep */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[16px]">
-        <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/[0.04] to-transparent animate-[sweep_8s_ease-in-out_infinite]" />
+      {/* 3 Machined Status LEDs (Top Right) */}
+      <div className="absolute top-6 right-7 flex gap-1.5 items-center z-20 pointer-events-none">
+        <motion.div custom={0} variants={DOT_VARIANTS} animate={activeDotState} className="w-1.5 h-1.5 rounded-full bg-[#030408] border border-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.20),0_1px_2px_rgba(0,0,0,0.9)]" />
+        <motion.div custom={1} variants={DOT_VARIANTS} animate={activeDotState} className="w-1.5 h-1.5 rounded-full bg-[#030408] border border-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.20),0_1px_2px_rgba(0,0,0,0.9)]" />
+        <motion.div custom={2} variants={DOT_VARIANTS} animate={activeDotState} className="w-1.5 h-1.5 rounded-full bg-[#030408] border border-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.20),0_1px_2px_rgba(0,0,0,0.9)]" />
       </div>
 
-      {/* 3 Loading Dots (Top Right) */}
-      <div className="absolute top-5 right-7 flex gap-2.5 items-center z-20 pointer-events-none">
-        <motion.div custom={0} variants={DOT_VARIANTS} animate={activeDotState} className="w-2 h-2 rounded-full border-[1.5px] border-[var(--accent)] bg-black/90" />
-        <motion.div custom={1} variants={DOT_VARIANTS} animate={activeDotState} className="w-2 h-2 rounded-full border-[1.5px] border-[var(--accent)] bg-black/90" />
-        <motion.div custom={2} variants={DOT_VARIANTS} animate={activeDotState} className="w-2 h-2 rounded-full border-[1.5px] border-[var(--accent)] bg-black/90" />
-      </div>
-
-      <motion.div variants={FORM_CHILD_VARIANTS} className="mb-6 relative z-10">
-        <div className="flex items-center justify-between mb-2.5">
-          <span className="text-[10px] font-mono tracking-[0.2em] font-semibold text-[var(--accent)] uppercase">
-            CONTACT
-          </span>
-        </div>
-        <h2 className="text-2xl md:text-3xl font-bold text-[var(--text-heading)] font-heading tracking-tight mb-2 leading-tight">
+      <motion.div variants={FORM_CHILD_VARIANTS} className="mb-5 relative z-10">
+        <span className="text-[10px] font-mono tracking-[0.20em] font-semibold text-[var(--accent)]/70 uppercase block mb-1.5">
+          CONTACT
+        </span>
+        <h2 className="text-2xl sm:text-[28px] font-bold text-white font-heading tracking-tight mb-1.5 leading-[1.15]">
           Let's Build Something
-          <span className="block bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] bg-clip-text text-transparent">
+          <span className="block bg-gradient-to-r from-primary via-accent to-accent-hover bg-clip-text text-transparent">
             Exceptional
           </span>
         </h2>
-        <p className="text-xs text-[var(--text-secondary)] leading-relaxed max-w-sm">
+        <p className="text-xs sm:text-[13px] text-white/65 leading-relaxed max-w-sm font-normal">
           I usually respond within 24 hours. Let's discuss your project and create something remarkable together.
         </p>
       </motion.div>
 
-      <form onSubmit={handleSubmit} onKeyDown={handleTypingEvent} onInput={handleTypingEvent} className="space-y-4 relative z-10">
+      <form onSubmit={handleSubmit} onKeyDown={handleTypingEvent} onInput={handleTypingEvent} className="space-y-3.5 relative z-10">
         <div
           style={{
             filter: isTransmit ? 'blur(1.5px)' : 'blur(0px)',
@@ -700,49 +672,47 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
               ? 'filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
               : 'filter 150ms cubic-bezier(0.22, 1, 0.36, 1)'
           }}
-          className="space-y-4"
+          className="space-y-3.5"
         >
           <motion.div
             variants={FORM_CHILD_VARIANTS}
-            className="space-y-2 relative z-30"
+            className="space-y-1.5 relative z-30"
             ref={dropdownRef}
             onBlur={handleDropdownBlur}
           >
-            <label htmlFor="inquiry-type" className="sr-only text-[10px] font-mono tracking-[0.08em] font-medium text-[var(--text-muted)] uppercase">
-              What brings you here?
-            </label>
-            <label className="text-[10px] font-mono tracking-[0.08em] font-medium text-[var(--text-muted)] uppercase">
-              What brings you here?
+            <label htmlFor="inquiry-type" className="block text-[9px] font-mono tracking-[0.14em] font-semibold text-[var(--accent)]/65 uppercase">
+              WHAT BRINGS YOU HERE?
             </label>
             <div className="relative">
-              <div className={`absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 z-10 ${isDropdownOpen ? 'text-[var(--accent)] scale-110' : 'text-white/55'
-                }`}>
-                <HelpCircle className="h-4 w-4" strokeWidth={1.75} />
+              <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 z-10 ${
+                isDropdownOpen ? 'text-[var(--accent)]' : 'text-white/35'
+              }`}>
+                <HelpCircle className="h-4 w-4" strokeWidth={1.5} />
               </div>
               <button
                 type="button"
                 id="inquiry-type"
                 onClick={() => setIsDropdownOpen(prev => !prev)}
                 onKeyDown={handleDropdownKeyDown}
-                className="w-full rounded-[6px] border border-white/[0.12] bg-black/45 pl-10 pr-4 py-3 text-xs md:text-sm text-[var(--text-primary)] outline-none transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] backdrop-blur-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.02)] hover:border-[var(--accent)]/30 focus:border-[var(--accent)]/70 focus:shadow-[inset_0_2px_4px_rgba(0,0,0,0.65),0_0_12px_var(--accent-dim)] focus:bg-black/60 flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                className="w-full h-[46px] rounded-[6px] border border-white/[0.08] border-t-white/[0.15] border-b-white/[0.03] bg-gradient-to-b from-[#0d0e1b]/95 via-[#080913]/98 to-[#040409]/98 pl-10 pr-3.5 text-xs sm:text-[13px] text-white/95 outline-none transition-all duration-200 shadow-[inset_0_1px_1px_rgba(255,255,255,0.06),0_2px_8px_rgba(0,0,0,0.5)] hover:border-white/[0.20] focus:border-[var(--accent)]/65 focus:shadow-[inset_0_1px_2px_rgba(0,0,0,0.9),0_0_12px_var(--accent-dim)] flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 aria-haspopup="listbox"
                 aria-expanded={isDropdownOpen}
                 aria-activedescendant={isDropdownOpen ? `option-${INQUIRY_OPTIONS.indexOf(inquiryType)}` : undefined}
               >
-                <span>{inquiryType}</span>
+                <span className="font-medium text-white/95 tracking-wide">{inquiryType}</span>
                 <ChevronDown
-                  className={`h-4 w-4 text-[var(--text-secondary)] transition-transform duration-150 ${isDropdownOpen ? 'rotate-180' : ''}`}
+                  className={`h-3.5 w-3.5 text-white/40 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[var(--accent)]' : ''}`}
                 />
               </button>
 
               <AnimatePresence>
                 {isDropdownOpen && (
                   <motion.ul
-                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    initial={{ opacity: 0, y: -6, scale: 0.99 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute z-50 left-0 right-0 mt-2 rounded-[6px] border border-white/[0.15] bg-surface/98 backdrop-blur-3xl py-1.5 shadow-[0_20px_45px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.04)] overflow-hidden"
+                    exit={{ opacity: 0, y: -6, scale: 0.99 }}
+                    transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute z-50 left-0 right-0 mt-1.5 rounded-[6px] border border-white/[0.09] bg-[#080913]/98 backdrop-blur-2xl py-1 shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.04)] overflow-hidden"
                     role="listbox"
                     onKeyDown={(e) => {
                       if (e.key === 'Escape') {
@@ -760,9 +730,9 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                             setInquiryType(option)
                             setIsDropdownOpen(false)
                           }}
-                          className={`px-4 py-2 text-xs cursor-pointer transition-all duration-200 flex items-center justify-between border-l-2 ${isSelected
-                            ? 'text-[var(--accent)] font-semibold bg-white/[0.05] border-[var(--accent)]'
-                            : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/[0.025] border-transparent'
+                          className={`px-3.5 py-2 text-xs cursor-pointer transition-colors duration-150 flex items-center justify-between border-l-2 ${isSelected
+                            ? 'text-[var(--accent)] font-medium bg-white/[0.03] border-[var(--accent)]/80'
+                            : 'text-white/70 hover:text-white hover:bg-white/[0.02] border-transparent'
                             }`}
                           role="option"
                           aria-selected={isSelected}
@@ -777,7 +747,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             </div>
           </motion.div>
 
-          <motion.div variants={FORM_CHILD_VARIANTS} className="grid gap-4 sm:grid-cols-2">
+          <motion.div variants={FORM_CHILD_VARIANTS} className="grid gap-3.5 sm:grid-cols-2">
             <FloatingInput
               id="name"
               label="Your Name *"
@@ -841,16 +811,16 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
         {status.message && (
           <motion.div
             variants={FORM_CHILD_VARIANTS}
-            initial={{ opacity: 0, y: -5 }}
+            initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`rounded-[6px] border p-3 text-xs flex items-center gap-2.5 ${status.type === 'success'
+            className={`rounded-[6px] border p-2.5 text-xs flex items-center gap-2 font-mono ${status.type === 'success'
               ? 'border-green-500/20 bg-green-500/5 text-green-400'
               : 'border-red-500/20 bg-red-500/5 text-red-400 animate-shake'
               }`}
           >
             {status.type === 'success' && <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} />}
             {status.type === 'error' && <AlertCircle className="h-3.5 w-3.5" strokeWidth={2} />}
-            {status.message}
+            <span>{status.message}</span>
           </motion.div>
         )}
 
@@ -866,25 +836,30 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             disabled={subState === 'submitting' || subState === 'success'}
             onMouseEnter={() => setIsBtnHovered(true)}
             onMouseLeave={() => setIsBtnHovered(false)}
-            className="group/btn relative overflow-hidden w-full rounded-[6px] py-3.5 px-6 text-xs font-semibold tracking-wide flex items-center justify-center gap-2.5 select-none outline-none border border-white/[0.22] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform active:translate-y-[1px] active:shadow-inner focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
+            className="group/btn relative overflow-hidden w-full h-[46px] rounded-[6px] py-0 px-6 text-xs font-semibold tracking-[0.04em] flex items-center justify-center gap-2 select-none outline-none border transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform active:translate-y-[0.5px] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none"
             style={{
-              background: ['idle', 'success', 'validation_error', 'api_error'].includes(subState) ? 'linear-gradient(to bottom, var(--accent) 0%, var(--accent-hover) 100%)' : undefined,
+              background: ['idle', 'success', 'validation_error', 'api_error'].includes(subState)
+                ? 'linear-gradient(to bottom, color-mix(in srgb, var(--accent) 18%, #0f1015), color-mix(in srgb, var(--accent) 10%, #08090d), #040508)'
+                : undefined,
+              borderColor: ['idle', 'success', 'validation_error', 'api_error'].includes(subState)
+                ? 'color-mix(in srgb, var(--accent) 26%, transparent)'
+                : 'rgba(255, 255, 255, 0.08)',
               boxShadow: ['idle', 'success', 'validation_error', 'api_error'].includes(subState)
-                ? '0 1px 0 rgba(255,255,255,0.30) inset, 0 -1px 0 rgba(0,0,0,0.3) inset, 0 4px 16px var(--accent-dim)'
-                : '0 1px 0 rgba(255,255,255,0.05) inset, 0 -1px 0 rgba(0,0,0,0.25) inset'
+                ? 'inset 0 1px 0 0 color-mix(in srgb, var(--accent) 22%, rgba(255,255,255,0.12)), inset 0 -1px 0 0 rgba(0, 0, 0, 0.50), 0 4px 14px rgba(0, 0, 0, 0.55)'
+                : 'inset 0 1px 0 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 0 rgba(0, 0, 0, 0.30)'
             }}
           >
-            {/* Glass reflection overlay */}
+            {/* Specular glass reflection overlay */}
             {['idle', 'validation_error', 'api_error'].includes(subState) && (
-              <div className="absolute inset-0 bg-gradient-to-b from-white/[0.06] to-transparent opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-b from-white/[0.05] to-transparent opacity-0 group-hover/btn:opacity-100 transition-opacity duration-200 pointer-events-none" />
             )}
 
-            {/* Animated Sheen/Shine Effect (Only on Hover, Idle/Error States) */}
+            {/* Precision Sheen Effect */}
             {['idle', 'validation_error', 'api_error'].includes(subState) && (
               <span
-                className="absolute inset-0 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300 pointer-events-none"
+                className="absolute inset-0 opacity-0 group-hover/btn:opacity-100 transition-opacity duration-200 pointer-events-none"
                 style={{
-                  background: 'linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, 0.10) 50%, transparent 80%)',
+                  background: 'linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, 0.08) 50%, transparent 80%)',
                   backgroundSize: '200% 100%',
                   animation: 'sheen 0.6s ease-out forwards',
                   animationPlayState: isBtnHovered ? 'running' : 'paused'
@@ -911,11 +886,11 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.15 }}
                   className="flex items-center gap-2"
                 >
-                  <span>Send Inquiry</span>
-                  <Send className={`h-3.5 w-3.5 transition-transform duration-300 translate-y-[0.5px] ${isBtnHovered ? 'translate-x-1 -translate-y-0.5' : ''}`} strokeWidth={2} />
+                  <span className="text-white/95 font-medium">Send Inquiry</span>
+                  <Send className={`h-3.5 w-3.5 text-white/80 transition-transform duration-200 ${isBtnHovered ? 'translate-x-0.5 -translate-y-0.5 text-white' : ''}`} strokeWidth={1.75} />
                 </motion.span>
               )}
               {subState === 'validation_error' && (
@@ -924,10 +899,10 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-2 text-white font-semibold"
+                  transition={{ duration: 0.15 }}
+                  className="flex items-center gap-2 text-white font-medium"
                 >
-                  <AlertCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <AlertCircle className="h-3.5 w-3.5 text-white" strokeWidth={1.75} />
                   <span>Please complete required fields</span>
                 </motion.span>
               )}
@@ -937,10 +912,10 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: 0.15 }}
                   className="flex items-center gap-2 text-white font-medium"
                 >
-                  <AlertCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <AlertCircle className="h-3.5 w-3.5 text-white" strokeWidth={1.75} />
                   <span>Something went wrong — try again</span>
                 </motion.span>
               )}
@@ -950,8 +925,8 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-2 text-white/80"
+                  transition={{ duration: 0.15 }}
+                  className="flex items-center gap-2 text-white/90"
                 >
                   <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
                   <span>Sending...</span>
@@ -963,11 +938,11 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-2 text-white font-semibold animate-pulse"
+                  transition={{ duration: 0.15 }}
+                  className="flex items-center gap-2 text-white font-semibold"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  <span>✓ Message Sent</span>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-white" strokeWidth={1.75} />
+                  <span>Message Sent</span>
                 </motion.span>
               )}
               {subState === 'error' && (
@@ -976,10 +951,10 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-2 text-red-400 font-semibold"
+                  transition={{ duration: 0.15 }}
+                  className="flex items-center gap-2 text-white font-medium"
                 >
-                  <AlertCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  <AlertCircle className="h-3.5 w-3.5 text-white" strokeWidth={1.75} />
                   <span>Failed to Send. Click to Retry</span>
                 </motion.span>
               )}

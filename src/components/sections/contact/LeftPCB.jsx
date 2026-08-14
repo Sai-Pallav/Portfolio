@@ -3,11 +3,9 @@ import { useReducedMotion } from 'framer-motion'
 
 const getTraceStyleAttrs = (category) => {
   if (category === 'main') {
-    return { w: 2.0, opDefault: 0.95 };
-  } else if (category === 'auxiliary') {
-    return { w: 0.75, opDefault: 0.82 };
+    return { w: 2.2, opDefault: 0.68 };
   } else {
-    return { w: 0.35, opDefault: 0.60 };
+    return { w: 0.65, opDefault: 0.48 };
   }
 };
 
@@ -524,112 +522,6 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     </g>
   ), [traces, getTargetOpacity, isTransmit, getTransitionStyle])
 
-  // Ground-plane plates are derived from each channel's own trace-fan geometry
-  // (same H-D-V-H bend proportions used by drawLeftPCBPath, mirrored for symmetric
-  // channels) so every plate edge, width, and chamfer is explained by the routing
-  // it borders — the pour recedes exactly where a channel's traces fan out, and its
-  // width/thickness is whatever that channel's real fan geometry leaves behind.
-  const groundPlanes = React.useMemo(() => {
-    const marginLeft = xStart + 15
-    const marginRight = L_form_end - 15
-    const boardTop = 20
-    const boardBottom = H - 20
-
-    // Mirrors the bend math in drawLeftPCBPath for category 'auxiliary' (pCenter 0.425),
-    // offset vertically by marginY to produce a plate edge that runs parallel to the trace.
-    const fan = (y1, y2, marginY) => {
-      const x1 = xStart
-      const x2 = xStart + 280 * scale
-      const dx = x2 - x1
-      const absDy = Math.abs(y2 - y1)
-      const pCenter = 0.425
-      const px1 = x1 + (dx * pCenter - absDy / 2)
-      const px2 = px1 + absDy
-      return [px1, y1 + marginY, px2, y2 + marginY]
-    }
-
-    const ch1Top = fan(CH1_Y - 55, CH1_Y - 15, -10)
-    const ch1Bot = fan(CH1_Y + 10, CH1_Y + 30, 8)
-    const ch2Top = fan(CH2_Y - 20, CH2_Y + 10, -8)
-    const ch2Bot = fan(CH2_Y + 15, CH2_Y + 35, 8)
-    const ch3Top = fan(CH3_Y - 15, CH3_Y - 35, -8)
-    const ch3Bot = fan(CH3_Y + 20, CH3_Y - 10, 8)
-    const ch4Top = fan(CH4_Y - 10, CH4_Y - 30, -8)
-    const ch4Bot = fan(CH4_Y + 55, CH4_Y + 15, 10)
-
-    const Y_center = (CH2_Y + CH3_Y) / 2
-
-    const plates = [
-      {
-        key: 'top',
-        opacity: 0.70,
-        pts: [
-          [marginLeft, boardTop], [marginRight - 15, boardTop], [marginRight, boardTop + 15],
-          [marginRight, ch1Top[3]], [ch1Top[2], ch1Top[3]], [ch1Top[0], ch1Top[1]],
-          [marginLeft + 12, ch1Top[1]], [marginLeft, ch1Top[1] - 12]
-        ]
-      },
-      {
-        key: 'ch1-2',
-        opacity: 0.85,
-        pts: [
-          [marginLeft, ch1Bot[1]], [ch1Bot[0], ch1Bot[1]], [ch1Bot[2], ch1Bot[3]], [marginRight - 18, ch1Bot[3]], [marginRight, ch1Bot[3] + 12],
-          [marginRight, ch2Top[3]], [ch2Top[2], ch2Top[3]], [ch2Top[0], ch2Top[1]], [marginLeft, ch2Top[1]]
-        ]
-      },
-      {
-        key: 'central',
-        opacity: 1.00,
-        pts: [
-          [marginLeft, ch2Bot[1]], [ch2Bot[0], ch2Bot[1]], [ch2Bot[2], ch2Bot[3]], [marginRight - 10, ch2Bot[3]],
-          [marginRight - 10, Y_center - 10], [marginRight - 18, Y_center], [marginRight - 10, Y_center + 10],
-          [marginRight - 10, ch3Top[3]], [ch3Top[2], ch3Top[3]], [ch3Top[0], ch3Top[1]], [marginLeft, ch3Top[1]]
-        ]
-      },
-      {
-        key: 'ch3-4',
-        opacity: 0.85,
-        pts: [
-          [marginLeft, ch3Bot[1]], [ch3Bot[0], ch3Bot[1]], [ch3Bot[2], ch3Bot[3]], [marginRight, ch3Bot[3]],
-          [marginRight, ch4Top[3] - 12], [marginRight - 18, ch4Top[3]], [ch4Top[2], ch4Top[3]], [ch4Top[0], ch4Top[1]], [marginLeft, ch4Top[1]]
-        ]
-      },
-      {
-        key: 'bottom',
-        opacity: 0.70,
-        pts: [
-          [marginLeft, ch4Bot[1] + 12], [marginLeft + 12, ch4Bot[1]], [ch4Bot[0], ch4Bot[1]], [ch4Bot[2], ch4Bot[3]], [marginRight, ch4Bot[3]],
-          [marginRight, boardBottom - 15], [marginRight - 15, boardBottom], [marginLeft, boardBottom]
-        ]
-      }
-    ]
-
-    // Isolation slots — recessed manufacturing cutlines that articulate the three
-    // largest pours so they never read as flat slabs (same depth language as the
-    // Middle PCB). Each slot is derived from its plate's own solid band, and only
-    // emitted when that band is tall enough to host one with clearance.
-    const slotX = marginLeft + 8
-    const slotW = Math.max(0, marginRight - marginLeft - 16)
-    const slots = []
-    const topBand = Math.min(ch1Top[1], ch1Top[3]) - (boardTop + 15)
-    if (topBand > 26) {
-      slots.push({ x: slotX, y: Math.min(ch1Top[1], ch1Top[3]) - 12, w: slotW })
-    }
-    slots.push({ x: slotX, y: Y_center - 2, w: slotW })
-    const botBand = (boardBottom - 15) - Math.max(ch4Bot[1], ch4Bot[3])
-    if (botBand > 26) {
-      slots.push({ x: slotX, y: Math.max(ch4Bot[1], ch4Bot[3]) + 8, w: slotW })
-    }
-
-    return {
-      plates: plates.map(p => ({
-        pts: p.pts.map(pt => pt.join(',')).join(' '),
-        opacity: p.opacity
-      })),
-      slots
-    }
-  }, [xStart, scale, L_form_end, H, CH1_Y, CH2_Y, CH3_Y, CH4_Y])
-
   const getTrailPath = (chKey) => {
     const startX = xStart + 275 * scale
     let startY = CH1_Y - 40
@@ -716,59 +608,63 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   }
 
   const renderTrace = (t, i) => {
-    const isHero = ['name', 'email', 'subject', 'message'].includes(t.chKey)
-    const targetOpacity = getTargetOpacity(t.chKey, 'trace')
+    const isMain = t.category === 'main'
+    const classOpacity = isMain ? 0.68 : 0.48
     const w = t.w
 
     return (
       <React.Fragment key={`trace-${i}`}>
         {/* Material Layer 2: Groove Shadow */}
-        {t.category === 'main' && (
+        {isMain && (
           <path
             d={t.d}
             stroke="rgba(0, 0, 0, 0.45)"
             strokeWidth={w + 0.8}
             fill="none"
-            opacity={targetOpacity * 0.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={classOpacity * 0.75}
             transform="translate(0.4, 0.4)"
             style={getTransitionStyle()}
           />
         )}
 
         {/* Material Layer 2: Groove Highlight */}
-        {t.category === 'main' && (
+        {isMain && (
           <path
             d={t.d}
             stroke="rgba(255, 255, 255, 0.03)"
             strokeWidth={w + 0.8}
             fill="none"
-            opacity={targetOpacity * 0.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={classOpacity * 0.75}
             transform="translate(-0.4, -0.4)"
             style={getTransitionStyle()}
           />
         )}
 
-        <path
-          d={t.d}
-          stroke="var(--accent)"
-          strokeWidth={w + 0.6}
-          opacity="0.30"
-          filter="url(#pcbHairlineGlow)"
-          style={{
-            ...getTransitionStyle(),
-            opacity: !isTransmit ? 0.30 : 0,
-            transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)'
-          }}
-        />
-        
-        {/* Material Layer 2: Groove Shadow */}
+        {!isTransmit && isMain && (
+          <path
+            d={t.d}
+            stroke="var(--accent)"
+            strokeWidth={w * 1.25}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.30"
+            filter="url(#pcbHairlineGlow)"
+            style={getTransitionStyle()}
+          />
+        )}
 
         {/* Material Layer 3: Trace Core */}
         <path
           d={t.d}
           stroke="var(--accent)"
           strokeWidth={w}
-          opacity={targetOpacity}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={classOpacity}
           style={getTransitionStyle()}
         />
 
@@ -777,41 +673,52 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           d={t.d}
           stroke="url(#copper-texture-l)"
           strokeWidth={w}
-          opacity={0.12 * targetOpacity}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={classOpacity * 0.12}
           style={getTransitionStyle()}
         />
 
-        {/* Passive Trace Idle Highlight */}
-        {t.category === 'auxiliary' && i % 3 === 0 && !isTransmit && (
+        {/* Passive Trace Idle Highlight across all non-main traces */}
+        {!isMain && !isTransmit && (
           <path
             d={t.d}
             stroke="var(--accent)"
             strokeWidth={w}
+            strokeLinecap="round"
+            strokeLinejoin="round"
             fill="none"
             opacity="0"
             style={{
               ...getTransitionStyle(),
               animation: 'pcbIdleTraceHighlight 6s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+              animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
               animationDelay: `${i * 0.7}s`
             }}
           />
         )}
 
         {/* Plated Solder Joints at Bends */}
-        {t.category !== 'ground' && t.bends && t.bends.map((bend, bIdx) => {
-          const isMainBend = t.category === 'main';
-          const nodeRadius = isMainBend ? 1.5 : 1.0;
-          const ringRadius = isMainBend ? 1.0 : 0.65;
+        {t.bends && t.bends.map((bend, bIdx) => {
+          const isMainBend = isMain;
+          const nodeRadius = isMainBend ? 1.5 : 1.1;
+          const ringRadius = isMainBend ? 1.0 : 0.75;
           const coreRadius = isMainBend ? 0.35 : 0.25;
+          const usePulse = isMainBend && bIdx === 0 && !isTransmit;
+          const pulseStyle = usePulse ? {
+            animation: 'pcbIdleNodePulse 4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+            animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
+            animationDelay: `${(i * 2.5 + bIdx * 0.8) * 0.4}s`
+          } : {};
           return (
             <g
               key={`l-bend-${i}-${bIdx}`}
               transform={`translate(${bend.x}, ${bend.y})`}
-              opacity={targetOpacity * (isMainBend ? 0.85 : 0.70)}
-              style={getTransitionStyle()}
+              opacity={classOpacity * (isMainBend ? 0.85 : 0.65)}
+              style={{ ...getTransitionStyle(), ...pulseStyle }}
             >
               <circle cx="0" cy="0" r={nodeRadius} fill="#030304" />
-              <circle cx="0" cy="0" r={ringRadius} fill="none" stroke="url(#gold-plated)" strokeWidth="0.25" opacity={isMainBend ? 0.80 : 0.65} />
+              <circle cx="0" cy="0" r={ringRadius} fill="none" stroke="url(#gold-plated)" strokeWidth="0.25" opacity={isMainBend ? 0.80 : 0.60} />
               <circle cx="0" cy="0" r={coreRadius} fill="#030304" />
             </g>
           );
@@ -918,6 +825,19 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             className="anim-pcb-ring-breathe"
             style={{
               animationPlayState: isNodeActive ? 'running' : 'paused',
+              transformOrigin: '0px 0px'
+            }}
+          />
+
+          {/* Soft Radar-Ping (Concentric ring expansion scale 1 -> 2.2, opacity 0.6 -> 0, 4.8s loop) */}
+          <circle
+            cx="0" cy="0" r="7"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="0.4"
+            style={{
+              animation: 'pcbRadarPing 4.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
+              animationDelay: '0s',
               transformOrigin: '0px 0px'
             }}
           />
@@ -1049,33 +969,9 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             <circle cx="2" cy="2" r="1" fill="#ffffff" opacity="0.015" />
           </pattern>
 
-          {/* Substrate vignette for depth perception */}
-          <radialGradient id="substrate-vignette" cx="50%" cy="50%">
-            <stop offset="0%" stopColor="#05090c" stopOpacity="1.0" />
-            <stop offset="100%" stopColor="#030607" stopOpacity="0.7" />
-          </radialGradient>
-
-          {/* Substrate noise filters */}
-          <filter id="pcbSubstrateBlur" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur stdDeviation="45" />
-          </filter>
-          <filter id="pcbSubstrateNoise">
-            <feTurbulence type="fractalNoise" baseFrequency="1.8" numOctaves="3" stitchTiles="stitch" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0.02  0 0 0 0 0.04  0 0 0 0 0.03  0 0 0 0 0.02 0" />
-          </filter>
-
-          {/* Substrate Patterns */}
-          <pattern id="pcbFiberglassWeaveL" width="6" height="6" patternUnits="userSpaceOnUse">
-            <path d="M 0 3 L 6 3 M 3 0 L 3 6" stroke="rgba(255,255,255,0.018)" strokeWidth="0.4" />
-          </pattern>
+          {/* Brushed copper texture */}
           <pattern id="copper-texture-l" width="8" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(3)">
             <line x1="0" y1="1" x2="8" y2="1" stroke="rgba(255,255,255,0.025)" strokeWidth="0.4" />
-          </pattern>
-
-          {/* Copper Hatch Ground Pour Pattern */}
-          <pattern id="copper-hatch-pattern-l" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="2" x2="4" y2="2" stroke="rgba(168, 85, 247, 0.22)" strokeWidth="0.60" />
-            <line x1="2" y1="0" x2="2" y2="4" stroke="rgba(168, 85, 247, 0.22)" strokeWidth="0.60" />
           </pattern>
 
           {/* Recessed routing field corridors */}
@@ -1109,116 +1005,13 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             <stop offset="50%" stopColor="#f3e5ab" />
             <stop offset="100%" stopColor="#aa7c11" />
           </linearGradient>
-
-          {/* Substrate Masks */}
-          <mask id="substrateMaskL" x="-100%" y="-100%" width="300%" height="300%">
-            <rect
-              x={xStart + 15}
-              y={20}
-              width={Math.max(0, L_form_end - xStart - 35)}
-              height={H - 40}
-              rx="4"
-              fill="white"
-              filter="url(#pcbSubstrateBlur)"
-            />
-          </mask>
-
-          <mask id="copperHatchMaskL" x="-100%" y="-100%" width="300%" height="300%">
-            <rect x="-100%" y="-100%" width="300%" height="300%" fill="white" />
-            
-            {/* Cut out black clearance rectangles for Left PCB components */}
-            {/* Channel 1 components */}
-            <rect x={xStart + 130 * scale - 12} y={CH1_Y - 70 - 8} width={24} height={16} fill="black" />
-            <rect x={xStart + 150 * scale - 14} y={CH1_Y - 15 - 9} width={28} height={18} fill="black" />
-            <rect x={xStart + 130 * scale - 11} y={CH1_Y + 10 - 8} width={22} height={16} fill="black" />
-            
-            {/* Channel 2 components */}
-            <rect x={xStart + 100 * scale - 13} y={CH2_Y - 8.5} width={26} height={17} fill="black" />
-            <rect x={xStart + 140 * scale - 16} y={CH2_Y + 30 - 9.5} width={32} height={19} fill="black" />
-            <rect x={xStart + 75 * scale - 11} y={CH2_Y - 20 - 8} width={22} height={16} fill="black" />
-
-            {/* Channel 3 components */}
-            <rect x={xStart + 100 * scale - 13} y={CH3_Y - 8.5} width={26} height={17} fill="black" />
-            <rect x={xStart + 140 * scale - 16} y={CH3_Y - 30 - 9.5} width={32} height={19} fill="black" />
-            <rect x={xStart + 75 * scale - 11} y={CH3_Y + 20 - 8} width={22} height={16} fill="black" />
-
-            {/* Channel 4 components */}
-            <rect x={xStart + 130 * scale - 12} y={CH4_Y + 70 - 8} width={24} height={16} fill="black" />
-            <rect x={xStart + 150 * scale - 14} y={CH4_Y + 15 - 9} width={28} height={18} fill="black" />
-            <rect x={xStart + 130 * scale - 11} y={CH4_Y - 10 - 8} width={22} height={16} fill="black" />
-
-            {/* Nodes clearance */}
-            {nodes.map((node, idx) => (
-              <circle
-                key={`hatch-clear-node-l-${idx}`}
-                cx={xStart + node.x * scale}
-                cy={node.y}
-                r="24"
-                fill="black"
-              />
-            ))}
-          </mask>
         </defs>
-
-        {/* ========================================================
-              SUBSTRATE LAYER
-           ======================================================== */}
-        <g mask="url(#substrateMaskL)">
-          {/* Matte edge vignette to ground the board edges */}
-          <rect
-            x={xStart - 100}
-            y={0}
-            width={Math.max(0, L_form_end - xStart + 200)}
-            height={H}
-            fill="url(#substrate-vignette)"
-            opacity="0.45"
-          />
-          {/* Substrate fiberglass weave grid pattern */}
-          <rect
-            x={xStart - 100}
-            y={0}
-            width={Math.max(0, L_form_end - xStart + 200)}
-            height={H}
-            fill="url(#pcbFiberglassWeaveL)"
-            opacity="0.65"
-          />
-        </g>
 
         {/* ========================================================
               DYNAMICAL TRACE ROUTING FIELDS & CORRIDORS
            ======================================================== */}
         {traceCorridors}
 
-        {/* ========================================================
-              COPPER HATCH GROUND PLANES
-           ======================================================== */}
-        <g mask="url(#copperHatchMaskL)" style={{ transition: 'opacity 750ms cubic-bezier(0.4, 0, 0.2, 1)' }} opacity={isTransmit ? 0.3 : 1}>
-          {groundPlanes.plates.map((plate, idx) => (
-            <polygon
-              key={`plate-${idx}`}
-              points={plate.pts}
-              fill="url(#copper-hatch-pattern-l)"
-              stroke="rgba(168, 85, 247, 0.22)"
-              strokeWidth="0.6"
-              opacity={plate.opacity}
-            />
-          ))}
-        </g>
-
-        {/* Isolation slots — recessed cutline (dark) + bevel highlight (light), the
-            same two-layer depth construction the Middle PCB uses to articulate pours */}
-        <g style={{ transition: 'opacity 750ms cubic-bezier(0.4, 0, 0.2, 1)' }} opacity={isTransmit ? 0 : 1}>
-          <g fill="#020204" opacity="0.65">
-            {groundPlanes.slots.map((s, idx) => (
-              <rect key={`slot-${idx}`} x={s.x} y={s.y} width={Math.max(0, s.w)} height="4" rx="0.5" />
-            ))}
-          </g>
-          <g stroke="rgba(255,255,255,0.025)" strokeWidth="0.3" fill="none">
-            {groundPlanes.slots.map((s, idx) => (
-              <rect key={`slot-bevel-${idx}`} x={s.x} y={s.y} width={Math.max(0, s.w)} height="4" rx="0.5" transform="translate(0, 0.5)" />
-            ))}
-          </g>
-        </g>
         {/* Dynamic Particles Container */}
         <g ref={particlesContainerRef} />
 
@@ -1249,54 +1042,59 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
            ======================================================== */}
         {beamActive && isIlluminated && mainBeamTraces.length > 0 && (
           <g className="left-pcb-light-beams" style={{ pointerEvents: 'none' }}>
-            {mainBeamTraces.map((trace, idx) => (
-              <g key={`left-beam-${idx}`}>
-                {/* Layer 1: Ambient Outer Glow Line Pulse */}
-                <path
-                  d={trace.d}
-                  pathLength="100"
-                  stroke="var(--accent)"
-                  strokeWidth="5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                  opacity="0.35"
-                  strokeDasharray="15 120"
-                  style={{
-                    animation: 'pcbLeftLinePulse 2.4s linear infinite'
-                  }}
-                />
-                {/* Layer 2: Mid Laser Line Pulse */}
-                <path
-                  d={trace.d}
-                  pathLength="100"
-                  stroke="var(--accent)"
-                  strokeWidth="3.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                  opacity="0.85"
-                  strokeDasharray="15 120"
-                  style={{
-                    animation: 'pcbLeftLinePulse 2.4s linear infinite'
-                  }}
-                />
-                {/* Layer 3: Hot Laser Core Line Pulse */}
-                <path
-                  d={trace.d}
-                  pathLength="100"
-                  stroke="#ffffff"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                  strokeDasharray="15 120"
-                  style={{
-                    animation: 'pcbLeftLinePulse 2.4s linear infinite'
-                  }}
-                />
-              </g>
-            ))}
+            {mainBeamTraces.map((trace, idx) => {
+              return (
+                <g key={`left-beam-${idx}`}>
+                  {/* Layer 1: Ambient Outer Glow Line Pulse */}
+                  <path
+                    d={trace.d}
+                    pathLength="100"
+                    stroke="var(--accent)"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                    opacity="0.35"
+                    strokeDasharray="15 120"
+                    style={{
+                      animation: 'pcbLeftLinePulse 2.4s linear infinite',
+                      animationDelay: '0s'
+                    }}
+                  />
+                  {/* Layer 2: Mid Laser Line Pulse */}
+                  <path
+                    d={trace.d}
+                    pathLength="100"
+                    stroke="var(--accent)"
+                    strokeWidth="3.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                    opacity="0.85"
+                    strokeDasharray="15 120"
+                    style={{
+                      animation: 'pcbLeftLinePulse 2.4s linear infinite',
+                      animationDelay: '0s'
+                    }}
+                  />
+                  {/* Layer 3: Hot Laser Core Line Pulse */}
+                  <path
+                    d={trace.d}
+                    pathLength="100"
+                    stroke="#ffffff"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                    strokeDasharray="15 120"
+                    style={{
+                      animation: 'pcbLeftLinePulse 2.4s linear infinite',
+                      animationDelay: '0s'
+                    }}
+                  />
+                </g>
+              )
+            })}
           </g>
         )}
 

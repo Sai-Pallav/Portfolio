@@ -292,9 +292,9 @@ const generateRightBusPaths = (x1, y1, x2, y2, category, components) => {
   return applyClearance(rawSegments, components);
 };
 
-// TIER 1 REFACTOR — Issue #1: Enhanced trace width hierarchy with better contrast
+// Enhanced trace width hierarchy: main traces at 2.2px, all non-main traces at 0.65px
 const getWidthForCategory = (category) => {
-  return category === 'main' ? 2.2 : category === 'auxiliary' ? 0.90 : 0.55;
+  return category === 'main' ? 2.2 : 0.65;
 };
 
 // TIER 1 REFACTOR — Issue #1: Proportional corridor scaling system
@@ -1223,7 +1223,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
       {/* Fiberglass weave and Grid overlays */}
 
       {/* ========================================================
-            SOLID GROUND PLANE POURS & ISOLATION ZONES
+            SOLID GROUND PLANE POURS & ISOLATION ZONES WITH SCANLINE SWEEP
          ======================================================== */}
       <g mask="url(#copperHatchMask)" style={{ transition: 'opacity 750ms cubic-bezier(0.4, 0, 0.2, 1)' }} opacity={isTransmit ? 0.3 : 1}>
         {/* Middle Top Ground Plane */}
@@ -1295,9 +1295,67 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
           stroke="rgba(168, 85, 247, 0.22)"
           strokeWidth="0.6"
         />
+
+        {/* Perforated Grid Panels: Slow Diagonal Scanline Sweep (Crossing every 9s) */}
+        <rect
+          x={midStart - 100}
+          y={Y_center - 250}
+          width={Math.max(0, endX - midStart + 200)}
+          height="500"
+          fill="url(#scanlineSweepGradient)"
+          style={{
+            animation: 'scanlineSweep 9s ease-in-out infinite',
+            pointerEvents: 'none',
+            willChange: 'transform, opacity'
+          }}
+        />
+
+        {/* ========================================================
+            AMBIENT RING PARTICLES (Scattered unlit rings with zero-gravity float & twinkle)
+         ======================================================== */}
+      <g className="ambient-ring-particles" opacity={isTransmit ? 0 : 1} style={{ pointerEvents: 'none' }}>
+        {[
+          { x: rightTargetLimit + W_right * 0.18, y: Y_center - 110, r: 5.5, delay: '0s', twinkleDelay: '3.2s' },
+          { x: rightTargetLimit + W_right * 0.32, y: Y_center - 45, r: 3.5, delay: '6.5s', twinkleDelay: '11.8s' },
+          { x: rightTargetLimit + W_right * 0.55, y: Y_center - 95, r: 6.5, delay: '13.2s', twinkleDelay: '19.4s' },
+          { x: rightTargetLimit + W_right * 0.25, y: Y_center + 70, r: 4.2, delay: '4.8s', twinkleDelay: '8.5s' },
+          { x: rightTargetLimit + W_right * 0.48, y: Y_center + 115, r: 5.8, delay: '10.4s', twinkleDelay: '16.0s' },
+          { x: rightTargetLimit + W_right * 0.70, y: Y_center + 40, r: 3.2, delay: '16.1s', twinkleDelay: '23.5s' }
+        ].map((ring, rIdx) => (
+          <g
+            key={`ambient-ring-${rIdx}`}
+            transform={`translate(${ring.x}, ${ring.y})`}
+            style={{
+              animation: 'ringFloatDrift 24s ease-in-out infinite',
+              animationDelay: ring.delay
+            }}
+          >
+            <circle
+              cx="0"
+              cy="0"
+              r={ring.r}
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth="0.35"
+              opacity="0.035"
+              style={{
+                animation: 'ringTwinkle 28s ease-in-out infinite',
+                animationDelay: ring.twinkleDelay
+              }}
+            />
+            <circle
+              cx="0"
+              cy="0"
+              r={ring.r * 0.45}
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.15)"
+              strokeWidth="0.2"
+              opacity="0.02"
+            />
+          </g>
+        ))}
       </g>
-
-
+      </g>
 
       {/* ========================================================
             NEGATIVE-SPACE CAD ROUTING ZONES & SILKSCREEN LABELS
@@ -1314,7 +1372,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         </g>
       </g>
     </>
-  ), [midStart, middleTargetLimit, rightTargetLimit, endX, Y_center, isTransmit])
+  ), [midStart, middleTargetLimit, rightTargetLimit, endX, Y_center, isTransmit, W_right])
 
   const traceCorridors = useMemo(() => (
     <g strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={isTransmit ? 0 : 1}>
@@ -1324,7 +1382,6 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         const w = getWidthForCategory(t.category)
         return (
           <React.Fragment key={`m-corridor-${idx}`}>
-            {/* TIER 2 REFACTOR — Issue #5: Multi-layer engineered channel system */}
             
             {/* Layer 1: Ambient Field (soft outer glow) */}
             <path
@@ -1339,42 +1396,36 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             <path
               d={t.d}
               stroke="url(#corridor-recess-gradient)"
-              strokeWidth={getCorridorWidth(w, 'channel')}
-              opacity={targetOpacity * 1.0}
-              style={getTransitionStyle()}
-            />
-            
-            {/* Layer 3: Channel Base (matte substrate) */}
-            <path
-              d={t.d}
-              stroke="#06060a"
-              strokeWidth={getCorridorWidth(w, 'inner') + 0.5}
+              strokeWidth={getCorridorWidth(w, 'outer')}
               opacity={targetOpacity * 0.95}
               style={getTransitionStyle()}
             />
-            
+
+            {/* Layer 3: Textured Floor */}
+            <path
+              d={t.d}
+              stroke="url(#corridor-texture)"
+              strokeWidth={getCorridorWidth(w, 'inner')}
+              opacity={targetOpacity * 0.6}
+              style={getTransitionStyle()}
+            />
+
             {/* Layer 4: Internal Highlight (optical depth cue) */}
             <path
               d={t.d}
-              stroke="rgba(255, 255, 255, 0.012)"
-              strokeWidth={getCorridorWidth(w, 'inner')}
+              stroke="rgba(255, 255, 255, 0.015)"
+              strokeWidth={getCorridorWidth(w, 'inner') - 0.2}
               opacity={targetOpacity * 0.9}
-              transform="translate(-0.3, -0.6)"
+              transform="translate(-0.2, -0.3)"
               style={getTransitionStyle()}
             />
-            
 
-            
-            {/* TIER 2 REFACTOR — Issue #11: Enhanced bend clearance with depth */}
+            {/* Bend Clearances */}
             {t.bends && t.bends.map((b, bIdx) => (
               <g key={`m-bend-clear-${idx}-${bIdx}`} opacity={targetOpacity * 0.95}>
-                {/* Depth well */}
                 <circle cx={b.x} cy={b.y} r="4.2" fill="url(#radial-depth-gradient)" style={getTransitionStyle()} />
-                {/* Manufacturing ring */}
                 <circle cx={b.x} cy={b.y} r="3.8" fill="none" stroke="rgba(168, 85, 247, 0.03)" strokeWidth="0.25" style={getTransitionStyle()} />
-                {/* Inner clearance */}
                 <circle cx={b.x} cy={b.y} r="3.2" fill="#040407" opacity="0.9" style={getTransitionStyle()} />
-                {/* Micro-highlight for 3D effect */}
                 <circle cx={b.x - 0.3} cy={b.y - 0.4} r="2.8" fill="none" stroke="rgba(255, 255, 255, 0.015)" strokeWidth="0.5" style={getTransitionStyle()} />
               </g>
             ))}
@@ -1384,12 +1435,10 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
       {/* Right Trace Corridors */}
       {pcbData.rightTraces.filter(t => t.category === 'main').map((t, idx) => {
-        const targetOpacity = 1.0
+        const targetOpacity = 0.85
         const w = getWidthForCategory(t.category)
         return (
           <React.Fragment key={`r-corridor-${idx}`}>
-            {/* TIER 2 REFACTOR — Issue #5: Multi-layer engineered channel system */}
-            
             {/* Layer 1: Ambient Field */}
             <path
               d={t.d}
@@ -1403,33 +1452,31 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             <path
               d={t.d}
               stroke="url(#corridor-recess-gradient)"
-              strokeWidth={getCorridorWidth(w, 'channel')}
-              opacity={targetOpacity * 1.0}
-              style={getTransitionStyle()}
-            />
-            
-            {/* Layer 3: Channel Base */}
-            <path
-              d={t.d}
-              stroke="#06060a"
-              strokeWidth={getCorridorWidth(w, 'inner') + 0.5}
+              strokeWidth={getCorridorWidth(w, 'outer')}
               opacity={targetOpacity * 0.95}
               style={getTransitionStyle()}
             />
-            
+
+            {/* Layer 3: Textured Floor */}
+            <path
+              d={t.d}
+              stroke="url(#corridor-texture)"
+              strokeWidth={getCorridorWidth(w, 'inner')}
+              opacity={targetOpacity * 0.6}
+              style={getTransitionStyle()}
+            />
+
             {/* Layer 4: Internal Highlight */}
             <path
               d={t.d}
-              stroke="rgba(255, 255, 255, 0.012)"
-              strokeWidth={getCorridorWidth(w, 'inner')}
+              stroke="rgba(255, 255, 255, 0.015)"
+              strokeWidth={getCorridorWidth(w, 'inner') - 0.2}
               opacity={targetOpacity * 0.9}
-              transform="translate(-0.3, -0.6)"
+              transform="translate(-0.2, -0.3)"
               style={getTransitionStyle()}
             />
-            
 
-            
-            {/* TIER 2 REFACTOR — Issue #11: Enhanced bend clearance with depth */}
+            {/* Bend Clearances */}
             {t.bends && t.bends.map((b, bIdx) => (
               <g key={`r-bend-clear-${idx}-${bIdx}`} opacity={targetOpacity * 0.95}>
                 <circle cx={b.x} cy={b.y} r="4.2" fill="url(#radial-depth-gradient)" style={getTransitionStyle()} />
@@ -1442,23 +1489,31 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         )
       })}
     </g>
-  ), [pcbData, getTargetOpacity, getTransitionStyle, isTransmit])
+  ), [pcbData.middleTraces, pcbData.rightTraces, isTransmit, getTransitionStyle])
+
+  const pcbContainerStyle = useMemo(() => {
+    if (contactSystemState !== 'dormant') return {}
+    if (!isMiddleActive) {
+      return {
+        opacity: 0.65,
+        filter: 'brightness(0.85) saturate(0.35) hue-rotate(-25deg)',
+        transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
+      }
+    }
+    return {
+      opacity: 1.0,
+      filter: 'brightness(1.05) saturate(1.05)',
+      transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
+    }
+  }, [contactSystemState, isMiddleActive])
 
   if (shouldReduceMotion) return null
-
-  // Before activation: desaturated cool-blue tint (clearly dim & cold)
-  // After activation: settles to natural warm accent tone
-  const dormantStyles = contactSystemState === 'dormant' ? {
-    opacity: isMiddleActive ? 1.0 : 0.65,
-    filter: isMiddleActive ? 'brightness(1.05) saturate(1.05)' : 'brightness(0.85) saturate(0.35) hue-rotate(-25deg)',
-    transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
-  } : {}
 
   return (
     <div
       ref={containerRef}
       className="absolute top-0 bottom-0 left-0 w-full pointer-events-none z-0 hidden lg:block"
-      style={{ ...dormantStyles, transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1)' }}
+      style={pcbContainerStyle}
     >
 
 
@@ -1627,6 +1682,15 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             <line x1="0" y1="2" x2="4" y2="2" stroke="rgba(168, 85, 247, 0.22)" strokeWidth="0.60" />
             <line x1="2" y1="0" x2="2" y2="4" stroke="rgba(168, 85, 247, 0.22)" strokeWidth="0.60" />
           </pattern>
+
+          {/* Diagonal Scanline Sweep Gradient (Refined & Restrained) */}
+          <linearGradient id="scanlineSweepGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0" />
+            <stop offset="45%" stopColor="var(--accent)" stopOpacity="0.02" />
+            <stop offset="50%" stopColor="#ffffff" stopOpacity="0.065" />
+            <stop offset="55%" stopColor="var(--accent)" stopOpacity="0.02" />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+          </linearGradient>
 
           {/* SMT Component Plating & Body Gradients */}
           <linearGradient id="solder-fillet-gradient" x1="0" y1="0" x2="0" y2="1">
@@ -1808,7 +1872,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
               <g strokeLinecap="round" strokeLinejoin="round" fill="none">
                 {pcbData.middleTraces.filter(t => t.chKey === chKey).map((t, idx) => {
                   const w = getWidthForCategory(t.category)
-                  const classOpacity = t.category === 'main' ? 0.95 : t.category === 'auxiliary' ? 0.80 : 0.60
+                  const classOpacity = t.category === 'main' ? 0.68 : 0.48
                   return (
                     <React.Fragment key={`m-trace-${idx}`}>
                       {/* Material Layer 2: Groove Shadow */}
@@ -1878,8 +1942,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                         style={getTransitionStyle()}
                       />
 
-                      {/* Passive Trace Idle Highlight */}
-                      {t.category === 'auxiliary' && idx % 3 === 0 && !isTransmit && (
+                      {/* Passive Trace Idle Highlight across all non-main traces */}
+                      {t.category !== 'main' && !isTransmit && (
                         <path
                           d={t.d}
                           stroke="var(--accent)"
@@ -1896,10 +1960,10 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                       )}
 
                       {/* Plated Solder Joints at Bends */}
-                      {t.category !== 'ground' && t.bends && t.bends.map((bend, bIdx) => {
+                      {t.bends && t.bends.map((bend, bIdx) => {
                         const isMainBend = t.category === 'main';
-                        const nodeRadius = isMainBend ? 1.5 : 1.0;
-                        const ringRadius = isMainBend ? 1.0 : 0.65;
+                        const nodeRadius = isMainBend ? 1.5 : 1.1;
+                        const ringRadius = isMainBend ? 1.0 : 0.75;
                         const coreRadius = isMainBend ? 0.35 : 0.25;
                         const usePulse = isMainBend && bIdx === 0 && !isTransmit;
                         const pulseStyle = usePulse ? {
@@ -1911,11 +1975,11 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                           <g
                             key={`m-bend-${idx}-${bIdx}`}
                             transform={`translate(${bend.x}, ${bend.y})`}
-                            opacity={classOpacity * (isMainBend ? 0.85 : 0.70)}
+                            opacity={classOpacity * (isMainBend ? 0.85 : 0.65)}
                             style={{ ...getTransitionStyle(), ...pulseStyle }}
                           >
                             <circle cx="0" cy="0" r={nodeRadius} fill="#030304" />
-                            <circle cx="0" cy="0" r={ringRadius} fill="none" stroke="url(#gold-plated)" strokeWidth="0.25" opacity={isMainBend ? 0.80 : 0.65} />
+                            <circle cx="0" cy="0" r={ringRadius} fill="none" stroke="url(#gold-plated)" strokeWidth="0.25" opacity={isMainBend ? 0.80 : 0.60} />
                             <circle cx="0" cy="0" r={coreRadius} fill="#030304" />
                           </g>
                         );
@@ -1956,12 +2020,15 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                     <circle cx="0" cy="0" r="4.2" fill="#030304" />
                     <circle cx="0" cy="0" r="3.5" fill="none" stroke="url(#solder-fillet-gradient)" strokeWidth="0.4" opacity="0.85" />
                     <circle cx="0" cy="0" r="1.3" fill="var(--accent)" opacity="0.85" />
-                    {/* Pulsing Outer Ring */}
-                    <circle cx="0" cy="0" r="3.5" fill="none" stroke="var(--accent)" strokeWidth="0.4"
-                      className="pcb-radar-pulse-ring"
+                    {/* Soft Radar-Ping (scale 1 -> 2.2, opacity 0.6 -> 0, 4.8s loop) */}
+                    <circle
+                      cx="0" cy="0" r="5.5"
+                      fill="none"
+                      stroke="var(--accent)"
+                      strokeWidth="0.4"
                       style={{
-                        animation: 'pcbRadarPulse 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
-                        animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
+                        animation: 'pcbRadarPing 4.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
+                        animationDelay: `${(i * 0.6).toFixed(2)}s`,
                         transformOrigin: '0px 0px'
                       }}
                     />
@@ -1978,7 +2045,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <g strokeLinecap="round" strokeLinejoin="round" fill="none">
           {pcbData.rightTraces.map((t, idx) => {
             const w = getWidthForCategory(t.category)
-            const classOpacity = t.category === 'main' ? 0.95 : t.category === 'auxiliary' ? 0.80 : 0.60
+            const classOpacity = t.category === 'main' ? 0.68 : 0.48
             return (
               <React.Fragment key={`r-trace-${idx}`}>
                 {/* Material Layer 2: Groove Shadow */}
@@ -2048,11 +2115,28 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                   />
                 )}
 
+                {/* Passive Trace Idle Highlight across all non-main traces */}
+                {t.category !== 'main' && !isTransmit && (
+                  <path
+                    d={t.d}
+                    stroke="var(--accent)"
+                    strokeWidth={w}
+                    fill="none"
+                    opacity="0"
+                    style={{
+                      ...getTransitionStyle(),
+                      animation: 'pcbIdleTraceHighlight 6s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+                      animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
+                      animationDelay: `${(idx + 6) * 0.7}s`
+                    }}
+                  />
+                )}
+
                 {/* Plated Solder Joints at Bends */}
-                {t.category !== 'ground' && t.bends && t.bends.map((bend, bIdx) => {
+                {t.bends && t.bends.map((bend, bIdx) => {
                   const isMainBend = t.category === 'main';
-                  const nodeRadius = isMainBend ? 1.5 : 1.0;
-                  const ringRadius = isMainBend ? 1.0 : 0.65;
+                  const nodeRadius = isMainBend ? 1.5 : 1.1;
+                  const ringRadius = isMainBend ? 1.0 : 0.75;
                   const coreRadius = isMainBend ? 0.35 : 0.25;
                   const usePulse = isMainBend && bIdx === 0 && !isTransmit;
                   const pulseStyle = usePulse ? {
@@ -2064,11 +2148,11 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                     <g
                       key={`r-bend-${idx}-${bIdx}`}
                       transform={`translate(${bend.x}, ${bend.y})`}
-                      opacity={classOpacity * (isMainBend ? 0.85 : 0.70)}
+                      opacity={classOpacity * (isMainBend ? 0.85 : 0.65)}
                       style={{ ...getTransitionStyle(), ...pulseStyle }}
                     >
                       <circle cx="0" cy="0" r={nodeRadius} fill="#030304" />
-                      <circle cx="0" cy="0" r={ringRadius} fill="none" stroke="url(#gold-plated)" strokeWidth="0.25" opacity={isMainBend ? 0.80 : 0.65} />
+                      <circle cx="0" cy="0" r={ringRadius} fill="none" stroke="url(#gold-plated)" strokeWidth="0.25" opacity={isMainBend ? 0.80 : 0.60} />
                       <circle cx="0" cy="0" r={coreRadius} fill="#030304" />
                     </g>
                   );
@@ -2114,12 +2198,15 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
               <circle cx="0" cy="0" r="4.2" fill="#030304" />
               <circle cx="0" cy="0" r="3.5" fill="none" stroke="url(#solder-fillet-gradient)" strokeWidth="0.4" opacity="0.85" />
               <circle cx="0" cy="0" r="1.3" fill="var(--accent)" opacity="0.85" />
-              {/* Pulsing Outer Ring */}
-              <circle cx="0" cy="0" r="3.5" fill="none" stroke="var(--accent)" strokeWidth="0.4"
-                className="pcb-radar-pulse-ring"
+              {/* Soft Radar-Ping (scale 1 -> 2.2, opacity 0.6 -> 0, 4.8s loop) */}
+              <circle
+                cx="0" cy="0" r="5.5"
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="0.4"
                 style={{
-                  animation: 'pcbRadarPulse 2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
-                  animationPlayState: activationLevel >= 3 ? 'running' : 'paused',
+                  animation: 'pcbRadarPing 4.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite',
+                  animationDelay: `${(i * 0.6 + 0.3).toFixed(2)}s`,
                   transformOrigin: '0px 0px'
                 }}
               />
