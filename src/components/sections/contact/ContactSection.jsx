@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, memo, useCallback } from 'react'
-import { useReducedMotion, useInView, motion } from 'framer-motion'
+import { useReducedMotion, useInView } from 'framer-motion'
 import ContactHero from './ContactHero'
 import ContactForm from './ContactForm'
 import ContactCards from './ContactCards'
@@ -10,11 +10,9 @@ import RightPCB from './RightPCB'
 export default memo(function ContactSection() {
   const [contactSystemState, setContactSystemState] = useState('dormant')
   const [transmissionFailed, setTransmissionFailed] = useState(false)
-  const [isTyping, setIsTyping] = useState(false)
-  const [formProgress, setFormProgress] = useState(0)
   const sectionRef = useRef(null)
 
-  // Optimization: Tracks viewport intersection to toggle canvas animation state
+  // Optimization: Tracks viewport intersection to toggle canvas & SVG animation state
   const isInViewRepeat = useInView(sectionRef, { margin: '200px 0px' })
   const shouldReduceMotion = useReducedMotion()
   const rectRef = useRef(null)
@@ -103,8 +101,6 @@ export default memo(function ContactSection() {
   const formContainerRef = useRef(null)
   const globeContainerRef = useRef(null)
 
-
-
   useEffect(() => {
     if (contactSystemState === 'transmit') {
       const timerDormant = setTimeout(() => {
@@ -115,19 +111,24 @@ export default memo(function ContactSection() {
     }
   }, [contactSystemState])
 
+  // Imperative event dispatch without triggering React re-renders on the master ContactSection
   const handleTypingChange = useCallback((typing) => {
-    setIsTyping(typing)
     if (sectionRef.current) {
       sectionRef.current.setAttribute('data-typing', typing ? 'true' : 'false')
       sectionRef.current.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: typing } }))
     }
   }, [])
 
+  const handleTransmit = useCallback(() => {
+    setContactSystemState('transmit')
+  }, [])
+
   return (
     <section
       id="contact"
       ref={sectionRef}
-      className="relative min-h-screen overflow-hidden px-6 lg:px-0 pt-16 pb-24 md:pt-24 md:pb-32 group/section"
+      data-inview={isInViewRepeat ? 'true' : 'false'}
+      className="relative min-h-screen overflow-hidden px-6 lg:px-0 pt-16 pb-12 md:pt-24 md:pb-16 group/section"
     >
       {/* Background Layers Stack (God-Tier Ambient Atmosphere System) */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
@@ -153,7 +154,7 @@ export default memo(function ContactSection() {
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {/* Transition field bridging PCB to Globe in center-right */}
             <div
-              className="absolute top-[14%] left-[30%] lg:left-[34%] w-[600px] h-[520px] rounded-full blur-[110px] will-change-transform"
+              className="absolute top-[14%] left-[30%] lg:left-[34%] w-[600px] h-[520px] rounded-full blur-[110px] will-change-transform anim-inview-pause"
               style={{
                 background: 'radial-gradient(ellipse 70% 60% at 50% 50%, color-mix(in srgb, var(--accent) 10.5%, #0e121c) 0%, color-mix(in srgb, var(--accent) 5.2%, #090b14) 46%, color-mix(in srgb, var(--accent) 1.5%, transparent) 70%, transparent 88%)',
                 animation: 'voidDriftField1 80s ease-in-out infinite'
@@ -161,7 +162,7 @@ export default memo(function ContactSection() {
             />
             {/* Globe environment field in upper-right (Zone C focused atmospheric field) */}
             <div
-              className="absolute top-[18%] right-[-4%] lg:right-[0%] w-[540px] h-[540px] rounded-full blur-[110px] will-change-transform"
+              className="absolute top-[18%] right-[-4%] lg:right-[0%] w-[540px] h-[540px] rounded-full blur-[110px] will-change-transform anim-inview-pause"
               style={{
                 background: 'radial-gradient(circle at 48% 48%, color-mix(in srgb, var(--accent-secondary, var(--accent)) 9.8%, #0c101a) 0%, color-mix(in srgb, var(--accent) 4.4%, #070910) 48%, color-mix(in srgb, var(--accent) 1.3%, transparent) 68%, transparent 88%)',
                 animation: 'voidDriftField2 75s ease-in-out infinite'
@@ -193,35 +194,22 @@ export default memo(function ContactSection() {
           }}
         />
 
-        {/* Layer 6: Volumetric Atmospheric Float */}
+        {/* Layer 6: Volumetric Atmospheric Float (Pure GPU Compositor Keyframes) */}
         {!shouldReduceMotion && (
           <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[0.19]">
-            <motion.div
-              animate={{
-                x: [0, 20, -10, 0],
-                y: [0, -15, 10, 0],
+            <div
+              className="absolute top-1/4 left-1/4 w-[300px] h-[200px] rounded-full blur-[90px] will-change-transform anim-inview-pause"
+              style={{
+                background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%)',
+                animation: 'floatAtmosphere1 28s ease-in-out infinite'
               }}
-              transition={{
-                duration: 28,
-                repeat: Infinity,
-                ease: 'easeInOut'
-              }}
-              className="absolute top-1/4 left-1/4 w-[300px] h-[200px] rounded-full blur-[90px] will-change-transform"
-              style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%)' }}
             />
-            <motion.div
-              animate={{
-                x: [0, -20, 20, 0],
-                y: [0, 20, -15, 0],
+            <div
+              className="absolute top-1/2 right-1/4 w-[320px] h-[220px] rounded-full blur-[100px] will-change-transform anim-inview-pause"
+              style={{
+                background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%)',
+                animation: 'floatAtmosphere2 32s ease-in-out infinite -5s'
               }}
-              transition={{
-                duration: 32,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: -5
-              }}
-              className="absolute top-1/2 right-1/4 w-[320px] h-[220px] rounded-full blur-[100px] will-change-transform"
-              style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%)' }}
             />
           </div>
         )}
@@ -254,8 +242,8 @@ export default memo(function ContactSection() {
       <div className="relative w-full mt-8 lg:mt-10">
         {/* Full-width backdrop wrapper for Left and Right PCB */}
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen pointer-events-none z-0 hidden lg:block">
-          <LeftPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isTyping={isTyping} formProgress={formProgress} beamActive={isBeamActive} />
-          <RightPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} formProgress={formProgress} isTyping={isTyping} isMiddleActive={isMiddleActive} isRightActive={isRightActive} />
+          <LeftPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} beamActive={isBeamActive} />
+          <RightPCB isInView={isInViewRepeat} formRef={formContainerRef} globeRef={globeContainerRef} contactSystemState={contactSystemState} transmissionFailed={transmissionFailed} isMiddleActive={isMiddleActive} isRightActive={isRightActive} />
         </div>
 
         {/* Full-width flex container keeps the form and globe in their natural positions. */}
@@ -276,11 +264,10 @@ export default memo(function ContactSection() {
               <div className="w-full max-w-[474px]">
                 <ContactForm
                   contactSystemState={contactSystemState}
-                  onTransmit={() => setContactSystemState('transmit')}
+                  onTransmit={handleTransmit}
                   setContactSystemState={setContactSystemState}
                   setTransmissionFailed={setTransmissionFailed}
                   onTypingChange={handleTypingChange}
-                  setFormProgress={setFormProgress}
                 />
               </div>
             </div>
@@ -306,7 +293,7 @@ export default memo(function ContactSection() {
                     opacity: 'calc(0.24 * var(--ambient-intensity, 1))'
                   }}
                 />
-                <Contact3DObject isInView={isInViewRepeat} contactSystemState={contactSystemState} />
+                <Contact3DObject isInView={isInViewRepeat} />
               </div>
             </div>
           </div>
@@ -320,3 +307,4 @@ export default memo(function ContactSection() {
     </section>
   )
 })
+

@@ -108,12 +108,13 @@ function CameraRig({ distanceFactor }) {
 
   useFrame((state, delta) => {
     if (shouldReduceMotion) return
+    const safeDelta = Math.min(delta, 0.05)
 
     // Wrap time accumulator (Issue #4)
-    timeAccum.current = (timeAccum.current + delta) % 100000
+    timeAccum.current = (timeAccum.current + safeDelta) % 100000
     const t = timeAccum.current
 
-    easedFactor.current = lerpFI(easedFactor.current, distanceFactor.current, LERP.proximitySpeed, delta)
+    easedFactor.current = lerpFI(easedFactor.current, distanceFactor.current, LERP.proximitySpeed, safeDelta)
     const f = easedFactor.current
 
     const nextX = (Math.sin(t * 0.06) * 0.035 + Math.cos(t * 0.14) * 0.015) * f
@@ -151,41 +152,65 @@ function Lights() {
   )
 }
 
+// Shared static geometries and scratch math objects to eliminate recreation & GC churn
+const staticGeomWire = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 2)
+const staticGeomGrid = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius * 1.025, 1)
+const staticGeomPoints = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 4)
+const staticGeomGlass = new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 32, 32)
+const staticGeomHalo = new THREE.SphereGeometry(SCENE_CONFIG.globe.haloRadius, 32, 32)
+const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.035, 8, 128)
+
+const staticParticlePositions = (() => {
+  const random = createPRNG(42)
+  const { count, minRadius, spread } = SCENE_CONFIG.particles
+  const pos = new Float32Array(count * 3)
+  for (let i = 0; i < count; i++) {
+    const u = random(), v = random()
+    const theta = u * 2.0 * Math.PI
+    const phi = Math.acos(2.0 * v - 1.0)
+    const r = minRadius + random() * spread
+    pos[i * 3] = r * Math.sin(phi) * Math.cos(theta)
+    pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+    pos[i * 3 + 2] = r * Math.cos(phi)
+  }
+  return pos
+})()
+
+const staticGeomMicroParticles = (() => {
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.BufferAttribute(staticParticlePositions, 3))
+  return geom
+})()
+
+const staticRingMaterial = (() => {
+  const mat = new RingGlowMaterial()
+  mat.transparent = true
+  mat.blending = THREE.AdditiveBlending
+  mat.depthWrite = false
+  mat.color = new THREE.Color('#8B5CFF')
+  mat.opacity = 0.35
+  return mat
+})()
+
+const tempIconVec = new THREE.Vector3()
+
 function MicroParticles({ distanceFactor }) {
   const pointsRef = useRef()
   const easedFactor = useRef(1.0)
   const shouldReduceMotion = useReducedMotion()
 
-  const [positions] = useMemo(() => {
-    const random = createPRNG(42)
-    const { count, minRadius, spread } = SCENE_CONFIG.particles
-    const pos = new Float32Array(count * 3)
-    for (let i = 0; i < count; i++) {
-      const u = random(), v = random()
-      const theta = u * 2.0 * Math.PI
-      const phi = Math.acos(2.0 * v - 1.0)
-      const r = minRadius + random() * spread
-      pos[i * 3] = r * Math.sin(phi) * Math.cos(theta)
-      pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
-      pos[i * 3 + 2] = r * Math.cos(phi)
-    }
-    return [pos]
-  }, [])
-
   useFrame((state, delta) => {
     if (!shouldReduceMotion && pointsRef.current) {
-      easedFactor.current = lerpFI(easedFactor.current, distanceFactor.current, LERP.proximitySpeed, delta)
+      const safeDelta = Math.min(delta, 0.05)
+      easedFactor.current = lerpFI(easedFactor.current, distanceFactor.current, LERP.proximitySpeed, safeDelta)
       const f = easedFactor.current
-      pointsRef.current.rotation.y += delta * 0.01 * f
-      pointsRef.current.rotation.x += delta * 0.005 * f
+      pointsRef.current.rotation.y += safeDelta * 0.01 * f
+      pointsRef.current.rotation.x += safeDelta * 0.005 * f
     }
   })
 
   return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-      </bufferGeometry>
+    <points ref={pointsRef} geometry={staticGeomMicroParticles}>
       <pointsMaterial color={globalTheme.color} size={0.02} transparent opacity={0.18}
         sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} />
     </points>
@@ -200,51 +225,46 @@ function Globe({ distanceFactor }) {
   const timeAccum = useRef(0)
   const shouldReduceMotion = useReducedMotion()
 
-  const geomWire = useMemo(() => new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 2), [])
-  const geomGrid = useMemo(() => new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius * 1.025, 1), [])
-  const geomPoints = useMemo(() => new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 4), [])
-  const geomGlass = useMemo(() => new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 32, 32), [])
-  const geomHalo = useMemo(() => new THREE.SphereGeometry(SCENE_CONFIG.globe.haloRadius, 32, 32), [])
-
   useFrame((state, delta) => {
     if (shouldReduceMotion) return
-    timeAccum.current = (timeAccum.current + delta) % 100000
+    const safeDelta = Math.min(delta, 0.05)
+    timeAccum.current = (timeAccum.current + safeDelta) % 100000
     const time = timeAccum.current
 
-    easedFactor.current = lerpFI(easedFactor.current, distanceFactor.current, LERP.proximitySpeed, delta)
+    easedFactor.current = lerpFI(easedFactor.current, distanceFactor.current, LERP.proximitySpeed, safeDelta)
     const f = easedFactor.current
-    if (wireRef.current) wireRef.current.rotation.y += delta * 0.08 * f
+    if (wireRef.current) wireRef.current.rotation.y += safeDelta * 0.08 * f
     if (gridRef.current) {
-      gridRef.current.rotation.y -= delta * 0.05 * f
-      gridRef.current.rotation.x -= delta * 0.015 * f
+      gridRef.current.rotation.y -= safeDelta * 0.05 * f
+      gridRef.current.rotation.x -= safeDelta * 0.015 * f
     }
     if (pointsRef.current) {
-      pointsRef.current.rotation.y += delta * 0.10 * f
-      pointsRef.current.rotation.x += delta * 0.02 * f
+      pointsRef.current.rotation.y += safeDelta * 0.10 * f
+      pointsRef.current.rotation.x += safeDelta * 0.02 * f
       pointsRef.current.material.size = (0.025 + Math.sin(time * 2.5) * 0.005) * (0.3 + 0.7 * f)
     }
   })
 
   return (
     <group>
-      <mesh geometry={geomGlass} name="glassCore">
+      <mesh geometry={staticGeomGlass} name="glassCore">
         <meshStandardMaterial color="#0a0814" roughness={0.25} metalness={0.6}
           transparent opacity={0.35} depthWrite={false} />
       </mesh>
-      <mesh ref={wireRef} geometry={geomWire}>
+      <mesh ref={wireRef} geometry={staticGeomWire}>
         <meshBasicMaterial color={globalTheme.color} wireframe transparent
           opacity={SCENE_CONFIG.globe.wireframeOpacity} depthWrite={false} />
       </mesh>
-      <mesh ref={gridRef} geometry={geomGrid}>
+      <mesh ref={gridRef} geometry={staticGeomGrid}>
         <meshBasicMaterial color={globalTheme.color} wireframe transparent
           opacity={SCENE_CONFIG.globe.wireframeOpacity * 0.7} depthWrite={false} />
       </mesh>
-      <points ref={pointsRef} geometry={geomPoints}>
+      <points ref={pointsRef} geometry={staticGeomPoints}>
         <pointsMaterial color={globalTheme.color} size={0.028} transparent
           opacity={SCENE_CONFIG.globe.pointsOpacity} sizeAttenuation
           depthWrite={false} blending={THREE.AdditiveBlending} />
       </points>
-      <mesh geometry={geomHalo}>
+      <mesh geometry={staticGeomHalo}>
         <fresnelGlowMaterial color={globalTheme.color}
           glowPower={SCENE_CONFIG.globe.glowPower}
           glowIntensity={SCENE_CONFIG.globe.glowIntensity}
@@ -254,7 +274,23 @@ function Globe({ distanceFactor }) {
   )
 }
 
-function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, hoveredCountRef }) {
+const STATIC_RING_ICONS = [
+  [
+    { key: 'github', platform: 'github', url: personal.socials.github },
+    { key: 'linkedin', platform: 'linkedin', url: personal.socials.linkedin },
+  ],
+  [
+    { key: 'leetcode', platform: 'leetcode', url: personal.socials.leetcode },
+    { key: 'gfg', platform: 'gfg', url: personal.socials.gfg },
+  ],
+  [
+    { key: 'email', platform: 'email', url: personal.email, isSpecial: true, specialType: 'email' },
+    { key: 'resume', platform: 'resume', url: personal.resume, isSpecial: true, specialType: 'resume' },
+  ],
+]
+const STATIC_ALL_ICONS = STATIC_RING_ICONS.flat()
+
+const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, hoveredCountRef }) {
   const iconGroupRef = useRef()
   const htmlRef = useRef()
   const glowRef = useRef()
@@ -269,17 +305,15 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, hoveredCountRe
   const { platform, url, specialType } = iconData
   const [copied, setCopied] = useState(false)
 
-  const tempVec = useMemo(() => new THREE.Vector3(), [])
-
   const handlePointerOver = useCallback(() => {
     hoverRef.current = true
-    hoveredCountRef.current += 1
+    if (hoveredCountRef) hoveredCountRef.current += 1
     if (onHoverChange) onHoverChange(true)
   }, [hoveredCountRef, onHoverChange])
 
   const handlePointerOut = useCallback(() => {
     hoverRef.current = false
-    hoveredCountRef.current = Math.max(0, hoveredCountRef.current - 1)
+    if (hoveredCountRef) hoveredCountRef.current = Math.max(0, hoveredCountRef.current - 1)
     if (onHoverChange) onHoverChange(false)
   }, [hoveredCountRef, onHoverChange])
 
@@ -310,63 +344,64 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, hoveredCountRe
     }
   }, [specialType, url])
 
-    // Combined physics loop and theme shadow synchronization
-    const lastColorVersion = useRef(-1)
+  // Combined physics loop and theme shadow synchronization
+  const lastColorVersion = useRef(-1)
 
-    useFrame((state, delta) => {
-      if (shouldReduceMotion) return
-      const hovered = hoverRef.current
+  useFrame((state, delta) => {
+    if (shouldReduceMotion) return
+    const safeDelta = Math.min(delta, 0.05)
+    const hovered = hoverRef.current
 
-      const targetGlow = hovered ? 1.0 : 0.0
-      const glowSpeed = hovered ? LERP.hoverGlowIn : LERP.hoverGlowOut
-      hoverGlowFactor.current = lerpFI(hoverGlowFactor.current, targetGlow, glowSpeed, delta)
+    const targetGlow = hovered ? 1.0 : 0.0
+    const glowSpeed = hovered ? LERP.hoverGlowIn : LERP.hoverGlowOut
+    hoverGlowFactor.current = lerpFI(hoverGlowFactor.current, targetGlow, glowSpeed, safeDelta)
 
-      // Depth-based opacity, scale, and brightness
-      if (iconGroupRef.current && htmlRef.current) {
-        iconGroupRef.current.getWorldPosition(tempVec)
-        tempVec.applyMatrix4(state.camera.matrixWorldInverse)
+    // Depth-based opacity, scale, and brightness
+    if (iconGroupRef.current && htmlRef.current) {
+      iconGroupRef.current.getWorldPosition(tempIconVec)
+      tempIconVec.applyMatrix4(state.camera.matrixWorldInverse)
 
-        const camZ = state.camera.position.z || SCENE_CONFIG.depth.cameraZ
-        const radius = 2.45
-        const maxZ = -(camZ - radius * 1.2)
-        const minZ = -(camZ + radius * 1.2)
-        const depth = THREE.MathUtils.clamp((tempVec.z - minZ) / (maxZ - minZ), 0, 1)
+      const camZ = state.camera.position.z || SCENE_CONFIG.depth.cameraZ
+      const radius = 2.45
+      const maxZ = -(camZ - radius * 1.2)
+      const minZ = -(camZ + radius * 1.2)
+      const depth = THREE.MathUtils.clamp((tempIconVec.z - minZ) / (maxZ - minZ), 0, 1)
 
-        const baseScale = 0.95 + depth * 0.08
-        const scaleVal = baseScale * (1.0 + hoverGlowFactor.current * 0.03)
-        const opacityVal = 0.55 + depth * 0.45
-        const brightnessVal = 0.8 + depth * 0.2
-        const saturateVal = 0.85 + depth * 0.15
-        const reactionGlow = reactionGlowRef ? reactionGlowRef.current : 0.0
-        const glowOpacity = Math.max(hoverGlowFactor.current, reactionGlow)
+      const baseScale = 0.95 + depth * 0.08
+      const scaleVal = baseScale * (1.0 + hoverGlowFactor.current * 0.03)
+      const opacityVal = 0.55 + depth * 0.45
+      const brightnessVal = 0.8 + depth * 0.2
+      const saturateVal = 0.85 + depth * 0.15
+      const reactionGlow = reactionGlowRef ? reactionGlowRef.current : 0.0
+      const glowOpacity = Math.max(hoverGlowFactor.current, reactionGlow)
 
-        // Dirty-check style updates
-        const prev = lastStyle.current
-        if (Math.abs(opacityVal - prev.opacity) > STYLE_THRESHOLD) {
-          htmlRef.current.style.opacity = opacityVal
-          prev.opacity = opacityVal
-        }
-        if (Math.abs(scaleVal - prev.scaleVal) > STYLE_THRESHOLD) {
-          htmlRef.current.style.transform = `scale(${scaleVal})`
-          prev.scaleVal = scaleVal
-        }
-        if (Math.abs(brightnessVal - prev.brightnessVal) > STYLE_THRESHOLD || Math.abs(saturateVal - prev.saturateVal) > STYLE_THRESHOLD) {
-          htmlRef.current.style.filter = `brightness(${brightnessVal.toFixed(3)}) saturate(${saturateVal.toFixed(3)})`
-          prev.brightnessVal = brightnessVal
-          prev.saturateVal = saturateVal
-        }
-        if (glowRef.current && Math.abs(glowOpacity - prev.glowOpacity) > 0.01) {
-          glowRef.current.style.opacity = glowOpacity.toFixed(2)
-          prev.glowOpacity = glowOpacity
-        }
+      // Dirty-check style updates
+      const prev = lastStyle.current
+      if (Math.abs(opacityVal - prev.opacity) > STYLE_THRESHOLD) {
+        htmlRef.current.style.opacity = opacityVal
+        prev.opacity = opacityVal
       }
-
-      // Theme shadow synchronization (combined to reduce hook overhead)
-      if (lastColorVersion.current !== globalTheme.version && glowRef.current) {
-        glowRef.current.style.boxShadow = `0 0 16px ${globalTheme.color}`
-        lastColorVersion.current = globalTheme.version
+      if (Math.abs(scaleVal - prev.scaleVal) > STYLE_THRESHOLD) {
+        htmlRef.current.style.transform = `scale(${scaleVal})`
+        prev.scaleVal = scaleVal
       }
-    })
+      if (Math.abs(brightnessVal - prev.brightnessVal) > STYLE_THRESHOLD || Math.abs(saturateVal - prev.saturateVal) > STYLE_THRESHOLD) {
+        htmlRef.current.style.filter = `brightness(${brightnessVal.toFixed(3)}) saturate(${saturateVal.toFixed(3)})`
+        prev.brightnessVal = brightnessVal
+        prev.saturateVal = saturateVal
+      }
+      if (glowRef.current && Math.abs(glowOpacity - prev.glowOpacity) > 0.01) {
+        glowRef.current.style.opacity = glowOpacity.toFixed(2)
+        prev.glowOpacity = glowOpacity
+      }
+    }
+
+    // Theme shadow synchronization
+    if (lastColorVersion.current !== globalTheme.version && glowRef.current) {
+      glowRef.current.style.boxShadow = `0 0 16px ${globalTheme.color}`
+      lastColorVersion.current = globalTheme.version
+    }
+  })
 
   const renderLink = () => {
     const iconContent = (
@@ -445,9 +480,7 @@ function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, hoveredCountRe
       </Html>
     </group>
   )
-}
-
-const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.035, 8, 128)
+})
 
 const OrbitalRing = memo(function OrbitalRing({ 
   myRingIndex,
@@ -478,61 +511,43 @@ const OrbitalRing = memo(function OrbitalRing({
   const hoverFactorB = useRef(0)
   const easedDistance = useRef(1.0)
 
-  // Create ring material per ring instance
-  const ringMaterial = useMemo(() => {
-    const mat = new RingGlowMaterial()
-    mat.transparent = true
-    mat.blending = THREE.AdditiveBlending
-    mat.depthWrite = false
-    mat.color = new THREE.Color('#8B5CFF')
-    mat.opacity = 0.35
-    return mat
+  const handleHoverA = useCallback((hovered) => {
+    isHoveredARef.current = hovered
   }, [])
 
-  useEffect(() => {
-    return () => {
-      ringMaterial.dispose()
-    }
-  }, [ringMaterial])
+  const handleHoverB = useCallback((hovered) => {
+    isHoveredBRef.current = hovered
+  }, [])
 
   useFrame((state, delta) => {
+    // Delta spike protection (50ms ceiling prevents teleportation on tab switch / scroll return)
+    const safeDelta = Math.min(delta, 0.05)
+
     // Eased distance factor (smooth deceleration as cursor moves closer)
     const targetDist = distanceFactor ? distanceFactor.current : 1.0
-    easedDistance.current = lerpFI(easedDistance.current, targetDist, LERP.proximitySpeed, delta)
+    easedDistance.current = lerpFI(easedDistance.current, targetDist, LERP.proximitySpeed, safeDelta)
     const proximitySpeedFactor = easedDistance.current
 
     // Smooth hover factor lerping
     const targetHoverA = isHoveredARef.current ? 1.0 : 0.0
-    hoverFactorA.current = lerpFI(hoverFactorA.current, targetHoverA, 6.0, delta)
+    hoverFactorA.current = lerpFI(hoverFactorA.current, targetHoverA, 6.0, safeDelta)
 
     const targetHoverB = isHoveredBRef.current ? 1.0 : 0.0
-    hoverFactorB.current = lerpFI(hoverFactorB.current, targetHoverB, 6.0, delta)
-
-    // Fixed orbital radius (prevents ring expansion or shift on hover)
-    const currentRadius = 2.45
-
-    // Set static positions of icon wrappers
-    if (iconWrapperARef.current) {
-      iconWrapperARef.current.position.set(currentRadius, 0, zOffset)
-    }
-    if (iconWrapperBRef.current) {
-      iconWrapperBRef.current.position.set(currentRadius, 0, zOffset)
-    }
+    hoverFactorB.current = lerpFI(hoverFactorB.current, targetHoverB, 6.0, safeDelta)
 
     // Orbital speed governed smoothly by cursor proximity
     const activeIconSpeed = iconSpeed * proximitySpeedFactor
     const activeRingSpeed = ringSpeed * proximitySpeedFactor
 
-    // 1. Rotate the OrbitGroup itself slowly according to cursor distance
-    orbitGroupPhase.current = (orbitGroupPhase.current + delta * activeRingSpeed) % (2 * Math.PI)
-    
+    // 1. Monotonic continuous phase integration (immune to negative modulo jumps)
+    orbitGroupPhase.current += safeDelta * activeRingSpeed
     if (orbitGroupRef.current) {
       orbitGroupRef.current.rotation.z = orbitGroupPhase.current
     }
 
-    // 2. Rotate the IconPivots (making the icons revolve along the ring according to cursor distance)
-    pivotAPhase.current = (pivotAPhase.current + delta * activeIconSpeed) % (2 * Math.PI)
-    pivotBPhase.current = (pivotBPhase.current + delta * activeIconSpeed) % (2 * Math.PI)
+    // 2. Monotonic continuous icon pivot integration
+    pivotAPhase.current += safeDelta * activeIconSpeed
+    pivotBPhase.current += safeDelta * activeIconSpeed
 
     if (pivotARef.current) {
       pivotARef.current.rotation.z = pivotAPhase.current
@@ -541,7 +556,7 @@ const OrbitalRing = memo(function OrbitalRing({
       pivotBRef.current.rotation.z = pivotBPhase.current
     }
 
-    // Feed hover scale to icon wrapper
+    // Hover scale applied to icon wrappers
     const hoverScaleA = 1.0 + hoverFactorA.current * 0.05
     if (iconWrapperARef.current) {
       iconWrapperARef.current.scale.set(hoverScaleA, hoverScaleA, hoverScaleA)
@@ -561,7 +576,7 @@ const OrbitalRing = memo(function OrbitalRing({
     <group rotation={[0, 0, radZ]}>
       <group rotation={[radTilt, 0, 0]}>
         <group ref={orbitGroupRef}>
-          <mesh ref={meshRef} position={[0, 0, zOffset]} geometry={sharedRingGeometry} material={ringMaterial} />
+          <mesh ref={meshRef} position={[0, 0, zOffset]} geometry={sharedRingGeometry} material={staticRingMaterial} />
 
           {/* IconPivot A */}
           <group ref={pivotARef}>
@@ -569,9 +584,7 @@ const OrbitalRing = memo(function OrbitalRing({
               {icons[0] && (
                 <OrbitingIcon
                   iconData={icons[0]}
-                  onHoverChange={(hovered) => {
-                    isHoveredARef.current = hovered
-                  }}
+                  onHoverChange={handleHoverA}
                   distanceFactor={distanceFactor}
                   hoveredCountRef={hoveredCountRef}
                   hoveredOrbitRef={hoveredOrbitRef}
@@ -586,9 +599,7 @@ const OrbitalRing = memo(function OrbitalRing({
               {icons[1] && (
                 <OrbitingIcon
                   iconData={icons[1]}
-                  onHoverChange={(hovered) => {
-                    isHoveredBRef.current = hovered
-                  }}
+                  onHoverChange={handleHoverB}
                   distanceFactor={distanceFactor}
                   hoveredCountRef={hoveredCountRef}
                   hoveredOrbitRef={hoveredOrbitRef}
@@ -605,7 +616,7 @@ const OrbitalRing = memo(function OrbitalRing({
 const tempColorA = new THREE.Color()
 const tempColorB = new THREE.Color()
 
-function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef }) {
+function Scene({ distanceFactor, hoveredCountRef, hoveredOrbitRef }) {
   const { width } = useThree((state) => state.size)
 
   const scale = useMemo(() => {
@@ -650,16 +661,6 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
     }
   })
 
-  // Group active icons into pairs for the 3 rings
-  const ringIcons = useMemo(() => {
-    const groups = [[], [], []]
-    iconsToRender.forEach((icon, idx) => {
-      const ringIdx = Math.floor(idx / 2) % 3
-      groups[ringIdx].push(icon)
-    })
-    return groups
-  }, [iconsToRender])
-
   return (
     <group scale={scale}>
       <Lights />
@@ -673,7 +674,7 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
         angle={0} 
         ringSpeed={0.02} 
         iconSpeed={0.35}
-        icons={ringIcons[0]} 
+        icons={STATIC_RING_ICONS[0]} 
         zOffset={0.00}
         distanceFactor={distanceFactor}
         hoveredCountRef={hoveredCountRef}
@@ -684,7 +685,7 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
         angle={60} 
         ringSpeed={-0.016} 
         iconSpeed={-0.28}
-        icons={ringIcons[1]} 
+        icons={STATIC_RING_ICONS[1]} 
         zOffset={0.00}
         distanceFactor={distanceFactor}
         hoveredCountRef={hoveredCountRef}
@@ -695,7 +696,7 @@ function Scene({ iconsToRender, distanceFactor, hoveredCountRef, hoveredOrbitRef
         angle={120} 
         ringSpeed={0.013} 
         iconSpeed={0.22}
-        icons={ringIcons[2]} 
+        icons={STATIC_RING_ICONS[2]} 
         zOffset={0.00}
         distanceFactor={distanceFactor}
         hoveredCountRef={hoveredCountRef}
@@ -800,55 +801,13 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
     return () => window.removeEventListener("mousemove", handleMouseMove)
   }, [shouldReduceMotion, webglSupported, isInView])
 
-  const iconsToRender = useMemo(() => {
-    const icons = []
-    
-    // Orbit 1: Professional Identity
-    if (personal.socials.github) {
-      icons.push({ key: 'github', platform: 'github', url: personal.socials.github })
-    }
-    if (personal.socials.linkedin) {
-      icons.push({ key: 'linkedin', platform: 'linkedin', url: personal.socials.linkedin })
-    }
-    
-    // Orbit 2: Technical Proof
-    if (personal.socials.leetcode) {
-      icons.push({ key: 'leetcode', platform: 'leetcode', url: personal.socials.leetcode })
-    }
-    if (personal.socials.gfg) {
-      icons.push({ key: 'gfg', platform: 'gfg', url: personal.socials.gfg })
-    }
-    
-    // Orbit 3: Direct Action
-    if (personal.email) {
-      icons.push({ 
-        key: 'email', 
-        platform: 'email', 
-        url: personal.email, 
-        isSpecial: true, 
-        specialType: 'email' 
-      })
-    }
-    if (personal.resume) {
-      icons.push({ 
-        key: 'resume', 
-        platform: 'resume', 
-        url: personal.resume, 
-        isSpecial: true, 
-        specialType: 'resume' 
-      })
-    }
-    
-    return icons
-  }, [])
-
   if (shouldReduceMotion) return null
 
   return (
     <>
       {/* Issue #14: Accessibility Fallback Nav Links - descriptive screen-reader text */}
       <nav aria-label="Social media links and contact options" className="sr-only">
-        {iconsToRender.map(icon => {
+        {STATIC_ALL_ICONS.map(icon => {
           if (icon.specialType === 'email') {
             return <button key={icon.key} onClick={() => navigator.clipboard.writeText(icon.url)}>Copy email: {icon.url}</button>
           }
@@ -881,6 +840,12 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
           {webglSupported ? (
             <Canvas
               frameloop={isInView ? "always" : "never"}
+              dpr={[1, 2]}
+              gl={{
+                powerPreference: "high-performance",
+                antialias: true,
+                alpha: true
+              }}
               camera={SCENE_CONFIG.camera}
               onCreated={({ gl }) => {
                 const canvasEl = gl.domElement
@@ -896,7 +861,6 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
               style={{ pointerEvents: 'auto', opacity: 1 }}
             >
               <Scene 
-                iconsToRender={iconsToRender} 
                 distanceFactor={distanceFactor} 
                 hoveredCountRef={hoveredCountRef}
                 hoveredOrbitRef={hoveredOrbitRef}
@@ -906,7 +870,7 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
             // Robust 2D recovery fallback: elegant animated list in place of crashed WebGL canvas
             <div className="flex items-center justify-center w-full h-full pointer-events-auto">
               <div className="flex gap-4 p-4 rounded-2xl bg-bg-surface/50 border border-white/5 backdrop-blur-md shadow-2xl animate-fade-in">
-                {iconsToRender.map(icon => {
+                {STATIC_ALL_ICONS.map(icon => {
                   if (icon.specialType === 'email') {
                     return (
                       <button

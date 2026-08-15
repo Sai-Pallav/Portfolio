@@ -317,34 +317,38 @@ function validateField(name, value) {
   return err
 }
 
-export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, setFormProgress, onTypingChange }) {
-  const shouldReduceMotion = useReducedMotion()
-  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
-  const [isFocused, setIsFocused] = useState(false)
-  const [isTypingState, setIsTypingState] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
-  const [inquiryType, setInquiryType] = useState('Internship')
-  const [touched, setTouched] = useState({ name: false, email: false, subject: false, message: false })
+const StatusLEDs = memo(function StatusLEDs({ activeDotState }) {
+  return (
+    <div className="absolute top-6 right-7 flex gap-1.5 items-center z-20 pointer-events-none">
+      <motion.div custom={0} variants={DOT_VARIANTS} animate={activeDotState} className="w-1.5 h-1.5 rounded-full bg-[#030408] border border-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.20),0_1px_2px_rgba(0,0,0,0.9)]" />
+      <motion.div custom={1} variants={DOT_VARIANTS} animate={activeDotState} className="w-1.5 h-1.5 rounded-full bg-[#030408] border border-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.20),0_1px_2px_rgba(0,0,0,0.9)]" />
+      <motion.div custom={2} variants={DOT_VARIANTS} animate={activeDotState} className="w-1.5 h-1.5 rounded-full bg-[#030408] border border-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.20),0_1px_2px_rgba(0,0,0,0.9)]" />
+    </div>
+  )
+})
+
+const FormHeader = memo(function FormHeader() {
+  return (
+    <motion.div variants={FORM_CHILD_VARIANTS} className="mb-5 relative z-10">
+      <span className="text-[10px] font-mono tracking-[0.20em] font-semibold text-[var(--accent)]/70 uppercase block mb-1.5">
+        CONTACT
+      </span>
+      <h2 className="text-2xl sm:text-[28px] font-bold text-white font-heading tracking-tight mb-1.5 leading-[1.15]">
+        Let's Build Something
+        <span className="block bg-gradient-to-r from-primary via-accent to-accent-hover bg-clip-text text-transparent">
+          Exceptional
+        </span>
+      </h2>
+      <p className="text-xs sm:text-[13px] text-white/65 leading-relaxed max-w-sm font-normal">
+        I usually respond within 24 hours. Let's discuss your project and create something remarkable together.
+      </p>
+    </motion.div>
+  )
+})
+
+const InquiryDropdown = memo(function InquiryDropdown({ inquiryType, onSelectInquiry }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
-  const clearFieldsTimeoutRef = useRef(null)
-  const typingTimerRef = useRef(null)
-
-  const apiErrorTimeoutRef = useRef(null)
-
-  useEffect(() => {
-    return () => {
-      if (clearFieldsTimeoutRef.current) {
-        clearTimeout(clearFieldsTimeoutRef.current)
-      }
-      if (apiErrorTimeoutRef.current) {
-        clearTimeout(apiErrorTimeoutRef.current)
-      }
-      if (typingTimerRef.current) {
-        clearTimeout(typingTimerRef.current)
-      }
-    }
-  }, [])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -368,7 +372,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       } else {
         const currIdx = INQUIRY_OPTIONS.indexOf(inquiryType)
         const nextIdx = (currIdx + 1) % INQUIRY_OPTIONS.length
-        setInquiryType(INQUIRY_OPTIONS[nextIdx])
+        onSelectInquiry(INQUIRY_OPTIONS[nextIdx])
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
@@ -377,7 +381,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       } else {
         const currIdx = INQUIRY_OPTIONS.indexOf(inquiryType)
         const prevIdx = (currIdx - 1 + INQUIRY_OPTIONS.length) % INQUIRY_OPTIONS.length
-        setInquiryType(INQUIRY_OPTIONS[prevIdx])
+        onSelectInquiry(INQUIRY_OPTIONS[prevIdx])
       }
     } else if (e.key === 'Escape') {
       if (isDropdownOpen) {
@@ -387,21 +391,122 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     } else if (e.key === 'Home') {
       if (isDropdownOpen) {
         e.preventDefault()
-        setInquiryType(INQUIRY_OPTIONS[0])
+        onSelectInquiry(INQUIRY_OPTIONS[0])
       }
     } else if (e.key === 'End') {
       if (isDropdownOpen) {
         e.preventDefault()
-        setInquiryType(INQUIRY_OPTIONS[INQUIRY_OPTIONS.length - 1])
+        onSelectInquiry(INQUIRY_OPTIONS[INQUIRY_OPTIONS.length - 1])
       }
     }
-  }, [isDropdownOpen, inquiryType])
+  }, [isDropdownOpen, inquiryType, onSelectInquiry])
 
   const handleDropdownBlur = useCallback((e) => {
     if (dropdownRef.current && !dropdownRef.current.contains(e.relatedTarget)) {
       setIsDropdownOpen(false)
     }
   }, [])
+
+  return (
+    <motion.div
+      variants={FORM_CHILD_VARIANTS}
+      className="space-y-1.5 relative z-30"
+      ref={dropdownRef}
+      onBlur={handleDropdownBlur}
+    >
+      <label htmlFor="inquiry-type" className="block text-[9px] font-mono tracking-[0.14em] font-medium text-white/50 uppercase mb-1.5">
+        WHAT BRINGS YOU HERE?
+      </label>
+      <div className="relative group/dd">
+        <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 ${
+          isDropdownOpen ? 'text-[var(--accent)]/90' : 'text-white/40 group-hover/dd:text-white/60'
+        }`}>
+          <HelpCircle className="h-4 w-4" strokeWidth={1.5} />
+        </div>
+        <button
+          type="button"
+          id="inquiry-type"
+          onClick={() => setIsDropdownOpen(prev => !prev)}
+          onKeyDown={handleDropdownKeyDown}
+          className="w-full h-[46px] rounded-[8px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#0a0b15]/95 via-[#06070c]/98 to-[#030306]/98 pl-10 pr-3.5 text-xs sm:text-[13px] text-white/95 outline-none transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.015)] hover:border-white/[0.14] hover:border-t-white/[0.18] hover:from-[#0d0e19]/95 hover:via-[#07080e]/98 hover:to-[#030306]/98 focus:border-[var(--accent)]/70 focus:border-t-[var(--accent)]/85 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.92),inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_8px_color-mix(in_srgb,var(--accent)_14%,transparent)] focus:bg-[#040509] flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+          aria-haspopup="listbox"
+          aria-expanded={isDropdownOpen}
+          aria-activedescendant={isDropdownOpen ? `option-${INQUIRY_OPTIONS.indexOf(inquiryType)}` : undefined}
+        >
+          <span className="font-medium text-white/95 tracking-wide">{inquiryType}</span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 text-white/40 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[var(--accent)]' : 'group-hover/dd:text-white/60'}`}
+          />
+        </button>
+
+        <AnimatePresence>
+          {isDropdownOpen && (
+            <motion.ul
+              initial={{ opacity: 0, y: -6, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.99 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute z-50 left-0 right-0 mt-1.5 rounded-[8px] border border-white/[0.08] bg-[#070810]/98 backdrop-blur-2xl py-1 shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.03)] overflow-hidden"
+              role="listbox"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setIsDropdownOpen(false)
+                }
+              }}
+            >
+              {INQUIRY_OPTIONS.map((option, index) => {
+                const isSelected = inquiryType === option
+                return (
+                  <li
+                    key={option}
+                    id={`option-${index}`}
+                    onClick={() => {
+                      onSelectInquiry(option)
+                      setIsDropdownOpen(false)
+                    }}
+                    className={`px-3.5 py-2 text-xs cursor-pointer transition-colors duration-150 flex items-center justify-between border-l-2 ${isSelected
+                      ? 'text-[var(--accent)] font-medium bg-white/[0.03] border-[var(--accent)]/80'
+                      : 'text-white/70 hover:text-white hover:bg-white/[0.02] border-transparent'
+                      }`}
+                    role="option"
+                    aria-selected={isSelected}
+                  >
+                    {option}
+                  </li>
+                )
+              })}
+            </motion.ul>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  )
+})
+
+export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, setFormProgress, onTypingChange }) {
+  const shouldReduceMotion = useReducedMotion()
+  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
+  const [isFocused, setIsFocused] = useState(false)
+  const [isTypingState, setIsTypingState] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [inquiryType, setInquiryType] = useState('Internship')
+  const [touched, setTouched] = useState({ name: false, email: false, subject: false, message: false })
+  const clearFieldsTimeoutRef = useRef(null)
+  const typingTimerRef = useRef(null)
+  const isTypingRef = useRef(false)
+  const typingTimeoutRef = useRef(null)
+
+  const apiErrorTimeoutRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (clearFieldsTimeoutRef.current) clearTimeout(clearFieldsTimeoutRef.current)
+      if (apiErrorTimeoutRef.current) clearTimeout(apiErrorTimeoutRef.current)
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    }
+  }, [])
+
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState({ type: '', message: '' })
   const [subState, setSubState] = useState('idle')
@@ -420,6 +525,10 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     if (progress !== lastProgressRef.current) {
       lastProgressRef.current = progress
       if (setFormProgress) setFormProgress(progress)
+      const sectionEl = document.getElementById('contact')
+      if (sectionEl) {
+        sectionEl.dispatchEvent(new CustomEvent('contact-progress', { detail: { progress } }))
+      }
     }
   }, [formData, setFormProgress])
 
@@ -447,7 +556,9 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     setErrors(prev => {
       if (prev[name]) {
         const err = validateField(name, value)
-        return { ...prev, [name]: err }
+        if (err !== prev[name]) {
+          return { ...prev, [name]: err }
+        }
       }
       return prev
     })
@@ -458,11 +569,18 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     setTouched(prev => ({ ...prev, [name]: true }))
     resetErrorState()
 
-    if (value.trim() || errors[name]) {
+    setErrors(prev => {
       const err = validateField(name, value)
-      setErrors(prev => ({ ...prev, [name]: err }))
-    }
-  }, [errors, resetErrorState])
+      if (err !== prev[name]) {
+        return { ...prev, [name]: err }
+      }
+      return prev
+    })
+  }, [resetErrorState])
+
+  const handleSelectInquiry = useCallback((opt) => {
+    setInquiryType(opt)
+  }, [])
 
   const handleRipple = useCallback((e) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -480,19 +598,26 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     }
   }, [ripples])
 
-  const typingTimeoutRef = useRef(null)
   const handleTypingEvent = useCallback(() => {
-    setIsTypingState(true)
-    const sectionEl = document.getElementById('contact')
-    if (sectionEl) {
-      sectionEl.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: true }, bubbles: true }))
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-      typingTimeoutRef.current = setTimeout(() => {
-        setIsTypingState(false)
-        sectionEl.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: false }, bubbles: true }))
-      }, 600)
+    if (!isTypingRef.current) {
+      isTypingRef.current = true
+      setIsTypingState(true)
+      const sectionEl = document.getElementById('contact')
+      if (sectionEl) {
+        sectionEl.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: true }, bubbles: true }))
+      }
     }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = setTimeout(() => {
+      isTypingRef.current = false
+      setIsTypingState(false)
+      const sectionEl = document.getElementById('contact')
+      if (sectionEl) {
+        sectionEl.dispatchEvent(new CustomEvent('contact-typing', { detail: { isTyping: false }, bubbles: true }))
+      }
+    }, 1500)
   }, [])
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -656,26 +781,9 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       />
 
       {/* 3 Machined Status LEDs (Top Right) */}
-      <div className="absolute top-6 right-7 flex gap-1.5 items-center z-20 pointer-events-none">
-        <motion.div custom={0} variants={DOT_VARIANTS} animate={activeDotState} className="w-1.5 h-1.5 rounded-full bg-[#030408] border border-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.20),0_1px_2px_rgba(0,0,0,0.9)]" />
-        <motion.div custom={1} variants={DOT_VARIANTS} animate={activeDotState} className="w-1.5 h-1.5 rounded-full bg-[#030408] border border-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.20),0_1px_2px_rgba(0,0,0,0.9)]" />
-        <motion.div custom={2} variants={DOT_VARIANTS} animate={activeDotState} className="w-1.5 h-1.5 rounded-full bg-[#030408] border border-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.20),0_1px_2px_rgba(0,0,0,0.9)]" />
-      </div>
+      <StatusLEDs activeDotState={activeDotState} />
 
-      <motion.div variants={FORM_CHILD_VARIANTS} className="mb-5 relative z-10">
-        <span className="text-[10px] font-mono tracking-[0.20em] font-semibold text-[var(--accent)]/70 uppercase block mb-1.5">
-          CONTACT
-        </span>
-        <h2 className="text-2xl sm:text-[28px] font-bold text-white font-heading tracking-tight mb-1.5 leading-[1.15]">
-          Let's Build Something
-          <span className="block bg-gradient-to-r from-primary via-accent to-accent-hover bg-clip-text text-transparent">
-            Exceptional
-          </span>
-        </h2>
-        <p className="text-xs sm:text-[13px] text-white/65 leading-relaxed max-w-sm font-normal">
-          I usually respond within 24 hours. Let's discuss your project and create something remarkable together.
-        </p>
-      </motion.div>
+      <FormHeader />
 
       <form onSubmit={handleSubmit} onKeyDown={handleTypingEvent} onInput={handleTypingEvent} className="space-y-3.5 relative z-10">
         <div
@@ -687,78 +795,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
           }}
           className="space-y-3.5"
         >
-          <motion.div
-            variants={FORM_CHILD_VARIANTS}
-            className="space-y-1.5 relative z-30"
-            ref={dropdownRef}
-            onBlur={handleDropdownBlur}
-          >
-            <label htmlFor="inquiry-type" className="block text-[9px] font-mono tracking-[0.14em] font-medium text-white/50 uppercase mb-1.5">
-              WHAT BRINGS YOU HERE?
-            </label>
-            <div className="relative group/dd">
-              <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 ${
-                isDropdownOpen ? 'text-[var(--accent)]/90' : 'text-white/40 group-hover/dd:text-white/60'
-              }`}>
-                <HelpCircle className="h-4 w-4" strokeWidth={1.5} />
-              </div>
-              <button
-                type="button"
-                id="inquiry-type"
-                onClick={() => setIsDropdownOpen(prev => !prev)}
-                onKeyDown={handleDropdownKeyDown}
-                className="w-full h-[46px] rounded-[8px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#0a0b15]/95 via-[#06070c]/98 to-[#030306]/98 pl-10 pr-3.5 text-xs sm:text-[13px] text-white/95 outline-none transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.015)] hover:border-white/[0.14] hover:border-t-white/[0.18] hover:from-[#0d0e19]/95 hover:via-[#07080e]/98 hover:to-[#030306]/98 focus:border-[var(--accent)]/70 focus:border-t-[var(--accent)]/85 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.92),inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_8px_color-mix(in_srgb,var(--accent)_14%,transparent)] focus:bg-[#040509] flex items-center justify-between focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                aria-haspopup="listbox"
-                aria-expanded={isDropdownOpen}
-                aria-activedescendant={isDropdownOpen ? `option-${INQUIRY_OPTIONS.indexOf(inquiryType)}` : undefined}
-              >
-                <span className="font-medium text-white/95 tracking-wide">{inquiryType}</span>
-                <ChevronDown
-                  className={`h-3.5 w-3.5 text-white/40 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[var(--accent)]' : 'group-hover/dd:text-white/60'}`}
-                />
-              </button>
-
-              <AnimatePresence>
-                {isDropdownOpen && (
-                  <motion.ul
-                    initial={{ opacity: 0, y: -6, scale: 0.99 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -6, scale: 0.99 }}
-                    transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute z-50 left-0 right-0 mt-1.5 rounded-[8px] border border-white/[0.08] bg-[#070810]/98 backdrop-blur-2xl py-1 shadow-[0_20px_40px_rgba(0,0,0,0.95),0_0_0_1px_rgba(255,255,255,0.03)] overflow-hidden"
-                    role="listbox"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setIsDropdownOpen(false)
-                      }
-                    }}
-                  >
-                    {INQUIRY_OPTIONS.map((option, index) => {
-                      const isSelected = inquiryType === option
-                      return (
-                        <li
-                          key={option}
-                          id={`option-${index}`}
-                          onClick={() => {
-                            setInquiryType(option)
-                            setIsDropdownOpen(false)
-                          }}
-                          className={`px-3.5 py-2 text-xs cursor-pointer transition-colors duration-150 flex items-center justify-between border-l-2 ${isSelected
-                            ? 'text-[var(--accent)] font-medium bg-white/[0.03] border-[var(--accent)]/80'
-                            : 'text-white/70 hover:text-white hover:bg-white/[0.02] border-transparent'
-                            }`}
-                          role="option"
-                          aria-selected={isSelected}
-                        >
-                          {option}
-                        </li>
-                      )
-                    })}
-                  </motion.ul>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
+          <InquiryDropdown inquiryType={inquiryType} onSelectInquiry={handleSelectInquiry} />
 
           <motion.div variants={FORM_CHILD_VARIANTS} className="grid gap-3.5 sm:grid-cols-2">
             <FloatingInput

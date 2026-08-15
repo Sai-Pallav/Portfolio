@@ -17,48 +17,53 @@ function Footer() {
   }, [])
 
   return (
-    <footer className="w-full bg-gradient-to-b from-transparent to-[#030712]/95 backdrop-blur-md relative z-20 border-t border-white/[0.04] mt-16 md:mt-24">
-      {/* Top CTA Block */}
-      <div className="max-w-6xl mx-auto w-full pt-20 pb-16 flex flex-col items-center justify-center text-center px-6">
-        <h3 className="text-secondary/50 font-mono text-[10px] uppercase tracking-[0.2em] mb-3">
+    <footer className="w-full bg-gradient-to-b from-transparent via-[#020408]/80 to-[#020306] relative z-20 border-t border-white/[0.04]">
+      {/* Top CTA Block: Controlled vertical rhythm with zero dead space */}
+      <div className="max-w-6xl mx-auto w-full pt-14 pb-12 md:pt-16 md:pb-14 flex flex-col items-center justify-center text-center px-6">
+        <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-[var(--text-muted)] mb-2.5 select-none">
           Still here?
-        </h3>
-        <h2 className="text-2xl md:text-3xl font-bold font-heading text-[var(--text-heading)] tracking-tight mb-8 max-w-lg">
+        </span>
+        <h2 className="text-2xl sm:text-3xl md:text-[32px] font-semibold font-heading text-[var(--text-heading)] tracking-tight leading-snug max-w-lg mb-6">
           Let's build something meaningful together.
         </h2>
         <button
           onClick={handleStartConversation}
-          className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-6 py-3 text-xs font-semibold text-white transition-all duration-300 hover:bg-white/[0.06] hover:border-white/20 hover:shadow-[0_0_24px_rgba(255,255,255,0.03)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50 focus-visible:outline-none"
+          className="group inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-6 py-2.5 sm:py-3 text-xs font-semibold text-[var(--text-primary)] transform-gpu transition-[transform,background-color,border-color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform hover:bg-white/[0.05] hover:border-white/[0.16] hover:shadow-[0_6px_20px_rgba(0,0,0,0.6)] hover:-translate-y-[1.5px] active:translate-y-0 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#020306]"
         >
           <span>Start a Conversation</span>
-          <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
+          <span className="text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1">
+            →
+          </span>
         </button>
       </div>
 
-      {/* Grid Divider */}
+      {/* Primary Structural Divider */}
       <div className="max-w-6xl mx-auto w-full px-6">
-        <div className="h-px bg-white/[0.04]" />
+        <div className="h-px bg-white/[0.05]" />
       </div>
 
-      {/* Main Footer Block */}
-      <div className="max-w-6xl mx-auto w-full py-12 px-6 flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
-        {/* Left Column: Wordmark */}
-        <div className="font-sans text-sm font-extrabold tracking-widest text-white uppercase select-none">
+      {/* Main Footer Identity Row */}
+      <div className="max-w-6xl mx-auto w-full py-8 px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
+        {/* Left: Brand Identity */}
+        <div className="font-mono text-xs font-bold tracking-widest text-[var(--text-heading)] uppercase select-none">
           SAIPALLAV.CORE
         </div>
 
-        {/* Center Column: Built with */}
-        <div className="font-mono text-[10px] tracking-wider text-secondary/40 uppercase">
-          Built with: <span className="text-secondary/65">React • Vite • Three.js • Framer Motion</span>
+        {/* Center: Engineering Stack Metadata */}
+        <div className="font-mono text-[11px] tracking-wider uppercase text-[var(--text-muted)]">
+          Built with:{' '}
+          <span className="text-[var(--text-secondary)]/80">
+            React • Vite • Three.js • Framer Motion
+          </span>
         </div>
 
-        {/* Right Column: Social Links */}
-        <div className="flex flex-wrap justify-center gap-6 font-mono text-[10px] tracking-wider uppercase text-secondary/50">
+        {/* Right: Navigation Cluster */}
+        <div className="flex flex-wrap justify-center items-center gap-6 font-mono text-[11px] tracking-wider uppercase text-[var(--text-secondary)]">
           <a
             href={personal.socials.github}
             target="_blank"
             rel="noopener noreferrer"
-            className="relative py-0.5 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-full after:origin-right after:scale-x-0 after:bg-white after:transition-transform after:duration-300 hover:after:origin-left hover:after:scale-x-100 hover:text-white transition-colors duration-300 outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none rounded px-1"
+            className="hover:text-[var(--text-primary)] transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:rounded px-0.5"
           >
             GitHub
           </a>
@@ -66,13 +71,13 @@ function Footer() {
             href={personal.socials.linkedin}
             target="_blank"
             rel="noopener noreferrer"
-            className="relative py-0.5 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-full after:origin-right after:scale-x-0 after:bg-white after:transition-transform after:duration-300 hover:after:origin-left hover:after:scale-x-100 hover:text-white transition-colors duration-300 outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none rounded px-1"
+            className="hover:text-[var(--text-primary)] transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:rounded px-0.5"
           >
             LinkedIn
           </a>
           <a
             href={`mailto:${personal.email}`}
-            className="relative py-0.5 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-full after:origin-right after:scale-x-0 after:bg-white after:transition-transform after:duration-300 hover:after:origin-left hover:after:scale-x-100 hover:text-white transition-colors duration-300 outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none rounded px-1"
+            className="hover:text-[var(--text-primary)] transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:rounded px-0.5"
           >
             Email
           </a>
@@ -80,24 +85,24 @@ function Footer() {
             href={personal.resume}
             target="_blank"
             rel="noopener noreferrer"
-            className="relative py-0.5 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-full after:origin-right after:scale-x-0 after:bg-white after:transition-transform after:duration-300 hover:after:origin-left hover:after:scale-x-100 hover:text-white transition-colors duration-300 outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none rounded px-1"
+            className="hover:text-[var(--text-primary)] transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:rounded px-0.5"
           >
             Resume
           </a>
         </div>
       </div>
 
-      {/* Bottom Divider */}
+      {/* Secondary Structural Divider */}
       <div className="max-w-6xl mx-auto w-full px-6">
-        <div className="h-px bg-white/[0.02]" />
+        <div className="h-px bg-white/[0.03]" />
       </div>
 
-      {/* Signature & Copyright */}
-      <div className="max-w-6xl mx-auto w-full py-8 px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-        <div className="font-mono text-[9px] tracking-wider text-secondary/35 uppercase">
+      {/* Signature & Legal Alignment Row */}
+      <div className="max-w-6xl mx-auto w-full py-6 px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+        <div className="font-mono text-[10px] tracking-wider text-[var(--text-muted)] uppercase">
           Designed and developed with precision by Sai Pallav.
         </div>
-        <div className="font-mono text-[9px] tracking-wider text-secondary/35 uppercase">
+        <div className="font-mono text-[10px] tracking-wider text-[var(--text-muted)] uppercase">
           © {currentYear} Sai Pallav. Crafted with precision.
         </div>
       </div>

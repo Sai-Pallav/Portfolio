@@ -308,16 +308,36 @@ const getCorridorWidth = (traceWidth, layer) => {
   return traceWidth * multipliers[layer] + base
 };
 
-export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, formProgress = 0, isTyping: propsIsTyping, isMiddleActive = true, isRightActive = true }) {
+export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isMiddleActive = true, isRightActive = true }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const particlesContainerRef = useRef(null)
   const particlePoolRef = useRef([])
   const poolIndexRef = useRef(0)
   const [isTypingActive, setIsTypingActive] = useState(false)
-  const isTyping = Boolean(propsIsTyping || isTypingActive)
+  const isTyping = isTypingActive
   const activationLevel = isTyping ? 3 : 0
+  const [formProgress, setFormProgress] = useState(0)
 
+  useEffect(() => {
+    const sectionEl = document.getElementById('contact')
+    const handleTypingEvent = (e) => {
+      setIsTypingActive(!!(e.detail && e.detail.isTyping))
+    }
+    const handleProgressEvent = (e) => {
+      if (e.detail && typeof e.detail.progress === 'number') {
+        setFormProgress(e.detail.progress)
+      }
+    }
+    if (sectionEl) {
+      sectionEl.addEventListener('contact-typing', handleTypingEvent)
+      sectionEl.addEventListener('contact-progress', handleProgressEvent)
+      return () => {
+        sectionEl.removeEventListener('contact-typing', handleTypingEvent)
+        sectionEl.removeEventListener('contact-progress', handleProgressEvent)
+      }
+    }
+  }, [])
 
   const [layout, setLayout] = useState({
     G: 600,
@@ -328,8 +348,6 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     globeCenterX: 800,
     globeCenterY: 300
   })
-
-
 
   const lastLayoutRef = useRef({ G: 0, H: 0, M_form: 0, L_globe: 0, R_globe: 0, globeCenterX: 0, globeCenterY: 0 })
 
@@ -891,9 +909,6 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
         const duration = isBurst ? '0.7s' : (isRightTrace ? '2.8s' : '1.2s')
 
-        // Reset and trigger CSS animation
-        circle.style.animation = 'none'
-        void circle.offsetWidth // Trigger reflow
         circle.style.animation = `pcbParticleTravel ${duration} linear forwards`
         circle.style.display = 'block'
 
@@ -910,8 +925,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
     const timers = []
 
-    const startTypingInterval = () => {
-      if (intervalId) return
+    if (activationLevel >= 1) {
       const runSpawn = () => {
         pcbData.middleTraces.forEach((t) => {
           if (t.main) {
@@ -921,34 +935,6 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
       }
       runSpawn()
       intervalId = setInterval(runSpawn, 450)
-    }
-
-    const stopTypingInterval = () => {
-      if (intervalId) {
-        clearInterval(intervalId)
-        intervalId = null
-      }
-    }
-
-    const sectionEl = document.getElementById('contact')
-
-    // Initial check
-    if (sectionEl && sectionEl.getAttribute('data-typing') === 'true') {
-      startTypingInterval()
-    }
-
-    const handleTypingEvent = (e) => {
-      const typing = !!(e.detail && e.detail.isTyping)
-      setIsTypingActive(typing)
-      if (typing) {
-        startTypingInterval()
-      } else {
-        stopTypingInterval()
-      }
-    }
-
-    if (sectionEl) {
-      sectionEl.addEventListener('contact-typing', handleTypingEvent)
     }
 
     const isTransmit = contactSystemState === 'transmit'
@@ -975,9 +961,6 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     }
 
     return () => {
-      if (sectionEl) {
-        sectionEl.removeEventListener('contact-typing', handleTypingEvent)
-      }
       if (intervalId) clearInterval(intervalId)
       timers.forEach((t) => clearTimeout(t))
       if (particlePoolRef.current) {
@@ -988,7 +971,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         })
       }
     }
-  }, [contactSystemState, pcbData, shouldReduceMotion, isInView])
+  }, [contactSystemState, activationLevel, pcbData, shouldReduceMotion, isInView])
 
   // SMT Package Renderer (High-Fidelity component rendering with solder joints, body texture, and silkscreen labels)
   const renderSMT = (x, y, w, h, label, chKey = null, isCap = false) => {

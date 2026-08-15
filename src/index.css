@@ -53,16 +53,6 @@
     }
   }
 
-  @keyframes pcbTravel {
-    0% {
-      offset-distance: 0%;
-    }
-
-    100% {
-      offset-distance: 100%;
-    }
-  }
-
   @keyframes borderBeam {
     0% {
       stroke-dashoffset: 100;
@@ -493,38 +483,6 @@ main {
   }
 }
 
-@keyframes pcbRadarRotate {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes pcbRadarRotateCounter {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(-360deg);
-  }
-}
-
-@keyframes pcbRadarPulse {
-  0% {
-    opacity: 0.85;
-    transform: scale(0.6);
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(1.6);
-  }
-}
-
 /* Middle PCB Group Pulse Animations */
 @keyframes pcbMiddleGroupPulse {
   0% {
@@ -730,3 +688,39 @@ main {
     transform: scale(1.01);
   }
 }
+
+@keyframes floatAtmosphere1 {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0);
+  }
+  25% {
+    transform: translate3d(20px, -15px, 0);
+  }
+  50% {
+    transform: translate3d(-10px, 10px, 0);
+  }
+  75% {
+    transform: translate3d(10px, -5px, 0);
+  }
+}
+
+@keyframes floatAtmosphere2 {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0);
+  }
+  25% {
+    transform: translate3d(-20px, 20px, 0);
+  }
+  50% {
+    transform: translate3d(20px, -15px, 0);
+  }
+  75% {
+    transform: translate3d(-10px, 10px, 0);
+  }
+}
+
+/* Pause all background atmosphere and SVG animations when contact section is outside viewport */
+#contact[data-inview="false"] svg *,
+#contact[data-inview="false"] .anim-inview-pause {
+  animation-play-state: paused !important;
+}

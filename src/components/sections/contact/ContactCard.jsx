@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback, memo } from 'react'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ArrowRight } from 'lucide-react'
 
 export default memo(function ContactCard({
@@ -16,126 +16,102 @@ export default memo(function ContactCard({
   actionType
 }) {
   const cardRef = useRef(null)
-  const cardRectRef = useRef(null)
-  const [isHovered, setIsHovered] = useState(false)
   const [isHighlighted, setIsHighlighted] = useState(false)
   const [copied, setCopied] = useState(false)
-  const shouldReduceMotion = useReducedMotion()
+
+  const isInteractive = Boolean(href || onClick || copyText)
 
   // Handle Event-Driven Highlight from Globe Platform Hover (Architecture Isolation)
   useEffect(() => {
     if (!platformKey) return
     const handleGlobeHover = (e) => {
-      const platform = e.detail.platform
+      const platform = e.detail?.platform
       const shouldHighlight = Array.isArray(platformKey)
         ? platformKey.includes(platform)
         : platformKey === platform
-      setIsHighlighted(shouldHighlight)
+      setIsHighlighted(Boolean(shouldHighlight))
     }
     window.addEventListener('globe-hover', handleGlobeHover)
     return () => window.removeEventListener('globe-hover', handleGlobeHover)
   }, [platformKey])
 
-  const handleMouseMove = useCallback((e) => {
-    if (!cardRectRef.current && cardRef.current) {
-      cardRectRef.current = cardRef.current.getBoundingClientRect()
-    }
-    const rect = cardRectRef.current
-    if (!rect) return
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    cardRef.current.style.setProperty('--card-mouse-x', `${x}px`)
-    cardRef.current.style.setProperty('--card-mouse-y', `${y}px`)
-  }, [])
-
-  const handleMouseEnter = useCallback(() => {
-    setIsHovered(true)
-    if (cardRef.current) {
-      cardRectRef.current = cardRef.current.getBoundingClientRect()
-    }
-  }, [])
-
-  const handleMouseLeave = useCallback(() => {
-    setIsHovered(false)
-    cardRectRef.current = null
-  }, [])
-
-  const handleCardClick = useCallback((e) => {
+  const handleAction = useCallback((e) => {
     if (copyText) {
-      e.preventDefault()
-      e.stopPropagation()
+      if (e) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
       navigator.clipboard.writeText(copyText)
       setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      setTimeout(() => setCopied(false), 1800)
+    } else if (href) {
+      if (e) {
+        e.stopPropagation()
+      }
+      if (href.startsWith('http')) {
+        window.open(href, '_blank', 'noopener,noreferrer')
+      } else {
+        window.location.href = href
+      }
     } else if (onClick) {
       onClick(e)
     }
-  }, [copyText, onClick])
-
-  const effectiveHovered = isHovered || isHighlighted
-
-  const accentConfigs = {
-    default: {
-      glow: 'var(--accent-glow)',
-      borderHover: 'hover:border-[var(--accent)]/30',
-      iconText: 'text-[var(--accent)]',
-      iconBg: 'bg-[var(--accent)]/15 border-[var(--accent)]/25',
-      iconGlow: 'group-hover:shadow-[0_0_20px_var(--accent-glow)]',
-      textAccent: 'text-[var(--accent)]/90',
-    }
-  }
-
-  const config = accentConfigs.default
+  }, [copyText, href, onClick])
 
   const renderFooter = () => {
     if (!footer) return null
 
-    const isLink = href || onClick || copyText
-
-    if (isLink) {
+    if (isInteractive) {
       const Component = href ? 'a' : 'button'
-      const props = href 
+      const linkProps = href 
         ? { 
             href, 
             target: href.startsWith('http') ? '_blank' : undefined, 
-            rel: href.startsWith('http') ? 'noopener noreferrer' : undefined 
+            rel: href.startsWith('http') ? 'noopener noreferrer' : undefined,
+            onClick: (e) => e.stopPropagation()
           }
-        : { onClick: handleCardClick }
+        : { 
+            type: 'button',
+            onClick: handleAction
+          }
 
       if (actionType === 'copy') {
         return (
           <Component
-            {...props}
-            className="inline-flex items-center text-xs font-semibold transition-all duration-300 group/cta mt-4 cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none rounded px-1"
-            style={{ color: copied ? 'var(--accent)' : 'var(--text-heading)' }}
+            {...linkProps}
+            className="group/cta inline-flex items-center gap-1.5 text-xs font-medium transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-surface)] focus-visible:rounded"
+            style={{ color: copied ? 'var(--accent)' : 'var(--text-secondary)' }}
             aria-label={copied ? 'Email copied to clipboard' : 'Copy email address'}
           >
             <AnimatePresence mode="wait" initial={false}>
               {copied ? (
                 <motion.span
                   key="copied"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.15, ease: "easeInOut" }}
-                  className="inline-flex items-center gap-1.5"
+                  initial={{ opacity: 0, y: 2 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -2 }}
+                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  className="inline-flex items-center gap-1.5 font-medium text-[var(--accent)]"
                 >
-                  <span aria-live="polite" className="font-semibold text-[var(--accent)]">Copied!</span>
-                  <Check className="h-3.5 w-3.5" strokeWidth={2} />
+                  <span>Copied!</span>
+                  <Check className="h-3 w-3 stroke-[2.2]" />
                 </motion.span>
               ) : (
                 <motion.span
                   key="copy"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.15, ease: "easeInOut" }}
-                  className="inline-flex items-center gap-1.5"
+                  initial={{ opacity: 0, y: 2 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -2 }}
+                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  className="inline-flex items-center gap-1.5 group-hover:text-[var(--text-primary)] transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
                 >
-                  <span className="relative py-0.5 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-full after:origin-right after:scale-x-0 after:bg-[var(--accent)] after:transition-transform after:duration-300 group-hover/cta:after:origin-left group-hover/cta:after:scale-x-100 group-hover/cta:text-white">
+                  <span className="py-0.5">
                     {footer.replace(' →', '')}
                   </span>
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover/cta:translate-x-1" strokeWidth={2} />
+                  <ArrowRight 
+                    className="h-3 w-3 text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1" 
+                    strokeWidth={2} 
+                  />
                 </motion.span>
               )}
             </AnimatePresence>
@@ -143,106 +119,91 @@ export default memo(function ContactCard({
         )
       }
 
-      if (actionType === 'navigate') {
-        return (
-          <Component
-            {...props}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold transition-all duration-300 group/cta mt-4 cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none rounded px-1"
-            style={{ color: 'var(--text-heading)' }}
-          >
-            <span className="relative py-0.5 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-full after:origin-right after:scale-x-0 after:bg-[var(--accent)] after:transition-transform after:duration-300 group-hover/cta:after:origin-left group-hover/cta:after:scale-x-100 group-hover/cta:text-white">
-              {footer.replace(' →', '')}
-            </span>
-            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover/cta:translate-x-1" strokeWidth={2} />
-          </Component>
-        )
-      }
-
-      // Default fallback
       return (
         <Component
-          {...props}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold transition-all duration-300 group/cta mt-4 cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:outline-none rounded px-1"
-          style={{ color: copied ? 'var(--accent)' : 'var(--text-heading)' }}
+          {...linkProps}
+          className="group/cta inline-flex items-center gap-1.5 text-xs font-medium transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-surface)] focus-visible:rounded text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
         >
-          <span className="relative py-0.5 after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-full after:origin-right after:scale-x-0 after:bg-[var(--accent)] after:transition-transform after:duration-300 group-hover/cta:after:origin-left group-hover/cta:after:scale-x-100 group-hover/cta:text-white">
-            {copied ? "Copied!" : footer.replace(' →', '')}
+          <span className="py-0.5">
+            {footer.replace(' →', '')}
           </span>
-          {copied ? (
-            <Check className="h-3.5 w-3.5" strokeWidth={2} />
-          ) : (
-            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover/cta:translate-x-1" strokeWidth={2} />
-          )}
+          <ArrowRight 
+            className="h-3 w-3 text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1" 
+            strokeWidth={2} 
+          />
         </Component>
       )
     }
 
     return (
-      <span className="text-xs font-normal text-secondary/80 tracking-normal mt-4">
+      <span className="text-[11px] font-mono text-[var(--text-muted)] tracking-tight flex items-center gap-1.5 select-text">
         {footer}
       </span>
     )
   }
 
-  const hasAction = Boolean(href || onClick || copyText || actionType)
-
   return (
-    <motion.div
+    <div
       ref={cardRef}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-surface/90 via-raised/70 to-surface/90 backdrop-blur-2xl p-6 md:p-8 min-h-[240px] h-full flex flex-col justify-between transition-all duration-200 ease-out select-none shadow-[0_6px_24px_-8px_rgba(0,0,0,0.5),0_1px_2px_var(--accent-dim)] ${
-        effectiveHovered
-          ? hasAction
-            ? 'border-[var(--accent)]/65 -translate-y-[2px] shadow-[0_12px_36px_-6px_rgba(0,0,0,0.65),0_0_20px_var(--accent-dim)]'
-            : 'border-white/30'
-          : 'border-white/[0.15]'
+      onClick={isInteractive ? handleAction : undefined}
+      className={`group relative overflow-hidden rounded-xl border p-5 sm:p-6 min-h-[224px] h-full flex flex-col justify-between transform-gpu transition-[transform,border-color,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform select-none ${
+        isInteractive ? 'cursor-pointer' : 'cursor-default'
+      } ${
+        isHighlighted
+          ? 'border-white/[0.18] -translate-y-[1.5px] shadow-[0_8px_24px_-4px_rgba(0,0,0,0.65)]'
+          : 'border-white/[0.07] hover:border-white/[0.14] hover:-translate-y-[1.5px] shadow-[0_4px_16px_-4px_rgba(0,0,0,0.45)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.65)]'
       }`}
+      style={{
+        background: isHighlighted
+          ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 45%, rgba(0, 0, 0, 0.22) 100%), var(--bg-surface)'
+          : 'linear-gradient(180deg, rgba(255, 255, 255, 0.024) 0%, rgba(255, 255, 255, 0.005) 45%, rgba(0, 0, 0, 0.26) 100%), var(--bg-surface)'
+      }}
     >
-      {/* Glossy top highlight */}
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/[0.015] to-white/[0.06] pointer-events-none" />
-
-      {/* Local mouse glow radial overlay */}
-      {!shouldReduceMotion && (
-        <div
-          className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-          style={{
-            background: `radial-gradient(150px circle at var(--card-mouse-x, 0px) var(--card-mouse-y, 0px), ${config.glow}, transparent 100%)`
-          }}
-        />
-      )}
+      {/* Precision top specular edge highlight */}
+      <div 
+        className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.14] to-transparent transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:via-white/[0.22]" 
+        style={{ opacity: isHighlighted ? 0.85 : 0.5 }}
+      />
 
       {/* Top Meta Row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          {/* Rounded Glass Icon Box with Soft Accents */}
-          <div className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border transition-all duration-500 shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.08)] ${config.iconBg} ${config.iconText} ${config.iconGlow} ${
-            effectiveHovered ? 'scale-105' : ''
-          }`}>
-            {typeof icon === 'function' ? icon(effectiveHovered) : icon}
+          {/* Engineered System Indicator / Icon Box */}
+          <div 
+            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-[background-color,border-color,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] ${
+              isHighlighted
+                ? 'border-white/[0.16] bg-white/[0.05] text-[var(--text-primary)]'
+                : 'border-white/[0.08] bg-white/[0.02] text-[var(--text-secondary)] group-hover:border-white/[0.15] group-hover:bg-white/[0.045] group-hover:text-[var(--text-primary)]'
+            }`}
+          >
+            {typeof icon === 'function' ? icon(isHighlighted) : icon}
           </div>
-          <p className="text-[11px] font-mono tracking-[0.08em] font-medium uppercase text-[var(--text-muted)]">
+          <p className="text-[10px] font-mono tracking-widest font-semibold uppercase text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
             {label}
           </p>
         </div>
-        <span className="font-mono text-[9px] text-secondary/40 tracking-wider">0{index}</span>
+        <span className="font-mono text-[10px] font-medium text-[var(--text-muted)]/50 tracking-widest group-hover:text-[var(--text-muted)]/80 transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
+          0{index}
+        </span>
       </div>
 
-      {/* Content Area */}
-      <div className="flex-grow flex flex-col justify-start mt-4">
-        <h4 className="text-base md:text-lg font-bold text-[var(--text-heading)] font-heading tracking-tight mb-2 text-left">
+      {/* Content Area with Intentional Vertical Rhythm */}
+      <div className="flex-1 flex flex-col justify-start my-3.5">
+        <h4 className="text-[15px] sm:text-[16px] font-semibold text-[var(--text-heading)] font-heading tracking-tight leading-snug text-left group-hover:text-white transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
           {title}
         </h4>
-        <p className="text-sm md:text-[15px] leading-[1.55] text-secondary/85 font-normal text-left">
+        <p className="text-[13px] leading-[1.6] text-[var(--text-secondary)] font-normal text-left mt-1.5 max-w-[280px]">
           {description}
         </p>
       </div>
 
-      {/* Footer / CTA Area */}
-      <div className="flex items-center justify-between border-t border-white/[0.06] mt-4 pt-3.5 w-full">
+      {/* Footer / Action Baseline Lock */}
+      <div className="flex items-center justify-between border-t border-white/[0.06] pt-3.5 w-full mt-auto">
         {renderFooter()}
       </div>
-    </motion.div>
+    </div>
   )
 })
+
+
+

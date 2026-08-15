@@ -58,24 +58,18 @@ const drawLeftPCBPath = (x1, y1, x2, y2, category) => {
   return `M ${x1},${y1} L ${x2},${y2}`;
 };
 
-export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isTyping: propsIsTyping, formProgress, beamActive }) {
+export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, beamActive }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
   const particlesContainerRef = useRef(null)
+  const particlePoolRef = useRef([])
+  const poolIndexRef = useRef(0)
   const [isTypingActive, setIsTypingActive] = useState(false)
-  const isTyping = Boolean(propsIsTyping || isTypingActive)
-  const [hasWokenUp, setHasWokenUp] = useState(false)
+  const isTyping = isTypingActive
   const activationLevel = isTyping ? 3 : 0
 
   const [activatedNodes, setActivatedNodes] = useState({})
   const [isIlluminated, setIsIlluminated] = useState(false)
-
-
-  useEffect(() => {
-    if (isInView || contactSystemState === 'engaged' || isTyping) {
-      setHasWokenUp(true)
-    }
-  }, [isInView, contactSystemState, isTyping])
 
   useEffect(() => {
     if (!isInView && !isIlluminated) {
@@ -337,13 +331,20 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     const container = particlesContainerRef.current
     if (!container) return
 
+    particlePoolRef.current = Array.from(container.children)
     let intervalId = null
 
     const spawnParticle = (trace, isBurst = false, delayMs = 0) => {
       const delayTimer = setTimeout(() => {
-        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
-        circle.setAttribute('cx', '0')
-        circle.setAttribute('cy', '0')
+        if (!particlePoolRef.current || particlePoolRef.current.length === 0) return
+
+        const circle = particlePoolRef.current[poolIndexRef.current]
+        poolIndexRef.current = (poolIndexRef.current + 1) % particlePoolRef.current.length
+
+        if (circle._cleanupTimer) {
+          clearTimeout(circle._cleanupTimer)
+          circle._cleanupTimer = null
+        }
 
         const r = isBurst ? '2.0' : '1.6'
         circle.setAttribute('r', r)
@@ -359,21 +360,20 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
         const duration = isBurst ? '0.7s' : '1.2s'
         circle.style.animation = `pcbParticleTravel ${duration} linear forwards`
-
-        container.appendChild(circle)
+        circle.style.display = 'block'
 
         const cleanupTimer = setTimeout(() => {
-          circle.remove()
+          circle.style.display = 'none'
+          circle.style.animation = 'none'
         }, isBurst ? 700 : 1200)
 
-        circle.__cleanupTimer = cleanupTimer
+        circle._cleanupTimer = cleanupTimer
       }, delayMs)
 
       return delayTimer
     }
 
     const timers = []
-
     const isTransmit = contactSystemState === 'transmit'
 
     if (isTransmit) {
@@ -400,8 +400,15 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     return () => {
       if (intervalId) clearInterval(intervalId)
       timers.forEach((t) => clearTimeout(t))
+      if (particlePoolRef.current) {
+        particlePoolRef.current.forEach((circle) => {
+          if (circle._cleanupTimer) clearTimeout(circle._cleanupTimer)
+          circle.style.display = 'none'
+          circle.style.animation = 'none'
+        })
+      }
     }
-  }, [isInView, activationLevel, contactSystemState, traces, shouldReduceMotion])
+  }, [isInView, isIlluminated, activationLevel, contactSystemState, traces, shouldReduceMotion])
 
   // Glassmorphic Component Block
   const renderGlassBlock = (x, y, w, h, label, chKey) => {
@@ -1010,8 +1017,19 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
            ======================================================== */}
         {traceCorridors}
 
-        {/* Dynamic Particles Container */}
-        <g ref={particlesContainerRef} />
+        {/* Dynamic Particles Container (Recycled Pool) */}
+        <g ref={particlesContainerRef}>
+          {Array.from({ length: 24 }).map((_, i) => (
+            <circle
+              key={`p-pool-l-${i}`}
+              cx="0"
+              cy="0"
+              r="1.6"
+              fill="var(--accent)"
+              style={{ display: 'none', pointerEvents: 'none' }}
+            />
+          ))}
+        </g>
 
         {/* Trailing Lines for Traveling Hero Channels */}
         {isTransmitOrFailed && ['name', 'email', 'subject', 'message'].map((chKey, chIdx) => (
