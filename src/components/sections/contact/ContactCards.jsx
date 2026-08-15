@@ -26,9 +26,9 @@ const CARD_VARIANTS = {
 export default React.memo(function ContactCards() {
   const iconStatus = useMemo(() => (
     <div className="relative flex h-2 w-2 items-center justify-center">
-      <span 
-        className="h-2 w-2 rounded-full ring-2 ring-[var(--accent)]/20" 
-        style={{ backgroundColor: 'var(--accent)' }} 
+      <span
+        className="h-2 w-2 rounded-full ring-2 ring-[var(--accent)]/20"
+        style={{ backgroundColor: 'var(--accent)' }}
       />
     </div>
   ), [])

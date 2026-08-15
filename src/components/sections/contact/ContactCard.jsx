@@ -63,17 +63,17 @@ export default memo(function ContactCard({
 
     if (isInteractive) {
       const Component = href ? 'a' : 'button'
-      const linkProps = href 
-        ? { 
-            href, 
-            target: href.startsWith('http') ? '_blank' : undefined, 
-            rel: href.startsWith('http') ? 'noopener noreferrer' : undefined,
-            onClick: (e) => e.stopPropagation()
-          }
-        : { 
-            type: 'button',
-            onClick: handleAction
-          }
+      const linkProps = href
+        ? {
+          href,
+          target: href.startsWith('http') ? '_blank' : undefined,
+          rel: href.startsWith('http') ? 'noopener noreferrer' : undefined,
+          onClick: (e) => e.stopPropagation()
+        }
+        : {
+          type: 'button',
+          onClick: handleAction
+        }
 
       if (actionType === 'copy') {
         return (
@@ -108,9 +108,9 @@ export default memo(function ContactCard({
                   <span className="py-0.5">
                     {footer.replace(' →', '')}
                   </span>
-                  <ArrowRight 
-                    className="h-3 w-3 text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1" 
-                    strokeWidth={2} 
+                  <ArrowRight
+                    className="h-3 w-3 text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1"
+                    strokeWidth={2}
                   />
                 </motion.span>
               )}
@@ -127,9 +127,9 @@ export default memo(function ContactCard({
           <span className="py-0.5">
             {footer.replace(' →', '')}
           </span>
-          <ArrowRight 
-            className="h-3 w-3 text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1" 
-            strokeWidth={2} 
+          <ArrowRight
+            className="h-3 w-3 text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1"
+            strokeWidth={2}
           />
         </Component>
       )
@@ -146,13 +146,11 @@ export default memo(function ContactCard({
     <div
       ref={cardRef}
       onClick={isInteractive ? handleAction : undefined}
-      className={`group relative overflow-hidden rounded-xl border p-5 sm:p-6 min-h-[224px] h-full flex flex-col justify-between transform-gpu transition-[transform,border-color,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform select-none ${
-        isInteractive ? 'cursor-pointer' : 'cursor-default'
-      } ${
-        isHighlighted
+      className={`group relative overflow-hidden rounded-xl border p-5 sm:p-6 min-h-[224px] h-full flex flex-col justify-between transform-gpu transition-[transform,border-color,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform select-none ${isInteractive ? 'cursor-pointer' : 'cursor-default'
+        } ${isHighlighted
           ? 'border-white/[0.18] -translate-y-[1.5px] shadow-[0_8px_24px_-4px_rgba(0,0,0,0.65)]'
           : 'border-white/[0.07] hover:border-white/[0.14] hover:-translate-y-[1.5px] shadow-[0_4px_16px_-4px_rgba(0,0,0,0.45)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.65)]'
-      }`}
+        }`}
       style={{
         background: isHighlighted
           ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 45%, rgba(0, 0, 0, 0.22) 100%), var(--bg-surface)'
@@ -160,8 +158,8 @@ export default memo(function ContactCard({
       }}
     >
       {/* Precision top specular edge highlight */}
-      <div 
-        className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.14] to-transparent transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:via-white/[0.22]" 
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.14] to-transparent transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:via-white/[0.22]"
         style={{ opacity: isHighlighted ? 0.85 : 0.5 }}
       />
 
@@ -169,12 +167,11 @@ export default memo(function ContactCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           {/* Engineered System Indicator / Icon Box */}
-          <div 
-            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-[background-color,border-color,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] ${
-              isHighlighted
-                ? 'border-white/[0.16] bg-white/[0.05] text-[var(--text-primary)]'
-                : 'border-white/[0.08] bg-white/[0.02] text-[var(--text-secondary)] group-hover:border-white/[0.15] group-hover:bg-white/[0.045] group-hover:text-[var(--text-primary)]'
-            }`}
+          <div
+            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-[background-color,border-color,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] ${isHighlighted
+              ? 'border-white/[0.16] bg-white/[0.05] text-[var(--text-primary)]'
+              : 'border-white/[0.08] bg-white/[0.02] text-[var(--text-secondary)] group-hover:border-white/[0.15] group-hover:bg-white/[0.045] group-hover:text-[var(--text-primary)]'
+              }`}
           >
             {typeof icon === 'function' ? icon(isHighlighted) : icon}
           </div>

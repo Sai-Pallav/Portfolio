@@ -1005,7 +1005,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
           height={h - 0.6} 
           rx={0.3} 
           fill={isCap ? "url(#capacitor-body)" : "url(#resistor-body)"} 
-          stroke={isCap ? "#806650" : "#22222a"} 
+          stroke={isCap ? "#333644" : "#22222a"} 
           strokeWidth="0.35" 
         />
 
@@ -1479,7 +1479,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     if (!isMiddleActive) {
       return {
         opacity: 0.65,
-        filter: 'brightness(0.85) saturate(0.35) hue-rotate(-25deg)',
+        filter: 'brightness(0.85) saturate(0.4)',
         transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
       }
     }
@@ -1686,13 +1686,13 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             <stop offset="100%" stopColor="#060608" />
           </linearGradient>
           <linearGradient id="capacitor-body" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#7a634e" />
-            <stop offset="100%" stopColor="#48382b" />
+            <stop offset="0%" stopColor="#1e2029" />
+            <stop offset="100%" stopColor="#12131a" />
           </linearGradient>
           <linearGradient id="gold-plated" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#d4af37" />
-            <stop offset="50%" stopColor="#f3e5ab" />
-            <stop offset="100%" stopColor="#aa7c11" />
+            <stop offset="0%" stopColor="#cbd5e1" />
+            <stop offset="50%" stopColor="#f1f5f9" />
+            <stop offset="100%" stopColor="#64748b" />
           </linearGradient>
 
           {/* Substrate Effect Defs */}

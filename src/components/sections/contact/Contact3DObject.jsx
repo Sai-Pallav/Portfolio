@@ -9,7 +9,7 @@ import SocialIcon from '@/components/ui/SocialIcon'
 // --- Global Theme Ref for Imperative Material Updates (No React Re-renders) ---
 const globalTheme = {
   color: '#8b5cf6',
-  secondaryColor: '#a855f7',
+  secondaryColor: '#8b5cf6',
   version: 0,
 }
 
@@ -72,8 +72,8 @@ const FresnelGlowMaterial = shaderMaterial(
 extend({ FresnelGlowMaterial })
 // Ring Glow Custom Neon Material - clean, calm infrastructure look
 const RingGlowMaterial = shaderMaterial(
-  { 
-    color: new THREE.Color('#8B5CFF'), 
+  {
+    color: new THREE.Color('#8b5cf6'),
     opacity: 0.8
   },
   `varying vec3 vNormal; varying vec3 vViewPosition; varying vec2 vUv;
@@ -187,7 +187,7 @@ const staticRingMaterial = (() => {
   mat.transparent = true
   mat.blending = THREE.AdditiveBlending
   mat.depthWrite = false
-  mat.color = new THREE.Color('#8B5CFF')
+  mat.color = new THREE.Color('#8b5cf6')
   mat.opacity = 0.35
   return mat
 })()
@@ -470,7 +470,7 @@ const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onH
       <Html center transform sprite distanceFactor={8} pointerEvents="auto">
         <div className="relative group/tooltip pointer-events-auto">
           {renderLink()}
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 px-3 py-1.5 rounded-lg bg-bg-raised/95 border border-white/[0.08] backdrop-blur-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-300 pointer-events-none shadow-[0_4px_16px_rgba(0,0,0,0.5)] scale-90 group-hover/tooltip:scale-100">
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 px-3 py-1.5 rounded-lg bg-bg-raised/95 border border-white/[0.08] backdrop-blur-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-300 pointer-events-none shadow-[0_4px_16px_rgba(0,0,0,0.5)] scale-90 group-hover/tooltip:scale-100">
             <span className="text-[10px] font-bold tracking-wider uppercase text-[var(--text-heading)] whitespace-nowrap">
               {specialType === 'email' && copied ? 'Copied!' : platform}
             </span>
@@ -482,16 +482,16 @@ const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onH
   )
 })
 
-const OrbitalRing = memo(function OrbitalRing({ 
+const OrbitalRing = memo(function OrbitalRing({
   myRingIndex,
-  angle, 
-  ringSpeed, 
-  iconSpeed, 
-  icons, 
-  zOffset, 
-  distanceFactor, 
-  hoveredCountRef, 
-  hoveredOrbitRef 
+  angle,
+  ringSpeed,
+  iconSpeed,
+  icons,
+  zOffset,
+  distanceFactor,
+  hoveredCountRef,
+  hoveredOrbitRef
 }) {
   const orbitGroupRef = useRef()
   const meshRef = useRef()
@@ -627,7 +627,7 @@ function Scene({ distanceFactor, hoveredCountRef, hoveredOrbitRef }) {
 
   // Imperative scene color update on theme state transitions
   const lastColorVersion = useRef(-1)
-  
+
   useFrame((state) => {
     if (lastColorVersion.current !== globalTheme.version) {
       tempColorA.set(globalTheme.color)
@@ -667,36 +667,36 @@ function Scene({ distanceFactor, hoveredCountRef, hoveredOrbitRef }) {
       <CameraRig distanceFactor={distanceFactor} />
       <Globe distanceFactor={distanceFactor} />
       <MicroParticles distanceFactor={distanceFactor} />
-      
+
       {/* 3 Premium-looking 3D Orbital Rings */}
-      <OrbitalRing 
+      <OrbitalRing
         myRingIndex={0}
-        angle={0} 
-        ringSpeed={0.02} 
+        angle={0}
+        ringSpeed={0.02}
         iconSpeed={0.35}
-        icons={STATIC_RING_ICONS[0]} 
+        icons={STATIC_RING_ICONS[0]}
         zOffset={0.00}
         distanceFactor={distanceFactor}
         hoveredCountRef={hoveredCountRef}
         hoveredOrbitRef={hoveredOrbitRef}
       />
-      <OrbitalRing 
+      <OrbitalRing
         myRingIndex={1}
-        angle={60} 
-        ringSpeed={-0.016} 
+        angle={60}
+        ringSpeed={-0.016}
         iconSpeed={-0.28}
-        icons={STATIC_RING_ICONS[1]} 
+        icons={STATIC_RING_ICONS[1]}
         zOffset={0.00}
         distanceFactor={distanceFactor}
         hoveredCountRef={hoveredCountRef}
         hoveredOrbitRef={hoveredOrbitRef}
       />
-      <OrbitalRing 
+      <OrbitalRing
         myRingIndex={2}
-        angle={120} 
-        ringSpeed={0.013} 
+        angle={120}
+        ringSpeed={0.013}
         iconSpeed={0.22}
-        icons={STATIC_RING_ICONS[2]} 
+        icons={STATIC_RING_ICONS[2]}
         zOffset={0.00}
         distanceFactor={distanceFactor}
         hoveredCountRef={hoveredCountRef}
@@ -745,7 +745,7 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
 
   // Cache rect, update on resize/scroll/mutation using ResizeObserver to prevent layout thrashing
   useEffect(() => {
-    const update = () => { 
+    const update = () => {
       if (containerRef.current) {
         cachedRect.current = containerRef.current.getBoundingClientRect()
       }
@@ -761,7 +761,7 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
 
     window.addEventListener("resize", update, { passive: true })
     window.addEventListener("scroll", update, { passive: true })
-    return () => { 
+    return () => {
       resizeObserver.disconnect()
       window.removeEventListener("resize", update)
       window.removeEventListener("scroll", update)
@@ -784,14 +784,14 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
           const dx = e.clientX - (r.left + r.width / 2)
           const dy = e.clientY - (r.top + r.height / 2)
           const d = Math.sqrt(dx * dx + dy * dy)
-          if (d > maxDistance) { 
-            distanceFactor.current = 1.0 
-          } else if (d < minDistance) { 
-            distanceFactor.current = minFactor 
-          } else { 
+          if (d > maxDistance) {
+            distanceFactor.current = 1.0
+          } else if (d < minDistance) {
+            distanceFactor.current = minFactor
+          } else {
             const t = (d - minDistance) / (maxDistance - minDistance)
             const eased = t * t * (3 - 2 * t)
-            distanceFactor.current = minFactor + eased * (1.0 - minFactor) 
+            distanceFactor.current = minFactor + eased * (1.0 - minFactor)
           }
         }
         ticking = false
@@ -860,8 +860,8 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
               }}
               style={{ pointerEvents: 'auto', opacity: 1 }}
             >
-              <Scene 
-                distanceFactor={distanceFactor} 
+              <Scene
+                distanceFactor={distanceFactor}
                 hoveredCountRef={hoveredCountRef}
                 hoveredOrbitRef={hoveredOrbitRef}
               />

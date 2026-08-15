@@ -32,9 +32,8 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-3.5 top-[23px] -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 ${
-        focused ? 'text-[var(--accent)]/90' : hasValue ? 'text-white/60' : 'text-white/40 group-hover:text-white/60'
-      }`}>
+      <div className={`absolute left-3.5 top-[23px] -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 ${focused ? 'text-[var(--accent)]/90' : hasValue ? 'text-white/60' : 'text-white/40 group-hover:text-white/60'
+        }`}>
         {Icon && <Icon className="h-4 w-4" strokeWidth={1.5} />}
       </div>
       <input
@@ -53,24 +52,21 @@ const FloatingInput = memo(function FloatingInput({ id, label, type, value, onCh
         }}
         placeholder=" "
         aria-required={isRequired ? "true" : "false"}
-        className={`peer w-full h-[46px] rounded-[8px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#0a0b15]/95 via-[#06070c]/98 to-[#030306]/98 pl-10 pr-3.5 pt-3.5 pb-1 text-xs sm:text-[13px] text-white/95 font-medium placeholder-transparent outline-none transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.015)] hover:border-white/[0.14] hover:border-t-white/[0.18] hover:from-[#0d0e19]/95 hover:via-[#07080e]/98 hover:to-[#030306]/98 focus:border-[var(--accent)]/70 focus:border-t-[var(--accent)]/85 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.92),inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_8px_color-mix(in_srgb,var(--accent)_14%,transparent)] focus:bg-[#040509] ${
-          touched && error
-            ? 'border-amber-500/40 focus:border-amber-500/70 focus:shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-            : hasValue ? 'border-white/[0.10] border-t-white/[0.14] border-b-white/[0.04]' : ''
-        }`}
+        className={`peer w-full h-[46px] rounded-[8px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#0a0b15]/95 via-[#06070c]/98 to-[#030306]/98 pl-10 pr-3.5 pt-3.5 pb-1 text-xs sm:text-[13px] text-white/95 font-medium placeholder-transparent outline-none transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.015)] hover:border-white/[0.14] hover:border-t-white/[0.18] hover:from-[#0d0e19]/95 hover:via-[#07080e]/98 hover:to-[#030306]/98 focus:border-[var(--accent)]/70 focus:border-t-[var(--accent)]/85 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.92),inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_8px_color-mix(in_srgb,var(--accent)_14%,transparent)] focus:bg-[#040509] ${touched && error
+          ? 'border-amber-500/40 focus:border-amber-500/70 focus:shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+          : hasValue ? 'border-white/[0.10] border-t-white/[0.14] border-b-white/[0.04]' : ''
+          }`}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute transition-all duration-150 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${
-          focused || hasValue
-            ? `top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] px-1.5 rounded-[2px] shadow-[0_1px_2px_rgba(0,0,0,0.8)] bg-[#080912] ${
-                focused
-                  ? 'text-[var(--accent)]/90 border border-[var(--accent)]/30'
-                  : 'text-white/60 border border-white/[0.08]'
-              }`
-            : 'top-1/2 -translate-y-1/2 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40 group-hover:text-white/55'
-        }`}
+        className={`absolute transition-all duration-150 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${focused || hasValue
+          ? `top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] px-1.5 rounded-[2px] shadow-[0_1px_2px_rgba(0,0,0,0.8)] bg-[#080912] ${focused
+            ? 'text-[var(--accent)]/90 border border-[var(--accent)]/30'
+            : 'text-white/60 border border-white/[0.08]'
+          }`
+          : 'top-1/2 -translate-y-1/2 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40 group-hover:text-white/55'
+          }`}
       >
         <span>{displayLabel}</span>
         {isRequired && <span className="text-white/25 text-[9px] ml-1 font-normal select-none">*</span>}
@@ -116,9 +112,8 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-3.5 top-4 pointer-events-none transition-colors duration-150 z-10 ${
-        focused ? 'text-[var(--accent)]/90' : hasValue ? 'text-white/60' : 'text-white/40 group-hover:text-white/60'
-      }`}>
+      <div className={`absolute left-3.5 top-4 pointer-events-none transition-colors duration-150 z-10 ${focused ? 'text-[var(--accent)]/90' : hasValue ? 'text-white/60' : 'text-white/40 group-hover:text-white/60'
+        }`}>
         {Icon && <Icon className="h-4 w-4" strokeWidth={1.5} />}
       </div>
       <textarea
@@ -137,38 +132,34 @@ const FloatingTextarea = memo(function FloatingTextarea({ id, label, value, onCh
         placeholder=" "
         rows={rows}
         aria-required={isRequired ? "true" : "false"}
-        className={`peer w-full rounded-[8px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#0a0b15]/95 via-[#06070c]/98 to-[#030306]/98 pl-10 pr-4 pt-4 pb-8 text-xs sm:text-[13px] text-white/95 font-medium placeholder-transparent outline-none transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] resize-none shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.015)] hover:border-white/[0.14] hover:border-t-white/[0.18] hover:from-[#0d0e19]/95 hover:via-[#07080e]/98 hover:to-[#030306]/98 focus:border-[var(--accent)]/70 focus:border-t-[var(--accent)]/85 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.92),inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_8px_color-mix(in_srgb,var(--accent)_14%,transparent)] focus:bg-[#040509] leading-relaxed ${
-          touched && error
-            ? 'border-amber-500/40 focus:border-amber-500/70 focus:shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-            : hasValue ? 'border-white/[0.10] border-t-white/[0.14] border-b-white/[0.04]' : ''
-        }`}
+        className={`peer w-full rounded-[8px] border border-white/[0.07] border-t-white/[0.12] border-b-white/[0.03] bg-gradient-to-b from-[#0a0b15]/95 via-[#06070c]/98 to-[#030306]/98 pl-10 pr-4 pt-4 pb-8 text-xs sm:text-[13px] text-white/95 font-medium placeholder-transparent outline-none transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] resize-none shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.85),inset_0_-1px_0_rgba(255,255,255,0.015)] hover:border-white/[0.14] hover:border-t-white/[0.18] hover:from-[#0d0e19]/95 hover:via-[#07080e]/98 hover:to-[#030306]/98 focus:border-[var(--accent)]/70 focus:border-t-[var(--accent)]/85 focus:shadow-[inset_0_1.5px_2px_rgba(0,0,0,0.92),inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_22%,transparent),0_0_8px_color-mix(in_srgb,var(--accent)_14%,transparent)] focus:bg-[#040509] leading-relaxed ${touched && error
+          ? 'border-amber-500/40 focus:border-amber-500/70 focus:shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+          : hasValue ? 'border-white/[0.10] border-t-white/[0.14] border-b-white/[0.04]' : ''
+          }`}
         style={{ minHeight: '140px' }}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       <label
         htmlFor={id}
-        className={`absolute transition-all duration-150 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${
-          focused || hasValue
-            ? `top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] px-1.5 rounded-[2px] shadow-[0_1px_2px_rgba(0,0,0,0.8)] bg-[#080912] ${
-                focused
-                  ? 'text-[var(--accent)]/90 border border-[var(--accent)]/30'
-                  : 'text-white/60 border border-white/[0.08]'
-              }`
-            : 'top-4 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40 group-hover:text-white/55'
-        }`}
+        className={`absolute transition-all duration-150 pointer-events-none ease-[cubic-bezier(0.16,1,0.3,1)] select-none uppercase flex items-center ${focused || hasValue
+          ? `top-0 -translate-y-1/2 left-7 text-[9px] font-medium tracking-[0.08em] px-1.5 rounded-[2px] shadow-[0_1px_2px_rgba(0,0,0,0.8)] bg-[#080912] ${focused
+            ? 'text-[var(--accent)]/90 border border-[var(--accent)]/30'
+            : 'text-white/60 border border-white/[0.08]'
+          }`
+          : 'top-4 left-10 text-[11px] tracking-[0.06em] font-medium text-white/40 group-hover:text-white/55'
+          }`}
       >
         <span>{displayLabel}</span>
         {isRequired && <span className="text-white/25 text-[9px] ml-1 font-normal select-none">*</span>}
       </label>
 
       <span
-        className={`absolute bottom-2.5 right-3 text-[10px] font-mono tracking-widest transition-colors duration-150 pointer-events-none select-none ${
-          characterCount > characterLimit
-            ? 'text-amber-400/90 font-medium'
-            : hasValue
+        className={`absolute bottom-2.5 right-3 text-[10px] font-mono tracking-widest transition-colors duration-150 pointer-events-none select-none ${characterCount > characterLimit
+          ? 'text-amber-400/90 font-medium'
+          : hasValue
             ? 'text-white/45'
             : 'text-white/30'
-        }`}
+          }`}
       >
         {characterCount} / {characterLimit}
       </span>
@@ -418,9 +409,8 @@ const InquiryDropdown = memo(function InquiryDropdown({ inquiryType, onSelectInq
         WHAT BRINGS YOU HERE?
       </label>
       <div className="relative group/dd">
-        <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 ${
-          isDropdownOpen ? 'text-[var(--accent)]/90' : 'text-white/40 group-hover/dd:text-white/60'
-        }`}>
+        <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 ${isDropdownOpen ? 'text-[var(--accent)]/90' : 'text-white/40 group-hover/dd:text-white/60'
+          }`}>
           <HelpCircle className="h-4 w-4" strokeWidth={1.5} />
         </div>
         <button
@@ -864,8 +854,8 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             className={`rounded-[6px] border p-2.5 text-xs flex items-center gap-2 font-mono ${status.type === 'success'
-              ? 'border-green-500/20 bg-green-500/5 text-green-400'
-              : 'border-red-500/20 bg-red-500/5 text-red-400 animate-shake'
+              ? 'border-[var(--accent)]/30 bg-[var(--accent)]/5 text-white/95'
+              : 'border-amber-500/30 bg-amber-500/5 text-amber-400/90 animate-shake'
               }`}
           >
             {status.type === 'success' && <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} />}
