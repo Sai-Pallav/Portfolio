@@ -316,14 +316,25 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   // Precision CAD Engineered Substrate Footprints conforming directly to PCB trace routing and component geometry
   const substratePolygons = useMemo(() => ({
     name: [
-      // Channel 1 (Left-Top): Compact substrate body tightly following R12→C08→NodeA1→R15 component footprint
-      // No excessive blocks, no lower-right tail, no oversized panels
-      // Upper chamfer → diagonal conduit → central hub zone → lower R15 branch → step back
+      // Channel 1 — THREE SEPARATE CLEAN SUBSTRATE ZONES matching the annotated reference:
+      //
+      // [1] UPPER-LEFT HORIZONTAL STRIP ("SUBSTRATE ADDED" top annotation)
+      //     Thin rectangular band under the top trace cluster (y: CH1_Y-70 to -56)
       [
-        { x: 88,  y: CH1_Y - 62 },
-        { x: 134, y: CH1_Y - 62 },
-        { x: 170, y: CH1_Y - 26 },
-        { x: 190, y: CH1_Y - 26 },
+        { x: 0,   y: CH1_Y - 74 },
+        { x: 58,  y: CH1_Y - 74 },
+        { x: 58,  y: CH1_Y - 34 },
+        { x: 0,   y: CH1_Y - 34 }
+      ],
+      //
+      // [2] CENTRAL COMPONENT BODY ("SUBSTRATE CENTER LAYER")
+      //     Compact precision polygon around R12, C08, Node A1, R15
+      //     Upper chamfer → diagonal conduit → hub zone → lower R15 branch
+      [
+        { x: 82,  y: CH1_Y - 62 },
+        { x: 130, y: CH1_Y - 62 },
+        { x: 168, y: CH1_Y - 24 },
+        { x: 190, y: CH1_Y - 24 },
         { x: 208, y: CH1_Y - 8 },
         { x: 208, y: CH1_Y + 2 },
         { x: 196, y: CH1_Y + 14 },
@@ -331,9 +342,18 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         { x: 146, y: CH1_Y + 28 },
         { x: 110, y: CH1_Y + 28 },
         { x: 96,  y: CH1_Y + 14 },
-        { x: 96,  y: CH1_Y - 18 },
-        { x: 78,  y: CH1_Y - 36 },
+        { x: 96,  y: CH1_Y - 16 },
+        { x: 78,  y: CH1_Y - 34 },
         { x: 78,  y: CH1_Y - 54 }
+      ],
+      //
+      // [3] LOWER-LEFT HORIZONTAL STRIP ("SUBSTRATE ADDED" lower annotation)
+      //     Thin rectangular band under the lower auxiliary traces (y: CH1_Y+2 to +22)
+      [
+        { x: 0,   y: CH1_Y + 2 },
+        { x: 58,  y: CH1_Y + 2 },
+        { x: 58,  y: CH1_Y + 22 },
+        { x: 0,   y: CH1_Y + 22 }
       ]
     ],
     email: [
