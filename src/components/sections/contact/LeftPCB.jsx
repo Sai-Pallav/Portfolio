@@ -316,26 +316,32 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   // Precision CAD Engineered Substrate Footprints conforming directly to PCB trace routing and component geometry
   const substratePolygons = useMemo(() => ({
     name: [
-      // Channel 1 (Left-Top): Full continuous structural PCB body matching center layer substrate
-      // Area 1: Upper-left horizontal structural body (y: CH1_Y - 76 to -32) around horizontal traces
-      // Area 2: Central diagonal section (continuous 45° angled structural conduit)
-      // Area 3: Central structural area (around C08 and circular central component Node A1)
-      // Area 4: Lower structural branch (stepped body wrapping R15 and lower trace corridor)
+      // Channel 1 (Left-Top): Complete continuous physical substrate body matching the user's annotated blueprint
+      // - Upper-left horizontal body ("SUBSTRATE ADDED"): x: 0 to 138, y: CH1_Y - 74 to -28
+      // - Central diagonal conduit ("SUBSTRATE CENTER LAYER"): x: 138 to 178 at 45°
+      // - Central mounting core: x: 178 to 210 wrapping Node A1
+      // - Lower-right continuation ramp: x: 198 to 280, y: CH1_Y + 8 to +62
+      // - Lower-left horizontal branch ("SUBSTRATE ADDED"): x: 0 to 154, y: CH1_Y + 2 to +22
+      // - Inner diagonal cutout notch: connecting lower branch to upper body with 45° slope
       [
-        { x: 0,   y: CH1_Y - 76 },
-        { x: 138, y: CH1_Y - 76 },
-        { x: 178, y: CH1_Y - 36 },
-        { x: 194, y: CH1_Y - 36 },
+        { x: 0,   y: CH1_Y - 74 },
+        { x: 138, y: CH1_Y - 74 },
+        { x: 178, y: CH1_Y - 34 },
+        { x: 196, y: CH1_Y - 34 },
         { x: 210, y: CH1_Y - 20 },
         { x: 210, y: CH1_Y - 4 },
         { x: 198, y: CH1_Y + 8 },
-        { x: 172, y: CH1_Y + 8 },
-        { x: 154, y: CH1_Y + 26 },
-        { x: 104, y: CH1_Y + 26 },
-        { x: 88,  y: CH1_Y + 10 },
-        { x: 88,  y: CH1_Y - 18 },
-        { x: 74,  y: CH1_Y - 32 },
-        { x: 0,   y: CH1_Y - 32 }
+        { x: 238, y: CH1_Y + 48 },
+        { x: 280, y: CH1_Y + 48 },
+        { x: 280, y: CH1_Y + 62 },
+        { x: 226, y: CH1_Y + 62 },
+        { x: 186, y: CH1_Y + 22 },
+        { x: 154, y: CH1_Y + 22 },
+        { x: 0,   y: CH1_Y + 22 },
+        { x: 0,   y: CH1_Y + 2 },
+        { x: 86,  y: CH1_Y + 2 },
+        { x: 56,  y: CH1_Y - 28 },
+        { x: 0,   y: CH1_Y - 28 }
       ]
     ],
     email: [
