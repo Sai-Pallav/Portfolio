@@ -316,95 +316,75 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   // Precision CAD Engineered Substrate Footprints conforming directly to PCB trace routing and component geometry
   const substratePolygons = useMemo(() => ({
     name: [
-      // Channel 1 — THREE SEPARATE CLEAN SUBSTRATE ZONES matching the annotated reference:
-      //
-      // [1] UPPER-LEFT HORIZONTAL STRIP ("SUBSTRATE ADDED" top annotation)
-      //     Thin rectangular band under the top trace cluster (y: CH1_Y-70 to -56)
+      // Channel 1: Precision CAD contour tightly hugging R12, C08, Node A1, and lower R15 branch
       [
-        { x: 0,   y: CH1_Y - 74 },
-        { x: 58,  y: CH1_Y - 74 },
-        { x: 58,  y: CH1_Y - 34 },
-        { x: 0,   y: CH1_Y - 34 }
-      ],
-      //
-      // [2] CENTRAL COMPONENT BODY ("SUBSTRATE CENTER LAYER")
-      //     Compact precision polygon around R12, C08, Node A1, R15
-      //     Upper chamfer → diagonal conduit → hub zone → lower R15 branch
-      [
-        { x: 82,  y: CH1_Y - 62 },
-        { x: 130, y: CH1_Y - 62 },
-        { x: 168, y: CH1_Y - 24 },
-        { x: 190, y: CH1_Y - 24 },
-        { x: 208, y: CH1_Y - 8 },
-        { x: 208, y: CH1_Y + 2 },
-        { x: 196, y: CH1_Y + 14 },
-        { x: 160, y: CH1_Y + 14 },
-        { x: 146, y: CH1_Y + 28 },
-        { x: 110, y: CH1_Y + 28 },
-        { x: 96,  y: CH1_Y + 14 },
-        { x: 96,  y: CH1_Y - 16 },
-        { x: 78,  y: CH1_Y - 34 },
-        { x: 78,  y: CH1_Y - 54 }
-      ],
-      //
-      // [3] LOWER-LEFT HORIZONTAL STRIP ("SUBSTRATE ADDED" lower annotation)
-      //     Thin rectangular band under the lower auxiliary traces (y: CH1_Y+2 to +22)
-      [
-        { x: 0,   y: CH1_Y + 2 },
-        { x: 58,  y: CH1_Y + 2 },
-        { x: 58,  y: CH1_Y + 22 },
-        { x: 0,   y: CH1_Y + 22 }
+        { x: 88, y: CH1_Y - 60 },
+        { x: 132, y: CH1_Y - 60 },
+        { x: 166, y: CH1_Y - 26 },
+        { x: 186, y: CH1_Y - 26 },
+        { x: 202, y: CH1_Y - 10 },
+        { x: 202, y: CH1_Y - 2 },
+        { x: 192, y: CH1_Y + 8 },
+        { x: 168, y: CH1_Y + 8 },
+        { x: 156, y: CH1_Y + 20 },
+        { x: 114, y: CH1_Y + 20 },
+        { x: 102, y: CH1_Y + 8 },
+        { x: 102, y: CH1_Y - 16 },
+        { x: 80, y: CH1_Y - 38 },
+        { x: 80, y: CH1_Y - 52 }
       ]
     ],
     email: [
-      // Channel 2 (Left-Mid-Top): Preserved from source image
+      // Channel 2: Precision CAD contour hugging R22, R21, C14, and Node A2
       [
-        { x: 54,  y: CH2_Y - 24 },
-        { x: 108, y: CH2_Y - 24 },
-        { x: 154, y: CH2_Y + 22 },
-        { x: 194, y: CH2_Y + 22 },
-        { x: 202, y: CH2_Y + 30 },
-        { x: 202, y: CH2_Y + 42 },
-        { x: 190, y: CH2_Y + 54 },
-        { x: 120, y: CH2_Y + 54 },
-        { x: 108, y: CH2_Y + 42 },
-        { x: 76,  y: CH2_Y + 42 },
-        { x: 54,  y: CH2_Y + 20 }
+        { x: 62, y: CH2_Y - 28 },
+        { x: 108, y: CH2_Y - 28 },
+        { x: 154, y: CH2_Y + 18 },
+        { x: 176, y: CH2_Y + 18 },
+        { x: 192, y: CH2_Y + 34 },
+        { x: 192, y: CH2_Y + 44 },
+        { x: 180, y: CH2_Y + 56 },
+        { x: 124, y: CH2_Y + 56 },
+        { x: 110, y: CH2_Y + 42 },
+        { x: 74, y: CH2_Y + 42 },
+        { x: 50, y: CH2_Y + 18 },
+        { x: 50, y: CH2_Y - 16 }
       ]
     ],
     subject: [
-      // Channel 3 (Left-Mid-Bottom): Preserved from source image
+      // Channel 3: Vertical mirror of Channel 2, perfectly contoured around R32, R31, C31, and Node A3
       [
-        { x: 54,  y: CH3_Y + 24 },
-        { x: 108, y: CH3_Y + 24 },
-        { x: 154, y: CH3_Y - 22 },
-        { x: 194, y: CH3_Y - 22 },
-        { x: 202, y: CH3_Y - 30 },
-        { x: 202, y: CH3_Y - 42 },
-        { x: 190, y: CH3_Y - 54 },
-        { x: 120, y: CH3_Y - 54 },
-        { x: 108, y: CH3_Y - 42 },
-        { x: 76,  y: CH3_Y - 42 },
-        { x: 54,  y: CH3_Y - 20 }
+        { x: 62, y: CH3_Y + 28 },
+        { x: 108, y: CH3_Y + 28 },
+        { x: 154, y: CH3_Y - 18 },
+        { x: 176, y: CH3_Y - 18 },
+        { x: 192, y: CH3_Y - 34 },
+        { x: 192, y: CH3_Y - 44 },
+        { x: 180, y: CH3_Y - 56 },
+        { x: 124, y: CH3_Y - 56 },
+        { x: 110, y: CH3_Y - 42 },
+        { x: 74, y: CH3_Y - 42 },
+        { x: 50, y: CH3_Y - 18 },
+        { x: 50, y: CH3_Y + 16 }
       ]
     ],
     message: [
-      // Channel 4 (Left-Bottom): Preserved from source image
+      // Channel 4: Vertical mirror of Channel 1, perfectly contoured around R41, C41, Node A4, and R42
       [
-        { x: 80,  y: CH4_Y + 52 },
-        { x: 80,  y: CH4_Y + 38 },
-        { x: 102, y: CH4_Y + 16 },
-        { x: 102, y: CH4_Y - 8 },
-        { x: 114, y: CH4_Y - 20 },
-        { x: 156, y: CH4_Y - 20 },
-        { x: 168, y: CH4_Y - 8 },
-        { x: 192, y: CH4_Y - 8 },
-        { x: 202, y: CH4_Y + 2 },
-        { x: 202, y: CH4_Y + 10 },
-        { x: 186, y: CH4_Y + 26 },
-        { x: 166, y: CH4_Y + 26 },
+        { x: 88, y: CH4_Y + 60 },
         { x: 132, y: CH4_Y + 60 },
-        { x: 88,  y: CH4_Y + 60 }
+        { x: 166, y: CH4_Y + 26 },
+        { x: 186, y: CH4_Y + 26 },
+        { x: 202, y: CH4_Y + 10 },
+        { x: 202, y: CH4_Y + 2 },
+        { x: 192, y: CH4_Y - 8 },
+        { x: 168, y: CH4_Y - 8 },
+        { x: 156, y: CH4_Y - 20 },
+        { x: 114, y: CH4_Y - 20 },
+        { x: 102, y: CH4_Y - 8 },
+        { x: 102, y: CH4_Y + 16 },
+        { x: 80, y: CH4_Y + 38 },
+        { x: 80, y: CH4_Y + 52 }
       ]
     ]
   }), [CH1_Y, CH2_Y, CH3_Y, CH4_Y])
@@ -424,10 +404,10 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
   const getTargetOpacity = React.useCallback((chKey, elementType = 'trace') => {
     const isHero = ['name', 'email', 'subject', 'message'].includes(chKey)
-    
+
     if (isTransmit) return elementType === 'particle' ? 1.0 : 0
     if (transmissionFailed && isHero) return 0
-    
+
     const illumFactor = isIlluminated ? 1.0 : 0.65 // 65% opacity before 5s, 100% after 5s
 
     const baseOp = {
@@ -534,9 +514,9 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     const targetOpacity = getTargetOpacity(chKey)
 
     return (
-      <g 
-        key={`comp-${label}-${x}-${y}`} 
-        transform={`translate(${px}, ${y})`} 
+      <g
+        key={`comp-${label}-${x}-${y}`}
+        transform={`translate(${px}, ${y})`}
         className={dropShadowClass}
         opacity={targetOpacity}
         style={getTransitionStyle()}
@@ -1130,14 +1110,14 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             <stop offset="70%" stopColor="#040408" />
             <stop offset="100%" stopColor="#050508" />
           </radialGradient>
-          
+
           {/* Via depth well gradient */}
           <radialGradient id="via-depth-well">
             <stop offset="0%" stopColor="#000000" stopOpacity="0.6" />
             <stop offset="50%" stopColor="#020204" stopOpacity="0.3" />
             <stop offset="100%" stopColor="transparent" />
           </radialGradient>
-          
+
           {/* Copper Hatch Ground Pour Pattern — identical to Middle PCB copper-hatch-pattern */}
           <pattern id="copper-hatch-pattern-l" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line x1="0" y1="2" x2="4" y2="2" stroke="color-mix(in srgb, var(--accent) 22%, transparent)" strokeWidth="0.60" />

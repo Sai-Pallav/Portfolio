@@ -5,27 +5,24 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
     <div className="relative group/card">
       {/* Card container */}
       <div
-        className="relative rounded-[20px] border overflow-hidden transition-all duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] shadow-[0_8px_30px_-4px_rgba(0,0,0,0.5)] hover:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.32)] hover:-translate-y-1"
+        className="relative rounded-[22px] border overflow-hidden transition-all duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] shadow-[0_12px_36px_-6px_rgba(0,0,0,0.65)] hover:shadow-[0_24px_55px_-10px_rgba(0,0,0,0.85)] hover:-translate-y-1"
         style={{
-          background: 'linear-gradient(135deg, rgba(24, 24, 30, 0.96), rgba(12, 13, 17, 0.98))',
-          borderColor: 'rgba(255, 255, 255, 0.08)',
+          background: `
+            radial-gradient(ellipse 110% 70% at 0% 0%, color-mix(in srgb, var(--accent) 18%, transparent) 0%, color-mix(in srgb, var(--accent-secondary, var(--accent)) 8%, transparent) 45%, transparent 100%),
+            radial-gradient(ellipse 85% 60% at 90% 10%, color-mix(in srgb, var(--accent-secondary, var(--accent)) 5%, transparent) 0%, transparent 60%),
+            radial-gradient(ellipse 90% 40% at 50% 100%, color-mix(in srgb, var(--accent) 9%, transparent) 0%, transparent 80%),
+            radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.45) 100%),
+            color-mix(in srgb, var(--bg-surface) 78%, #000)
+          `,
+          borderColor: 'var(--border)',
           backdropFilter: "blur(12px)",
+          boxShadow: "0 12px 36px -6px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.08)",
         }}
       >
-        {/* Subtle top highlight */}
+        {/* Directional top-left rim highlight */}
         <div 
-          className="absolute top-0 left-0 right-0 h-px opacity-60 pointer-events-none"
-          style={{ background: 'rgba(255, 255, 255, 0.06)' }}
-          aria-hidden="true"
-        />
-
-        {/* Subtle atmospheric glow */}
-        <div
-          className="absolute -top-20 left-1/2 -translate-x-1/2 w-[60%] h-32 opacity-0 group-hover/card:opacity-100 transition-opacity duration-700 pointer-events-none"
-          style={{
-            background: 'radial-gradient(circle at 50% 0%, rgba(130, 90, 255, 0.08), transparent 55%)',
-            filter: 'blur(30px)',
-          }}
+          className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: 'linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--text-primary) 14%, transparent) 10%, color-mix(in srgb, var(--text-primary) 4%, transparent) 55%, transparent 100%)' }}
           aria-hidden="true"
         />
 
@@ -46,13 +43,13 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
           <div
             className="absolute inset-0"
             style={{
-              background: "linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(0,0,0,0.3))",
+              background: "linear-gradient(135deg, var(--accent-dim), rgba(0,0,0,0.3))",
             }}
           />
           <img
             src={project.image}
             alt={`Screenshot of ${project.title}`}
-            className="w-full h-full object-cover transition-transform duration-[700ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:scale-[1.025]"
+            className="w-full h-full object-cover transition-transform duration-[700ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:scale-[1.03]"
             loading="lazy"
             decoding="async"
             onError={(e) => {
@@ -63,24 +60,29 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
           <div 
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: 'linear-gradient(to bottom, transparent 55%, rgba(10, 10, 14, 0.45) 78%, rgba(10, 10, 14, 0.95) 100%)',
+              background: 'linear-gradient(to bottom, transparent 40%, color-mix(in srgb, var(--bg-surface) 40%, transparent) 70%, color-mix(in srgb, var(--bg-surface) 78%, #000) 100%)',
             }}
           />
         </div>
 
         {/* Card content */}
-        <div className="p-7 relative">
+        <div 
+          className="p-7 relative"
+          style={{
+            background: 'radial-gradient(ellipse 90% 70% at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 65%)',
+          }}
+        >
           {/* Project number */}
           <div 
-            className="text-[10px] font-mono tracking-[0.2em] uppercase mb-3 transition-colors duration-300"
-            style={{ color: 'rgba(255, 255, 255, 0.35)' }}
+            className="text-[10px] font-mono tracking-[0.22em] uppercase mb-2.5 transition-colors duration-300"
+            style={{ color: 'rgba(255, 255, 255, 0.4)' }}
           >
-            {String(index + 1).padStart(2, "0")}
+            PROJECT {String(index + 1).padStart(2, "0")}
           </div>
 
           {/* Title */}
           <h3
-            className="text-2xl font-bold mb-2 tracking-tight transition-colors duration-300 group-hover/card:brightness-110"
+            className="text-2xl font-bold mb-2 tracking-tight transition-colors duration-300 group-hover/card:text-[var(--accent)]"
             style={{ color: 'rgba(255, 255, 255, 0.95)' }}
           >
             {project.title}
@@ -88,16 +90,16 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
 
           {/* Metadata row */}
           <div 
-            className="flex items-center gap-2 mb-4 text-[11px] transition-colors duration-300"
-            style={{ color: 'rgba(255, 255, 255, 0.4)' }}
+            className="flex items-center gap-2 mb-4 text-[11px] transition-colors duration-300 font-mono"
+            style={{ color: 'rgba(255, 255, 255, 0.45)' }}
           >
             <span>Released</span>
-            <span>·</span>
+            <span className="opacity-40">·</span>
             <span>{project.date}</span>
             {project.highlights[0] && (
               <>
-                <span>·</span>
-                <span className="transition-colors duration-300 group-hover/card:text-[var(--accent)]">
+                <span className="opacity-40">·</span>
+                <span className="text-[var(--accent)] font-medium">
                   {project.highlights[0]}
                 </span>
               </>
@@ -106,8 +108,8 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
 
           {/* Description */}
           <p
-            className="text-[15px] leading-relaxed mb-5"
-            style={{ color: 'rgba(255, 255, 255, 0.65)' }}
+            className="text-[14px] leading-relaxed mb-5"
+            style={{ color: 'rgba(255, 255, 255, 0.68)' }}
           >
             {project.description}
           </p>
@@ -120,16 +122,16 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
                 if (parts) {
                   const [, number, label] = parts;
                   return (
-                    <div key={i} className="flex items-baseline gap-1.5">
+                    <div key={i} className="flex items-baseline gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.05]">
                       <span 
-                        className="text-lg font-semibold tracking-tight transition-colors duration-300"
-                        style={{ color: 'rgba(255, 255, 255, 0.9)' }}
+                        className="text-base font-semibold tracking-tight transition-colors duration-300"
+                        style={{ color: 'rgba(255, 255, 255, 0.95)' }}
                       >
                         {number}
                       </span>
                       <span 
                         className="text-[11px] transition-colors duration-300"
-                        style={{ color: 'rgba(255, 255, 255, 0.4)' }}
+                        style={{ color: 'rgba(255, 255, 255, 0.45)' }}
                       >
                         {label}
                       </span>
@@ -142,14 +144,18 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
           )}
 
           {/* Tech stack */}
-          <div 
-            className="flex flex-wrap gap-1.5 mb-6 text-[11px] transition-colors duration-300 group-hover/card:brightness-110"
-            style={{ color: 'rgba(255, 255, 255, 0.45)' }}
-          >
-            {project.tags.map((tag, i) => (
-              <span key={tag}>
+          <div className="flex flex-wrap gap-1.5 mb-6">
+            {project.tags.map((tag) => (
+              <span
+                key={tag}
+                className="px-2.5 py-1 text-[10px] font-mono tracking-wide rounded-md border transition-all duration-300"
+                style={{
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  background: 'rgba(255, 255, 255, 0.025)',
+                  borderColor: 'rgba(255, 255, 255, 0.06)',
+                }}
+              >
                 {tag}
-                {i < project.tags.length - 1 && <span className="ml-1.5">·</span>}
               </span>
             ))}
           </div>
@@ -157,7 +163,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
           {/* Divider */}
           <div 
             className="h-[1px] w-full mb-5"
-            style={{ background: 'rgba(255, 255, 255, 0.07)' }}
+            style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 15%, rgba(255, 255, 255, 0.08) 85%, transparent 100%)' }}
           />
 
           {/* Actions */}
@@ -167,11 +173,12 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
                 href={project.github}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-2.5 px-4 rounded-xl text-[11px] font-medium tracking-wide uppercase transition-all duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] text-center flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-black hover:-translate-y-0.5 hover:brightness-125"
+                className="flex-1 py-2.5 px-4 rounded-xl text-[11px] font-mono font-medium tracking-wider uppercase transition-all duration-[300ms] ease-[cubic-bezier(0.22,1,0.36,1)] text-center flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-black hover:-translate-y-0.5 hover:bg-white/[0.07] hover:border-white/[0.14] hover:text-white"
                 style={{
-                  background: "rgba(255, 255, 255, 0.04)",
-                  color: "rgba(255, 255, 255, 0.7)",
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  background: "rgba(255, 255, 255, 0.03)",
+                  color: "rgba(255, 255, 255, 0.75)",
+                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
                 }}
                 data-custom-cursor-ignore
                 aria-label={`View source code for ${project.title}`}
@@ -187,7 +194,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
                 href={project.live}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-2.5 px-4 rounded-xl text-[11px] font-medium tracking-wide uppercase transition-all duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] text-center flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-black hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+                className="flex-1 py-2.5 px-4 rounded-xl text-[11px] font-mono font-semibold tracking-wider uppercase transition-all duration-[300ms] ease-[cubic-bezier(0.22,1,0.36,1)] text-center flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-black hover:-translate-y-0.5 hover:brightness-110 shadow-[0_4px_16px_var(--accent-dim)] hover:shadow-[0_6px_22px_var(--accent-dim)]"
                 style={{
                   background: "var(--accent)",
                   color: "var(--accent-contrast)",

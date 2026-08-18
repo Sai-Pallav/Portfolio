@@ -422,24 +422,24 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       >
         <div 
-          className="relative p-4 rounded-2xl min-w-[230px] max-w-[275px] border border-white/10 backdrop-blur-[12px] overflow-hidden transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-white/[0.18]"
+          className="relative p-4 rounded-2xl min-w-[230px] max-w-[275px] border border-white/[0.06] backdrop-blur-md overflow-hidden transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-white/[0.12]"
           style={{
             background: `
               radial-gradient(
-                circle at 20% 10%,
-                rgba(110, 80, 180, 0.12),
-                transparent 45%
+                120% 80% at 50% 0%,
+                rgba(255, 255, 255, 0.05) 0%,
+                transparent 60%
               ),
               linear-gradient(
-                135deg,
-                rgba(27, 25, 38, 0.94),
-                rgba(12, 13, 18, 0.92)
+                180deg,
+                rgba(20, 21, 23, 0.96) 0%,
+                rgba(12, 12, 14, 0.98) 100%
               )
             `,
-            WebkitBackdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(16px)",
             boxShadow: `
-              0 18px 45px rgba(0, 0, 0, 0.35),
-              inset 0 1px 0 rgba(255, 255, 255, 0.07)
+              0 24px 48px -12px rgba(0, 0, 0, 0.5),
+              inset 0 1px 1px rgba(255, 255, 255, 0.06)
             `,
           }}
         >

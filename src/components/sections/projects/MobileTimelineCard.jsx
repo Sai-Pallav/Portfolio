@@ -137,11 +137,27 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
         }}
       >
         <div
-          className="relative rounded-2xl border overflow-hidden transition-all duration-250 bg-gradient-to-br from-zinc-900/[0.35] to-zinc-950/[0.05] border-white/[0.05] shadow-[0_8px_30px_-4px_rgba(0,0,0,0.5)] hover:border-white/[0.12] hover:shadow-[0_20px_45px_-12px_rgba(0,0,0,0.85),_0_0_20px_-5px_color-mix(in srgb,_var(--accent)_15%,_transparent)]"
+          className="relative rounded-[20px] border overflow-hidden transition-all duration-250 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.65)] hover:shadow-[0_24px_55px_-10px_rgba(0,0,0,0.85)]"
           style={{
+            background: `
+              radial-gradient(ellipse 110% 70% at 0% 0%, color-mix(in srgb, var(--accent) 18%, transparent) 0%, color-mix(in srgb, var(--accent-secondary, var(--accent)) 8%, transparent) 45%, transparent 100%),
+              radial-gradient(ellipse 85% 60% at 90% 10%, color-mix(in srgb, var(--accent-secondary, var(--accent)) 5%, transparent) 0%, transparent 60%),
+              radial-gradient(ellipse 90% 40% at 50% 100%, color-mix(in srgb, var(--accent) 9%, transparent) 0%, transparent 80%),
+              radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.45) 100%),
+              color-mix(in srgb, var(--bg-surface) 78%, #000)
+            `,
+            borderColor: 'var(--border)',
             backdropFilter: "blur(12px)",
+            boxShadow: "0 12px 36px -6px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.08)",
           }}
         >
+          {/* Directional top-left rim highlight */}
+          <div 
+            className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+            style={{ background: 'linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--text-primary) 14%, transparent) 10%, color-mix(in srgb, var(--text-primary) 4%, transparent) 55%, transparent 100%)' }}
+            aria-hidden="true"
+          />
+
           {/* Connection edge accent line */}
           <div
             className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-6 rounded-full z-10 border border-[var(--accent)]/30 transition-all duration-250"
@@ -153,15 +169,15 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
 
           {/* Category badge */}
           <div
-            className="absolute top-11 right-3 z-20 flex items-center gap-1 px-2 py-0.5 rounded border"
+            className="absolute top-11 right-3 z-20 flex items-center gap-1 px-2 py-0.5 rounded-md border"
             style={{
-              background: 'rgba(10, 10, 12, 0.7)',
-              borderColor: 'rgba(255, 255, 255, 0.06)',
+              background: 'rgba(10, 10, 12, 0.75)',
+              borderColor: 'rgba(255, 255, 255, 0.08)',
               backdropFilter: 'blur(8px)',
             }}
           >
             {catInfo.icon}
-            <span className="font-mono text-[8px] tracking-[0.12em] uppercase text-white/50">
+            <span className="font-mono text-[8px] tracking-[0.12em] uppercase text-white/60">
               {catInfo.label}
             </span>
           </div>
@@ -184,8 +200,8 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
               </div>
 
               {/* Secure URL Bar Capsule */}
-              <div className="flex items-center gap-1.5 px-3 py-0.5 rounded border border-white/[0.06] text-white/30 bg-[#070708]/30 text-[8px] font-mono max-w-[60%] truncate">
-                <svg className="w-2.5 h-2.5 text-white/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <div className="flex items-center gap-1.5 px-3 py-0.5 rounded border border-white/[0.06] text-white/40 bg-[#070708]/30 text-[8px] font-mono max-w-[60%] truncate">
+                <svg className="w-2.5 h-2.5 text-white/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
@@ -206,14 +222,19 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
                 e.target.style.display = "none";
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+            <div 
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: 'linear-gradient(to bottom, transparent 40%, color-mix(in srgb, var(--bg-surface) 40%, transparent) 70%, color-mix(in srgb, var(--bg-surface) 78%, #000) 100%)',
+              }}
+            />
 
             {/* Featured badge */}
             {project.featured && (
               <div
-                className="absolute top-11 left-3 px-2.5 py-0.5 rounded text-[8px] font-mono tracking-[0.12em] uppercase flex items-center gap-1.5 z-20 border border-[var(--accent)]/20"
+                className="absolute top-11 left-3 px-2.5 py-0.5 rounded-md text-[8px] font-mono tracking-[0.12em] uppercase flex items-center gap-1.5 z-20 border border-[var(--accent)]/30"
                 style={{
-                  background: "rgba(10, 10, 12, 0.7)",
+                  background: "rgba(10, 10, 12, 0.75)",
                   color: "var(--accent)",
                   backdropFilter: "blur(8px)",
                 }}
@@ -227,38 +248,43 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
             )}
           </div>
 
-          <div className="p-4">
-            <span className="font-mono text-[9px] tracking-[0.2em] text-white/40">
+          <div 
+            className="p-4 relative"
+            style={{
+              background: 'radial-gradient(ellipse 90% 70% at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 65%)',
+            }}
+          >
+            <span className="font-mono text-[9px] tracking-[0.22em] text-white/40 uppercase">
               PROJECT {String(index + 1).padStart(2, "0")} — {project.date}
             </span>
             <h3
-              className="font-heading text-lg font-bold mt-1 mb-1.5 text-[var(--text-primary)] group-hover/item:text-[var(--accent)] transition-colors duration-300"
+              className="font-heading text-lg font-bold mt-1 mb-1.5 text-white/95 group-hover/item:text-[var(--accent)] transition-colors duration-300"
             >
               {project.title}
             </h3>
 
             {/* Mobile Case-Study Outcome Pill */}
             <div className="flex flex-wrap items-center gap-1.5 mt-1.5 mb-3">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded border border-[var(--accent)]/30 bg-[var(--accent-dim)] text-[8px] font-mono font-bold uppercase tracking-wider text-[var(--accent)] shadow-[0_0_8px_var(--accent-dim)]">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md border border-[var(--accent)]/30 bg-[var(--accent-dim)] text-[8px] font-mono font-bold uppercase tracking-wider text-[var(--accent)] shadow-[0_0_8px_var(--accent-dim)]">
                 Outcome: {project.highlights[0]}
               </span>
             </div>
 
             <p
-              className="text-xs leading-relaxed mb-3.5 opacity-90 text-[var(--text-secondary)]"
+              className="text-xs leading-relaxed mb-3.5 text-white/70"
             >
               {project.description}
             </p>
 
             {/* Tech tags */}
-            <div className="flex flex-wrap gap-1 mb-4">
+            <div className="flex flex-wrap gap-1.5 mb-4">
               {project.tags.slice(0, 4).map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 text-[9px] font-mono rounded border transition-colors duration-300"
+                  className="px-2 py-0.5 text-[9px] font-mono rounded-md border transition-colors duration-300"
                   style={{
-                    color: "var(--text-secondary)",
-                    background: "rgba(255, 255, 255, 0.015)",
+                    color: "rgba(255, 255, 255, 0.6)",
+                    background: "rgba(255, 255, 255, 0.025)",
                     borderColor: "rgba(255, 255, 255, 0.06)",
                   }}
                 >
@@ -268,7 +294,10 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
             </div>
 
             {/* Divider */}
-            <div className="h-[1px] w-full bg-white/[0.04] my-4" />
+            <div 
+              className="h-[1px] w-full mb-4" 
+              style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 15%, rgba(255, 255, 255, 0.08) 85%, transparent 100%)' }}
+            />
 
             {/* CTA Buttons */}
             <div className="flex gap-2">
@@ -277,11 +306,11 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
                   href={project.github}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-200 border border-white/[0.05] hover:border-white/20 text-center flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 active:scale-95 shadow-[0_4px_12px_rgba(0,0,0,0.2)]"
+                  className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-200 border text-center flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.3)] hover:bg-white/[0.07] hover:border-white/[0.14] hover:text-white"
                   style={{
-                    background: "rgba(255, 255, 255, 0.02)",
-                    color: "var(--text-secondary)",
-                    borderColor: "rgba(255,255,255,0.06)",
+                    background: "rgba(255, 255, 255, 0.03)",
+                    color: "rgba(255, 255, 255, 0.75)",
+                    borderColor: "rgba(255, 255, 255, 0.07)",
                   }}
                   aria-label={`View source code for ${project.title}`}
                 >
@@ -296,7 +325,7 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
                   href={project.live}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-200 text-center flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 active:scale-95 shadow-[0_4px_12px_rgba(0,0,0,0.2)] active:shadow-[0_4px_8px_var(--accent-dim)]"
+                  className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold font-mono tracking-wider uppercase transition-all duration-200 text-center flex items-center justify-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 active:scale-95 shadow-[0_4px_16px_var(--accent-dim)] hover:shadow-[0_6px_22px_var(--accent-dim)] active:shadow-[0_4px_8px_var(--accent-dim)]"
                   style={{
                     background: "var(--accent)",
                     color: "var(--accent-contrast)",

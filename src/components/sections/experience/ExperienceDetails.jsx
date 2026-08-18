@@ -46,29 +46,36 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
   
   return (
     <motion.div
-      initial={{ opacity: 0, x: slideDirection, scale: 0.85, filter: 'blur(10px)' }}
+      initial={{ opacity: 0, x: slideDirection, scale: 0.9, filter: 'blur(8px)' }}
       animate={{ opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' }}
-      exit={{ opacity: 0, x: slideDirection, scale: 0.85, filter: 'blur(10px)' }}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="absolute top-[5%] w-full max-w-md md:max-w-lg"
+      exit={{ opacity: 0, x: slideDirection, scale: 0.9, filter: 'blur(8px)' }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute top-[0%] md:top-[1%] lg:top-[2%] w-full max-w-[390px] md:max-w-[420px] lg:max-w-[440px]"
       style={{
-        left: position === 'right' ? 'auto' : '5%',
-        right: position === 'right' ? '5%' : 'auto',
+        left: position === 'right' ? 'auto' : '0%',
+        right: position === 'right' ? '0%' : 'auto',
         zIndex: 60
       }}
     >
       {/* Main panel */}
-      <div ref={ref} tabIndex={-1} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white/10 via-white/5 to-white/10 backdrop-blur-2xl border border-white/20 shadow-2xl shadow-accent/20 outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:border-accent/50 transition-all duration-300">
-        
+      <div 
+        ref={ref} 
+        tabIndex={-1} 
+        className="relative overflow-hidden rounded-3xl bg-[rgba(15,15,19,0.85)] backdrop-blur-2xl border border-white/[0.12] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_var(--accent-dim)] outline-none focus-visible:ring-2 focus-visible:ring-accent/50 transition-all duration-300 max-h-[88vh] overflow-y-auto"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(255, 255, 255, 0.15) transparent'
+        }}
+      >
         {/* Animated border glow sweep */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
           className="absolute inset-0 rounded-3xl pointer-events-none"
           style={{
             background: 'linear-gradient(135deg, transparent 30%, var(--accent) 50%, transparent 70%)',
-            opacity: 0.1,
+            opacity: 0.12,
             mask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
             maskComposite: 'exclude',
             WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
@@ -83,10 +90,10 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
           initial={{ y: -20, opacity: 0 }}
           animate={{ 
             y: ['0%', '100%', '0%'],
-            opacity: [0, 1, 0]
+            opacity: [0, 0.8, 0]
           }}
           transition={{ 
-            duration: 3,
+            duration: 3.5,
             repeat: Infinity,
             ease: "linear"
           }}
@@ -95,108 +102,88 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
           aria-hidden="true"
         />
         
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-accent-hover/5 pointer-events-none" />
+        {/* Ambient background lighting */}
+        <div 
+          className="absolute inset-0 pointer-events-none" 
+          style={{
+            background: `
+              radial-gradient(ellipse 90% 60% at 0% 0%, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 60%),
+              radial-gradient(ellipse 70% 50% at 100% 100%, color-mix(in srgb, var(--accent-secondary, var(--accent)) 10%, transparent) 0%, transparent 50%)
+            `
+          }}
+        />
         
         {/* Close button */}
         <motion.button
           onClick={handleCloseClick}
           whileHover={{ scale: 1.1, rotate: 90 }}
           whileTap={{ scale: 0.9 }}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center transition-colors z-20"
+          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 flex items-center justify-center transition-colors z-20 text-white/70 hover:text-white"
           aria-label="Close details panel"
           type="button"
           data-custom-cursor-ignore
         >
-          <X className="w-4 h-4 text-[var(--text-heading)]" />
+          <X className="w-4 h-4" />
         </motion.button>
         
-        {/* Content */}
+        {/* Content Container */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="relative p-6 md:p-8 space-y-5"
+          className="relative p-6 sm:p-7 space-y-5"
         >
-          {/* Header */}
-          <motion.div variants={itemVariants} className="space-y-2">
-            <motion.div 
-              className="flex items-center gap-2 mb-2"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4, type: 'spring', stiffness: 200, damping: 15 }}
-            >
-              <motion.span 
-                className="text-3xl"
-                initial={{ rotate: -180, scale: 0 }}
-                animate={{ rotate: 0, scale: 1 }}
-                transition={{ delay: 0.35, type: 'spring', stiffness: 200, damping: 12 }}
-              >
+          {/* Header Section */}
+          <motion.div variants={itemVariants} className="space-y-2 pr-8">
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl flex-shrink-0">
                 {exp.icon || '💼'}
-              </motion.span>
+              </span>
               {exp.badge && (
-                <motion.span 
-                  className="text-xs px-3 py-1 rounded-full bg-accent/20 text-accent border border-accent/30 font-semibold"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5 }}
-                >
+                <span className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent)]/30 font-semibold shadow-[0_0_8px_var(--accent-dim)]">
                   {exp.badge}
-                </motion.span>
+                </span>
               )}
-            </motion.div>
+            </div>
             
-            <motion.h3 
-              className="font-heading text-2xl md:text-3xl font-bold text-[var(--text-heading)] leading-tight"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            >
+            <h3 className="font-heading text-xl sm:text-2xl font-bold text-[var(--text-heading)] leading-snug tracking-tight">
               {exp.role}
-            </motion.h3>
+            </h3>
             
-            <motion.p 
-              className="text-lg text-accent font-semibold"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
-            >
-              {exp.company}
-            </motion.p>
-            
-            <motion.p 
-              className="text-sm text-secondary"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.55, duration: 0.5 }}
-            >
-              {exp.duration}
-            </motion.p>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm">
+              <span className="text-[var(--accent)] font-semibold">
+                {exp.company}
+              </span>
+              <span className="text-white/30">·</span>
+              <span className="text-[var(--text-secondary)] font-mono text-xs">
+                {exp.duration}
+              </span>
+            </div>
           </motion.div>
           
           {/* Divider */}
-          <motion.div
-            variants={itemVariants}
-            className="h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent"
+          <div 
+            className="h-[1px] w-full"
+            style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 15%, rgba(255, 255, 255, 0.1) 85%, transparent 100%)' }}
             aria-hidden="true"
           />
           
-          {/* Achievements */}
+          {/* Key Achievements */}
           {exp.bullets && exp.bullets.length > 0 && (
-            <motion.div variants={itemVariants} className="space-y-3">
-              <h4 className="text-sm font-semibold text-[var(--text-heading)] uppercase tracking-wider">
-                Key Achievements
+            <motion.div variants={itemVariants} className="space-y-2.5">
+              <h4 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                Key Contributions & Impact
               </h4>
-              <ul className="space-y-2">
+              <ul className="space-y-2.5">
                 {exp.bullets.map((bullet, i) => (
                   <motion.li
                     key={i}
-                    initial={{ opacity: 0, x: -20 }}
+                    initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.3 + i * 0.1 }}
-                    className="flex items-start gap-3 text-sm text-secondary leading-relaxed"
+                    transition={{ delay: 0.2 + i * 0.08 }}
+                    className="flex items-start gap-2.5 text-[13px] sm:text-[13.5px] leading-relaxed text-white/80"
                   >
-                    <span className="text-accent mt-1 flex-shrink-0">▸</span>
+                    <span className="text-[var(--accent)] font-bold text-sm mt-0.5 flex-shrink-0 leading-none">▸</span>
                     <span>{bullet}</span>
                   </motion.li>
                 ))}
@@ -204,62 +191,53 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
             </motion.div>
           )}
           
-          {/* Tech Stack */}
-          {exp.tech && exp.tech.length > 0 && (
-            <motion.div variants={itemVariants} className="space-y-3">
-              <h4 className="text-sm font-semibold text-[var(--text-heading)] uppercase tracking-wider">
-                Technologies
+          {/* Project Impact Cards Grid */}
+          {exp.projects && exp.projects.length > 0 && (
+            <motion.div variants={itemVariants} className="space-y-2">
+              <h4 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                Key Highlights
               </h4>
-              <div className="flex flex-wrap gap-2">
-                {exp.tech.map((tech, i) => (
-                  <motion.span
-                    key={tech}
-                    initial={{ opacity: 0, scale: 0.5, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ delay: 0.7 + i * 0.08, type: 'spring', stiffness: 300, damping: 20 }}
-                    className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-secondary hover:border-accent/40 hover:text-accent transition-colors cursor-default"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {exp.projects.map((project) => (
+                  <div
+                    key={project.name}
+                    className="flex flex-col justify-center p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] transition-colors"
                   >
-                    {tech}
-                  </motion.span>
+                    <span className="text-xs font-medium text-white/90 truncate">
+                      {project.name}
+                    </span>
+                    <span className="text-[11px] font-mono text-[var(--accent)] font-semibold mt-0.5">
+                      {project.impact}
+                    </span>
+                  </div>
                 ))}
               </div>
             </motion.div>
           )}
-          
-          {/* Project Contributions */}
-          {exp.projects && exp.projects.length > 0 && (
-            <motion.div variants={itemVariants} className="space-y-3">
-              <h4 className="text-sm font-semibold text-[var(--text-heading)] uppercase tracking-wider">
-                Project Impact
+
+          {/* Tech Stack */}
+          {exp.tech && exp.tech.length > 0 && (
+            <motion.div variants={itemVariants} className="space-y-2 pt-1">
+              <h4 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                Technologies
               </h4>
-              <div className="space-y-2">
-                {exp.projects.map((project) => (
-                  <motion.div
-                    key={project.name}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6, type: 'spring', stiffness: 300, damping: 20 }}
-                    className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10"
+              <div className="flex flex-wrap gap-1.5">
+                {exp.tech.map((tech) => (
+                  <span
+                    key={tech}
+                    className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.07] text-white/75 hover:border-[var(--accent)]/40 hover:text-[var(--accent)] transition-colors cursor-default"
                   >
-                    <span className="text-sm text-[var(--text-heading)] font-medium">
-                      {project.name}
-                    </span>
-                    <span className="text-xs text-accent font-semibold">
-                      {project.impact}
-                    </span>
-                  </motion.div>
+                    {tech}
+                  </span>
                 ))}
               </div>
             </motion.div>
           )}
         </motion.div>
         
-        {/* Bottom glow accent with reveal animation */}
-        <motion.div 
-          className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-accent to-transparent"
-          initial={{ scaleX: 0, opacity: 0 }}
-          animate={{ scaleX: 1, opacity: 0.5 }}
-          transition={{ delay: 0.8, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        {/* Bottom edge glow */}
+        <div 
+          className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-accent to-transparent opacity-40"
           aria-hidden="true"
         />
       </div>
