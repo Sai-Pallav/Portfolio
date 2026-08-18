@@ -192,7 +192,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   const CH1_Y = H * 0.18
   const CH2_Y = H * 0.40
   const CH3_Y = H * 0.62
-  const CH4_Y = H * 0.82
+  const CH4_Y = H * 0.84
 
   // Draw intricate traces.
   const traces = useMemo(() => {
@@ -316,75 +316,82 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   // Custom Engineered Substrate Footprints specifically designed around each channel's trace & component architecture
   const substratePolygons = useMemo(() => ({
     name: [
-      // Channel 1: Extended upper-left trace intake feeding down into C08 & Node A1 with horizontal output shelf
+      // Channel 1 Masterwork Substrate: Seamless continuous ground plane contouring Start intake, Middle core (R12, C08, Node A1, R15), and End transmission beam
       [
-        { x: 94, y: CH1_Y - 58 },
-        { x: 140, y: CH1_Y - 58 },
-        { x: 170, y: CH1_Y - 28 },
-        { x: 230, y: CH1_Y - 28 },
-        { x: 240, y: CH1_Y - 18 },
-        { x: 240, y: CH1_Y + 2 },
-        { x: 230, y: CH1_Y + 12 },
-        { x: 152, y: CH1_Y + 12 },
-        { x: 142, y: CH1_Y + 22 },
-        { x: 110, y: CH1_Y + 22 },
-        { x: 98, y: CH1_Y + 10 },
-        { x: 98, y: CH1_Y - 22 },
-        { x: 86, y: CH1_Y - 34 },
-        { x: 86, y: CH1_Y - 50 }
+        { x: 44,  y: CH1_Y - 54 },
+        { x: 138, y: CH1_Y - 54 },
+        { x: 162, y: CH1_Y - 30 },
+        { x: 194, y: CH1_Y - 30 },
+        { x: 210, y: CH1_Y - 14 },
+        { x: 248, y: CH1_Y - 14 },
+        { x: 256, y: CH1_Y - 6 },
+        { x: 248, y: CH1_Y + 2 },
+        { x: 204, y: CH1_Y + 2 },
+        { x: 194, y: CH1_Y + 12 },
+        { x: 150, y: CH1_Y + 12 },
+        { x: 140, y: CH1_Y + 22 },
+        { x: 114, y: CH1_Y + 22 },
+        { x: 102, y: CH1_Y + 10 },
+        { x: 60,  y: CH1_Y + 10 },
+        { x: 36,  y: CH1_Y - 14 },
+        { x: 36,  y: CH1_Y - 46 }
       ]
     ],
     email: [
-      // Channel 2: Exact vertical mirror image of Channel 3
+      // Channel 2: Pure 45° and orthogonal CAD chamfering around R22, R21, C14 and Node A2
       [
-        { x: 120, y: CH2_Y + 58 },
-        { x: 224, y: CH2_Y + 58 },
-        { x: 234, y: CH2_Y + 48 },
-        { x: 234, y: CH2_Y + 16 },
-        { x: 220, y: CH2_Y + 2 },
-        { x: 152, y: CH2_Y + 2 },
-        { x: 128, y: CH2_Y - 22 },
-        { x: 66, y: CH2_Y - 22 },
-        { x: 54, y: CH2_Y - 10 },
+        { x: 120, y: CH2_Y + 54 },
+        { x: 178, y: CH2_Y + 54 },
+        { x: 194, y: CH2_Y + 38 },
+        { x: 194, y: CH2_Y + 22 },
+        { x: 184, y: CH2_Y + 12 },
+        { x: 144, y: CH2_Y + 12 },
+        { x: 124, y: CH2_Y - 8 },
+        { x: 100, y: CH2_Y - 8 },
+        { x: 84, y: CH2_Y - 24 },
+        { x: 64, y: CH2_Y - 24 },
+        { x: 54, y: CH2_Y - 14 },
         { x: 54, y: CH2_Y + 10 },
         { x: 76, y: CH2_Y + 32 },
-        { x: 106, y: CH2_Y + 32 },
-        { x: 120, y: CH2_Y + 46 }
+        { x: 108, y: CH2_Y + 32 },
+        { x: 120, y: CH2_Y + 44 }
       ]
     ],
     subject: [
-      // Channel 3: Upward-sloping structural carrier plate with extended top exit shelf and offset lower ground wing
+      // Channel 3: Vertical mirror of Channel 2, perfectly contoured around Node A3
       [
-        { x: 120, y: CH3_Y - 58 },
-        { x: 224, y: CH3_Y - 58 },
-        { x: 234, y: CH3_Y - 48 },
-        { x: 234, y: CH3_Y - 16 },
-        { x: 220, y: CH3_Y - 2 },
-        { x: 152, y: CH3_Y - 2 },
-        { x: 128, y: CH3_Y + 22 },
-        { x: 66, y: CH3_Y + 22 },
-        { x: 54, y: CH3_Y + 10 },
+        { x: 120, y: CH3_Y - 54 },
+        { x: 178, y: CH3_Y - 54 },
+        { x: 194, y: CH3_Y - 38 },
+        { x: 194, y: CH3_Y - 22 },
+        { x: 184, y: CH3_Y - 12 },
+        { x: 144, y: CH3_Y - 12 },
+        { x: 124, y: CH3_Y + 8 },
+        { x: 100, y: CH3_Y + 8 },
+        { x: 84, y: CH3_Y + 24 },
+        { x: 64, y: CH3_Y + 24 },
+        { x: 54, y: CH3_Y + 14 },
         { x: 54, y: CH3_Y - 10 },
         { x: 76, y: CH3_Y - 32 },
-        { x: 106, y: CH3_Y - 32 },
-        { x: 120, y: CH3_Y - 46 }
+        { x: 108, y: CH3_Y - 32 },
+        { x: 120, y: CH3_Y - 44 }
       ]
     ],
     message: [
-      // Channel 4: Exact vertical mirror image of Channel 1
+      // Channel 4: Vertical mirror of Channel 1, perfectly contoured around Node A4
       [
         { x: 94, y: CH4_Y + 58 },
         { x: 140, y: CH4_Y + 58 },
-        { x: 170, y: CH4_Y + 28 },
-        { x: 230, y: CH4_Y + 28 },
-        { x: 240, y: CH4_Y + 18 },
-        { x: 240, y: CH4_Y - 2 },
-        { x: 230, y: CH4_Y - 12 },
-        { x: 152, y: CH4_Y - 12 },
-        { x: 142, y: CH4_Y - 22 },
-        { x: 110, y: CH4_Y - 22 },
-        { x: 98, y: CH4_Y - 10 },
-        { x: 98, y: CH4_Y + 22 },
+        { x: 164, y: CH4_Y + 34 },
+        { x: 188, y: CH4_Y + 34 },
+        { x: 204, y: CH4_Y + 18 },
+        { x: 204, y: CH4_Y + 6 },
+        { x: 194, y: CH4_Y - 4 },
+        { x: 152, y: CH4_Y - 4 },
+        { x: 136, y: CH4_Y - 20 },
+        { x: 114, y: CH4_Y - 20 },
+        { x: 102, y: CH4_Y - 8 },
+        { x: 102, y: CH4_Y + 18 },
         { x: 86, y: CH4_Y + 34 },
         { x: 86, y: CH4_Y + 50 }
       ]
@@ -533,78 +540,32 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     )
   }
 
-  // Circular Termination Landing Pad
-  const renderTerminationPad = (x, y, label, chKey) => {
-    const targetOpacity = getTargetOpacity(chKey)
-    const ringAnimation = {
-      animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
-      animationDelay: `${(x + y) % 5 * 150}ms`
-    }
-
-    return (
-      <g 
-        key={`term-${x}-${y}`} 
-        transform={`translate(${xStart + x * scale}, ${y})`}
-        opacity={targetOpacity}
-        style={getTransitionStyle()}
-      >
-        <circle cx="0" cy="0" r="3" fill="#18181f" stroke="#333" strokeWidth="0.5" />
-        <circle cx="0" cy="0" r="1.8" fill="#2d2d3a" stroke="var(--accent)" strokeWidth="0.3" opacity={0.65} style={ringAnimation} />
-        <circle cx="0" cy="0" r="0.8" fill="#000" />
-      </g>
-    )
-  }
 
   // Custom Engineered Substrate Renderer for Left PCB Component
+  // Exact same structure as Middle PCB: bare polygon + fiducials only.
+  // The mask and opacity wrapper is applied globally at the render site.
   const renderChannelSubstrates = (chKey) => {
     const polys = substratePolygons[chKey] || []
-    const targetOpacity = getTargetOpacity(chKey, 'substrate')
-
     return (
-      <g
-        key={`sub-group-${chKey}`}
-        className="left-pcb-substrate-layer"
-        opacity={targetOpacity}
-        style={getTransitionStyle()}
-      >
+      <g key={`sub-group-${chKey}`}>
         {polys.map((poly, pIdx) => {
           const pointsStr = poly.map(pt => `${xStart + pt.x * scale},${pt.y}`).join(' ')
           const cornerFiducials = [poly[0], poly[3], poly[6], poly[9]].filter(Boolean)
-
           return (
             <g key={`sub-poly-${chKey}-${pIdx}`}>
-              {/* Layer 1: Dark Substrate Gradient Base Plate */}
+              {/* Ground Pour Plane — identical to Middle PCB copper-hatch-pattern polygons */}
               <polygon
                 points={pointsStr}
-                fill="url(#left-substrate-gradient)"
-                fillOpacity="0.94"
-                stroke="color-mix(in srgb, var(--accent) 26%, transparent)"
-                strokeWidth="0.65"
-                strokeLinejoin="round"
+                fill="url(#copper-hatch-pattern-l)"
+                stroke="color-mix(in srgb, var(--accent) 22%, transparent)"
+                strokeWidth="0.6"
               />
-              {/* Layer 2: Subtle Upper/Left Chamfer Depth Highlight */}
-              <polygon
-                points={pointsStr}
-                fill="none"
-                stroke="rgba(255, 255, 255, 0.04)"
-                strokeWidth="0.35"
-                strokeLinejoin="round"
-                transform="translate(-0.3, -0.3)"
-              />
-              {/* Layer 3: Industrial Crosshatch Mesh (Reference 2) with Precision Clearances */}
-              <g mask={`url(#leftSubMask-${chKey})`}>
-                <polygon
-                  points={pointsStr}
-                  fill="url(#copper-hatch-pattern-l)"
-                  stroke="none"
-                />
-              </g>
-              {/* Layer 4: Precision CAD Corner Fiducials */}
+              {/* Precision CAD Corner Fiducials */}
               {cornerFiducials.map((pt, cIdx) => (
                 <g
                   key={`fiducial-${chKey}-${cIdx}`}
                   transform={`translate(${xStart + pt.x * scale}, ${pt.y})`}
-                  opacity="0.4"
+                  opacity="0.35"
                 >
                   <circle cx="0" cy="0" r="0.8" fill="var(--accent)" />
                   <line x1="-2" y1="0" x2="2" y2="0" stroke="var(--accent)" strokeWidth="0.25" />
@@ -1069,13 +1030,13 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     if (!isIlluminated) {
       return {
         opacity: 0.65,
-        filter: 'brightness(0.85) saturate(0.35) hue-rotate(-25deg)',
+        filter: 'brightness(0.85) saturate(0.4)',
         transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
       }
     }
     return {
-      opacity: 0.88,
-      filter: 'brightness(0.96) saturate(0.98)',
+      opacity: 0.95,
+      filter: 'brightness(1.0) saturate(1.0)',
       transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
     }
   }, [contactSystemState, isIlluminated])
@@ -1166,44 +1127,37 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             <stop offset="100%" stopColor="transparent" />
           </radialGradient>
           
-          {/* Copper Hatch Ground Pour Pattern (High fidelity industrial mesh - Reference 2) */}
+          {/* Copper Hatch Ground Pour Pattern — identical to Middle PCB copper-hatch-pattern */}
           <pattern id="copper-hatch-pattern-l" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line x1="0" y1="2" x2="4" y2="2" stroke="color-mix(in srgb, var(--accent) 22%, transparent)" strokeWidth="0.60" />
             <line x1="2" y1="0" x2="2" y2="4" stroke="color-mix(in srgb, var(--accent) 22%, transparent)" strokeWidth="0.60" />
           </pattern>
 
-          {/* Substrate Component & Node Clearance Masks */}
-          {['name', 'email', 'subject', 'message'].map((chKey) => {
-            const chNodes = nodes.filter(n => n.chKey === chKey)
-            const chComps = smtComponents.filter(c => c.chKey === chKey)
-            return (
-              <mask key={`leftSubMask-${chKey}`} id={`leftSubMask-${chKey}`} x="-100%" y="-100%" width="300%" height="300%">
-                <rect x="-100%" y="-100%" width="300%" height="300%" fill="white" />
-                {/* Node Clearance */}
-                {chNodes.map((n, idx) => (
-                  <circle key={`mask-node-${idx}`} cx={xStart + n.x * scale} cy={n.y} r="18.5" fill="black" />
-                ))}
-                {/* SMT Component Clearances */}
-                {chComps.map((c, idx) => (
-                  <rect
-                    key={`mask-comp-${idx}`}
-                    x={xStart + c.x * scale - c.w / 2 - 2}
-                    y={c.y - c.h / 2 - 2}
-                    width={c.w + 4}
-                    height={c.h + 4}
-                    fill="black"
-                  />
-                ))}
-              </mask>
-            )
-          })}
-
-          {/* Left Substrate Multi-stop Base Gradient */}
-          <linearGradient id="left-substrate-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#030305" />
-            <stop offset="50%" stopColor="#040409" />
-            <stop offset="100%" stopColor="#06060e" />
-          </linearGradient>
+          {/* Single Global Copper Hatch Mask — identical structure to copperHatchMask in RightPCB */}
+          <mask id="leftCopperHatchMask" x="-100%" y="-100%" width="300%" height="300%">
+            <rect x="-100%" y="-100%" width="300%" height="300%" fill="white" />
+            {/* Cut out clearance circles for all nodes */}
+            {nodes.map((n, idx) => (
+              <circle
+                key={`left-hatch-clear-node-${idx}`}
+                cx={xStart + n.x * scale}
+                cy={n.y}
+                r="18.5"
+                fill="black"
+              />
+            ))}
+            {/* Cut out clearance rectangles for all SMT components */}
+            {smtComponents.map((c, idx) => (
+              <rect
+                key={`left-hatch-clear-comp-${idx}`}
+                x={xStart + c.x * scale - c.w / 2 - 2.5}
+                y={c.y - c.h / 2 - 2.5}
+                width={c.w + 5.0}
+                height={c.h + 5.0}
+                fill="black"
+              />
+            ))}
+          </mask>
 
           {/* Gold Plating Gradient */}
           <linearGradient id="gold-plated" x1="0%" y1="0%" x2="1" y2="1">
@@ -1315,20 +1269,29 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           </g>
         )}
 
+        {/* ========================================================
+              LEFT PCB GROUND PLANE POURS — identical structure to Middle PCB
+              Single global mask applied to all substrate polygons at once
+           ======================================================== */}
+        <g
+          mask="url(#leftCopperHatchMask)"
+          style={{ transition: 'opacity 750ms cubic-bezier(0.4, 0, 0.2, 1)' }}
+          opacity={isTransmit ? 0.3 : 1}
+        >
+          {renderChannelSubstrates('name')}
+          {renderChannelSubstrates('email')}
+          {renderChannelSubstrates('subject')}
+          {renderChannelSubstrates('message')}
+        </g>
+
         {/* CHANNEL 1 (NAME) GROUP */}
         <g style={getChannelGroupStyle('name', 0)}>
-          {/* Custom Engineered Substrate Layer */}
-          {renderChannelSubstrates('name')}
-
           {/* Traces */}
           <g strokeLinecap="round" strokeLinejoin="round" fill="none">
             {traces.filter(t => t.chKey === 'name').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
           {smtComponents.filter(c => c.chKey === 'name').map(c => renderGlassBlock(c.x, c.y, c.w, c.h, c.label, c.chKey))}
-          {renderTerminationPad(0, CH1_Y - 70, 'TP1_S1', 'name')}
-          {renderTerminationPad(0, CH1_Y - 50, 'TP1_S2', 'name')}
-
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'name').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
@@ -1337,18 +1300,12 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
         {/* CHANNEL 2 (EMAIL) GROUP */}
         <g style={getChannelGroupStyle('email', 1)}>
-          {/* Custom Engineered Substrate Layer */}
-          {renderChannelSubstrates('email')}
-
           {/* Traces */}
           <g strokeLinecap="round" strokeLinejoin="round" fill="none">
             {traces.filter(t => t.chKey === 'email').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
           {smtComponents.filter(c => c.chKey === 'email').map(c => renderGlassBlock(c.x, c.y, c.w, c.h, c.label, c.chKey))}
-          {renderTerminationPad(0, CH2_Y - 20, 'TP2_S1', 'email')}
-          {renderTerminationPad(0, CH2_Y, 'TP2_S2', 'email')}
-
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'email').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
@@ -1357,18 +1314,12 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
         {/* CHANNEL 3 (SUBJECT) GROUP */}
         <g style={getChannelGroupStyle('subject', 2)}>
-          {/* Custom Engineered Substrate Layer */}
-          {renderChannelSubstrates('subject')}
-
           {/* Traces */}
           <g strokeLinecap="round" strokeLinejoin="round" fill="none">
             {traces.filter(t => t.chKey === 'subject').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
           {smtComponents.filter(c => c.chKey === 'subject').map(c => renderGlassBlock(c.x, c.y, c.w, c.h, c.label, c.chKey))}
-          {renderTerminationPad(0, CH3_Y + 20, 'TP3_S1', 'subject')}
-          {renderTerminationPad(0, CH3_Y, 'TP3_S2', 'subject')}
-
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'subject').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
@@ -1377,18 +1328,12 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
         {/* CHANNEL 4 (MESSAGE) GROUP */}
         <g style={getChannelGroupStyle('message', 3)}>
-          {/* Custom Engineered Substrate Layer */}
-          {renderChannelSubstrates('message')}
-
           {/* Traces */}
           <g strokeLinecap="round" strokeLinejoin="round" fill="none">
             {traces.filter(t => t.chKey === 'message').map((t, i) => renderTrace(t, i))}
           </g>
           {/* SMT Components */}
           {smtComponents.filter(c => c.chKey === 'message').map(c => renderGlassBlock(c.x, c.y, c.w, c.h, c.label, c.chKey))}
-          {renderTerminationPad(0, CH4_Y + 70, 'TP4_S1', 'message')}
-          {renderTerminationPad(0, CH4_Y + 50, 'TP4_S2', 'message')}
-
           {/* Nodes */}
           {nodes.filter(n => n.chKey === 'message').map((n, i) => renderNode(n, i))}
           {/* Edge Connector */}
