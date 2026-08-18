@@ -313,87 +313,80 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     { chKey: 'message', x: 130, y: CH4_Y - 12, w: 14, h: 8, label: 'R42' }
   ], [CH1_Y, CH2_Y, CH3_Y, CH4_Y])
 
-  // Custom Engineered Substrate Footprints specifically designed around each channel's trace & component architecture
+  // Precision CAD Engineered Substrate Footprints conforming directly to PCB trace routing and component geometry
   const substratePolygons = useMemo(() => ({
     name: [
-      // Channel 1 Masterwork Substrate: Seamless continuous ground plane contouring Start intake, Middle core (R12, C08, Node A1, R15), and End transmission beam
+      // Channel 1 (Left-Top): Full continuous structural PCB body matching center layer substrate
+      // Area 1: Upper-left horizontal structural body (y: CH1_Y - 76 to -32) around horizontal traces
+      // Area 2: Central diagonal section (continuous 45° angled structural conduit)
+      // Area 3: Central structural area (around C08 and circular central component Node A1)
+      // Area 4: Lower structural branch (stepped body wrapping R15 and lower trace corridor)
       [
-        { x: 44,  y: CH1_Y - 54 },
-        { x: 138, y: CH1_Y - 54 },
-        { x: 162, y: CH1_Y - 30 },
-        { x: 194, y: CH1_Y - 30 },
-        { x: 210, y: CH1_Y - 14 },
-        { x: 248, y: CH1_Y - 14 },
-        { x: 256, y: CH1_Y - 6 },
-        { x: 248, y: CH1_Y + 2 },
-        { x: 204, y: CH1_Y + 2 },
-        { x: 194, y: CH1_Y + 12 },
-        { x: 150, y: CH1_Y + 12 },
-        { x: 140, y: CH1_Y + 22 },
-        { x: 114, y: CH1_Y + 22 },
-        { x: 102, y: CH1_Y + 10 },
-        { x: 60,  y: CH1_Y + 10 },
-        { x: 36,  y: CH1_Y - 14 },
-        { x: 36,  y: CH1_Y - 46 }
+        { x: 0,   y: CH1_Y - 76 },
+        { x: 138, y: CH1_Y - 76 },
+        { x: 178, y: CH1_Y - 36 },
+        { x: 194, y: CH1_Y - 36 },
+        { x: 210, y: CH1_Y - 20 },
+        { x: 210, y: CH1_Y - 4 },
+        { x: 198, y: CH1_Y + 8 },
+        { x: 172, y: CH1_Y + 8 },
+        { x: 154, y: CH1_Y + 26 },
+        { x: 104, y: CH1_Y + 26 },
+        { x: 88,  y: CH1_Y + 10 },
+        { x: 88,  y: CH1_Y - 18 },
+        { x: 74,  y: CH1_Y - 32 },
+        { x: 0,   y: CH1_Y - 32 }
       ]
     ],
     email: [
-      // Channel 2: Pure 45° and orthogonal CAD chamfering around R22, R21, C14 and Node A2
+      // Channel 2 (Left-Mid-Top): Preserved from source image
       [
-        { x: 120, y: CH2_Y + 54 },
-        { x: 178, y: CH2_Y + 54 },
-        { x: 194, y: CH2_Y + 38 },
+        { x: 54,  y: CH2_Y - 24 },
+        { x: 108, y: CH2_Y - 24 },
+        { x: 154, y: CH2_Y + 22 },
         { x: 194, y: CH2_Y + 22 },
-        { x: 184, y: CH2_Y + 12 },
-        { x: 144, y: CH2_Y + 12 },
-        { x: 124, y: CH2_Y - 8 },
-        { x: 100, y: CH2_Y - 8 },
-        { x: 84, y: CH2_Y - 24 },
-        { x: 64, y: CH2_Y - 24 },
-        { x: 54, y: CH2_Y - 14 },
-        { x: 54, y: CH2_Y + 10 },
-        { x: 76, y: CH2_Y + 32 },
-        { x: 108, y: CH2_Y + 32 },
-        { x: 120, y: CH2_Y + 44 }
+        { x: 202, y: CH2_Y + 30 },
+        { x: 202, y: CH2_Y + 42 },
+        { x: 190, y: CH2_Y + 54 },
+        { x: 120, y: CH2_Y + 54 },
+        { x: 108, y: CH2_Y + 42 },
+        { x: 76,  y: CH2_Y + 42 },
+        { x: 54,  y: CH2_Y + 20 }
       ]
     ],
     subject: [
-      // Channel 3: Vertical mirror of Channel 2, perfectly contoured around Node A3
+      // Channel 3 (Left-Mid-Bottom): Preserved from source image
       [
-        { x: 120, y: CH3_Y - 54 },
-        { x: 178, y: CH3_Y - 54 },
-        { x: 194, y: CH3_Y - 38 },
+        { x: 54,  y: CH3_Y + 24 },
+        { x: 108, y: CH3_Y + 24 },
+        { x: 154, y: CH3_Y - 22 },
         { x: 194, y: CH3_Y - 22 },
-        { x: 184, y: CH3_Y - 12 },
-        { x: 144, y: CH3_Y - 12 },
-        { x: 124, y: CH3_Y + 8 },
-        { x: 100, y: CH3_Y + 8 },
-        { x: 84, y: CH3_Y + 24 },
-        { x: 64, y: CH3_Y + 24 },
-        { x: 54, y: CH3_Y + 14 },
-        { x: 54, y: CH3_Y - 10 },
-        { x: 76, y: CH3_Y - 32 },
-        { x: 108, y: CH3_Y - 32 },
-        { x: 120, y: CH3_Y - 44 }
+        { x: 202, y: CH3_Y - 30 },
+        { x: 202, y: CH3_Y - 42 },
+        { x: 190, y: CH3_Y - 54 },
+        { x: 120, y: CH3_Y - 54 },
+        { x: 108, y: CH3_Y - 42 },
+        { x: 76,  y: CH3_Y - 42 },
+        { x: 54,  y: CH3_Y - 20 }
       ]
     ],
     message: [
-      // Channel 4: Vertical mirror of Channel 1, perfectly contoured around Node A4
+      // Channel 4 (Left-Bottom): Preserved from source image
       [
-        { x: 94, y: CH4_Y + 58 },
-        { x: 140, y: CH4_Y + 58 },
-        { x: 164, y: CH4_Y + 34 },
-        { x: 188, y: CH4_Y + 34 },
-        { x: 204, y: CH4_Y + 18 },
-        { x: 204, y: CH4_Y + 6 },
-        { x: 194, y: CH4_Y - 4 },
-        { x: 152, y: CH4_Y - 4 },
-        { x: 136, y: CH4_Y - 20 },
-        { x: 114, y: CH4_Y - 20 },
+        { x: 80,  y: CH4_Y + 52 },
+        { x: 80,  y: CH4_Y + 38 },
+        { x: 102, y: CH4_Y + 16 },
         { x: 102, y: CH4_Y - 8 },
-        { x: 102, y: CH4_Y + 18 },
-        { x: 86, y: CH4_Y + 34 },
-        { x: 86, y: CH4_Y + 50 }
+        { x: 114, y: CH4_Y - 20 },
+        { x: 156, y: CH4_Y - 20 },
+        { x: 168, y: CH4_Y - 8 },
+        { x: 192, y: CH4_Y - 8 },
+        { x: 202, y: CH4_Y + 2 },
+        { x: 202, y: CH4_Y + 10 },
+        { x: 186, y: CH4_Y + 26 },
+        { x: 166, y: CH4_Y + 26 },
+        { x: 132, y: CH4_Y + 60 },
+        { x: 88,  y: CH4_Y + 60 }
       ]
     ]
   }), [CH1_Y, CH2_Y, CH3_Y, CH4_Y])
