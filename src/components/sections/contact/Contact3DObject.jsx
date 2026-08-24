@@ -82,19 +82,22 @@ const RingGlowMaterial = shaderMaterial(
    void main() { 
      vec3 normal = normalize(vNormal); vec3 viewDir = normalize(vViewPosition); 
      float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.5); 
-     
-     vec3 baseColor = color * 0.35;
-     vec3 edgeGlow = color * fresnel * 1.5;
-     vec3 finalColor = baseColor + edgeGlow;
-     
-     // Camera space Z depth fade to enhance volumetric hologram depth
+     vec3 finalColor = color * (0.35 + fresnel * 1.5);
      float depthFade = clamp((vViewPosition.z + 10.45) / 4.9, 0.2, 1.0);
      float finalOpacity = opacity * (0.2 + fresnel * 0.8) * depthFade;
-     
      gl_FragColor = vec4(finalColor, finalOpacity); 
    }`
 )
 extend({ RingGlowMaterial })
+
+// Shared static geometries and scratch math objects to eliminate recreation & GC churn
+const staticGeomWire = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 2)
+const staticGeomGrid = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius * 1.025, 1)
+const staticGeomPoints = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 4)
+const staticGeomGlass = new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 24, 24)
+const staticGeomHalo = new THREE.SphereGeometry(SCENE_CONFIG.globe.haloRadius, 24, 24)
+const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.035, 8, 64)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Issue #7: Camera drift respects distanceFactor.
 // Issue #18: lookAt cached and only calculated on subpixel movement.
@@ -152,13 +155,6 @@ function Lights() {
   )
 }
 
-// Shared static geometries and scratch math objects to eliminate recreation & GC churn
-const staticGeomWire = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 2)
-const staticGeomGrid = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius * 1.025, 1)
-const staticGeomPoints = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 4)
-const staticGeomGlass = new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 32, 32)
-const staticGeomHalo = new THREE.SphereGeometry(SCENE_CONFIG.globe.haloRadius, 32, 32)
-const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.035, 8, 128)
 
 const staticParticlePositions = (() => {
   const random = createPRNG(42)
@@ -300,7 +296,9 @@ const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onH
 
   const hoverGlowFactor = useRef(0.0)
   const lastStyle = useRef({ opacity: -1, scaleVal: -1, glowOpacity: -1, brightnessVal: -1, saturateVal: -1 })
-  const STYLE_THRESHOLD = 0.002
+  const STYLE_THRESHOLD = 0.005
+  const FILTER_THRESHOLD = 0.015
+  const GLOW_THRESHOLD = 0.015
 
   const { platform, url, specialType } = iconData
   const [copied, setCopied] = useState(false)
@@ -362,10 +360,8 @@ const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onH
       tempIconVec.applyMatrix4(state.camera.matrixWorldInverse)
 
       const camZ = state.camera.position.z || SCENE_CONFIG.depth.cameraZ
-      const radius = 2.45
-      const maxZ = -(camZ - radius * 1.2)
-      const minZ = -(camZ + radius * 1.2)
-      const depth = THREE.MathUtils.clamp((tempIconVec.z - minZ) / (maxZ - minZ), 0, 1)
+      // Streamlined depth calculation: (tempIconVec.z + camZ + 2.94) / 5.88
+      const depth = THREE.MathUtils.clamp((tempIconVec.z + camZ + 2.94) * 0.170068, 0, 1)
 
       const baseScale = 0.95 + depth * 0.08
       const scaleVal = baseScale * (1.0 + hoverGlowFactor.current * 0.03)
@@ -375,22 +371,22 @@ const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onH
       const reactionGlow = reactionGlowRef ? reactionGlowRef.current : 0.0
       const glowOpacity = Math.max(hoverGlowFactor.current, reactionGlow)
 
-      // Dirty-check style updates
+      // Dirty-check style updates to eliminate unnecessary DOM writes
       const prev = lastStyle.current
       if (Math.abs(opacityVal - prev.opacity) > STYLE_THRESHOLD) {
-        htmlRef.current.style.opacity = opacityVal
+        htmlRef.current.style.opacity = opacityVal.toFixed(3)
         prev.opacity = opacityVal
       }
       if (Math.abs(scaleVal - prev.scaleVal) > STYLE_THRESHOLD) {
-        htmlRef.current.style.transform = `scale(${scaleVal})`
+        htmlRef.current.style.transform = `scale(${scaleVal.toFixed(3)})`
         prev.scaleVal = scaleVal
       }
-      if (Math.abs(brightnessVal - prev.brightnessVal) > STYLE_THRESHOLD || Math.abs(saturateVal - prev.saturateVal) > STYLE_THRESHOLD) {
-        htmlRef.current.style.filter = `brightness(${brightnessVal.toFixed(3)}) saturate(${saturateVal.toFixed(3)})`
+      if (Math.abs(brightnessVal - prev.brightnessVal) > FILTER_THRESHOLD || Math.abs(saturateVal - prev.saturateVal) > FILTER_THRESHOLD) {
+        htmlRef.current.style.filter = `brightness(${brightnessVal.toFixed(2)}) saturate(${saturateVal.toFixed(2)})`
         prev.brightnessVal = brightnessVal
         prev.saturateVal = saturateVal
       }
-      if (glowRef.current && Math.abs(glowOpacity - prev.glowOpacity) > 0.01) {
+      if (glowRef.current && Math.abs(glowOpacity - prev.glowOpacity) > GLOW_THRESHOLD) {
         glowRef.current.style.opacity = glowOpacity.toFixed(2)
         prev.glowOpacity = glowOpacity
       }
@@ -840,7 +836,7 @@ const Contact3DObject = memo(function Contact3DObject({ isInView }) {
           {webglSupported ? (
             <Canvas
               frameloop={isInView ? "always" : "never"}
-              dpr={[1, 2]}
+              dpr={[1, 1.5]}
               gl={{
                 powerPreference: "high-performance",
                 antialias: true,

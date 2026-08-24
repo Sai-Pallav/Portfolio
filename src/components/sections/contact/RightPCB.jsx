@@ -455,12 +455,12 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
   const getTransitionStyle = useCallback(() => {
     if (contactSystemState === 'dormant') {
-      return { transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1)' }
+      return { transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1)' }
     }
     if (isTransmit) {
       return { transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }
     }
-    return { transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)' }
+    return { transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1)' }
   }, [contactSystemState, isTransmit])
 
   const getTrailPath = (chKey) => {
@@ -1480,13 +1480,13 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
       return {
         opacity: 0.65,
         filter: 'brightness(0.85) saturate(0.4)',
-        transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
+        transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1), filter 500ms cubic-bezier(0.25, 1, 0.5, 1)'
       }
     }
     return {
       opacity: 0.95,
       filter: 'brightness(1.0) saturate(1.0)',
-      transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
+      transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1), filter 500ms cubic-bezier(0.25, 1, 0.5, 1)'
     }
   }, [contactSystemState, isMiddleActive])
 

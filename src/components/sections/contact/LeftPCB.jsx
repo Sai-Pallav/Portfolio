@@ -72,25 +72,23 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   const [isIlluminated, setIsIlluminated] = useState(false)
 
   useEffect(() => {
-    if (!isInView && !isIlluminated) {
+    if (!isInView) {
       setIsIlluminated(false)
       setActivatedNodes({})
       return
     }
 
-    if (isIlluminated) return
-
-    // 0s - 5s: Baseline state - all PCB components are properly visible at 85% opacity & static
-    // At 5.0s: Illumination power-up! Opacity jumps to 100%, brightness lifts, nodes animate & pulse
+    // 0s - 2s: Baseline state
+    // At 2.0s: Illumination power-up! Opacity jumps to 100%, nodes activate, beams & pulse light up
     const tIllum = setTimeout(() => {
       setIsIlluminated(true)
       setActivatedNodes({ A1: true, A2: true, A3: true, A4: true })
-    }, 5000)
+    }, 2000)
 
     return () => {
       clearTimeout(tIllum)
     }
-  }, [isInView, isIlluminated])
+  }, [isInView])
 
   useEffect(() => {
     const sectionEl = document.getElementById('contact')
@@ -394,12 +392,12 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
   const getTransitionStyle = React.useCallback(() => {
     if (contactSystemState === 'dormant') {
-      return { transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1)' }
+      return { transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1)' }
     }
     if (isTransmit) {
       return { transition: 'opacity 750ms cubic-bezier(0.65, 0, 0.35, 1)' }
     }
-    return { transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)' }
+    return { transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1)' }
   }, [contactSystemState, isTransmit])
 
   const getTargetOpacity = React.useCallback((chKey, elementType = 'trace') => {
@@ -482,7 +480,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           timers.push(spawnParticle(t, true, 360))
         }
       })
-    } else if (activationLevel >= 1) {
+    } else if (isInView) {
       const runSpawn = () => {
         traces.forEach((t) => {
           if (t.main) {
@@ -491,7 +489,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         })
       }
       runSpawn()
-      intervalId = setInterval(runSpawn, 450)
+      intervalId = setInterval(runSpawn, isTyping ? 450 : 1800)
     }
 
     return () => {
@@ -811,7 +809,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             style={{
               ...getTransitionStyle(),
               animation: 'pcbIdleTraceHighlight 6s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-              animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
+              animationPlayState: (isIlluminated || activationLevel >= 1) ? 'running' : 'paused',
               animationDelay: `${i * 0.7}s`
             }}
           />
@@ -826,7 +824,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           const usePulse = isMainBend && bIdx === 0 && !isTransmit;
           const pulseStyle = usePulse ? {
             animation: 'pcbIdleNodePulse 4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-            animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
+            animationPlayState: (isIlluminated || activationLevel >= 1) ? 'running' : 'paused',
             animationDelay: `${(i * 2.5 + bIdx * 0.8) * 0.4}s`
           } : {};
           return (
@@ -1022,13 +1020,13 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
       return {
         opacity: 0.65,
         filter: 'brightness(0.85) saturate(0.4)',
-        transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
+        transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1), filter 500ms cubic-bezier(0.25, 1, 0.5, 1)'
       }
     }
     return {
       opacity: 0.95,
       filter: 'brightness(1.0) saturate(1.0)',
-      transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1), filter 800ms cubic-bezier(0.4, 0, 0.2, 1)'
+      transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1), filter 500ms cubic-bezier(0.25, 1, 0.5, 1)'
     }
   }, [contactSystemState, isIlluminated])
 
@@ -1202,7 +1200,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         {/* ========================================================
             LEFT PCB CONTINUOUS TRAVELING LINE PULSE ANIMATION
            ======================================================== */}
-        {beamActive && isIlluminated && mainBeamTraces.length > 0 && (
+        {isIlluminated && mainBeamTraces.length > 0 && (
           <g className="left-pcb-light-beams" style={{ pointerEvents: 'none' }}>
             {mainBeamTraces.map((trace, idx) => {
               return (
