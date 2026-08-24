@@ -2,6 +2,27 @@ import React, { useRef, useState, useEffect, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check } from 'lucide-react'
 
+/**
+ * Per-card atmospheric lighting offsets.
+ * Each card gets a subtly different focal point so the four cards
+ * look like a system rather than four identical rectangles.
+ *
+ *  index 0 → illumination pulled slightly left + upper
+ *  index 1 → illumination centered top
+ *  index 2 → illumination centered (slightly right)
+ *  index 3 → illumination pulled right + lower-mid
+ */
+const CARD_LIGHT_CONFIGS = [
+  // Card 0 — STATUS: upper-left bias
+  { primary: '38% 28%', secondary: '72% 78%', highlight: '20% 0%' },
+  // Card 1 — EMAIL: upper-center bias
+  { primary: '52% 22%', secondary: '28% 80%', highlight: '50% 0%' },
+  // Card 2 — LINKEDIN: center-right bias
+  { primary: '62% 45%', secondary: '20% 72%', highlight: '62% 0%' },
+  // Card 3 — LOCATION: right + lower-mid bias
+  { primary: '72% 55%', secondary: '18% 30%', highlight: '82% 0%' },
+]
+
 export default memo(function ContactCard({
   index,
   label,
@@ -20,6 +41,7 @@ export default memo(function ContactCard({
   const [copied, setCopied] = useState(false)
 
   const isInteractive = Boolean(href || onClick || copyText)
+  const cfg = CARD_LIGHT_CONFIGS[index] ?? CARD_LIGHT_CONFIGS[0]
 
   // Handle Event-Driven Highlight from Globe Platform Hover
   useEffect(() => {
@@ -129,28 +151,73 @@ export default memo(function ContactCard({
     )
   }
 
+  // ── GLASS SURFACE SYSTEM ────────────────────────────────────────────────────────────────────────────
+  // Four gradient layers (bottom to top):
+  //  L1 — Vertical luminance spine  (dark obsidian base with tonal depth)
+  //  L2 — Primary atmospheric lobe  (accent, large, per-card positioned)
+  //  L3 — Secondary fill lobe       (accent, softer, opposite corner)
+  //  L4 — Top-edge glass sheen      (neutral white, simulates light on glass)
+
+  const lobeIntensity     = isHighlighted ? '18%' : '12%'
+  const lobeMidIntensity  = isHighlighted ? '9%'  : '6%'
+  const lobeFillIntensity = isHighlighted ? '8%'  : '5%'
+  const sheenOpacity      = isHighlighted ? 0.09  : 0.06
+  const sheenMidOpacity   = isHighlighted ? 0.032 : 0.022
+
+  const glassBackground = [
+    // L4 — Top-edge glass sheen (narrowband, simulates reflected light on glass surface)
+    `radial-gradient(ellipse 85% 22% at ${cfg.highlight}, rgba(255,255,255,${sheenOpacity}) 0%, rgba(255,255,255,${sheenMidOpacity}) 45%, transparent 75%)`,
+    // L3 — Secondary atmospheric fill lobe (opposite corner, softer)
+    `radial-gradient(ellipse 72% 58% at ${cfg.secondary}, color-mix(in srgb, var(--accent) ${lobeFillIntensity}, transparent) 0%, color-mix(in srgb, var(--accent) 1.2%, transparent) 48%, transparent 74%)`,
+    // L2 — Primary atmospheric lobe (main "light through glass" effect, per-card positioned)
+    `radial-gradient(ellipse 100% 78% at ${cfg.primary}, color-mix(in srgb, var(--accent) ${lobeIntensity}, transparent) 0%, color-mix(in srgb, var(--accent) ${lobeMidIntensity}, transparent) 35%, color-mix(in srgb, var(--accent) 1.8%, transparent) 62%, transparent 84%)`,
+    // L1 — Vertical luminance spine (obsidian base with subtle tonal variation, not flat black)
+    `linear-gradient(180deg, color-mix(in srgb, var(--bg-surface) 62%, var(--bg)) 0%, color-mix(in srgb, var(--bg-surface) 50%, var(--bg)) 25%, color-mix(in srgb, var(--bg-surface) 44%, var(--bg)) 55%, color-mix(in srgb, var(--bg-surface) 36%, var(--bg)) 82%, color-mix(in srgb, var(--bg-surface) 28%, var(--bg)) 100%)`,
+  ].join(', ')
+
   return (
     <div
       ref={cardRef}
       onClick={isInteractive ? handleAction : undefined}
-      className={`group relative overflow-hidden rounded-[18px] border p-5 sm:p-5.5 min-h-[220px] h-full flex flex-col justify-between transform-gpu transition-all duration-300 ease-out select-none shadow-[0_6px_20px_rgba(0,0,0,0.45)] ${
+      className={`group relative overflow-hidden rounded-[18px] p-5 sm:p-5.5 min-h-[220px] h-full flex flex-col justify-between transform-gpu select-none ${
         isInteractive ? 'cursor-pointer' : 'cursor-default'
-      } ${
-        isHighlighted
-          ? 'border-[#382e56] bg-[#141024] -translate-y-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]'
-          : 'border-[#221d36] bg-[#0e0c1a] hover:border-[#352c52] hover:bg-[#120f21] hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.65)]'
       }`}
       style={{
-        background: isHighlighted
-          ? 'linear-gradient(180deg, #161228 0%, #0d0b17 100%)'
-          : 'linear-gradient(180deg, #131022 0%, #0c0a15 100%)'
+        border: isHighlighted
+          ? `1px solid color-mix(in srgb, var(--accent) 24%, rgba(255,255,255,0.10))`
+          : `1px solid color-mix(in srgb, var(--accent) 13%, rgba(255,255,255,0.06))`,
+        background: glassBackground,
+        boxShadow: isHighlighted
+          ? `0 14px 36px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.07)`
+          : `0 6px 22px rgba(0,0,0,0.42), 0 1px 4px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.04)`,
+        transform: isHighlighted ? 'translateY(-4px)' : 'translateY(0)',
+        transition: 'background 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease, transform 0.28s ease',
       }}
     >
+      {/* Hover brightening overlay — "glass catches more light" effect */}
+      <div
+        className="absolute inset-0 rounded-[17px] opacity-0 group-hover:opacity-100 pointer-events-none"
+        style={{
+          background: [
+            `radial-gradient(ellipse 85% 22% at ${cfg.highlight}, rgba(255,255,255,0.035) 0%, transparent 68%)`,
+            `radial-gradient(ellipse 80% 60% at ${cfg.primary}, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 72%)`,
+          ].join(', '),
+          transition: 'opacity 0.32s ease',
+        }}
+        aria-hidden="true"
+      />
       {/* Top Meta Row */}
-      <div className="flex items-center justify-between mb-3.5">
+      <div className="flex items-center justify-between mb-3.5 relative z-10">
         <div className="flex items-center gap-2.5">
-          {/* Icon Box */}
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-[#1e1738] border border-[#2e2354] text-[#a855f7] shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]">
+          {/* Icon Box — glass language: accent-tinted translucent surface */}
+          <div
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl"
+            style={{
+              background: `color-mix(in srgb, var(--accent) 12%, color-mix(in srgb, var(--bg-surface) 65%, transparent))`,
+              border: `1px solid color-mix(in srgb, var(--accent) 22%, rgba(255,255,255,0.08))`,
+              boxShadow: `inset 0 1px 1px rgba(255,255,255,0.06)`,
+            }}
+          >
             {typeof icon === 'function' ? icon(isHighlighted) : icon}
           </div>
           <span className="text-[10.5px] font-mono font-bold tracking-[0.18em] text-[#766f98] uppercase">
@@ -163,7 +230,7 @@ export default memo(function ContactCard({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 flex flex-col justify-start my-1">
+      <div className="flex-1 flex flex-col justify-start my-1 relative z-10">
         <h4 className="text-[15px] sm:text-[16px] font-bold text-white font-heading tracking-tight leading-snug text-left group-hover:text-purple-200 transition-colors duration-200">
           {title}
         </h4>
@@ -173,7 +240,10 @@ export default memo(function ContactCard({
       </div>
 
       {/* Footer Divider & Action */}
-      <div className="flex items-center justify-between border-t border-[#1d1930] pt-3 w-full mt-auto">
+      <div
+        className="flex items-center justify-between pt-3 w-full mt-auto relative z-10"
+        style={{ borderTop: `1px solid color-mix(in srgb, var(--accent) 9%, rgba(255,255,255,0.05))` }}
+      >
         {renderFooter()}
       </div>
     </div>
