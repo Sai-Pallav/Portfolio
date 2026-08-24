@@ -6,43 +6,34 @@ export default function SectionTitle() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <motion.header variants={staggerFast} className="max-w-3xl relative">
-      <motion.span
+    <motion.header variants={staggerFast} className="max-w-3xl relative mb-8 sm:mb-10">
+      {/* Section Tag */}
+      <motion.div
         variants={fadeUpSoft}
-        className="inline-flex items-center gap-3 font-mono text-xs font-medium tracking-[0.22em] uppercase text-accent mb-5"
+        className="inline-flex items-center gap-3 font-mono text-xs sm:text-[13px] font-medium tracking-[0.2em] uppercase text-accent mb-4"
       >
         <motion.span
           variants={drawLineX}
-          className="h-1 w-10 rounded-full bg-gradient-to-r from-accent to-accent/20 origin-left"
+          className="h-[1.5px] w-8 rounded-full bg-accent/60 origin-left"
           aria-hidden="true"
         />
-        About
-      </motion.span>
+        <span>01 — ABOUT · BITS PILANI</span>
+      </motion.div>
 
+      {/* Main Name Heading */}
       <motion.h2
         variants={fadeUp}
-        className="font-heading text-4xl sm:text-5xl lg:text-[3.35rem] font-bold leading-[1.08] tracking-tight"
+        className="font-heading text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.08] tracking-tight text-white/95"
       >
-        <span className="text-[var(--text-heading)]">Building software that </span>
-        <motion.span
-          className="inline-block bg-gradient-to-r from-accent via-accent-hover to-accent bg-clip-text text-transparent"
-          animate={
-            reduceMotion
-              ? {}
-              : { backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'] }
-          }
-          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ backgroundSize: '200% auto' }}
-        >
-          reaches real users
-        </motion.span>
+        {personal.name}
       </motion.h2>
 
+      {/* Role / Subtitle */}
       <motion.p
         variants={fadeUpSoft}
-        className="mt-6 text-lg sm:text-xl text-secondary/90 leading-relaxed max-w-2xl font-light"
+        className="mt-3 font-mono text-sm sm:text-base tracking-wider uppercase font-semibold text-accent/90"
       >
-        {personal.tagline}
+        FULL-STACK & SYSTEMS ENGINEER
       </motion.p>
     </motion.header>
   )

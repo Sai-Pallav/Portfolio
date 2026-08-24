@@ -1,86 +1,77 @@
-import { useRef } from 'react'
+import { useRef, memo, useMemo } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
+import SectionTitle from './SectionTitle'
+import BioBlock from './BioBlock'
 import PhotoCard from './PhotoCard'
 import { staggerContainer } from './aboutVariants'
 
-export default function About() {
-  const sectionRef = useRef(null)
-  const contentRef = useRef(null)
-  const reduceMotion = useReducedMotion()
-  const isInView = true
+function About() {
+  const containerRef = useRef(null)
+  const shouldReduceMotion = useReducedMotion()
+
+  const ambientBgStyle = useMemo(() => ({
+    background:
+      'radial-gradient(circle at 85% 20%, var(--accent-dim) 0%, transparent 55%), radial-gradient(circle at 15% 85%, var(--accent-dim) 0%, transparent 55%)',
+  }), [])
 
   return (
     <section
-      ref={sectionRef}
       id="about"
-      aria-label="About me"
-      className="relative min-h-screen flex items-center py-20 md:py-24 lg:py-28 overflow-hidden"
+      ref={containerRef}
+      aria-label="About Sai Pallav"
+      className="relative min-h-screen w-full flex flex-col justify-center py-20 sm:py-24 md:py-28 overflow-hidden bg-bg border-t border-white/[0.04]"
     >
-      {/* Premium ambient background */}
-      <div className="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={isInView ? { opacity: 1 } : { opacity: 0 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute inset-0 bg-gradient-to-br from-bg via-surface/40 to-bg"
-        />
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.85 }}
-          animate={
-            isInView
-              ? reduceMotion
-                ? { opacity: 0.15, scale: 1 }
-                : { opacity: [0.12, 0.2, 0.12], scale: [1, 1.08, 1] }
-              : { opacity: 0, scale: 0.85 }
-          }
-          transition={
-            isInView && !reduceMotion
-              ? { opacity: { duration: 14, repeat: Infinity, ease: 'easeInOut' }, scale: { duration: 14, repeat: Infinity, ease: 'easeInOut' } }
-              : { duration: 1, ease: [0.16, 1, 0.3, 1] }
-          }
-          className="absolute -top-24 -right-24 w-[520px] h-[520px] rounded-full blur-[100px]"
-          style={{ background: 'radial-gradient(circle, var(--accent) 0%, transparent 68%)' }}
-        />
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={
-            isInView
-              ? reduceMotion
-                ? { opacity: 0.08 }
-                : { opacity: [0.06, 0.12, 0.06], scale: [1, 1.12, 1] }
-              : { opacity: 0 }
-          }
-          transition={
-            isInView && !reduceMotion
-              ? { duration: 18, repeat: Infinity, ease: 'easeInOut', delay: 4 }
-              : { duration: 1, delay: 0.2 }
-          }
-          className="absolute bottom-0 left-1/4 w-[400px] h-[400px] rounded-full blur-[90px]"
-          style={{ background: 'radial-gradient(circle, var(--accent-hover) 0%, transparent 70%)' }}
-        />
-
-        <div
-          className="absolute inset-0 opacity-[0.035]"
-          style={{
-            backgroundImage: `
-              linear-gradient(var(--border) 1px, transparent 1px),
-              linear-gradient(90deg, var(--border) 1px, transparent 1px)
-            `,
-            backgroundSize: '56px 56px',
-          }}
-        />
+      {/* Top Center Glowing Pill Indicator (Matching Reference Image) */}
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+        <div className="w-12 h-4 rounded-full bg-white/[0.04] border border-white/10 backdrop-blur-md flex items-center justify-center shadow-lg shadow-black/40">
+          <div className="w-3 h-1 rounded-full bg-accent/80 animate-pulse" />
+        </div>
       </div>
 
+      {/* Background Atmosphere */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-40 -z-10"
+        style={ambientBgStyle}
+        aria-hidden="true"
+      />
+
+      {/* Subtle Noise / Grid Pattern */}
+      <div
+        className="absolute inset-0 opacity-[0.025] pointer-events-none -z-10"
+        style={{
+          backgroundImage: `
+            linear-gradient(var(--border) 1px, transparent 1px),
+            linear-gradient(90deg, var(--border) 1px, transparent 1px)
+          `,
+          backgroundSize: '48px 48px',
+        }}
+        aria-hidden="true"
+      />
+
       <motion.div
-        ref={contentRef}
-        className="w-full px-6 lg:px-8 relative"
+        className="relative z-10 max-w-7xl w-full mx-auto px-6 sm:px-10 md:px-12 lg:px-16"
         variants={staggerContainer}
         initial="hidden"
-        animate={isInView ? 'show' : 'hidden'}
+        whileInView="show"
+        viewport={{ once: true, amount: 0.1 }}
       >
-        <PhotoCard sectionRef={sectionRef} />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+          
+          {/* Left Column: Text, Identity, Stats & Focus Areas */}
+          <div className="lg:col-span-7 flex flex-col justify-center">
+            <SectionTitle />
+            <BioBlock />
+          </div>
+
+          {/* Right Column: Seamless Background-Blended Portrait Photo */}
+          <div className="lg:col-span-5 flex flex-col items-center lg:items-end">
+            <PhotoCard />
+          </div>
+
+        </div>
       </motion.div>
     </section>
   )
 }
+
+export default memo(About)

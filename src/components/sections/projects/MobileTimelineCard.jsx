@@ -137,7 +137,7 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
         }}
       >
         <div
-          className="relative rounded-[20px] border overflow-hidden transition-all duration-250 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.65)] hover:shadow-[0_24px_55px_-10px_rgba(0,0,0,0.85)]"
+          className="relative rounded-[20px] border border-b-0 overflow-hidden transition-all duration-250 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.65)] hover:shadow-[0_24px_55px_-10px_rgba(0,0,0,0.85)]"
           style={{
             background: `
               radial-gradient(ellipse 110% 70% at 0% 0%, color-mix(in srgb, var(--accent) 18%, transparent) 0%, color-mix(in srgb, var(--accent-secondary, var(--accent)) 8%, transparent) 45%, transparent 100%),
@@ -147,6 +147,7 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
               color-mix(in srgb, var(--bg-surface) 78%, #000)
             `,
             borderColor: 'var(--border)',
+            borderBottom: 'none',
             backdropFilter: "blur(12px)",
             boxShadow: "0 12px 36px -6px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.08)",
           }}

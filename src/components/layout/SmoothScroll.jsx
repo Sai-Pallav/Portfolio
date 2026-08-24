@@ -40,6 +40,14 @@ function SmoothScroll({ children }) {
       lenis.raf(time * 1000)
     }
 
+    // Handle initial hash navigation if present
+    if (window.location.hash) {
+      setTimeout(() => {
+        const target = document.querySelector(window.location.hash)
+        if (target) lenis.scrollTo(target, { immediate: true })
+      }, 100)
+    }
+
     gsap.ticker.add(tickerCallback)
     gsap.ticker.lagSmoothing(0)
 

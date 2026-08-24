@@ -6,6 +6,7 @@ import CustomCursor from '@/components/ui/CustomCursor'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import SmoothScroll from '@/components/layout/SmoothScroll'
 import Hero from '@/components/sections/Hero'
+import About from '@/components/sections/About'
 import Skills from '@/components/sections/Skills'
 import Projects from '@/components/sections/Projects'
 import Experience from '@/components/sections/Experience'
@@ -13,7 +14,7 @@ import Contact from '@/components/sections/Contact'
 import { useScrollTrigger } from '@/hooks/useScrollTrigger'
 
 function App() {
-  const sectionIds = useMemo(() => ['hero', 'skills', 'projects', 'experience', 'contact'], [])
+  const sectionIds = useMemo(() => ['hero', 'about', 'skills', 'projects', 'experience', 'contact'], [])
   const activeSection = useScrollTrigger(sectionIds)
   const [showThemePicker, setShowThemePicker] = useState(false)
 
@@ -34,6 +35,7 @@ function App() {
       <SmoothScroll>
         <main id="main-content" className="relative">
           <Hero />
+          <About />
           <Skills />
           <Projects />
           <Experience />

@@ -144,10 +144,22 @@ body {
   transform-style: preserve-3d;
 }
 
-/* Mobile adjustments for cinematic hero portrait blending */
-@media (max-width: 768px) {
-  .hero-portrait-img {
-    opacity: calc(var(--hero-img-opacity) * 0.6) !important;
+/* Responsive Hero Media Anchoring */
+.hero-image,
+.hero-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: right top;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Minimal mobile adjustment: align anchor with subject center (72% X) on tall narrow viewports */
+@media (max-width: 640px) {
+  .hero-image,
+  .hero-video {
+    object-position: 72% top;
   }
 }
 

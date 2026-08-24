@@ -1,65 +1,42 @@
 import { motion } from 'framer-motion'
 import { scaleIn } from './aboutVariants'
-import { lazy, Suspense } from 'react'
-const Lanyard = lazy(() => import('@/components/ui/Lanyard'))
-import SectionTitle from './SectionTitle'
-import BioBlock from './BioBlock'
 
-export default function PhotoCard({ sectionRef }) {
+const aboutPortrait = '/hero-portrait.webp'
+
+export default function PhotoCard() {
   return (
-    <motion.aside
+    <motion.div
       variants={scaleIn}
-      className="group relative w-full"
-      aria-label="Profile photo"
+      className="relative w-full h-full min-h-[480px] lg:min-h-[640px] flex items-end justify-center lg:justify-end overflow-hidden"
     >
-      {/* Full screen container with stacked layout */}
-      <div className="relative">
+      {/* Backlight Ambient Glow */}
+      <div
+        className="absolute inset-0 opacity-40 blur-3xl pointer-events-none"
+        style={{
+          background: 'radial-gradient(circle at 60% 40%, var(--accent) 0%, transparent 65%)',
+        }}
+      />
 
-        {/* ID card - positioned above text */}
-        <div className="relative z-20 mb-12 lg:mb-16 lg:absolute lg:right-0 lg:top-0 lg:w-1/2 lg:max-w-lg">
-          {/* Photo Container */}
-          <motion.div
-            className="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl shadow-black/30"
-          >
-            {/* Gradient overlay */}
-            <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-accent/20 via-transparent to-accent-hover/20 opacity-0 transition-opacity duration-500" />
+      {/* Portrait Image Container */}
+      <div className="relative w-full max-w-lg lg:max-w-xl h-full flex items-end">
+        <img
+          src={aboutPortrait}
+          alt="Sai Pallav"
+          loading="eager"
+          decoding="async"
+          className="w-full h-auto max-h-[680px] object-cover object-top filter brightness-[0.92] contrast-[1.05]"
+        />
 
-            {/* Lanyard Component */}
-            <div className="w-full h-[400px] md:h-[450px] lg:h-[500px] flex items-center justify-center">
-              <Suspense fallback={
-                <div className="flex flex-col items-center gap-3 text-white/20 font-mono text-xs select-none">
-                  <div className="w-6 h-6 border-2 border-white/20 border-t-accent rounded-full animate-spin" />
-                  <span>INITIALIZING 3D CANVAS</span>
-                </div>
-              }>
-                <Lanyard position={[0, 0, 13]} gravity={[0, -40, 0]} fov={25} transparent={true} sectionRef={sectionRef} />
-              </Suspense>
-            </div>
+        {/* Seamless Vignette Gradients (Blending Bottom and Left into Background) */}
+        {/* Bottom Fade */}
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-bg via-bg/70 to-transparent pointer-events-none" />
 
-            {/* Shine effect */}
-            <motion.div
-              className="absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-white/10 to-transparent"
-              initial={{ x: '-100%' }}
-              transition={{ duration: 0.6 }}
-            />
-          </motion.div>
+        {/* Left Fade (Desktop) */}
+        <div className="hidden lg:block absolute inset-y-0 left-0 w-36 bg-gradient-to-r from-bg via-bg/60 to-transparent pointer-events-none" />
 
-          {/* Decorative glow */}
-          <motion.div
-            className="absolute -inset-4 rounded-3xl opacity-0 transition-opacity duration-500 pointer-events-none"
-            style={{
-              background: 'radial-gradient(circle at center, var(--accent) 0%, transparent 70%)',
-              filter: 'blur(40px)',
-            }}
-          />
-        </div>
-
-        {/* Text content - below ID card */}
-        <div className="relative z-10 lg:pr-8 lg:max-w-2xl">
-          <SectionTitle />
-          <BioBlock />
-        </div>
+        {/* Top Fade Subtle */}
+        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-bg/40 to-transparent pointer-events-none" />
       </div>
-    </motion.aside>
+    </motion.div>
   )
 }

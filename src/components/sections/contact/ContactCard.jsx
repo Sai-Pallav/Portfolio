@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, ArrowRight } from 'lucide-react'
+import { Check } from 'lucide-react'
 
 export default memo(function ContactCard({
   index,
@@ -21,7 +21,7 @@ export default memo(function ContactCard({
 
   const isInteractive = Boolean(href || onClick || copyText)
 
-  // Handle Event-Driven Highlight from Globe Platform Hover (Architecture Isolation)
+  // Handle Event-Driven Highlight from Globe Platform Hover
   useEffect(() => {
     if (!platformKey) return
     const handleGlobeHover = (e) => {
@@ -65,22 +65,21 @@ export default memo(function ContactCard({
       const Component = href ? 'a' : 'button'
       const linkProps = href
         ? {
-          href,
-          target: href.startsWith('http') ? '_blank' : undefined,
-          rel: href.startsWith('http') ? 'noopener noreferrer' : undefined,
-          onClick: (e) => e.stopPropagation()
-        }
+            href,
+            target: href.startsWith('http') ? '_blank' : undefined,
+            rel: href.startsWith('http') ? 'noopener noreferrer' : undefined,
+            onClick: (e) => e.stopPropagation()
+          }
         : {
-          type: 'button',
-          onClick: handleAction
-        }
+            type: 'button',
+            onClick: handleAction
+          }
 
       if (actionType === 'copy') {
         return (
           <Component
             {...linkProps}
-            className="group/cta inline-flex items-center gap-1.5 text-xs font-medium transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-surface)] focus-visible:rounded"
-            style={{ color: copied ? 'var(--accent)' : 'var(--text-secondary)' }}
+            className="group/cta inline-flex items-center gap-1 text-xs font-semibold text-white transition-colors duration-200 cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none hover:text-purple-300"
             aria-label={copied ? 'Email copied to clipboard' : 'Copy email address'}
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -90,11 +89,11 @@ export default memo(function ContactCard({
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                  className="inline-flex items-center gap-1.5 font-medium text-[var(--accent)]"
+                  transition={{ duration: 0.18 }}
+                  className="inline-flex items-center gap-1 font-semibold text-purple-300"
                 >
                   <span>Copied!</span>
-                  <Check className="h-3 w-3 stroke-[2.2]" />
+                  <Check className="h-3 w-3 stroke-[2.5]" />
                 </motion.span>
               ) : (
                 <motion.span
@@ -102,16 +101,10 @@ export default memo(function ContactCard({
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                  className="inline-flex items-center gap-1.5 group-hover:text-[var(--text-primary)] transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                  transition={{ duration: 0.18 }}
+                  className="inline-flex items-center gap-1 text-white group-hover/cta:text-purple-300 transition-colors"
                 >
-                  <span className="py-0.5">
-                    {footer.replace(' →', '')}
-                  </span>
-                  <ArrowRight
-                    className="h-3 w-3 text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1"
-                    strokeWidth={2}
-                  />
+                  <span>Copy Email →</span>
                 </motion.span>
               )}
             </AnimatePresence>
@@ -122,21 +115,15 @@ export default memo(function ContactCard({
       return (
         <Component
           {...linkProps}
-          className="group/cta inline-flex items-center gap-1.5 text-xs font-medium transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-surface)] focus-visible:rounded text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
+          className="group/cta inline-flex items-center gap-1 text-xs font-semibold text-white transition-colors duration-200 cursor-pointer text-left border-none bg-transparent p-0 outline-none hover:text-purple-300"
         >
-          <span className="py-0.5">
-            {footer.replace(' →', '')}
-          </span>
-          <ArrowRight
-            className="h-3 w-3 text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1"
-            strokeWidth={2}
-          />
+          <span>{footer}</span>
         </Component>
       )
     }
 
     return (
-      <span className="text-[11px] font-mono text-[var(--text-muted)] tracking-tight flex items-center gap-1.5 select-text">
+      <span className="text-[11px] text-[#554f73] font-normal text-left select-text">
         {footer}
       </span>
     )
@@ -146,61 +133,54 @@ export default memo(function ContactCard({
     <div
       ref={cardRef}
       onClick={isInteractive ? handleAction : undefined}
-      className={`group relative overflow-hidden rounded-xl border p-5 sm:p-6 min-h-[224px] h-full flex flex-col justify-between transform-gpu transition-[transform,border-color,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform select-none ${isInteractive ? 'cursor-pointer' : 'cursor-default'
-        } ${isHighlighted
-          ? 'border-white/[0.18] -translate-y-[1.5px] shadow-[0_8px_24px_-4px_rgba(0,0,0,0.65)]'
-          : 'border-white/[0.07] hover:border-white/[0.14] hover:-translate-y-[1.5px] shadow-[0_4px_16px_-4px_rgba(0,0,0,0.45)] hover:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.65)]'
-        }`}
+      className={`group relative overflow-hidden rounded-[18px] border p-5 sm:p-5.5 min-h-[220px] h-full flex flex-col justify-between transform-gpu transition-all duration-300 ease-out select-none shadow-[0_6px_20px_rgba(0,0,0,0.45)] ${
+        isInteractive ? 'cursor-pointer' : 'cursor-default'
+      } ${
+        isHighlighted
+          ? 'border-[#382e56] bg-[#141024] -translate-y-1 shadow-[0_12px_30px_rgba(0,0,0,0.65)]'
+          : 'border-[#221d36] bg-[#0e0c1a] hover:border-[#352c52] hover:bg-[#120f21] hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(0,0,0,0.65)]'
+      }`}
       style={{
         background: isHighlighted
-          ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 45%, rgba(0, 0, 0, 0.22) 100%), var(--bg-surface)'
-          : 'linear-gradient(180deg, rgba(255, 255, 255, 0.024) 0%, rgba(255, 255, 255, 0.005) 45%, rgba(0, 0, 0, 0.26) 100%), var(--bg-surface)'
+          ? 'linear-gradient(180deg, #161228 0%, #0d0b17 100%)'
+          : 'linear-gradient(180deg, #131022 0%, #0c0a15 100%)'
       }}
     >
-      {/* Precision top specular edge highlight */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.14] to-transparent transition-opacity duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:via-white/[0.22]"
-        style={{ opacity: isHighlighted ? 0.85 : 0.5 }}
-      />
-
       {/* Top Meta Row */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-2.5">
-          {/* Engineered System Indicator / Icon Box */}
-          <div
-            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border transition-[background-color,border-color,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] ${isHighlighted
-              ? 'border-white/[0.16] bg-white/[0.05] text-[var(--text-primary)]'
-              : 'border-white/[0.08] bg-white/[0.02] text-[var(--text-secondary)] group-hover:border-white/[0.15] group-hover:bg-white/[0.045] group-hover:text-[var(--text-primary)]'
-              }`}
-          >
+          {/* Icon Box */}
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-[#1e1738] border border-[#2e2354] text-[#a855f7] shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]">
             {typeof icon === 'function' ? icon(isHighlighted) : icon}
           </div>
-          <p className="text-[10px] font-mono tracking-widest font-semibold uppercase text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
+          <span className="text-[10.5px] font-mono font-bold tracking-[0.18em] text-[#766f98] uppercase">
             {label}
-          </p>
+          </span>
         </div>
-        <span className="font-mono text-[10px] font-medium text-[var(--text-muted)]/50 tracking-widest group-hover:text-[var(--text-muted)]/80 transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
+        <span className="font-mono text-[10.5px] font-medium text-[#463f63] tracking-wider">
           0{index}
         </span>
       </div>
 
-      {/* Content Area with Intentional Vertical Rhythm */}
-      <div className="flex-1 flex flex-col justify-start my-3.5">
-        <h4 className="text-[15px] sm:text-[16px] font-semibold text-[var(--text-heading)] font-heading tracking-tight leading-snug text-left group-hover:text-white transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
+      {/* Content Area */}
+      <div className="flex-1 flex flex-col justify-start my-1">
+        <h4 className="text-[15px] sm:text-[16px] font-bold text-white font-heading tracking-tight leading-snug text-left group-hover:text-purple-200 transition-colors duration-200">
           {title}
         </h4>
-        <p className="text-[13px] leading-[1.6] text-[var(--text-secondary)] font-normal text-left mt-1.5 max-w-[280px]">
+        <p className="text-[12px] sm:text-[12.5px] leading-[1.6] text-[#8e87ab] font-normal text-left mt-1.5 max-w-[280px]">
           {description}
         </p>
       </div>
 
-      {/* Footer / Action Baseline Lock */}
-      <div className="flex items-center justify-between border-t border-white/[0.06] pt-3.5 w-full mt-auto">
+      {/* Footer Divider & Action */}
+      <div className="flex items-center justify-between border-t border-[#1d1930] pt-3 w-full mt-auto">
         {renderFooter()}
       </div>
     </div>
   )
 })
+
+
 
 
 

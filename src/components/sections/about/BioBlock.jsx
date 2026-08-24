@@ -10,10 +10,10 @@ import {
 
 const FOCUS_AREAS = [
   {
-    title: 'Full-Stack',
-    description: 'End-to-end web apps — from React interfaces to Node.js APIs.',
+    title: 'Full-Stack Engineering',
+    description: 'End-to-end web applications with React, modern state management, and robust backend APIs.',
     icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
         <rect x="2" y="3" width="20" height="14" rx="2" />
         <path d="M8 21h8M12 17v4" />
       </svg>
@@ -21,108 +21,110 @@ const FOCUS_AREAS = [
   },
   {
     title: 'Distributed Systems',
-    description: 'Language-agnostic architectures built for scale and reliability.',
+    description: 'High-performance, language-agnostic architectures engineered for scale and uptime.',
     icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
         <circle cx="12" cy="12" r="3" />
         <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
       </svg>
     ),
   },
   {
-    title: 'Open Source',
-    description: 'Contributing to and maintaining systems used beyond the classroom.',
+    title: 'AI & Open Source',
+    description: 'Integrating AI capabilities and actively maintaining systems used by real audiences.',
     icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
         <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77 5.44 5.44 0 003.5 8.55c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" />
       </svg>
     ),
   },
 ]
 
-function splitBio(text) {
-  const trimmed = text.trim()
-  const firstBreak = trimmed.indexOf('. ')
-  if (firstBreak === -1) return [trimmed]
-  return [trimmed.slice(0, firstBreak + 1), trimmed.slice(firstBreak + 2)]
-}
-
 export default function BioBlock() {
-  const [lead, ...rest] = splitBio(personal.bio)
-  const body = rest.join(' ')
-
   return (
-    <motion.div variants={fadeLeft} className="relative space-y-12 lg:col-span-8">
-      <motion.div
-        variants={drawLineY}
-        className="hidden lg:block absolute -left-8 top-0 bottom-0 w-px origin-top bg-gradient-to-b from-transparent via-accent/40 to-transparent"
-        aria-hidden="true"
-      />
+    <motion.div variants={fadeLeft} className="relative space-y-8">
+      {/* Preserved Bio Paragraphs */}
+      <div className="space-y-4 max-w-2xl">
+        <p className="text-lg sm:text-xl leading-relaxed font-body text-white/90">
+          Building production web applications and AI-powered systems with a focus on reliable software architecture, performance, and thoughtful user experiences.
+        </p>
+        <p className="text-sm sm:text-base leading-relaxed font-body text-white/65">
+          Third-year Computer Science & Engineering student at BITS Pilani, specializing in full-stack web development, language-agnostic applications, and distributed architectures.
+        </p>
+      </div>
 
-      <motion.div variants={slideMaskUp} className="relative rounded-2xl border border-border/70 bg-surface/40 backdrop-blur-sm p-6 sm:p-8 lg:p-10 overflow-hidden">
-        <div
-          className="absolute top-0 right-0 w-48 h-48 opacity-[0.07] pointer-events-none"
-          style={{ background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)' }}
-          aria-hidden="true"
-        />
-
-        <motion.div
-          variants={drawLineY}
-          className="absolute left-0 top-8 bottom-8 w-[3px] origin-top rounded-full bg-gradient-to-b from-accent via-accent-hover to-transparent"
-          aria-hidden="true"
-        />
-
-        <div className="relative pl-5 sm:pl-6 space-y-6">
-          <p className="text-xl sm:text-2xl lg:text-[1.65rem] font-medium text-[var(--text-heading)] leading-snug tracking-tight">
-            {lead}
+      {/* Stats Grid (Reference Image Style) */}
+      <div className="pt-6 border-t border-white/10 grid grid-cols-3 gap-4 max-w-xl">
+        <div>
+          <p className="text-2xl sm:text-3xl font-bold font-heading text-white">300+</p>
+          <p className="text-[11px] sm:text-xs font-mono uppercase tracking-wider text-white/50 mt-1">
+            CAMPUS USERS
           </p>
-          {body && (
-            <p className="text-base sm:text-lg text-secondary/90 leading-[1.9] max-w-prose">
-              {body}
-            </p>
-          )}
         </div>
-      </motion.div>
+        <div className="border-l border-white/10 pl-4">
+          <p className="text-2xl sm:text-3xl font-bold font-heading text-white">Production</p>
+          <p className="text-[11px] sm:text-xs font-mono uppercase tracking-wider text-white/50 mt-1">
+            WEB SYSTEMS
+          </p>
+        </div>
+        <div className="border-l border-white/10 pl-4">
+          <p className="text-2xl sm:text-3xl font-bold font-heading text-white">{personal.cgpa} CGPA</p>
+          <p className="text-[11px] sm:text-xs font-mono uppercase tracking-wider text-white/50 mt-1">
+            CSE / BITS PILANI
+          </p>
+        </div>
+      </div>
 
-      <motion.div variants={fadeUpSoft} className="flex items-center gap-3 mb-6">
-        <div className="flex-1 max-w-[3rem] h-1 rounded-full bg-gradient-to-r from-accent/60 to-transparent" aria-hidden="true" />
-        <h3 className="font-mono text-xs font-semibold tracking-[0.2em] uppercase text-muted">
-          What I focus on
-        </h3>
-        <div className="flex-1 h-1 rounded-full bg-gradient-to-l from-border to-transparent" aria-hidden="true" />
-      </motion.div>
+      {/* Location / Campus Detail line */}
+      <p className="text-xs sm:text-sm font-body text-white/60">
+        <span className="font-semibold text-white/80">{personal.university}</span> · Computer Science & Engineering
+      </p>
 
-      <motion.ul variants={staggerFast} className="grid sm:grid-cols-3 gap-4">
+      {/* Status Badge & Action CTAs */}
+      <div className="pt-4 flex flex-wrap items-center justify-between gap-4 max-w-2xl">
+        <div className="flex items-center gap-2.5 text-xs sm:text-[13px] font-mono tracking-wider uppercase text-emerald-400">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
+          <span>OPEN TO SWE INTERNSHIPS</span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <a
+            href="#skills"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-accent-contrast font-mono text-xs font-semibold tracking-wider uppercase transition-all duration-300 hover:brightness-110 shadow-lg shadow-accent/20"
+          >
+            <span>EXPLORE THE STACK</span>
+            <span>→</span>
+          </a>
+          <a
+            href="#projects"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/80 hover:text-white font-mono text-xs font-medium tracking-wider uppercase transition-colors duration-300"
+          >
+            <span>VIEW PROJECTS</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Focus Areas Section */}
+      <div className="pt-8 border-t border-white/10">
+        <p className="font-mono text-xs uppercase tracking-widest text-accent font-semibold mb-4">
+          Focus Areas
+        </p>
+        <div className="grid sm:grid-cols-3 gap-3">
           {FOCUS_AREAS.map((area) => (
-            <motion.li
+            <div
               key={area.title}
-              variants={fadeUpSoft}
-              whileHover={{ y: -6, transition: { duration: 0.25, ease: [0.16, 1, 0.3, 1] } }}
-              className="group relative rounded-2xl p-[1px] overflow-hidden"
+              className="p-4 rounded-xl border border-white/10 bg-surface/30 backdrop-blur-sm flex flex-col gap-2 transition-all duration-300 hover:border-accent/40 hover:bg-surface/50"
             >
-              <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-hover), transparent)' }}
-                aria-hidden="true"
-              />
-              <div className="relative h-full rounded-2xl border border-border/60 bg-surface/50 backdrop-blur-md p-5 transition-all duration-300 group-hover:border-transparent group-hover:bg-surface/80 group-hover:shadow-xl group-hover:shadow-accent/5">
-                <motion.span
-                  className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-accent mb-4"
-                  style={{
-                    background: 'linear-gradient(145deg, var(--accent-dim), rgba(255,255,255,0.02))',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-                  }}
-                  whileHover={{ scale: 1.08, rotate: 3 }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-                >
-                  {area.icon}
-                </motion.span>
-                <p className="font-heading text-base font-semibold text-[var(--text-heading)] mb-2">{area.title}</p>
-                <p className="text-sm text-secondary/85 leading-relaxed">{area.description}</p>
-              </div>
-            </motion.li>
+              <div className="text-accent">{area.icon}</div>
+              <p className="font-heading text-sm font-semibold text-white">{area.title}</p>
+              <p className="text-xs text-white/60 leading-relaxed">{area.description}</p>
+            </div>
           ))}
-      </motion.ul>
+        </div>
+      </div>
     </motion.div>
   )
 }
