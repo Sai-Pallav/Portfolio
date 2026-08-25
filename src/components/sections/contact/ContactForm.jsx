@@ -389,6 +389,20 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     }
   }, [])
 
+  useEffect(() => {
+    const sectionEl = document.getElementById('contact')
+    if (!sectionEl) return
+
+    let validCount = 0
+    if (formData.name && formData.name.trim().length >= 2) validCount++
+    if (formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) validCount++
+    if (formData.subject && formData.subject.trim().length >= 3) validCount++
+    if (formData.message && formData.message.trim().length >= 10) validCount++
+
+    const progress = (validCount / 4) * 100
+    sectionEl.dispatchEvent(new CustomEvent('contact-progress', { detail: { progress } }))
+  }, [formData])
+
   const [isTyping, setIsTyping] = useState(false)
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState({ type: '', message: '' })
