@@ -1,6 +1,105 @@
 import React, { useRef, useState, useEffect, useMemo, memo, useCallback } from 'react'
 import { useReducedMotion } from 'framer-motion'
 
+const AnimatedPulseItem = ({ active, item, reverse = false }) => {
+  const [renderActive, setRenderActive] = useState(active);
+  const startTimeRef = useRef(0);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  useEffect(() => {
+    if (active) {
+      setRenderActive(true);
+    }
+  }, [active]);
+
+  useEffect(() => {
+    if (!active && renderActive) {
+      if (!hasStarted) {
+        setRenderActive(false);
+        return;
+      }
+      const now = Date.now();
+      const elapsed = now - startTimeRef.current;
+      const cycleDuration = 1800; // 1.8s
+      const currentCycleTime = elapsed % cycleDuration;
+      
+      let timeUntilSafeToUnmount = 0;
+      if (currentCycleTime < (cycleDuration - 50)) {
+        timeUntilSafeToUnmount = (cycleDuration - 50) - currentCycleTime;
+      }
+      
+      const timer = setTimeout(() => {
+        setRenderActive(false);
+        setHasStarted(false);
+      }, timeUntilSafeToUnmount);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [active, renderActive, hasStarted]);
+
+  const handleStart = () => {
+    startTimeRef.current = Date.now();
+    setHasStarted(true);
+  };
+
+  if (!renderActive) return null;
+
+  const animationStr = `${reverse ? 'pcbRightLinePulseReverse' : 'pcbLeftLinePulse'} 1.8s linear infinite`;
+  const pathD = item.rawD || item.d;
+
+  return (
+    <g onAnimationStart={handleStart}>
+      {/* Layer 1: Ambient Outer Glow Line Pulse */}
+      <path
+        d={pathD}
+        pathLength="100"
+        stroke="var(--accent)"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="0.35"
+        strokeDasharray="15 100"
+        style={{
+          animation: animationStr,
+          animationDelay: item.delay
+        }}
+      />
+      {/* Layer 2: Mid Laser Line Pulse */}
+      <path
+        d={pathD}
+        pathLength="100"
+        stroke="var(--accent)"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="0.85"
+        strokeDasharray="15 100"
+        style={{
+          animation: animationStr,
+          animationDelay: item.delay
+        }}
+      />
+      {/* Layer 3: Hot Laser Core Line Pulse */}
+      <path
+        d={pathD}
+        pathLength="100"
+        stroke="#ffffff"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        strokeDasharray="15 100"
+        style={{
+          animation: animationStr,
+          animationDelay: item.delay
+        }}
+      />
+    </g>
+  );
+};
+
 const drawPCBPath = (x1, y1, x2, y2, bendPositions, style = 1) => {
   const dx = Math.abs(x2 - x1);
   const dy = y2 - y1;
@@ -265,7 +364,11 @@ const generateLeftBusPaths = (x1, y1, x2, y2, category, components) => {
     }
   }
   const rawSegments = drawPCBPath(x1, y1, x2, y2, bendPositions, style);
-  return applyClearance(rawSegments, components);
+  const rawD = rawSegments.map((seg, idx) => {
+    const prefix = idx === 0 ? `M ${seg.x1},${seg.y1}` : '';
+    return `${prefix} L ${seg.x2},${seg.y2}`;
+  }).join(' ');
+  return { d: applyClearance(rawSegments, components), rawD };
 };
 
 const generateRightBusPaths = (x1, y1, x2, y2, category, components) => {
@@ -289,7 +392,11 @@ const generateRightBusPaths = (x1, y1, x2, y2, category, components) => {
     }
   }
   const rawSegments = drawPCBPath(x1, y1, x2, y2, bendPositions, style);
-  return applyClearance(rawSegments, components);
+  const rawD = rawSegments.map((seg, idx) => {
+    const prefix = idx === 0 ? `M ${seg.x1},${seg.y1}` : '';
+    return `${prefix} L ${seg.x2},${seg.y2}`;
+  }).join(' ');
+  return { d: applyClearance(rawSegments, components), rawD };
 };
 
 // Enhanced trace width hierarchy: main traces at 2.2px, all non-main traces at 0.65px
@@ -311,9 +418,7 @@ const getCorridorWidth = (traceWidth, layer) => {
 export default memo(function RightPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, isMiddleActive = true, isRightActive = true }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
-  const particlesContainerRef = useRef(null)
-  const particlePoolRef = useRef([])
-  const poolIndexRef = useRef(0)
+
   const [isTypingActive, setIsTypingActive] = useState(false)
   const isTyping = isTypingActive
   const activationLevel = isTyping ? 3 : 0
@@ -351,10 +456,8 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
   const lastLayoutRef = useRef({ G: 0, H: 0, M_form: 0, L_globe: 0, R_globe: 0, globeCenterX: 0, globeCenterY: 0 })
 
-  // Layout calculations (throttled using requestAnimationFrame)
   useEffect(() => {
     if (!isInView) return
-    let ticking = false
     const update = () => {
       const gridEl = containerRef.current
       const formEl = formRef?.current
@@ -362,22 +465,22 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
       if (gridEl) {
         const rectGrid = gridEl.getBoundingClientRect()
-        const G_val = rectGrid.width
-        const H_val = rectGrid.height || 600
+        const G_val = Math.round(rectGrid.width)
+        const H_val = Math.round(rectGrid.height || 600)
 
-        let formRight = G_val * 0.42
+        let formRight = Math.round(G_val * 0.42)
         if (formEl) {
           const rectForm = formEl.getBoundingClientRect()
-          formRight = rectForm.right - rectGrid.left
+          formRight = Math.round(rectForm.right - rectGrid.left)
         }
 
-        let sphereLeft = G_val * 0.5
-        let sphereRight = G_val * 0.9
+        let sphereLeft = Math.round(G_val * 0.5)
+        let sphereRight = Math.round(G_val * 0.9)
         if (globeEl) {
           const rectGlobe = globeEl.getBoundingClientRect()
           const sphereWidth = Math.min(460, rectGlobe.width)
-          sphereLeft = rectGlobe.left - rectGrid.left + (rectGlobe.width - sphereWidth) / 2
-          sphereRight = rectGlobe.right - rectGrid.left - (rectGlobe.width - sphereWidth) / 2
+          sphereLeft = Math.round(rectGlobe.left - rectGrid.left + (rectGlobe.width - sphereWidth) / 2)
+          sphereRight = Math.round(rectGlobe.right - rectGrid.left - (rectGlobe.width - sphereWidth) / 2)
         }
 
         const FORM_PCB_GAP = 28
@@ -385,69 +488,49 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         const middleStart = Math.min(formRight + FORM_PCB_GAP, sphereLeft + GLOBE_PCB_OVERLAP)
         const middleEnd = Math.max(sphereLeft + GLOBE_PCB_OVERLAP, middleStart + 20)
 
-        let gx = G_val * 0.8
-        let gy = H_val * 0.5
+        let gx = Math.round(G_val * 0.8)
+        let gy = Math.round(H_val * 0.5)
         if (globeEl) {
           const rectGlobe = globeEl.getBoundingClientRect()
-          gx = rectGlobe.left - rectGrid.left + rectGlobe.width / 2
-          gy = rectGlobe.top - rectGrid.top + rectGlobe.height / 2
+          gx = Math.round(rectGlobe.left - rectGrid.left + rectGlobe.width / 2)
+          gy = Math.round(rectGlobe.top - rectGrid.top + rectGlobe.height / 2)
         }
 
-        const rGlobeVal = sphereRight - GLOBE_PCB_OVERLAP
-        const threshold = 1.0
-        const diffG = Math.abs(G_val - lastLayoutRef.current.G)
-        const diffH = Math.abs(H_val - lastLayoutRef.current.H)
-        const diffM = Math.abs(middleStart - lastLayoutRef.current.M_form)
-        const diffL = Math.abs(middleEnd - lastLayoutRef.current.L_globe)
-        const diffR = Math.abs(rGlobeVal - lastLayoutRef.current.R_globe)
-        const diffGX = Math.abs(gx - lastLayoutRef.current.globeCenterX)
-        const diffGY = Math.abs(gy - lastLayoutRef.current.globeCenterY)
-
-        if (diffG > threshold || diffH > threshold || diffM > threshold || diffL > threshold || diffR > threshold || diffGX > threshold || diffGY > threshold) {
-          lastLayoutRef.current = { G: G_val, H: H_val, M_form: middleStart, L_globe: middleEnd, R_globe: rGlobeVal, globeCenterX: gx, globeCenterY: gy }
-          setLayout({
-            G: G_val,
-            H: H_val,
-            M_form: middleStart,
-            L_globe: middleEnd,
-            R_globe: rGlobeVal,
-            globeCenterX: gx,
-            globeCenterY: gy
-          })
+        const rGlobeVal = Math.round(sphereRight - GLOBE_PCB_OVERLAP)
+        if (
+          lastLayoutRef.current.G > 0 &&
+          Math.abs(G_val - lastLayoutRef.current.G) < 2 &&
+          Math.abs(H_val - lastLayoutRef.current.H) < 2
+        ) {
+          return
         }
+
+        lastLayoutRef.current = { G: G_val, H: H_val, M_form: middleStart, L_globe: middleEnd, R_globe: rGlobeVal, globeCenterX: gx, globeCenterY: gy }
+        setLayout({
+          G: G_val,
+          H: H_val,
+          M_form: middleStart,
+          L_globe: middleEnd,
+          R_globe: rGlobeVal,
+          globeCenterX: gx,
+          globeCenterY: gy
+        })
       }
     }
 
-    const throttledUpdate = () => {
-      if (ticking) return
-      ticking = true
-      window.requestAnimationFrame(() => {
-        update()
-        ticking = false
-      })
-    }
-
-    const gridEl = containerRef.current
-    const formEl = formRef?.current
-    const globeEl = globeRef?.current
-
+    // Initial measurement
     update()
-
-    const resizeObserver = new ResizeObserver(() => throttledUpdate())
-    if (gridEl) resizeObserver.observe(gridEl)
-    if (formEl) resizeObserver.observe(formEl)
-    if (globeEl) resizeObserver.observe(globeEl)
-
-    window.addEventListener('resize', throttledUpdate, { passive: true })
+    // Only recalculate on actual window resize — NOT on form content changes
+    window.addEventListener('resize', update, { passive: true })
 
     return () => {
-      resizeObserver.disconnect()
-      window.removeEventListener('resize', throttledUpdate)
+      window.removeEventListener('resize', update)
     }
   }, [formRef, globeRef, isInView])
 
   const { G, H, M_form, L_globe, R_globe } = layout
-  const Y_center = H / 2
+  const H_ref = H || 600
+  const Y_center = H_ref / 2
   const endX = G - 15
   const isTransmit = contactSystemState === 'transmit'
   const isTransmitOrFailed = isTransmit || transmissionFailed
@@ -714,11 +797,12 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
   const pcbTracesData = useMemo(() => {
     const middleTracesList = [];
     const addMiddleTrace = (chKey, y1, y2, category, extra = {}) => {
-      const d = generateLeftBusPaths(midStart, y1, middleTargetLimit, y2, category, clearanceComponents);
+      const paths = generateLeftBusPaths(midStart, y1, middleTargetLimit, y2, category, clearanceComponents);
       const bends = getPCBPathBends(midStart, y1, middleTargetLimit, y2, category, false);
       middleTracesList.push({
         chKey,
-        d,
+        d: paths.d,
+        rawD: paths.rawD,
         category,
         bends,
         ...extra
@@ -747,10 +831,11 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
     const rightTracesList = [];
     const addRightTrace = (y1, y2, category, extra = {}) => {
-      const d = generateRightBusPaths(rightTargetLimit, y1, endX, y2, category, clearanceComponents);
+      const paths = generateRightBusPaths(rightTargetLimit, y1, endX, y2, category, clearanceComponents);
       const bends = getPCBPathBends(rightTargetLimit, y1, endX, y2, category, true);
       rightTracesList.push({
-        d,
+        d: paths.d,
+        rawD: paths.rawD,
         category,
         bends,
         ...extra
@@ -805,14 +890,14 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
       const mainTrace = pcbData.middleTraces.find(t => t.chKey === chKey && t.main)
       if (!mainTrace) return null
 
-      // Group 1 delay: 0s, Group 2 delay: 0.6s
-      const delay = group === 1 ? '0s' : '0.6s'
+      // Remove 0.6s delay to prevent late-spawning pulses after typing stops
+      const delay = '0s'
 
       return {
         chKey,
         index,
         group,
-        d: mainTrace.d,
+        d: mainTrace.rawD || mainTrace.d,
         delay
       }
     }).filter(Boolean)
@@ -837,11 +922,11 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     ]
 
     return mappings.map(({ trace, id, group }) => {
-      const delay = group === 1 ? '0s' : '0.6s'
+      const delay = '0s'
       return {
         id,
         group,
-        d: trace.d,
+        d: trace.rawD || trace.d,
         delay
       }
     })
@@ -872,106 +957,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     }[elementType] || 0.85) * illumFactor
   }, [transmissionFailed, isTransmit, isMiddleActive, isRightActive])
 
-  useEffect(() => {
-    if (!isInView || shouldReduceMotion) return
 
-    const container = particlesContainerRef.current
-    if (!container) return
-
-    // Populate particle pool references
-    particlePoolRef.current = Array.from(container.children)
-
-    let intervalId = null
-
-    const spawnParticle = (trace, isBurst = false, delayMs = 0, isRightTrace = false) => {
-      const delayTimer = setTimeout(() => {
-        if (!particlePoolRef.current || particlePoolRef.current.length === 0) return
-
-        const circle = particlePoolRef.current[poolIndexRef.current]
-        poolIndexRef.current = (poolIndexRef.current + 1) % particlePoolRef.current.length
-
-        if (circle._cleanupTimer) {
-          clearTimeout(circle._cleanupTimer)
-          circle._cleanupTimer = null
-        }
-
-        const r = isBurst ? '2.0' : '1.6'
-        circle.setAttribute('r', r)
-
-        const colors = ['var(--accent)', 'var(--accent-secondary)', '#ffffff']
-        const randomColor = isBurst
-          ? colors[Math.floor(Math.random() * colors.length)]
-          : 'var(--accent)'
-        circle.setAttribute('fill', randomColor)
-
-        circle.setAttribute('filter', isBurst ? 'url(#pcbGlowActive)' : 'url(#pcbHairlineGlow)')
-        circle.style.offsetPath = `path('${trace.d}')`
-
-        const duration = isBurst ? '0.7s' : (isRightTrace ? '2.8s' : '1.2s')
-
-        circle.style.animation = `pcbParticleTravel ${duration} linear forwards`
-        circle.style.display = 'block'
-
-        const cleanupTimer = setTimeout(() => {
-          circle.style.display = 'none'
-          circle.style.animation = 'none'
-        }, isBurst ? 700 : (isRightTrace ? 2800 : 1200))
-
-        circle._cleanupTimer = cleanupTimer
-      }, delayMs)
-
-      return delayTimer
-    }
-
-    const timers = []
-
-    if (activationLevel >= 1) {
-      const runSpawn = () => {
-        pcbData.middleTraces.forEach((t) => {
-          if (t.main) {
-            timers.push(spawnParticle(t, false, Math.random() * 150, false))
-          }
-        })
-      }
-      runSpawn()
-      intervalId = setInterval(runSpawn, 450)
-    }
-
-    const isTransmit = contactSystemState === 'transmit'
-
-    if (isTransmit) {
-      // Middle traces burst (inputs to globe)
-      pcbData.middleTraces.forEach((t) => {
-        if (t.main) {
-          timers.push(spawnParticle(t, true, 0, false))
-          timers.push(spawnParticle(t, true, 120, false))
-          timers.push(spawnParticle(t, true, 240, false))
-          timers.push(spawnParticle(t, true, 360, false))
-        }
-      })
-      // Right traces burst (exiting globe)
-      pcbData.rightTraces.forEach((t) => {
-        if (t.main) {
-          timers.push(spawnParticle(t, true, 200, true))
-          timers.push(spawnParticle(t, true, 320, true))
-          timers.push(spawnParticle(t, true, 440, true))
-          timers.push(spawnParticle(t, true, 560, true))
-        }
-      })
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId)
-      timers.forEach((t) => clearTimeout(t))
-      if (particlePoolRef.current) {
-        particlePoolRef.current.forEach((circle) => {
-          if (circle._cleanupTimer) clearTimeout(circle._cleanupTimer)
-          circle.style.display = 'none'
-          circle.style.animation = 'none'
-        })
-      }
-    }
-  }, [contactSystemState, activationLevel, pcbData, shouldReduceMotion, isInView])
 
   // SMT Package Renderer (High-Fidelity component rendering with solder joints, body texture, and silkscreen labels)
   const renderSMT = (x, y, w, h, label, chKey = null, isCap = false) => {
@@ -1476,16 +1462,16 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
 
   const pcbContainerStyle = useMemo(() => {
     if (contactSystemState !== 'dormant') return {}
-    if (!isMiddleActive) {
+    if (isMiddleActive) {
       return {
-        opacity: 0.65,
-        filter: 'brightness(0.85) saturate(0.4)',
+        opacity: 1,
+        filter: 'brightness(1.0) saturate(1.0)',
         transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1), filter 500ms cubic-bezier(0.25, 1, 0.5, 1)'
       }
     }
     return {
-      opacity: 0.95,
-      filter: 'brightness(1.0) saturate(1.0)',
+      opacity: 0.65,
+      filter: 'brightness(0.85) saturate(0.4)',
       transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1), filter 500ms cubic-bezier(0.25, 1, 0.5, 1)'
     }
   }, [contactSystemState, isMiddleActive])
@@ -1759,19 +1745,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         {/* Memoized trace corridors to prevent layout recalculations when typing */}
         {traceCorridors}
 
-        {/* Dynamic Particles Container */}
-        <g ref={particlesContainerRef}>
-          {Array.from({ length: 35 }).map((_, i) => (
-            <circle
-              key={`p-pool-r-${i}`}
-              cx="0"
-              cy="0"
-              r="1.6"
-              fill="var(--accent)"
-              style={{ display: 'none', pointerEvents: 'none' }}
-            />
-          ))}
-        </g>
+
 
         {/* Trailing Lines for Traveling Hero Channels */}
         {isTransmitOrFailed && ['name', 'email', 'subject', 'message'].map((chKey, chIdx) => (
@@ -1792,57 +1766,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
           />
         ))}
 
-        {/* ========================================================
-            MIDDLE PCB GROUP PULSE ANIMATIONS
-           ======================================================== */}
-        {!shouldReduceMotion && isInView && !isTransmit && isFormInteracting && isMiddleActive && (
-          <g className="middle-pcb-group-pulses" style={{ pointerEvents: 'none' }}>
-            {middlePulseElements.map((item) => (
-              <g
-                key={`middle-pulse-${item.chKey}`}
-                style={{
-                  offsetPath: `path('${item.d}')`,
-                  animation: 'pcbMiddleGroupPulse 2.4s linear infinite',
-                  animationDelay: item.delay,
-                  willChange: 'transform, opacity'
-                }}
-              >
-                {/* Glow aura */}
-                <circle cx="0" cy="0" r="4.5" fill="var(--accent)" opacity="0.65" filter="url(#pcbGlowActive)" />
-                {/* Main pulse head */}
-                <circle cx="0" cy="0" r="2.4" fill="#ffffff" stroke="var(--accent)" strokeWidth="0.8" />
-                {/* Core dot */}
-                <circle cx="0" cy="0" r="1.1" fill="var(--accent)" />
-              </g>
-            ))}
-          </g>
-        )}
 
-        {/* ========================================================
-            RIGHT PCB GROUP PULSE ANIMATIONS
-           ======================================================== */}
-        {!shouldReduceMotion && isInView && !isTransmit && isFormInteracting && isRightActive && (
-          <g className="right-pcb-group-pulses" style={{ pointerEvents: 'none' }}>
-            {rightPulseElements.map((item) => (
-              <g
-                key={`right-pulse-${item.id}`}
-                style={{
-                  offsetPath: `path('${item.d}')`,
-                  animation: 'pcbRightGroupPulseReverse 2.4s linear infinite',
-                  animationDelay: item.delay,
-                  willChange: 'transform, opacity'
-                }}
-              >
-                {/* Glow aura */}
-                <circle cx="0" cy="0" r="4.5" fill="var(--accent)" opacity="0.65" filter="url(#pcbGlowActive)" />
-                {/* Main pulse head */}
-                <circle cx="0" cy="0" r="2.4" fill="#ffffff" stroke="var(--accent)" strokeWidth="0.8" />
-                {/* Core dot */}
-                <circle cx="0" cy="0" r="1.1" fill="var(--accent)" />
-              </g>
-            ))}
-          </g>
-        )}
 
         {/* ========================================================
             HERO TRANSMISSION CHANNELS
@@ -1948,12 +1872,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                         const nodeRadius = isMainBend ? 1.5 : 1.1;
                         const ringRadius = isMainBend ? 1.0 : 0.75;
                         const coreRadius = isMainBend ? 0.35 : 0.25;
-                        const usePulse = isMainBend && bIdx === 0 && !isTransmit;
-                        const pulseStyle = usePulse ? {
-                          animation: 'pcbIdleNodePulse 4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-                          animationPlayState: activationLevel >= 2 ? 'running' : 'paused',
-                          animationDelay: `${(idx * 2.5 + bIdx * 0.8) * 0.4}s`
-                        } : {};
+                        const pulseStyle = {};
                         return (
                           <g
                             key={`m-bend-${idx}-${bIdx}`}
@@ -2021,6 +1940,20 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             </g>
           )
         })}
+
+        {/* ========================================================
+            MIDDLE & RIGHT PCB CONTINUOUS LINE PULSES (ACTIVE ON TYPING)
+           ======================================================== */}
+        <g className="middle-pcb-light-beams" style={{ pointerEvents: 'none' }}>
+          {pcbData.middleTraces.filter(t => t.category === 'main').map((trace, idx) => (
+            <AnimatedPulseItem key={`middle-pulse-${idx}`} active={isTyping} item={trace} reverse={false} />
+          ))}
+        </g>
+        <g className="right-pcb-light-beams" style={{ pointerEvents: 'none' }}>
+          {pcbData.rightTraces.filter(t => t.category === 'main').map((trace, idx) => (
+            <AnimatedPulseItem key={`right-pulse-${idx}`} active={isTyping} item={trace} reverse={true} />
+          ))}
+        </g>
 
         {/* ========================================================
             AMBIENT COMPONENTS & TRACES (FADE OUT DURING TRANSMIT)
@@ -2121,12 +2054,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
                   const nodeRadius = isMainBend ? 1.5 : 1.1;
                   const ringRadius = isMainBend ? 1.0 : 0.75;
                   const coreRadius = isMainBend ? 0.35 : 0.25;
-                  const usePulse = isMainBend && bIdx === 0 && !isTransmit;
-                  const pulseStyle = usePulse ? {
-                    animation: 'pcbIdleNodePulse 4s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-                    animationPlayState: activationLevel >= 3 ? 'running' : 'paused',
-                    animationDelay: `${(idx * 2.5 + bIdx * 0.8 + 12) * 0.4}s`
-                  } : {};
+                  const pulseStyle = {};
                   return (
                     <g
                       key={`r-bend-${idx}-${bIdx}`}

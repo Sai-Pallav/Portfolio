@@ -35,11 +35,14 @@ const ControlInput = memo(function ControlInput({ id, label, type, value, onChan
 
   return (
     <div className="relative w-full group">
-      {/* Icon */}
-      <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 ${
-        focused ? 'text-[#a78bfa]' : hasValue ? 'text-[#a78bfa]/80' : 'text-[#6b647e] group-hover:text-[#8b83a0]'
-      }`}>
-        {Icon && <Icon className="h-4 w-4" strokeWidth={1.5} />}
+      {/* Icon — pinned at bottom-half of the 48px input so it aligns with the text cursor when focused */}
+      <div
+        className={`absolute left-3.5 pointer-events-none transition-colors duration-150 z-10 ${
+          focused ? 'text-[#a78bfa]' : hasValue ? 'text-[#a78bfa]/80' : 'text-[#6b647e] group-hover:text-[#8b83a0]'
+        }`}
+        style={{ top: '50%', transform: 'translateY(-50%)' }}
+      >
+        {Icon && <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />}
       </div>
 
       <input
@@ -58,9 +61,7 @@ const ControlInput = memo(function ControlInput({ id, label, type, value, onChan
         }}
         placeholder=" "
         aria-required={isRequired ? "true" : "false"}
-        className={`peer w-full h-[48px] rounded-[12px] border pl-10 pr-3.5 ${
-          focused || hasValue ? 'pt-3.5 pb-1' : 'py-2.5'
-        } text-xs sm:text-[13px] text-white font-medium placeholder-transparent outline-none transition-all duration-150 bg-[#0c0a18] ${
+        className={`peer w-full h-[48px] rounded-[12px] border pl-10 pr-3.5 text-xs sm:text-[13px] text-white font-medium placeholder-transparent outline-none transition-all duration-150 bg-[#0c0a18] ${
           touched && error
             ? 'border-red-500/50 focus:border-red-500/80 focus:shadow-[0_0_8px_rgba(239,68,68,0.12)]'
             : focused
@@ -75,9 +76,10 @@ const ControlInput = memo(function ControlInput({ id, label, type, value, onChan
         htmlFor={id}
         className={`absolute transition-all duration-150 pointer-events-none select-none flex items-center ease-out ${
           focused || hasValue
-            ? 'top-0 -translate-y-1/2 left-8 text-[9px] font-mono tracking-[0.1em] font-semibold text-[#a78bfa] uppercase bg-[#0c0a18] px-1 rounded-[2px]'
-            : 'top-1/2 -translate-y-1/2 left-10 text-xs sm:text-[13px] font-medium text-[#8b859e] group-hover:text-[#a29bbb]'
+            ? 'top-0 -translate-y-1/2 left-8 text-[9px] font-mono tracking-[0.1em] font-semibold text-[#a78bfa] uppercase px-1.5 rounded-[2px] z-10'
+            : 'top-0 h-full left-10 text-xs sm:text-[13px] font-medium text-[#8b859e] group-hover:text-[#a29bbb]'
         }`}
+        style={focused || hasValue ? { backgroundColor: focused ? '#0e0c1b' : '#0c0a18' } : {}}
       >
         <span>{focused || hasValue ? displayLabel : label}</span>
         {(focused || hasValue) && isRequired && <span className="text-[#a78bfa]/60 text-[9px] ml-0.5 font-normal">*</span>}
@@ -117,10 +119,14 @@ const ControlTextarea = memo(function ControlTextarea({ id, label, value, onChan
 
   return (
     <div className="relative w-full group">
-      <div className={`absolute left-3.5 top-3.5 pointer-events-none transition-colors duration-150 z-10 ${
-        focused ? 'text-[#a78bfa]' : hasValue ? 'text-[#a78bfa]/80' : 'text-[#6b647e] group-hover:text-[#8b83a0]'
-      }`}>
-        {Icon && <Icon className="h-4 w-4" strokeWidth={1.5} />}
+      {/* Icon pinned at pt-3.5 to align with first line of text */}
+      <div
+        className={`absolute left-3.5 pointer-events-none transition-colors duration-150 z-10 flex items-center ${
+          focused ? 'text-[#a78bfa]' : hasValue ? 'text-[#a78bfa]/80' : 'text-[#6b647e] group-hover:text-[#8b83a0]'
+        }`}
+        style={{ top: '14px' }}
+      >
+        {Icon && <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />}
       </div>
 
       <textarea
@@ -139,9 +145,7 @@ const ControlTextarea = memo(function ControlTextarea({ id, label, value, onChan
         placeholder=" "
         rows={rows}
         aria-required={isRequired ? "true" : "false"}
-        className={`peer w-full rounded-[12px] border pl-10 pr-3.5 ${
-          focused || hasValue ? 'pt-4.5 pb-6' : 'pt-3 pb-6'
-        } text-xs sm:text-[13px] text-white font-medium placeholder-transparent outline-none transition-all duration-150 resize-none bg-[#0c0a18] ${
+        className={`peer w-full rounded-[12px] border pl-10 pr-3.5 pt-3.5 pb-6 text-xs sm:text-[13px] text-white font-medium placeholder-transparent outline-none transition-all duration-150 resize-none bg-[#0c0a18] ${
           touched && error
             ? 'border-red-500/50 focus:border-red-500/80 focus:shadow-[0_0_8px_rgba(239,68,68,0.12)]'
             : focused
@@ -156,9 +160,12 @@ const ControlTextarea = memo(function ControlTextarea({ id, label, value, onChan
         htmlFor={id}
         className={`absolute transition-all duration-150 pointer-events-none select-none flex items-center ease-out ${
           focused || hasValue
-            ? 'top-0 -translate-y-1/2 left-8 text-[9px] font-mono tracking-[0.1em] font-semibold text-[#a78bfa] uppercase bg-[#0c0a18] px-1 rounded-[2px]'
-            : 'top-3 left-10 text-xs sm:text-[13px] font-medium text-[#8b859e] group-hover:text-[#a29bbb]'
+            ? 'top-0 -translate-y-1/2 left-8 text-[9px] font-mono tracking-[0.1em] font-semibold text-[#a78bfa] uppercase px-1.5 rounded-[2px] z-10'
+            : 'left-10 text-xs sm:text-[13px] font-medium text-[#8b859e] group-hover:text-[#a29bbb]'
         }`}
+        style={{
+          ...(focused || hasValue ? { backgroundColor: focused ? '#0e0c1b' : '#0c0a18' } : { top: '14px' })
+        }}
       >
         <span>{focused || hasValue ? displayLabel : label}</span>
         {(focused || hasValue) && isRequired && <span className="text-[#a78bfa]/60 text-[9px] ml-0.5 font-normal">*</span>}
@@ -225,35 +232,25 @@ function validateField(name, value) {
   return err
 }
 
-/* Subdued Animated Status Indicator Dots */
+/* Continuous Smooth Animated Status Indicator Dots */
 const StatusDots = memo(function StatusDots({ isFormActive = true, subState = 'idle', isTyping = false }) {
   const isSubmitting = subState === 'submitting'
+  const isActive = isSubmitting || isTyping
 
   return (
-    <div className="absolute top-6 right-6 flex gap-1.5 items-center z-20 pointer-events-none">
+    <div className="absolute top-6 right-6 flex gap-2 items-center z-20 pointer-events-none">
       {[0, 1, 2].map((idx) => {
-        const isLast = idx === 2
-        const delay = idx * 0.25
-        const fastDelay = idx * 0.15
+        const delayClass = idx === 1 ? 'status-dot-delay-1' : idx === 2 ? 'status-dot-delay-2' : ''
         return (
           <span
             key={idx}
-            className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-              isSubmitting
-                ? 'bg-[#a78bfa] shadow-[0_0_8px_rgba(167,139,250,0.8)]'
-                : isTyping
-                ? isLast
-                  ? 'bg-[#a78bfa] shadow-[0_0_6px_rgba(167,139,250,0.6)]'
-                  : 'bg-[#7c66c1]'
-                : 'bg-[#2b2447]'
+            className={`w-2 h-2 rounded-full border transition-colors duration-300 ease-out ${
+              isActive ? `status-dot-anim ${delayClass}` : ''
+            } ${
+              isActive
+                ? 'bg-[#a78bfa] border-[#c4b5fd] shadow-[0_0_5px_rgba(167,139,250,0.5)]'
+                : 'bg-[#141022] border-[#2d2547] opacity-40'
             }`}
-            style={{
-              animation: isSubmitting
-                ? `statusDotPulse 0.8s ease-in-out infinite ${fastDelay}s`
-                : isTyping
-                ? `statusDotPulse 1.2s ease-in-out infinite ${delay}s`
-                : 'none'
-            }}
           />
         )
       })}
@@ -418,7 +415,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     typingTimerRef.current = setTimeout(() => {
       setIsTyping(false)
       if (onTypingChange) onTypingChange(false)
-    }, 2500)
+    }, 1000)
 
     setErrors(prev => {
       if (prev[name]) {
@@ -433,16 +430,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
 
   const handleFocus = useCallback(() => {
     resetErrorState()
-    setIsTyping(true)
-    if (onTypingChange) {
-      onTypingChange(true)
-    }
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
-    typingTimerRef.current = setTimeout(() => {
-      setIsTyping(false)
-      if (onTypingChange) onTypingChange(false)
-    }, 2500)
-  }, [resetErrorState, onTypingChange])
+  }, [resetErrorState])
 
   const handleBlur = useCallback((e) => {
     const { name, value } = e.target
@@ -697,7 +685,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   exit={{ opacity: 0, y: -2 }}
                   className="flex items-center gap-2 text-white relative z-10"
                 >
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+                  <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" strokeWidth={2} />
                   <span>Sending...</span>
                 </motion.span>
               )}

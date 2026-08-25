@@ -9,6 +9,105 @@ const getTraceStyleAttrs = (category) => {
   }
 };
 
+const AnimatedPulseItem = ({ active, item, reverse = false }) => {
+  const [renderActive, setRenderActive] = useState(active);
+  const startTimeRef = useRef(0);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  useEffect(() => {
+    if (active) {
+      setRenderActive(true);
+    }
+  }, [active]);
+
+  useEffect(() => {
+    if (!active && renderActive) {
+      if (!hasStarted) {
+        setRenderActive(false);
+        return;
+      }
+      const now = Date.now();
+      const elapsed = now - startTimeRef.current;
+      const cycleDuration = 1800; // 1.8s
+      const currentCycleTime = elapsed % cycleDuration;
+      
+      let timeUntilSafeToUnmount = 0;
+      if (currentCycleTime < (cycleDuration - 50)) {
+        timeUntilSafeToUnmount = (cycleDuration - 50) - currentCycleTime;
+      }
+      
+      const timer = setTimeout(() => {
+        setRenderActive(false);
+        setHasStarted(false);
+      }, timeUntilSafeToUnmount);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [active, renderActive, hasStarted]);
+
+  const handleStart = () => {
+    startTimeRef.current = Date.now();
+    setHasStarted(true);
+  };
+
+  if (!renderActive) return null;
+
+  const animationStr = `${reverse ? 'pcbRightLinePulseReverse' : 'pcbLeftLinePulse'} 1.8s linear infinite`;
+  const pathD = item.rawD || item.d;
+
+  return (
+    <g onAnimationStart={handleStart}>
+      {/* Layer 1: Ambient Outer Glow Line Pulse */}
+      <path
+        d={pathD}
+        pathLength="100"
+        stroke="var(--accent)"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="0.35"
+        strokeDasharray="15 100"
+        style={{
+          animation: animationStr,
+          animationDelay: '0s'
+        }}
+      />
+      {/* Layer 2: Mid Laser Line Pulse */}
+      <path
+        d={pathD}
+        pathLength="100"
+        stroke="var(--accent)"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="0.85"
+        strokeDasharray="15 100"
+        style={{
+          animation: animationStr,
+          animationDelay: '0s'
+        }}
+      />
+      {/* Layer 3: Hot Laser Core Line Pulse */}
+      <path
+        d={pathD}
+        pathLength="100"
+        stroke="#ffffff"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        strokeDasharray="15 100"
+        style={{
+          animation: animationStr,
+          animationDelay: '0s'
+        }}
+      />
+    </g>
+  );
+};
+
 const drawLeftPCBPath = (x1, y1, x2, y2, category) => {
   const dx = Math.abs(x2 - x1);
   const dy = y2 - y1;
@@ -61,9 +160,7 @@ const drawLeftPCBPath = (x1, y1, x2, y2, category) => {
 export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, beamActive }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
-  const particlesContainerRef = useRef(null)
-  const particlePoolRef = useRef([])
-  const poolIndexRef = useRef(0)
+
   const [isTypingActive, setIsTypingActive] = useState(false)
   const isTyping = isTypingActive
   const activationLevel = isTyping ? 3 : 0
@@ -113,7 +210,6 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
 
   useEffect(() => {
-    let ticking = false
     const update = () => {
       const gridEl = containerRef.current
       const formEl = formRef?.current
@@ -121,30 +217,30 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
       if (gridEl) {
         const rectGrid = gridEl.getBoundingClientRect()
-        const G_val = rectGrid.width
-        const H_val = rectGrid.height || 600
+        const G_val = Math.round(rectGrid.width)
+        const H_val = Math.round(rectGrid.height || 600)
 
-        let L_form_val = G_val * 0.5
+        let L_form_val = Math.round(G_val * 0.5)
         if (formEl) {
           const rectForm = formEl.getBoundingClientRect()
-          L_form_val = rectForm.left - rectGrid.left
+          L_form_val = Math.round(rectForm.left - rectGrid.left)
         }
 
-        let gx = G_val * 0.8
-        let gy = H_val * 0.5
+        let gx = Math.round(G_val * 0.8)
+        let gy = Math.round(H_val * 0.5)
         if (globeEl) {
           const rectGlobe = globeEl.getBoundingClientRect()
-          gx = rectGlobe.left - rectGrid.left + rectGlobe.width / 2
-          gy = rectGlobe.top - rectGrid.top + rectGlobe.height / 2
+          gx = Math.round(rectGlobe.left - rectGrid.left + rectGlobe.width / 2)
+          gy = Math.round(rectGlobe.top - rectGrid.top + rectGlobe.height / 2)
         }
+
+        const L_end_val = L_form_val - 12
 
         setLayout(prev => {
           if (
+            prev.G > 0 &&
             Math.abs(prev.G - G_val) < 2 &&
-            Math.abs(prev.H - H_val) < 2 &&
-            Math.abs(prev.L_form_end - (L_form_val - 12)) < 2 &&
-            Math.abs(prev.globeCenterX - gx) < 2 &&
-            Math.abs(prev.globeCenterY - gy) < 2
+            Math.abs(prev.H - H_val) < 2
           ) {
             return prev
           }
@@ -152,7 +248,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
             G: G_val,
             H: H_val,
             xStart: 5,
-            L_form_end: L_form_val - 12,
+            L_form_end: L_end_val,
             globeCenterX: gx,
             globeCenterY: gy
           }
@@ -160,25 +256,13 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
       }
     }
 
-    const throttledUpdate = () => {
-      if (ticking) return
-      ticking = true
-      window.requestAnimationFrame(() => {
-        update()
-        ticking = false
-      })
-    }
-
+    // Initial measurement
     update()
-    const resizeObserver = new ResizeObserver(() => throttledUpdate())
-    if (containerRef.current) resizeObserver.observe(containerRef.current)
-    if (formRef?.current) resizeObserver.observe(formRef.current)
-    if (globeRef?.current) resizeObserver.observe(globeRef.current)
-    window.addEventListener('resize', throttledUpdate, { passive: true })
+    // Only recalculate on actual window resize — NOT on form content changes
+    window.addEventListener('resize', update, { passive: true })
 
     return () => {
-      resizeObserver.disconnect()
-      window.removeEventListener('resize', throttledUpdate)
+      window.removeEventListener('resize', update)
     }
   }, [formRef, globeRef])
 
@@ -281,6 +365,8 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   const mainBeamTraces = useMemo(() => {
     return traces.filter(t => t.main)
   }, [traces])
+
+
 
 
   // Nodes (Mirrored Y coordinates)
@@ -420,90 +506,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     return baseOp * illumFactor
   }, [isTransmit, transmissionFailed, isIlluminated])
 
-  useEffect(() => {
-    if (!isInView || !isIlluminated || shouldReduceMotion) return
 
-    const container = particlesContainerRef.current
-    if (!container) return
-
-    particlePoolRef.current = Array.from(container.children)
-    let intervalId = null
-
-    const spawnParticle = (trace, isBurst = false, delayMs = 0) => {
-      const delayTimer = setTimeout(() => {
-        if (!particlePoolRef.current || particlePoolRef.current.length === 0) return
-
-        const circle = particlePoolRef.current[poolIndexRef.current]
-        poolIndexRef.current = (poolIndexRef.current + 1) % particlePoolRef.current.length
-
-        if (circle._cleanupTimer) {
-          clearTimeout(circle._cleanupTimer)
-          circle._cleanupTimer = null
-        }
-
-        const r = isBurst ? '2.0' : '1.6'
-        circle.setAttribute('r', r)
-
-        const colors = ['var(--accent)', 'var(--accent-secondary)', '#ffffff']
-        const randomColor = isBurst
-          ? colors[Math.floor(Math.random() * colors.length)]
-          : 'var(--accent)'
-        circle.setAttribute('fill', randomColor)
-
-        circle.setAttribute('filter', isBurst ? 'url(#pcbGlowActive)' : 'url(#pcbHairlineGlow)')
-        circle.style.offsetPath = `path('${trace.d}')`
-
-        const duration = isBurst ? '0.7s' : '1.2s'
-        circle.style.animation = `pcbParticleTravel ${duration} linear forwards`
-        circle.style.display = 'block'
-
-        const cleanupTimer = setTimeout(() => {
-          circle.style.display = 'none'
-          circle.style.animation = 'none'
-        }, isBurst ? 700 : 1200)
-
-        circle._cleanupTimer = cleanupTimer
-      }, delayMs)
-
-      return delayTimer
-    }
-
-    const timers = []
-    const isTransmit = contactSystemState === 'transmit'
-
-    if (isTransmit) {
-      traces.forEach((t) => {
-        if (t.main) {
-          timers.push(spawnParticle(t, true, 0))
-          timers.push(spawnParticle(t, true, 120))
-          timers.push(spawnParticle(t, true, 240))
-          timers.push(spawnParticle(t, true, 360))
-        }
-      })
-    } else if (isInView) {
-      const runSpawn = () => {
-        traces.forEach((t) => {
-          if (t.main) {
-            timers.push(spawnParticle(t, false, Math.random() * 150))
-          }
-        })
-      }
-      runSpawn()
-      intervalId = setInterval(runSpawn, isTyping ? 450 : 1800)
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId)
-      timers.forEach((t) => clearTimeout(t))
-      if (particlePoolRef.current) {
-        particlePoolRef.current.forEach((circle) => {
-          if (circle._cleanupTimer) clearTimeout(circle._cleanupTimer)
-          circle.style.display = 'none'
-          circle.style.animation = 'none'
-        })
-      }
-    }
-  }, [isInView, isIlluminated, activationLevel, contactSystemState, traces, shouldReduceMotion])
 
   // Glassmorphic Component Block
   const renderGlassBlock = (x, y, w, h, label, chKey) => {
@@ -1161,19 +1164,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
            ======================================================== */}
         {traceCorridors}
 
-        {/* Dynamic Particles Container (Recycled Pool) */}
-        <g ref={particlesContainerRef}>
-          {Array.from({ length: 24 }).map((_, i) => (
-            <circle
-              key={`p-pool-l-${i}`}
-              cx="0"
-              cy="0"
-              r="1.6"
-              fill="var(--accent)"
-              style={{ display: 'none', pointerEvents: 'none' }}
-            />
-          ))}
-        </g>
+
 
         {/* Trailing Lines for Traveling Hero Channels */}
         {isTransmitOrFailed && ['name', 'email', 'subject', 'message'].map((chKey, chIdx) => (
@@ -1197,64 +1188,16 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
 
 
+
+
         {/* ========================================================
-            LEFT PCB CONTINUOUS TRAVELING LINE PULSE ANIMATION
+            LEFT PCB CONTINUOUS TRAVELING LINE PULSE ANIMATION (INDEPENDENT & CONTINUOUS)
            ======================================================== */}
         {isIlluminated && mainBeamTraces.length > 0 && (
           <g className="left-pcb-light-beams" style={{ pointerEvents: 'none' }}>
-            {mainBeamTraces.map((trace, idx) => {
-              return (
-                <g key={`left-beam-${idx}`}>
-                  {/* Layer 1: Ambient Outer Glow Line Pulse */}
-                  <path
-                    d={trace.d}
-                    pathLength="100"
-                    stroke="var(--accent)"
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                    opacity="0.35"
-                    strokeDasharray="15 120"
-                    style={{
-                      animation: 'pcbLeftLinePulse 2.4s linear infinite',
-                      animationDelay: '0s'
-                    }}
-                  />
-                  {/* Layer 2: Mid Laser Line Pulse */}
-                  <path
-                    d={trace.d}
-                    pathLength="100"
-                    stroke="var(--accent)"
-                    strokeWidth="3.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                    opacity="0.85"
-                    strokeDasharray="15 120"
-                    style={{
-                      animation: 'pcbLeftLinePulse 2.4s linear infinite',
-                      animationDelay: '0s'
-                    }}
-                  />
-                  {/* Layer 3: Hot Laser Core Line Pulse */}
-                  <path
-                    d={trace.d}
-                    pathLength="100"
-                    stroke="#ffffff"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                    strokeDasharray="15 120"
-                    style={{
-                      animation: 'pcbLeftLinePulse 2.4s linear infinite',
-                      animationDelay: '0s'
-                    }}
-                  />
-                </g>
-              )
-            })}
+            {mainBeamTraces.map((trace, idx) => (
+              <AnimatedPulseItem key={`left-beam-${idx}`} active={true} item={trace} reverse={false} />
+            ))}
           </g>
         )}
 
