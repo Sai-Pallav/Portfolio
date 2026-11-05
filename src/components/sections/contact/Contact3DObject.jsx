@@ -117,22 +117,23 @@ const RingGlowMaterial = shaderMaterial(
      float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.5); 
      
      // Depth relative to globe center (at 8.0 in view space)
-     float zRel = 8.0 - vViewPosition.z; // > 0: in front of globe center, < 0: behind globe center
-     float frontFactor = smoothstep(-0.35, 0.35, zRel); 
+     float zRel = 8.0 - vViewPosition.z; // > 0: in front, < 0: behind
      
-     // Front part appearance: Crisp, visible, luminous foreground track
-     vec3 frontCoreColor = color * (0.82 + fresnel * 0.9);
-     vec3 frontGlow = color * (fresnel * 1.5);
-     vec3 frontCol = frontCoreColor + frontGlow;
-     float frontOp = opacity * (0.80 + fresnel * 0.45);
-
-     // Back part appearance: Soft, calm outer loop
-     vec3 backCol = color * (0.42 + fresnel * 1.0);
-     float backOp = opacity * (0.35 + fresnel * 0.50);
-
-     vec3 finalColor = mix(backCol, frontCol, frontFactor);
-     float finalOpacity = mix(backOp, frontOp, frontFactor);
-
+     // Continuous smooth depth gradient along the 3D trajectory
+     // Ranges from 0.0 at maximum back (zRel ~ -2.2) to 1.0 at maximum front (zRel ~ +2.2)
+     float depthFactor = clamp((zRel + 2.2) / 4.4, 0.0, 1.0);
+     
+     // Calibrated depth ratio: Front visibility 80%, Back visibility 60%
+     // Smooth transition from 0.60 (back) to 0.80 (front)
+     float visFactor = mix(0.60, 0.80, depthFactor);
+     
+     // Color intensity smoothly modulates from back (0.60 base) to front (0.80 base) with rim glow
+     float coreLuminance = mix(0.60, 0.80, depthFactor);
+     vec3 finalColor = color * (coreLuminance + fresnel * (1.1 + 0.4 * depthFactor));
+     
+     // Opacity smoothly modulates from back (0.60 scale) to front (0.80 scale)
+     float finalOpacity = opacity * (visFactor + fresnel * 0.45);
+     
      gl_FragColor = vec4(finalColor, finalOpacity); 
    }`
 )
@@ -144,7 +145,6 @@ const staticGeomInnerWire = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.rad
 const staticGeomPoints = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 4)
 const staticGeomGlass = new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 32, 32)
 const staticGeomHalo = new THREE.SphereGeometry(SCENE_CONFIG.globe.haloRadius, 32, 32)
-const staticGeomDepthMask = new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 36, 36)
 
 // 3 Graduated ring geometries with calibrated tube thickness for distinct visual hierarchy
 const ringGeometries = [
@@ -195,13 +195,6 @@ const staticMatAtmosphericHalo = new FresnelGlowMaterial()
 staticMatAtmosphericHalo.transparent = true
 staticMatAtmosphericHalo.depthWrite = false
 staticMatAtmosphericHalo.blending = THREE.AdditiveBlending
-
-const staticMatDepthMask = new THREE.MeshBasicMaterial({
-  colorWrite: false,
-  depthWrite: true,
-  depthTest: true,
-  transparent: true,
-})
 
 // 3 Tiered Ring Glow Materials: Ring 0 (Primary), Ring 1 (Secondary), Ring 2 (Hover/Tertiary)
 const staticRingMaterials = [
@@ -414,9 +407,6 @@ function Globe({ distanceFactor, isTransmit = false }) {
 
       {/* 5. Luminous Atmospheric Rim Glow (Halo) */}
       <mesh geometry={staticGeomHalo} material={staticMatAtmosphericHalo} renderOrder={5} />
-
-      {/* 6. Invisible Depth Proxy Sphere - occludes background portions of orbital rings */}
-      <mesh geometry={staticGeomDepthMask} material={staticMatDepthMask} renderOrder={6} />
     </group>
   )
 }
