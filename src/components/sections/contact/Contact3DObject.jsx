@@ -11,7 +11,6 @@ const globalTheme = {
   primary: '#2563eb',
   secondary: '#6366f1',
   hover: '#3b82f6',
-  highlight: '#dbeafe',
   version: 0,
 }
 
@@ -21,12 +20,12 @@ const SCENE_CONFIG = {
   globe: {
     radius: 2.0,
     glassRadius: 1.96,
-    haloRadius: 2.06,
+    haloRadius: 2.08,
     innerRadius: 1.72,
-    wireframeOpacity: 0.24,
-    pointsOpacity: 0.98,
-    glowIntensity: 1.35,
-    glowPower: 3.6,
+    wireframeOpacity: 0.12,
+    pointsOpacity: 0.50,
+    glowIntensity: 0.75,
+    glowPower: 4.8,
   },
   orbit: {
     radius: 2.45,
@@ -36,7 +35,7 @@ const SCENE_CONFIG = {
   },
   depth: { cameraZ: 8 },
   proximity: { maxDistance: 220, minDistance: 40, minFactor: 0.05 },
-  particles: { count: 75, minRadius: 2.3, spread: 2.6 },
+  particles: { count: 30, minRadius: 2.4, spread: 2.0 },
 }
 
 // Three-tier hierarchical orbital system (TASK 15 configuration)
@@ -68,7 +67,6 @@ const lerpFI = (current, target, factor, delta) =>
 const FresnelGlowMaterial = shaderMaterial(
   {
     color: new THREE.Color('#2563eb'),
-    rimColor: new THREE.Color('#dbeafe'),
     glowPower: SCENE_CONFIG.globe.glowPower,
     glowIntensity: SCENE_CONFIG.globe.glowIntensity,
   },
@@ -80,7 +78,6 @@ const FresnelGlowMaterial = shaderMaterial(
      gl_Position = projectionMatrix * mvPosition; 
    }`,
   `uniform vec3 color; 
-   uniform vec3 rimColor; 
    uniform float glowPower; 
    uniform float glowIntensity; 
    varying vec3 vNormal; 
@@ -90,18 +87,16 @@ const FresnelGlowMaterial = shaderMaterial(
      vec3 viewDir = normalize(vViewPosition); 
      float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), glowPower); 
      float intensity = fresnel * glowIntensity; 
-     vec3 edgeCol = mix(color, rimColor, 0.45);
-     gl_FragColor = vec4(edgeCol, intensity); 
+     gl_FragColor = vec4(color, intensity); 
    }`
 )
 extend({ FresnelGlowMaterial })
 
-// Ring Glow Custom Neon Material - clean, vibrant infrastructure look
+// Ring Glow Custom Neon Material - clean, calm infrastructure look with distinct foreground / background depth
 const RingGlowMaterial = shaderMaterial(
   {
     color: new THREE.Color('#2563eb'),
-    coreTint: new THREE.Color('#ffffff'),
-    opacity: 0.95
+    opacity: 0.35,
   },
   `varying vec3 vNormal; varying vec3 vViewPosition; varying vec2 vUv;
    void main() { 
@@ -112,7 +107,6 @@ const RingGlowMaterial = shaderMaterial(
      gl_Position = projectionMatrix * mvPosition; 
    }`,
   `uniform vec3 color; 
-   uniform vec3 coreTint; 
    uniform float opacity; 
    varying vec3 vNormal; 
    varying vec3 vViewPosition; 
@@ -120,90 +114,52 @@ const RingGlowMaterial = shaderMaterial(
    void main() { 
      vec3 normal = normalize(vNormal); 
      vec3 viewDir = normalize(vViewPosition); 
-     float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.6); 
+     float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.5); 
      
-     // Depth relative to globe center (camera at z=8.0 in world, so globe center in view space has vViewPosition.z = 8.0)
-     float zRel = 8.0 - vViewPosition.z; // > 0: in front of globe center; < 0: behind globe center
-     float dist2D = length(vViewPosition.xy); // 2D distance from globe center in camera plane
+     // Depth relative to globe center (at 8.0 in view space)
+     float zRel = 8.0 - vViewPosition.z; // > 0: in front of globe center, < 0: behind globe center
+     float frontFactor = smoothstep(-0.35, 0.35, zRel); 
+     
+     // Front part appearance: Crisp, visible, luminous foreground track
+     vec3 frontCoreColor = color * (0.82 + fresnel * 0.9);
+     vec3 frontGlow = color * (fresnel * 1.5);
+     vec3 frontCol = frontCoreColor + frontGlow;
+     float frontOp = opacity * (0.80 + fresnel * 0.45);
 
-     // Smooth detection: 1.0 when behind the globe sphere, 0.0 when in front or outside in space
-     float isBehind = smoothstep(0.12, -0.12, zRel) * smoothstep(2.02, 1.70, dist2D);
+     // Back part appearance: Soft, calm outer loop
+     vec3 backCol = color * (0.42 + fresnel * 1.0);
+     float backOp = opacity * (0.35 + fresnel * 0.50);
 
-     // Front Ring Appearance: Vibrant laser-core neon
-     vec3 frontCoreColor = mix(color, coreTint, 0.38);
-     vec3 frontEdgeGlow = color * (fresnel * 1.3) + coreTint * pow(fresnel, 2.5) * 0.38;
-     vec3 frontColor = frontCoreColor + frontEdgeGlow;
-     float frontOpacity = opacity * (0.85 + fresnel * 0.15);
-
-     // Back Ring Appearance: Properly visible through translucent obsidian core, soft & dimmer than front
-     vec3 backCoreColor = color * 0.38;
-     vec3 backEdgeGlow = color * (fresnel * 0.7) * 0.30;
-     vec3 backColor = backCoreColor + backEdgeGlow;
-     float backOpacity = opacity * (0.24 + fresnel * 0.10);
-
-     vec3 finalColor = mix(frontColor, backColor, isBehind);
-     float finalOpacity = mix(frontOpacity, backOpacity, isBehind);
+     vec3 finalColor = mix(backCol, frontCol, frontFactor);
+     float finalOpacity = mix(backOp, frontOp, frontFactor);
 
      gl_FragColor = vec4(finalColor, finalOpacity); 
    }`
 )
 extend({ RingGlowMaterial })
 
-// Specular Starburst Lens Flare Material - procedural, high-end cinematic glint
-const StarFlareMaterial = shaderMaterial(
-  {
-    color: new THREE.Color('#ffffff'),
-    haloColor: new THREE.Color('#3b82f6'),
-    time: 0,
-  },
-  `varying vec2 vUv;
-   void main() {
-     vUv = uv;
-     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-   }`,
-  `uniform vec3 color;
-   uniform vec3 haloColor;
-   uniform float time;
-   varying vec2 vUv;
-   void main() {
-     vec2 p = vUv * 2.0 - 1.0;
-     float d = length(p);
-     if (d > 1.0) discard;
-     // Soft radial bloom aura
-     float bloom = 0.07 / (d + 0.07);
-     // 4-point cross streaks (anamorphic star flare)
-     float streakH = 0.007 / (abs(p.y * 36.0) + 0.03) * smoothstep(1.0, 0.0, abs(p.x));
-     float streakV = 0.007 / (abs(p.x * 36.0) + 0.03) * smoothstep(1.0, 0.0, abs(p.y));
-     float flare = bloom * 0.75 + (streakH + streakV) * 0.95;
-     float twinkle = 0.92 + 0.08 * sin(time * 2.8);
-     vec3 finalColor = mix(haloColor, color, smoothstep(0.2, 1.2, flare));
-     gl_FragColor = vec4(finalColor * flare * twinkle, clamp(flare * twinkle, 0.0, 1.0));
-   }`
-)
-extend({ StarFlareMaterial })
-
 // Shared static geometries
-const staticGeomWire = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 3)
-const staticGeomInnerWire = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.innerRadius, 2)
-const staticGeomInnerPoints = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.innerRadius, 2)
-const staticGeomPoints = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 3)
+const staticGeomWire = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 2)
+const staticGeomInnerWire = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius * 1.025, 1)
+const staticGeomPoints = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius, 4)
 const staticGeomGlass = new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 32, 32)
 const staticGeomHalo = new THREE.SphereGeometry(SCENE_CONFIG.globe.haloRadius, 32, 32)
+const staticGeomDepthMask = new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 36, 36)
 
-// 3 Graduated ring geometries with decreasing tube thickness for distinct visual hierarchy
+// 3 Graduated ring geometries with calibrated tube thickness for distinct visual hierarchy
 const ringGeometries = [
-  new THREE.TorusGeometry(2.45, 0.036, 16, 128),
-  new THREE.TorusGeometry(2.45, 0.030, 16, 128),
-  new THREE.TorusGeometry(2.45, 0.026, 16, 128),
+  new THREE.TorusGeometry(2.45, 0.035, 16, 128),
+  new THREE.TorusGeometry(2.45, 0.031, 16, 128),
+  new THREE.TorusGeometry(2.45, 0.028, 16, 128),
 ]
 
 // Shared static materials - allocated once to completely eliminate GC churn
 const staticMatGlassCore = new THREE.MeshStandardMaterial({
-  color: new THREE.Color('#06080f'),
-  roughness: 0.20,
-  metalness: 0.50,
+  color: new THREE.Color('#0a0814'),
+  roughness: 0.25,
+  metalness: 0.60,
   transparent: true,
-  opacity: 0.46,
+  opacity: 0.35,
   depthWrite: false,
 })
 
@@ -211,19 +167,9 @@ const staticMatInnerWire = new THREE.MeshBasicMaterial({
   color: new THREE.Color('#6366f1'),
   wireframe: true,
   transparent: true,
-  opacity: 0.28,
+  opacity: SCENE_CONFIG.globe.wireframeOpacity * 0.7,
   depthWrite: false,
-  blending: THREE.AdditiveBlending,
-})
-
-const staticMatInnerPoints = new THREE.PointsMaterial({
-  color: new THREE.Color('#818cf8'),
-  size: 0.026,
-  transparent: true,
-  opacity: 0.65,
-  sizeAttenuation: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
+  blending: THREE.NormalBlending,
 })
 
 const staticMatOuterWire = new THREE.MeshBasicMaterial({
@@ -232,12 +178,12 @@ const staticMatOuterWire = new THREE.MeshBasicMaterial({
   transparent: true,
   opacity: SCENE_CONFIG.globe.wireframeOpacity,
   depthWrite: false,
-  blending: THREE.AdditiveBlending,
+  blending: THREE.NormalBlending,
 })
 
 const staticMatOuterPoints = new THREE.PointsMaterial({
-  color: new THREE.Color('#f8fafc'),
-  size: 0.038,
+  color: new THREE.Color('#2563eb'),
+  size: 0.026,
   transparent: true,
   opacity: SCENE_CONFIG.globe.pointsOpacity,
   sizeAttenuation: true,
@@ -245,15 +191,17 @@ const staticMatOuterPoints = new THREE.PointsMaterial({
   blending: THREE.AdditiveBlending,
 })
 
-const staticMatStarburstFlare = new StarFlareMaterial()
-staticMatStarburstFlare.transparent = true
-staticMatStarburstFlare.depthWrite = false
-staticMatStarburstFlare.blending = THREE.AdditiveBlending
-
 const staticMatAtmosphericHalo = new FresnelGlowMaterial()
 staticMatAtmosphericHalo.transparent = true
 staticMatAtmosphericHalo.depthWrite = false
 staticMatAtmosphericHalo.blending = THREE.AdditiveBlending
+
+const staticMatDepthMask = new THREE.MeshBasicMaterial({
+  colorWrite: false,
+  depthWrite: true,
+  depthTest: true,
+  transparent: true,
+})
 
 // 3 Tiered Ring Glow Materials: Ring 0 (Primary), Ring 1 (Secondary), Ring 2 (Hover/Tertiary)
 const staticRingMaterials = [
@@ -262,10 +210,9 @@ const staticRingMaterials = [
     mat.transparent = true
     mat.blending = THREE.AdditiveBlending
     mat.depthWrite = false
-    mat.depthTest = false
+    mat.depthTest = true
     mat.color = new THREE.Color('#2563eb')
-    mat.coreTint = new THREE.Color('#ffffff')
-    mat.opacity = 0.95
+    mat.opacity = 0.52
     return mat
   })(),
   (() => {
@@ -273,10 +220,9 @@ const staticRingMaterials = [
     mat.transparent = true
     mat.blending = THREE.AdditiveBlending
     mat.depthWrite = false
-    mat.depthTest = false
+    mat.depthTest = true
     mat.color = new THREE.Color('#6366f1')
-    mat.coreTint = new THREE.Color('#ffffff')
-    mat.opacity = 0.86
+    mat.opacity = 0.48
     return mat
   })(),
   (() => {
@@ -284,40 +230,22 @@ const staticRingMaterials = [
     mat.transparent = true
     mat.blending = THREE.AdditiveBlending
     mat.depthWrite = false
-    mat.depthTest = false
+    mat.depthTest = true
     mat.color = new THREE.Color('#3b82f6')
-    mat.coreTint = new THREE.Color('#ffffff')
-    mat.opacity = 0.80
+    mat.opacity = 0.45
     return mat
   })(),
 ]
 
 const staticMatMicroParticles = new THREE.PointsMaterial({
-  color: new THREE.Color('#818cf8'),
-  size: 0.022,
+  color: new THREE.Color('#6366f1'),
+  size: 0.020,
   transparent: true,
-  opacity: 0.28,
+  opacity: 0.18,
   sizeAttenuation: true,
   depthWrite: false,
   blending: THREE.AdditiveBlending,
 })
-
-function SpecularFlare({ renderOrder = 3 }) {
-  const meshRef = useRef()
-
-  useFrame((state) => {
-    staticMatStarburstFlare.time = state.clock.getElapsedTime()
-    if (meshRef.current) {
-      meshRef.current.quaternion.copy(state.camera.quaternion)
-    }
-  })
-
-  return (
-    <mesh ref={meshRef} position={[0.62, 0.45, 1.84]} renderOrder={renderOrder} material={staticMatStarburstFlare}>
-      <planeGeometry args={[0.75, 0.75]} />
-    </mesh>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Issue #7: Camera drift respects distanceFactor.
@@ -359,24 +287,21 @@ function CameraRig({ distanceFactor }) {
 
 function Lights() {
   const lightRef = useRef()
-  const flareLightRef = useRef()
   const lastColorVersion = useRef(-1)
   useFrame(() => {
-    if (lastColorVersion.current !== globalTheme.version) {
-      if (lightRef.current) lightRef.current.color.set(globalTheme.primary)
-      if (flareLightRef.current) flareLightRef.current.color.set(globalTheme.highlight)
+    if (lastColorVersion.current !== globalTheme.version && lightRef.current) {
+      lightRef.current.color.set(globalTheme.primary)
       lastColorVersion.current = globalTheme.version
     }
   })
   return (
     <>
-      <ambientLight intensity={0.32} />
-      <hemisphereLight args={['#ffffff', '#090913', 0.40]} />
-      {/* Specular spotlight creating soft highlight on upper-right hemisphere */}
-      <directionalLight position={[3.5, 3.0, 4.5]} intensity={1.4} color="#ffffff" />
-      <pointLight ref={flareLightRef} position={[2.2, 1.8, 3.2]} intensity={2.6} color={globalTheme.highlight} distance={8} decay={1.8} />
+      <ambientLight intensity={0.25} />
+      <hemisphereLight args={['#ffffff', '#090913', 0.30]} />
+      {/* Specular directional light creating subtle highlight on upper-right */}
+      <directionalLight position={[5, 4, 4]} intensity={1.2} color="#ffffff" />
       {/* Deep back rim light */}
-      <pointLight ref={lightRef} position={[-4, -2, -4]} intensity={1.8} color={globalTheme.primary} distance={12} decay={2.0} />
+      <pointLight ref={lightRef} position={[-4, -1, -4]} intensity={2.2} color={globalTheme.primary} distance={12} decay={2.2} />
     </>
   )
 }
@@ -438,7 +363,6 @@ function Globe({ distanceFactor, isTransmit = false }) {
   const globeGroupRef = useRef()
   const wireRef = useRef()
   const innerWireRef = useRef()
-  const innerPointsRef = useRef()
   const pointsRef = useRef()
   const easedFactor = useRef(1.0)
   const transmitFactor = useRef(0)
@@ -460,15 +384,12 @@ function Globe({ distanceFactor, isTransmit = false }) {
     if (wireRef.current) wireRef.current.rotation.y += safeDelta * (0.08 * f + p * 2.8)
     if (innerWireRef.current) {
       innerWireRef.current.rotation.y -= safeDelta * (0.05 * f + p * 2.2)
-      innerWireRef.current.rotation.x += safeDelta * (0.02 * f + p * 1.0)
-    }
-    if (innerPointsRef.current) {
-      innerPointsRef.current.rotation.y -= safeDelta * (0.05 * f + p * 2.2)
-      innerPointsRef.current.rotation.x += safeDelta * (0.02 * f + p * 1.0)
+      innerWireRef.current.rotation.x -= safeDelta * (0.015 * f + p * 1.0)
     }
     if (pointsRef.current) {
       pointsRef.current.rotation.y += safeDelta * (0.08 * f + p * 2.8)
-      pointsRef.current.material.size = (0.038 + p * 0.025 + Math.sin(time * 2.5) * 0.003) * (0.5 + 0.5 * f)
+      pointsRef.current.rotation.x += safeDelta * (0.02 * f + p * 0.8)
+      pointsRef.current.material.size = (0.025 + p * 0.015 + Math.sin(time * 2.5) * 0.005) * (0.3 + 0.7 * f)
       pointsRef.current.material.opacity = SCENE_CONFIG.globe.pointsOpacity
     }
     if (globeGroupRef.current) {
@@ -479,29 +400,29 @@ function Globe({ distanceFactor, isTransmit = false }) {
 
   return (
     <group ref={globeGroupRef}>
-      {/* 1. Inner Connection Lattice - clearly visible network criss-crossing the globe interior */}
-      <mesh ref={innerWireRef} geometry={staticGeomInnerWire} material={staticMatInnerWire} renderOrder={1} />
+      {/* 1. Translucent Cosmic Obsidian Glass Core - provides deep optical depth */}
+      <mesh geometry={staticGeomGlass} material={staticMatGlassCore} name="glassCore" renderOrder={1} />
 
-      {/* 2. Inner Connection Junction Nodes */}
-      <points ref={innerPointsRef} geometry={staticGeomInnerPoints} material={staticMatInnerPoints} renderOrder={1} />
+      {/* 2. Secondary Depth Grid Network */}
+      <mesh ref={innerWireRef} geometry={staticGeomInnerWire} material={staticMatInnerWire} renderOrder={2} />
 
-      {/* 3. Translucent Cosmic Obsidian Glass Core - provides deep optical depth */}
-      <mesh geometry={staticGeomGlass} material={staticMatGlassCore} name="glassCore" renderOrder={2} />
-
-      {/* 4. Primary Outer Geodesic Wireframe Network */}
+      {/* 3. Primary Outer Geodesic Wireframe Network */}
       <mesh ref={wireRef} geometry={staticGeomWire} material={staticMatOuterWire} renderOrder={3} />
 
-      {/* 5. Sparkling White Constellation Nodes at Outer Vertices */}
-      <points ref={pointsRef} geometry={staticGeomPoints} material={staticMatOuterPoints} renderOrder={3} />
+      {/* 4. Delicate Constellation Nodes at Vertices */}
+      <points ref={pointsRef} geometry={staticGeomPoints} material={staticMatOuterPoints} renderOrder={4} />
 
-      {/* 6. Radiant Specular Glint / Starburst Flare on upper right */}
-      <SpecularFlare renderOrder={4} />
-
-      {/* 7. Luminous Atmospheric Rim Glow (Halo) */}
+      {/* 5. Luminous Atmospheric Rim Glow (Halo) */}
       <mesh geometry={staticGeomHalo} material={staticMatAtmosphericHalo} renderOrder={5} />
+
+      {/* 6. Invisible Depth Proxy Sphere - occludes background portions of orbital rings */}
+      <mesh geometry={staticGeomDepthMask} material={staticMatDepthMask} renderOrder={6} />
     </group>
   )
 }
+
+// Toggle to temporarily enable/disable the orbiting social & contact icons on the rings
+const ENABLE_ORBITING_ICONS = false
 
 const STATIC_RING_ICONS = [
   [
@@ -739,10 +660,10 @@ const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onH
 // followed by Rz(deg) creates 3 symmetrically distributed orbital planes (0°, -60°, +60°)
 // wrapping gracefully around the globe with consistent bilateral spacing.
 // =============================================================================
-const radTilt = 60 * (Math.PI / 180)
+const radTilt = 65 * (Math.PI / 180)
 const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), radTilt)
 
-// Precomputed static quaternions for the 3 orbital rings: 0°, -60°, +60°
+// Precomputed static quaternions for the 3 orbital rings symmetrically centered at the top: 0°, -60°, +60°
 const ORBIT_RING_ANGLES = [0, -60, 60]
 const ORBIT_RING_QUATERNIONS = ORBIT_RING_ANGLES.map((deg) => {
   const qZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), deg * (Math.PI / 180))
@@ -861,37 +782,41 @@ const OrbitalRing = memo(function OrbitalRing({
   return (
     <group quaternion={ringQuaternion}>
       <group ref={orbitGroupRef}>
-        <mesh ref={meshRef} position={[0, 0, zOffset]} geometry={ringGeom} material={ringMat} renderOrder={6} />
+        <mesh ref={meshRef} position={[0, 0, zOffset]} geometry={ringGeom} material={ringMat} renderOrder={7} />
 
         {/* IconPivot A */}
-        <group ref={pivotARef}>
-          <group ref={iconWrapperARef} position={[radius, 0, zOffset]}>
-            {icons[0] && (
-              <OrbitingIcon
-                iconData={icons[0]}
-                onHoverChange={handleHoverA}
-                distanceFactor={distanceFactor}
-                hoveredCountRef={hoveredCountRef}
-                hoveredOrbitRef={hoveredOrbitRef}
-              />
-            )}
+        {ENABLE_ORBITING_ICONS && (
+          <group ref={pivotARef}>
+            <group ref={iconWrapperARef} position={[radius, 0, zOffset]}>
+              {icons[0] && (
+                <OrbitingIcon
+                  iconData={icons[0]}
+                  onHoverChange={handleHoverA}
+                  distanceFactor={distanceFactor}
+                  hoveredCountRef={hoveredCountRef}
+                  hoveredOrbitRef={hoveredOrbitRef}
+                />
+              )}
+            </group>
           </group>
-        </group>
+        )}
 
         {/* IconPivot B */}
-        <group ref={pivotBRef}>
-          <group ref={iconWrapperBRef} position={[radius, 0, zOffset]}>
-            {icons[1] && (
-              <OrbitingIcon
-                iconData={icons[1]}
-                onHoverChange={handleHoverB}
-                distanceFactor={distanceFactor}
-                hoveredCountRef={hoveredCountRef}
-                hoveredOrbitRef={hoveredOrbitRef}
-              />
-            )}
+        {ENABLE_ORBITING_ICONS && (
+          <group ref={pivotBRef}>
+            <group ref={iconWrapperBRef} position={[radius, 0, zOffset]}>
+              {icons[1] && (
+                <OrbitingIcon
+                  iconData={icons[1]}
+                  onHoverChange={handleHoverB}
+                  distanceFactor={distanceFactor}
+                  hoveredCountRef={hoveredCountRef}
+                  hoveredOrbitRef={hoveredOrbitRef}
+                />
+              )}
+            </group>
           </group>
-        </group>
+        )}
       </group>
     </group>
   )
@@ -915,63 +840,45 @@ function Scene({ distanceFactor, hoveredCountRef, hoveredOrbitRef, contactSystem
       const primaryCol = new THREE.Color(globalTheme.primary)
       const secondaryCol = new THREE.Color(globalTheme.secondary)
       const hoverCol = new THREE.Color(globalTheme.hover)
-      const highlightCol = new THREE.Color(globalTheme.highlight)
 
-      // 1. Cosmic Obsidian Glass Core
+      // 1. Cosmic Obsidian Glass Core - 10% theme undertone on dark obsidian
       staticMatGlassCore.color
         .copy(primaryCol)
-        .multiplyScalar(0.08)
-        .add(new THREE.Color('#050609'))
-      staticMatGlassCore.emissive
-        .copy(primaryCol)
-        .multiplyScalar(0.04)
+        .multiplyScalar(0.10)
+        .add(new THREE.Color('#05060a'))
+      staticMatGlassCore.emissive.setHex(0x000000)
 
-      // 2. Inner Network Wireframe
+      // 2. Secondary Depth Network
       staticMatInnerWire.color
         .copy(secondaryCol)
-        .multiplyScalar(0.68)
-        .lerp(primaryCol, 0.32)
-
-      // 3. Inner Network Junction Nodes
-      staticMatInnerPoints.color
-        .copy(secondaryCol)
-        .lerp(new THREE.Color('#ffffff'), 0.18)
-
+        .multiplyScalar(0.70)
+        .lerp(primaryCol, 0.30)
       // 4. Primary Outer Geodesic Network
       staticMatOuterWire.color.copy(primaryCol)
 
-      // 5. Constellation Stars (sparkling diamond nodes)
+      // 5. Constellation Stars (delicate nodes with restrained luminous theme tint)
       staticMatOuterPoints.color
-        .set('#ffffff')
-        .lerp(hoverCol, 0.18)
+        .copy(primaryCol)
+        .lerp(new THREE.Color('#ffffff'), 0.22)
 
       // 6. Atmospheric Rim Halo
       staticMatAtmosphericHalo.uniforms.color.value.copy(primaryCol)
-      staticMatAtmosphericHalo.uniforms.rimColor.value.copy(highlightCol)
 
-      // 7. Specular Starburst Flare
-      staticMatStarburstFlare.uniforms.color.value.set('#ffffff')
-      staticMatStarburstFlare.uniforms.haloColor.value.copy(hoverCol)
-
-      // 8. Three Tiered Orbital Rings
+      // 7. Three Tiered Orbital Rings
       // Ring 0 (Equatorial primary)
       staticRingMaterials[0].uniforms.color.value.copy(primaryCol)
-      staticRingMaterials[0].uniforms.coreTint.value.copy(highlightCol)
 
       // Ring 1 (Slanted left secondary)
       staticRingMaterials[1].uniforms.color.value.copy(secondaryCol)
-      staticRingMaterials[1].uniforms.coreTint.value.copy(highlightCol)
 
       // Ring 2 (Slanted right tertiary/hover)
       staticRingMaterials[2].uniforms.color.value.copy(hoverCol)
-      staticRingMaterials[2].uniforms.coreTint.value.copy(highlightCol)
 
-      // 9. Floating MicroParticles
+      // 8. Floating MicroParticles
       staticMatMicroParticles.color
         .copy(secondaryCol)
-        .lerp(new THREE.Color('#ffffff'), 0.22)
-
-      lastColorVersion.current = globalTheme.version
+        .lerp(new THREE.Color('#ffffff'), 0.15)
+lastColorVersion.current = globalTheme.version
     }
   })
 
@@ -1046,10 +953,6 @@ const Contact3DObject = memo(function Contact3DObject({ isInView, contactSystemS
       const secondary = styles.getPropertyValue("--accent-secondary").trim() || styles.getPropertyValue("--accent-hover").trim() || accent
       const hover = styles.getPropertyValue("--accent-hover").trim() || accent
 
-      const cAccent = new THREE.Color(accent)
-      const cHighlight = cAccent.clone().lerp(new THREE.Color('#ffffff'), 0.70)
-      const highlightHex = '#' + cHighlight.getHexString()
-
       let updated = false
       if (accent !== globalTheme.primary) {
         globalTheme.primary = accent
@@ -1061,10 +964,6 @@ const Contact3DObject = memo(function Contact3DObject({ isInView, contactSystemS
       }
       if (hover !== globalTheme.hover) {
         globalTheme.hover = hover
-        updated = true
-      }
-      if (highlightHex !== globalTheme.highlight) {
-        globalTheme.highlight = highlightHex
         updated = true
       }
       if (updated) {
@@ -1166,8 +1065,8 @@ const Contact3DObject = memo(function Contact3DObject({ isInView, contactSystemS
         className="relative w-full aspect-square max-w-[380px] lg:max-w-[420px] z-10 pointer-events-none flex items-center justify-center"
       >
         <div
-          className="absolute w-[80%] h-[80%] rounded-full blur-[110px] pointer-events-none -z-10 transition-colors duration-500"
-          style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 10%, transparent) 50%, transparent 70%)' }}
+          className="absolute w-[60%] h-[60%] rounded-full blur-[100px] pointer-events-none -z-10 transition-colors duration-500"
+          style={{ background: 'radial-gradient(circle, var(--accent) 0%, transparent 70%)', opacity: 0.08 }}
         />
 
         <div className="absolute inset-0 pointer-events-none">

@@ -187,23 +187,23 @@ export default memo(function ContactSection() {
               <div id="contact-globe-inner" ref={globeContainerRef} className="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] overflow-visible flex items-center justify-center pointer-events-none z-10">
                 {/* Zone B: Globe Environment (Soft localized outer halo, softened edge & controlled spread) */}
                 <div
-                  className="absolute w-[320px] h-[320px] md:w-[400px] md:h-[400px] lg:w-[460px] lg:h-[460px] rounded-full blur-[65px] pointer-events-none -z-10 transition-all duration-700 ease-out"
+                  className="absolute w-[280px] h-[280px] md:w-[350px] md:h-[350px] lg:w-[410px] lg:h-[410px] rounded-full blur-[58px] pointer-events-none -z-10 transition-all duration-700 ease-out"
                   style={{
-                    background: 'radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 28%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 10%, transparent) 45%, transparent 72%)',
+                    background: 'radial-gradient(ellipse 65% 58% at 46% 52%, color-mix(in srgb, var(--accent) 12%, #0b0d18) 0%, color-mix(in srgb, var(--accent) 3.5%, transparent) 45%, transparent 68%)',
                     animation: shouldReduceMotion ? 'none' : 'globeAtmosphereBreathe 7.5s ease-in-out infinite',
-                    opacity: contactSystemState === 'transmit' ? 0.50 : 0.26,
+                    opacity: contactSystemState === 'transmit' ? 0.32 : 0.14,
                     transform: contactSystemState === 'transmit' ? 'scale(1.15) translateZ(0)' : 'scale(1) translateZ(0)',
                     willChange: 'opacity, transform'
                   }}
                 />
                 {/* Zone A: Globe Core (Strong crisp localized core illumination) */}
                 <div
-                  className="absolute w-[200px] h-[200px] md:w-[260px] md:h-[260px] lg:w-[320px] lg:h-[320px] rounded-full blur-[38px] pointer-events-none -z-10 transition-all duration-700 ease-out"
+                  className="absolute w-[180px] h-[180px] md:w-[240px] md:h-[240px] lg:w-[295px] lg:h-[295px] rounded-full blur-[34px] pointer-events-none -z-10 transition-all duration-700 ease-out"
                   style={{
-                    background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 45%, #ffffff 12%) 0%, color-mix(in srgb, var(--accent) 20%, transparent) 38%, transparent 68%)',
+                    background: 'radial-gradient(circle, var(--accent) 0%, color-mix(in srgb, var(--accent) 28%, transparent) 34%, transparent 64%)',
                     animation: shouldReduceMotion ? 'none' : 'globeAtmosphereBreathe 7.5s ease-in-out infinite',
                     animationDelay: '-3.75s',
-                    opacity: contactSystemState === 'transmit' ? 0.60 : 0.30,
+                    opacity: contactSystemState === 'transmit' ? 0.45 : 0.22,
                     transform: contactSystemState === 'transmit' ? 'scale(1.2) translateZ(0)' : 'scale(1) translateZ(0)',
                     willChange: 'opacity, transform'
                   }}
