@@ -9,6 +9,62 @@ const getTraceStyleAttrs = (category) => {
   }
 };
 
+const DataPacketStream = ({ active, trace, delay = 0, reverse = false }) => {
+  if (!active || !trace) return null
+  const pathD = trace.rawD || trace.d
+  const animName = reverse ? 'pcbPacketTravelReverse' : 'pcbPacketTravel'
+  return (
+    <g pointerEvents="none">
+      {/* Outer Luminous Aura */}
+      <path
+        d={pathD}
+        pathLength="100"
+        stroke="var(--accent)"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="0.85"
+        filter="url(#pcbHairlineGlow-l)"
+        strokeDasharray="14 100"
+        style={{
+          animation: `${animName} 680ms cubic-bezier(0.22, 0.85, 0.36, 1) ${delay}ms forwards`
+        }}
+      />
+      {/* Radiant Packet Body */}
+      <path
+        d={pathD}
+        pathLength="100"
+        stroke="var(--accent)"
+        strokeWidth="3.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="1"
+        strokeDasharray="12 100"
+        style={{
+          animation: `${animName} 680ms cubic-bezier(0.22, 0.85, 0.36, 1) ${delay}ms forwards`
+        }}
+      />
+      {/* Hot White Photon Head */}
+      <path
+        d={pathD}
+        pathLength="100"
+        stroke="#ffffff"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        opacity="1"
+        strokeDasharray="8 100"
+        style={{
+          animation: `${animName} 680ms cubic-bezier(0.22, 0.85, 0.36, 1) ${delay}ms forwards`
+        }}
+      />
+    </g>
+  )
+}
+
 const AnimatedPulseItem = ({ active, item, reverse = false }) => {
   const [renderActive, setRenderActive] = useState(active);
   const startTimeRef = useRef(0);
@@ -642,91 +698,6 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     </g>
   ), [traces, getTargetOpacity, isTransmit, getTransitionStyle])
 
-  const getTrailPath = (chKey) => {
-    const startX = xStart + 275 * scale
-    let startY = CH1_Y - 40
-    if (chKey === 'email') startY = CH2_Y + 20
-    else if (chKey === 'subject') startY = CH3_Y - 20
-    else if (chKey === 'message') startY = CH4_Y + 40
-
-    const targetX = layout.globeCenterX
-    let targetY = layout.globeCenterY
-    if (chKey === 'name') {
-      targetY = layout.globeCenterY - 35
-    } else if (chKey === 'subject') {
-      targetY = layout.globeCenterY + 35
-    }
-
-    const dx = targetX - startX
-    const dy = targetY - startY
-
-    let cy1 = -60
-    if (chKey === 'email') cy1 = -30
-    else if (chKey === 'subject') cy1 = 30
-    else if (chKey === 'message') cy1 = 60
-
-    return `M ${startX},${startY} C ${startX + dx * 0.3},${startY + cy1} ${startX + dx * 0.7},${startY + dy - 20} ${startX + dx},${startY + dy}`
-  }
-
-  const getTrailStyle = (chIdx) => {
-    const delay = 150 + chIdx * 80
-    return {
-      strokeDasharray: '120 280',
-      strokeDashoffset: 400,
-      animation: `pcbTrailAnim 650ms cubic-bezier(0.65, 0, 0.35, 1) ${delay}ms forwards`
-    }
-  }
-
-  const getTravelStyle = (chKey, index) => {
-    if (!isTransmit && !transmissionFailed) return {}
-
-    const startX = xStart + 275 * scale
-    let startY = CH1_Y - 40
-    if (chKey === 'email') startY = CH2_Y + 20
-    else if (chKey === 'subject') startY = CH3_Y - 20
-    else if (chKey === 'message') startY = CH4_Y + 40
-
-    // Targets relative to globe center
-    const targetX = layout.globeCenterX
-    let targetY = layout.globeCenterY
-    if (chKey === 'name') {
-      targetY = layout.globeCenterY - 35
-    } else if (chKey === 'subject') {
-      targetY = layout.globeCenterY + 35
-    }
-
-    const dx = targetX - startX
-    const dy = targetY - startY
-
-    let cy1 = -60
-    if (chKey === 'email') cy1 = -30
-    else if (chKey === 'subject') cy1 = 30
-    else if (chKey === 'message') cy1 = 60
-
-    const pathData = `M 0,0 C ${dx * 0.3},${cy1} ${dx * 0.7},${dy - 20} ${dx},${dy}`
-
-    const delay = 150 + index * 80 // Stagger by 80ms
-
-    return {
-      offsetPath: `path('${pathData}')`,
-      offsetRotate: '0deg',
-      transformOrigin: `${startX}px ${startY}px`,
-      animation: `pcbTravel 650ms cubic-bezier(0.65, 0, 0.35, 1) ${delay}ms forwards`
-    }
-  }
-
-  const getChannelGroupStyle = (chKey, index) => {
-    const baseStyle = getTravelStyle(chKey, index)
-    if (transmissionFailed) {
-      return {
-        ...baseStyle,
-        opacity: 0,
-        transition: 'opacity 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
-      }
-    }
-    return baseStyle
-  }
-
   const renderTrace = (t, i) => {
     const isMain = t.category === 'main'
     const classOpacity = isMain ? 0.68 : 0.48
@@ -1166,30 +1137,6 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
 
 
-        {/* Trailing Lines for Traveling Hero Channels */}
-        {isTransmitOrFailed && ['name', 'email', 'subject', 'message'].map((chKey, chIdx) => (
-          <path
-            key={`trail-${chKey}`}
-            d={getTrailPath(chKey)}
-            stroke="url(#pcbTrailGradient)"
-            strokeWidth="1.2"
-            fill="none"
-            strokeLinecap="round"
-            style={{
-              ...getTrailStyle(chIdx),
-              ...(transmissionFailed ? {
-                opacity: 0,
-                transition: 'opacity 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
-              } : {})
-            }}
-          />
-        ))}
-
-
-
-
-
-
         {/* ========================================================
             LEFT PCB CONTINUOUS TRAVELING LINE PULSE ANIMATION (INDEPENDENT & CONTINUOUS)
            ======================================================== */}
@@ -1216,8 +1163,19 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
           {renderChannelSubstrates('message')}
         </g>
 
+        {/* ========================================================
+            LEFT PCB HIGH-SPEED DATA PACKET STREAM (ON TRANSMIT)
+           ======================================================== */}
+        {isTransmit && (
+          <g className="left-pcb-packet-stream" style={{ pointerEvents: 'none' }}>
+            {mainBeamTraces.map((trace, idx) => (
+              <DataPacketStream key={`left-tx-${idx}`} active={isTransmit} trace={trace} delay={idx * 50} reverse={false} />
+            ))}
+          </g>
+        )}
+
         {/* CHANNEL 1 (NAME) GROUP */}
-        <g style={getChannelGroupStyle('name', 0)}>
+        <g key="ch-name">
           {/* Traces */}
           <g strokeLinecap="round" strokeLinejoin="round" fill="none">
             {traces.filter(t => t.chKey === 'name').map((t, i) => renderTrace(t, i))}
@@ -1231,7 +1189,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         </g>
 
         {/* CHANNEL 2 (EMAIL) GROUP */}
-        <g style={getChannelGroupStyle('email', 1)}>
+        <g key="ch-email">
           {/* Traces */}
           <g strokeLinecap="round" strokeLinejoin="round" fill="none">
             {traces.filter(t => t.chKey === 'email').map((t, i) => renderTrace(t, i))}
@@ -1245,7 +1203,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         </g>
 
         {/* CHANNEL 3 (SUBJECT) GROUP */}
-        <g style={getChannelGroupStyle('subject', 2)}>
+        <g key="ch-subject">
           {/* Traces */}
           <g strokeLinecap="round" strokeLinejoin="round" fill="none">
             {traces.filter(t => t.chKey === 'subject').map((t, i) => renderTrace(t, i))}
@@ -1259,7 +1217,7 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
         </g>
 
         {/* CHANNEL 4 (MESSAGE) GROUP */}
-        <g style={getChannelGroupStyle('message', 3)}>
+        <g key="ch-message">
           {/* Traces */}
           <g strokeLinecap="round" strokeLinejoin="round" fill="none">
             {traces.filter(t => t.chKey === 'message').map((t, i) => renderTrace(t, i))}

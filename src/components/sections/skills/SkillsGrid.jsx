@@ -37,21 +37,14 @@ const categoryCardVariants = {
 };
 
 const categories = Object.keys(skills);
+const DARK_ICONS = ["express", "nextjs"];
 
 const handleMouseMove = (e) => {
-  let rect = e.currentTarget._cachedRect;
-  if (!rect) {
-    rect = e.currentTarget.getBoundingClientRect();
-    e.currentTarget._cachedRect = rect;
-  }
+  const rect = e.currentTarget.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   e.currentTarget.style.setProperty("--mouse-x", `${x}px`);
   e.currentTarget.style.setProperty("--mouse-y", `${y}px`);
-};
-
-const handleMouseLeave = (e) => {
-  e.currentTarget._cachedRect = null;
 };
 
 const SkillsGrid = memo(function SkillsGrid() {
@@ -85,14 +78,13 @@ const SkillsGrid = memo(function SkillsGrid() {
             <div className="flex flex-col gap-3">
               {categoryItems.map((item, idx) => {
                 const isPrimary = item.level === "primary";
-                const isDark = ["express", "nextjs"].includes(item.icon);
+                const isDark = DARK_ICONS.includes(item.icon);
                 const percent = Math.min((item.years / 5) * 100, 100);
 
                 return (
                   <div
                     key={idx}
                     onMouseMove={handleMouseMove}
-                    onMouseLeave={handleMouseLeave}
                     className={`flex flex-col gap-2 p-3.5 rounded-2xl bg-[rgba(20,20,22,0.45)] border border-white/[0.04] transition-all duration-300 relative group/item overflow-hidden ${
                       !isPrimary ? "opacity-70 hover:opacity-100" : "opacity-100"
                     }`}
@@ -120,6 +112,8 @@ const SkillsGrid = memo(function SkillsGrid() {
                         <img
                           src={getDeviconUrl(item.icon)}
                           alt=""
+                          width={36}
+                          height={36}
                           loading="lazy"
                           decoding="async"
                           className="size-full object-contain transition-transform duration-300 group-hover/item:scale-110"
@@ -152,8 +146,8 @@ const SkillsGrid = memo(function SkillsGrid() {
                     {/* Progress Bar with hover scale */}
                     <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-1 relative z-10">
                       <div
-                        className="h-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] rounded-full transition-all duration-500 origin-left"
-                        style={{ width: `${percent}%` }}
+                        className="h-full w-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] rounded-full transition-transform duration-500 origin-left"
+                        style={{ transform: `scaleX(${percent / 100})` }}
                       />
                     </div>
 

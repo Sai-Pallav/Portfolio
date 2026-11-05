@@ -7,7 +7,7 @@ const SCROLL_CONFIG = {
   SPEED_PX_PER_S: 40,
   TILE_SIZE: 160,
   TILE_GAP: 60,
-  ITEM_HEIGHT: 220,
+  ITEM_HEIGHT: 220, // TILE_SIZE + TILE_GAP
   ENTRANCE_DURATION: 0.8,
   TILE_STAGGER: 40,
   HOVER_DURATION: 0.3,
@@ -27,8 +27,6 @@ const MarqueeCard = memo(({
   prefersReducedMotion,
   onSkillHover,
   subarrayLength,
-  onPause,
-  onResume,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isKeyPressed, setIsKeyPressed] = useState(false);
@@ -39,6 +37,8 @@ const MarqueeCard = memo(({
   const isFirstCopy = copyIndex === 0;
   const globalIndex = colIndex * chunkSize + (slotIndex % subarrayLength);
   const tileDelay = isFirstCopy ? globalIndex * (SCROLL_CONFIG.TILE_STAGGER / 1000) : 0;
+  const isDark = skill?.icon && ['express', 'nextjs'].includes(skill.icon);
+  const isPrimary = skill?.level === "primary";
 
   return (
     <motion.div
@@ -58,22 +58,18 @@ const MarqueeCard = memo(({
       }}
       whileHover="hover"
       onPointerEnter={(e) => {
-        onPause();
         if (skill) onSkillHover(skill, 'mouse', e);
       }}
       onPointerLeave={() => {
-        onResume();
         onSkillHover(null, 'mouse');
       }}
       onFocus={(e) => {
         setIsFocused(true);
-        onPause();
         if (skill) onSkillHover(skill, 'keyboard', e);
       }}
       onBlur={() => {
         setIsFocused(false);
         setIsKeyPressed(false);
-        onResume();
         onSkillHover(null, 'keyboard');
       }}
       onKeyDown={(e) => {
@@ -88,11 +84,11 @@ const MarqueeCard = memo(({
         }
       }}
       tabIndex={copyIndex === 0 ? 0 : -1}
-      className="relative cursor-default pointer-events-auto rounded-3xl focus-visible:outline-none"
+      className="relative cursor-default pointer-events-auto rounded-3xl focus-visible:outline-none group/card"
       style={{
-        width: `${SCROLL_CONFIG.TILE_SIZE}px`,
-        height: `${SCROLL_CONFIG.TILE_SIZE}px`,
-        contain: "layout style",
+        width: `var(--tile-size)`,
+        height: `var(--tile-size)`,
+        contain: "layout style paint",
       }}
       role={copyIndex === 0 ? "listitem" : undefined}
       aria-label={
@@ -125,31 +121,29 @@ const MarqueeCard = memo(({
           z: 0,
           boxShadow: "inset 0 1px 1px rgba(255,255,255,0.05), 0 4px 12px rgba(0,0,0,0.4)",
           backgroundColor: "rgba(15, 15, 18, 0.45)",
+          transform: "translateZ(0)",
         }}
         transition={prefersReducedMotion ? { duration: 0 } : { type: "spring", mass: 0.8, stiffness: 250, damping: 22 }}
         whileHover="hover"
         whileTap="active"
-        className={`absolute inset-0 overflow-hidden rounded-3xl border border-white/[0.04] ${
+        className={`absolute inset-0 overflow-hidden rounded-3xl border border-white/[0.04] transition-colors duration-200 ${
           skill?.label ? "flex flex-col items-center justify-center" : "flex items-center justify-center"
         } ${isFocused ? "ring-2 ring-[var(--accent)] ring-offset-4 ring-offset-[#0A0A0C]" : ""}`}
       >
         <div className="absolute inset-0 pointer-events-none bg-white/[0.02]" />
 
-        <motion.div
-          variants={{
-            hover: { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", opacity: 1 }
-          }}
-          initial={{ backdropFilter: "none", WebkitBackdropFilter: "none", opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="absolute inset-0 pointer-events-none"
+        {/* Hover blur overlay with GPU acceleration */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-0 group-hover/card:opacity-100 transition-opacity duration-200 backdrop-blur-[12px]"
           style={{ transform: "translateZ(0)" }}
         />
 
+        {/* Icon container */}
         <motion.div
           variants={{
             hover: {
-              scale: skill?.level === "primary" ? 1.15 : 1.05,
-              filter: skill?.level === "primary"
+              scale: isPrimary ? 1.15 : 1.05,
+              filter: isPrimary
                 ? "drop-shadow(0 0 20px var(--border-glow))"
                 : "drop-shadow(0 0 5px rgba(255,255,255,0.1))",
             }
@@ -163,30 +157,18 @@ const MarqueeCard = memo(({
               alt=""
               loading="lazy"
               decoding="async"
-              initial={{ opacity: skill?.level === "primary" ? 0.45 : 0.35 }}
-              variants={{ hover: { opacity: 0 } }}
-              transition={{ duration: prefersReducedMotion ? 0 : SCROLL_CONFIG.ICON_HOVER_DURATION }}
-              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-              style={{
-                filter: ['express', 'nextjs'].includes(skill?.icon)
-                  ? "invert(1) grayscale(1)"
-                  : "grayscale(1)",
+              variants={{
+                hover: {
+                  opacity: isPrimary ? 1 : 0.75,
+                  filter: isDark ? "invert(1) grayscale(0)" : "grayscale(0)",
+                }
               }}
-            />
-            <motion.img
-              src={image}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              initial={{ opacity: 0 }}
-              variants={{ hover: { opacity: skill?.level === "primary" ? 1 : 0.75 } }}
-              transition={{ duration: prefersReducedMotion ? 0 : SCROLL_CONFIG.ICON_HOVER_DURATION }}
-              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-              style={{
-                filter: ['express', 'nextjs'].includes(skill?.icon)
-                  ? "invert(1)"
-                  : "none",
+              initial={{
+                opacity: isPrimary ? 0.45 : 0.35,
+                filter: isDark ? "invert(1) grayscale(1)" : "grayscale(1)",
               }}
+              transition={{ duration: prefersReducedMotion ? 0 : SCROLL_CONFIG.ICON_HOVER_DURATION }}
+              className="w-full h-full object-contain pointer-events-none transition-all duration-200"
             />
           </div>
         </motion.div>
@@ -200,7 +182,7 @@ const MarqueeCard = memo(({
               letterSpacing: "0.05em",
               textTransform: "uppercase",
               color: "rgba(255,255,255,0.65)",
-              maxWidth: `${SCROLL_CONFIG.TILE_SIZE - 16}px`,
+              maxWidth: `calc(var(--tile-size) - 16px)`,
               wordBreak: "break-word",
             }}
           >
@@ -208,96 +190,25 @@ const MarqueeCard = memo(({
           </div>
         )}
 
-        <motion.div
-          variants={{ hover: { opacity: 1 } }}
-          transition={{ duration: 0.25 }}
-          className="absolute inset-0 rounded-3xl pointer-events-none"
-          style={{ border: "1px solid var(--accent)", opacity: 0 }}
+        {/* Border glow on hover */}
+        <div
+          className="absolute inset-0 rounded-3xl pointer-events-none opacity-0 group-hover/card:opacity-100 transition-opacity duration-250"
+          style={{ border: "1px solid var(--accent)" }}
         />
       </motion.div>
     </motion.div>
   );
 });
 
-// ─── Single column: scrolls forever once isInView fires ──────────────────────
+// ─── Single column: scrolls continuously when in view ───────────────────────
 const MarqueeColumn = memo(({
   subarray, colIndex, chunkSize, isInView, maxItems,
-  directionPattern, onSkillHover,
+  directionPattern, onSkillHover, prefersReducedMotion
 }) => {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
-    if (typeof window !== "undefined") {
-      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    }
-    return false;
-  });
-  const scrollRef = useRef(null);
-  const scrollPositionRef = useRef(null);
-  const isPausedRef = useRef(false);
-  const rafIdRef = useRef(null);
+  const pattern = directionPattern || DEFAULT_DIRECTION_PATTERN;
+  const direction = pattern[colIndex] ?? -1;
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const handleChange = (e) => setPrefersReducedMotion(e.matches);
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  useEffect(() => {
-    if (!isInView || prefersReducedMotion || !scrollRef.current) {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-      return;
-    }
-
-    const startScroll = () => {
-      const pattern = directionPattern || DEFAULT_DIRECTION_PATTERN;
-      const direction = pattern[colIndex] ?? -1;
-      const totalHeight = maxItems * SCROLL_CONFIG.ITEM_HEIGHT;
-      const pixelsPerMs = (SCROLL_CONFIG.SPEED_PX_PER_S || 40) / 1000;
-
-      if (scrollPositionRef.current === null) {
-        scrollPositionRef.current = -totalHeight;
-        if (scrollRef.current) {
-          scrollRef.current.style.transform = `translate3d(0, ${-totalHeight}px, 0)`;
-        }
-      }
-
-      let lastTime;
-      const animate = (time) => {
-        if (lastTime === undefined) lastTime = time;
-        const deltaTime = time - lastTime;
-        lastTime = time;
-
-        if (!isPausedRef.current) {
-          const clampedDelta = Math.min(deltaTime, 50);
-          scrollPositionRef.current += direction * pixelsPerMs * clampedDelta;
-          if (scrollPositionRef.current <= -2 * totalHeight) {
-            scrollPositionRef.current += totalHeight;
-          } else if (scrollPositionRef.current >= 0) {
-            scrollPositionRef.current -= totalHeight;
-          }
-          if (scrollRef.current) {
-            scrollRef.current.style.transform = `translate3d(0, ${scrollPositionRef.current}px, 0)`;
-          }
-        }
-        rafIdRef.current = requestAnimationFrame(animate);
-      };
-
-      rafIdRef.current = requestAnimationFrame(animate);
-    };
-
-    startScroll();
-
-    return () => {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-    };
-  }, [isInView, prefersReducedMotion, directionPattern, colIndex, maxItems, chunkSize, subarray.length]);
-
+  // Keep 5 full copies for seamless infinite scroll
   const duplicatedArray = useMemo(() => {
     const padded = Array.from({ length: maxItems }, (_, i) => subarray[i % subarray.length]);
     return [
@@ -311,9 +222,13 @@ const MarqueeColumn = memo(({
 
   return (
     <div
-      ref={scrollRef}
-      className="flex flex-col items-start"
-      style={{ gap: `${SCROLL_CONFIG.TILE_GAP}px`, willChange: "transform" }}
+      className={`flex flex-col items-start ${!prefersReducedMotion && isInView ? "animate-marquee-scroll" : ""}`}
+      style={{ 
+        gap: `var(--tile-gap)`, 
+        contain: "layout style",
+        "--max-items": maxItems,
+      }}
+      data-direction={direction}
       role="list"
       aria-label={`Technology icons column ${colIndex + 1}`}
     >
@@ -331,8 +246,6 @@ const MarqueeColumn = memo(({
             prefersReducedMotion={prefersReducedMotion}
             onSkillHover={onSkillHover}
             subarrayLength={subarray.length}
-            onPause={() => { isPausedRef.current = true; }}
-            onResume={() => { isPausedRef.current = false; }}
           />
         );
       })}
@@ -343,6 +256,17 @@ const MarqueeColumn = memo(({
 // ─── Main Marquee ─────────────────────────────────────────────────────────────
 export const ThreeDMarquee = ({ images, className, directionPattern }) => {
   const [hoveredSkill, setHoveredSkill] = useState(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      setPrefersReducedMotion(mediaQuery.matches);
+      const handleChange = (e) => setPrefersReducedMotion(e.matches);
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+  }, []);
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -353,18 +277,33 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
 
   const handlePointerMove = useCallback((e) => {
     if (!hoveredSkill) return;
-    mouseX.set(e.clientX);
+    let x = e.clientX;
+    if (typeof window !== "undefined") {
+      const halfWidth = 140; // Approx half of max-w-[275px]
+      x = Math.max(halfWidth + 10, Math.min(x, window.innerWidth - halfWidth - 10));
+    }
+    mouseX.set(x);
     mouseY.set(e.clientY);
   }, [mouseX, mouseY, hoveredSkill]);
 
   const handleSkillHover = useCallback((skillData, source = 'mouse', e = null) => {
     if (skillData) {
       if (source === 'mouse' && e) {
-        mouseX.set(e.clientX);
+        let x = e.clientX;
+        if (typeof window !== "undefined") {
+          const halfWidth = 140;
+          x = Math.max(halfWidth + 10, Math.min(x, window.innerWidth - halfWidth - 10));
+        }
+        mouseX.set(x);
         mouseY.set(e.clientY);
       } else if (source === 'keyboard' && e && e.currentTarget) {
         const rect = e.currentTarget.getBoundingClientRect();
-        mouseX.set(rect.left + rect.width / 2);
+        let x = rect.left + rect.width / 2;
+        if (typeof window !== "undefined") {
+          const halfWidth = 140;
+          x = Math.max(halfWidth + 10, Math.min(x, window.innerWidth - halfWidth - 10));
+        }
+        mouseX.set(x);
         mouseY.set(rect.top);
       }
       setHoveredSkill(skillData);
@@ -372,31 +311,29 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
       setHoveredSkill(null);
     }
   }, [mouseX, mouseY]);
+
   const { chunks, maxItems, chunkSize } = useMemo(() => {
-    // Support explicitly grouped columns (2D array)
     if (images.length > 0 && Array.isArray(images[0])) {
       const max = Math.max(...images.map(col => col.length), 4);
       return { chunks: images, maxItems: max, chunkSize: max };
     }
 
-    // Fallback: auto-distribute flat array
     const columns = 5;
-    // Enforce minimum 4 items per column to ensure the scroll container has enough height
     const max = Math.max(Math.ceil(images.length / columns), 4);
 
     const generatedChunks = Array.from({ length: columns }, (_, colIndex) => {
       return Array.from({ length: max }, (_, itemIndex) => {
-        // Flat index across the entire grid
         const globalIndex = colIndex * max + itemIndex;
-        // Wrap around the available images pool gracefully
         return images[globalIndex % images.length];
       });
     });
 
     return { chunks: generatedChunks, maxItems: max, chunkSize: max };
   }, [images]);
+
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-60px 0px" });
+  // Viewport observation: responsive margin to smoothly trigger and pause off-screen rAF
+  const isInView = useInView(ref, { margin: "100px 0px" });
 
   return (
     <div
@@ -494,8 +431,8 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
 
         <div className="absolute inset-0 flex items-center justify-center">
           <div
-            style={{ transform: "rotateX(55deg) rotateY(0deg) rotateZ(-45deg)", gap: `${SCROLL_CONFIG.TILE_GAP}px` }}
-            className="relative grid grid-cols-5 scale-75 sm:scale-90 lg:scale-100 transform-3d origin-center pointer-events-none"
+            style={{ transform: "rotateX(55deg) rotateY(0deg) rotateZ(-45deg)", gap: `var(--tile-gap)` }}
+            className="relative grid grid-cols-5 scale-[0.65] sm:scale-[0.7] md:scale-[0.85] lg:scale-100 transform-3d origin-center pointer-events-none"
           >
             {chunks.map((subarray, colIndex) => (
               <MarqueeColumn
@@ -507,6 +444,7 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
                 maxItems={maxItems}
                 directionPattern={directionPattern}
                 onSkillHover={handleSkillHover}
+                prefersReducedMotion={prefersReducedMotion}
               />
             ))}
           </div>
@@ -515,14 +453,14 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
           <div
             style={{
               transform: "rotateX(55deg) rotateY(0deg) rotateZ(-45deg) translateZ(30px)",
-              gap: `${SCROLL_CONFIG.TILE_GAP}px`
+              gap: `var(--tile-gap)`
             }}
-            className="relative grid grid-cols-5 scale-75 sm:scale-90 lg:scale-100 transform-3d origin-center"
+            className="relative grid grid-cols-5 scale-[0.65] sm:scale-[0.7] md:scale-[0.85] lg:scale-100 transform-3d origin-center"
           >
             {["Languages", "CS Concepts", "Frontend", "Backend", "Tools & DBs"].map((header, i) => {
               const topPos = -360 + i * 114;
               return (
-                <div key={i} className="flex justify-center relative" style={{ width: SCROLL_CONFIG.TILE_SIZE }}>
+                <div key={i} className="flex justify-center relative" style={{ width: "var(--tile-size)" }}>
                   <div
                     className="absolute transition-opacity duration-300"
                     style={{ top: `${topPos}px`, opacity: hoveredSkill ? 0 : 1 }}
@@ -551,3 +489,5 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
     </div>
   );
 };
+
+export default ThreeDMarquee;

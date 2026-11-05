@@ -191,18 +191,44 @@ body {
   }
 }
 
-/* PCB Animations */
-@keyframes pcbTravel {
+/* High-Speed Glowing Photon Data Packet Stream */
+@keyframes pcbPacketTravel {
   0% {
-    offset-distance: 0%;
-    transform: scale(1);
-    opacity: 0.35;
+    stroke-dashoffset: 100;
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
   }
 
   100% {
-    offset-distance: 100%;
-    transform: scale(1);
-    opacity: 0.35;
+    stroke-dashoffset: -15;
+    opacity: 0;
+  }
+}
+
+@keyframes pcbPacketTravelReverse {
+  0% {
+    stroke-dashoffset: -15;
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    stroke-dashoffset: 100;
+    opacity: 0;
   }
 }
 
@@ -229,23 +255,6 @@ body {
   50% {
     opacity: 0.32;
     transform: scale(1.08);
-  }
-}
-
-@keyframes pcbTrailAnim {
-  0% {
-    stroke-dashoffset: 400;
-    opacity: 0.8;
-  }
-
-  70% {
-    stroke-dashoffset: 120;
-    opacity: 0.8;
-  }
-
-  100% {
-    stroke-dashoffset: 0;
-    opacity: 0;
   }
 }
 
@@ -794,4 +803,54 @@ body {
 #contact[data-inview="false"] svg *,
 #contact[data-inview="false"] .anim-inview-pause {
   animation-play-state: paused !important;
-}
+}
+
+:root {
+  --tile-size: 160px;
+  --tile-gap: 60px;
+  --item-height: calc(var(--tile-size) + var(--tile-gap));
+  --speed-px-per-s: 40;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --tile-size: 140px;
+    --tile-gap: 32px;
+  }
+}
+@media (max-width: 480px) {
+  :root {
+    --tile-size: 120px;
+    --tile-gap: 24px;
+  }
+}
+
+@keyframes marqueeInfiniteScroll {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, calc(-1 * var(--max-items) * var(--item-height)), 0);
+  }
+}
+
+.animate-marquee-scroll {
+  --total-height: calc(var(--max-items) * var(--item-height));
+  --marquee-duration: calc((var(--total-height) / 1px) / var(--speed-px-per-s) * 1s);
+  animation: marqueeInfiniteScroll var(--marquee-duration) linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-scroll[data-direction="-1"] {
+  animation-direction: normal;
+}
+
+.animate-marquee-scroll[data-direction="1"] {
+  animation-direction: reverse;
+}
+
+.animate-marquee-scroll:hover,
+.animate-marquee-scroll:focus-within {
+  animation-play-state: paused !important;
+}
+

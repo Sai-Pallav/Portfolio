@@ -377,6 +377,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
   const [inquiryType, setInquiryType] = useState('Full-Time Opportunity')
   const [touched, setTouched] = useState({ name: false, email: false, subject: false, message: false })
+  const [focusedField, setFocusedField] = useState(null)
   const clearFieldsTimeoutRef = useRef(null)
   const typingTimerRef = useRef(null)
   const apiErrorTimeoutRef = useRef(null)
@@ -393,15 +394,25 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     const sectionEl = document.getElementById('contact')
     if (!sectionEl) return
 
-    let validCount = 0
-    if (formData.name && formData.name.trim().length >= 2) validCount++
-    if (formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) validCount++
-    if (formData.subject && formData.subject.trim().length >= 3) validCount++
-    if (formData.message && formData.message.trim().length >= 10) validCount++
+    const { name = '', email = '', subject = '', message = '' } = formData
 
-    const progress = (validCount / 4) * 100
+    // Gradual typing fill + automatic 25% top-up when moving to next field
+    // Expected character counts to reach full 25% for each field
+    const nameDone = touched.name && name.trim().length > 0 && focusedField !== 'name'
+    const nameScore = nameDone ? 25 : Math.min(25, (name.length / 25) * 25)
+
+    const emailDone = touched.email && email.trim().length > 0 && focusedField !== 'email'
+    const emailScore = emailDone ? 25 : Math.min(25, (email.length / 35) * 25)
+
+    const subjectDone = touched.subject && subject.trim().length > 0 && focusedField !== 'subject'
+    const subjectScore = subjectDone ? 25 : Math.min(25, (subject.length / 40) * 25)
+
+    const messageDone = touched.message && message.trim().length > 0 && focusedField !== 'message'
+    const messageScore = messageDone ? 25 : Math.min(25, (message.length / 100) * 25)
+
+    const progress = Math.min(100, Math.round(nameScore + emailScore + subjectScore + messageScore))
     sectionEl.dispatchEvent(new CustomEvent('contact-progress', { detail: { progress } }))
-  }, [formData])
+  }, [formData, touched, focusedField])
 
   const [isTyping, setIsTyping] = useState(false)
   const [errors, setErrors] = useState({})
@@ -442,13 +453,15 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     })
   }, [resetErrorState, onTypingChange])
 
-  const handleFocus = useCallback(() => {
+  const handleFocus = useCallback((e) => {
     resetErrorState()
+    if (e && e.target) setFocusedField(e.target.name)
   }, [resetErrorState])
 
   const handleBlur = useCallback((e) => {
     const { name, value } = e.target
     setTouched(prev => ({ ...prev, [name]: true }))
+    setFocusedField(null)
     resetErrorState()
 
     setErrors(prev => {
@@ -476,18 +489,19 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       return
     }
 
-    const newErrors = {}
-    Object.keys(formData).forEach(key => {
-      const err = validateField(key, formData[key])
-      if (err) newErrors[key] = err
-    })
-    setErrors(newErrors)
+    // TEMPORARY: Validation bypassed so Send Inquiry works independently of form filling
+    // const newErrors = {}
+    // Object.keys(formData).forEach(key => {
+    //   const err = validateField(key, formData[key])
+    //   if (err) newErrors[key] = err
+    // })
+    // setErrors(newErrors)
 
-    if (Object.keys(newErrors).length > 0) {
-      setSubState('validation_error')
-      setStatus({ type: '', message: '' })
-      return
-    }
+    // if (Object.keys(newErrors).length > 0) {
+    //   setSubState('validation_error')
+    //   setStatus({ type: '', message: '' })
+    //   return
+    // }
 
     if (onTransmit) {
       onTransmit()
@@ -499,21 +513,21 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     try {
       if (!isConfigured) {
         await new Promise(resolve => setTimeout(resolve, 1000))
-        if (formData.subject.toLowerCase() === 'fail') {
+        if ((formData.subject || '').toLowerCase() === 'fail') {
           throw new Error('Simulated API Failure')
         }
       } else {
-        if (formData.subject.toLowerCase() === 'fail') {
+        if ((formData.subject || '').toLowerCase() === 'fail') {
           throw new Error('Simulated API Failure')
         }
         await emailjs.send(
           serviceId,
           templateId,
           {
-            from_name: formData.name,
-            from_email: formData.email,
-            subject: formData.subject,
-            message: `[Inquiry Type: ${inquiryType}]\n\n${formData.message}`,
+            from_name: formData.name || 'Anonymous / Test',
+            from_email: formData.email || 'test@example.com',
+            subject: formData.subject || `Inquiry: ${inquiryType}`,
+            message: `[Inquiry Type: ${inquiryType}]\n\n${formData.message || 'No message provided (Test Submission)'}`,
             to_email: personal.email,
           },
           publicKey
@@ -534,7 +548,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
     if (contactSystemState === 'transmit') {
       const tSuccess = setTimeout(() => {
         setSubState(curr => (curr === 'submitting' ? 'success' : curr))
-      }, 900)
+      }, 780)
 
       clearFieldsTimeoutRef.current = setTimeout(() => {
         setFormData({ name: '', email: '', subject: '', message: '' })
@@ -556,7 +570,9 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       className={`relative rounded-[20px] border p-6 sm:p-7 md:p-7.5 w-full overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${
-        isFormActive
+        isTransmit
+          ? 'border-[#a78bfa] bg-[#0c0a1b] shadow-[0_0_50px_rgba(167,139,250,0.35),0_25px_60px_-15px_rgba(0,0,0,0.95)]'
+          : isFormActive
           ? 'border-[#2d254a] bg-[#090812] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95),0_0_30px_rgba(167,139,250,0.10)]'
           : 'border-[#191528] bg-[#07060e] shadow-none opacity-65'
       }`}

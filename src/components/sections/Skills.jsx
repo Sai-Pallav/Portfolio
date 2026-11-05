@@ -60,7 +60,10 @@ function Skills() {
   return (
     <section id="skills" aria-labelledby="skills-heading" className="py-24 relative overflow-hidden bg-[#0A0A0C]">
       {/* 5-Layer Premium Background System */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div 
+        className="absolute inset-0 overflow-hidden pointer-events-none"
+        style={{ contain: "paint", transform: "translateZ(0)" }}
+      >
         {/* Layer 1: Dark atmospheric foundation */}
         <div className="absolute inset-0 bg-[#0A0A0C]" />
         
@@ -80,11 +83,11 @@ function Skills() {
         />
 
         {/* Layer 3: Large blurred gradient meshes */}
-        <div className="absolute -top-[30%] left-[20%] w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(37,99,235,0.08)_0%,transparent_70%)] blur-[80px]" />
-        <div className="absolute -bottom-[20%] right-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(59,130,246,0.06)_0%,transparent_70%)] blur-[100px]" />
+        <div className="absolute -top-[30%] left-[20%] w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(37,99,235,0.08)_0%,transparent_70%)] blur-[80px] will-change-transform" />
+        <div className="absolute -bottom-[20%] right-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(59,130,246,0.06)_0%,transparent_70%)] blur-[100px] will-change-transform" />
         
         {/* Layer 4: Soft ambient center glow */}
-        <div className="absolute top-[20%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.04)_0%,transparent_60%)] blur-[60px]" />
+        <div className="absolute top-[20%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.04)_0%,transparent_60%)] blur-[60px] will-change-transform" />
       </div>
 
       <div className="container mx-auto px-4 relative z-10 flex flex-col items-center">
