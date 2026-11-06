@@ -5,13 +5,109 @@ import * as THREE from 'three'
 import { motion, useReducedMotion } from 'framer-motion'
 import { personal } from '@/data/personal'
 import SocialIcon from '@/components/ui/SocialIcon'
+import { useThemeContext } from '@/context/ThemeContext'
+
+// --- Theme Palettes for all portfolio themes ---
+const THEME_PALETTES = {
+  'obsidian': {
+    primary: '#2563eb',
+    secondary: '#6366f1',
+    hover: '#3b82f6',
+  },
+  'warm-slate': {
+    primary: '#f97316',
+    secondary: '#fb923c',
+    hover: '#fb8f3f',
+  },
+  'midnight-violet': {
+    primary: '#a78bfa',
+    secondary: '#9f7aea',
+    hover: '#c4b5fd',
+  },
+  'steel-flame': {
+    primary: '#ff3c3c',
+    secondary: '#ff6b9d',
+    hover: '#ff6060',
+  },
+  'emerald-noir': {
+    primary: '#10b981',
+    secondary: '#14b8a6',
+    hover: '#34d399',
+  },
+  'graphite': {
+    primary: '#9ca3af',
+    secondary: '#6b7280',
+    hover: '#d1d5db',
+  },
+  'nordic-frost': {
+    primary: '#3b82f6',
+    secondary: '#6366f1',
+    hover: '#60a5fa',
+  },
+  'professional': {
+    primary: '#2563eb',
+    secondary: '#6366f1',
+    hover: '#3b82f6',
+  },
+}
+
+const getInitialThemeKey = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('portfolio-theme')
+      if (saved && THEME_PALETTES[saved]) return saved
+      const docTheme = document.documentElement.getAttribute('data-theme')
+      if (docTheme && THEME_PALETTES[docTheme]) return docTheme
+    } catch {
+      // ignore
+    }
+  }
+  return 'obsidian'
+}
+
+const initialPalette = THEME_PALETTES[getInitialThemeKey()] || THEME_PALETTES['obsidian']
 
 // --- Global Theme Ref for Imperative Material Updates (No React Re-renders) ---
 const globalTheme = {
-  primary: '#2563eb',
-  secondary: '#6366f1',
-  hover: '#3b82f6',
+  primary: initialPalette.primary,
+  secondary: initialPalette.secondary,
+  hover: initialPalette.hover,
   version: 0,
+}
+
+function applyThemeColors(themeKey) {
+  const palette = THEME_PALETTES[themeKey]
+  if (palette) {
+    if (
+      globalTheme.primary !== palette.primary ||
+      globalTheme.secondary !== palette.secondary ||
+      globalTheme.hover !== palette.hover
+    ) {
+      globalTheme.primary = palette.primary
+      globalTheme.secondary = palette.secondary
+      globalTheme.hover = palette.hover
+      globalTheme.version += 1
+    }
+    return
+  }
+
+  // Fallback to DOM styles for unknown custom themes
+  if (typeof document !== 'undefined') {
+    try {
+      const styles = getComputedStyle(document.documentElement)
+      const accent = styles.getPropertyValue('--accent').trim()
+      const secondary = styles.getPropertyValue('--accent-secondary').trim() || styles.getPropertyValue('--accent-hover').trim() || accent
+      const hover = styles.getPropertyValue('--accent-hover').trim() || accent
+      if (accent && (accent !== globalTheme.primary || secondary !== globalTheme.secondary || hover !== globalTheme.hover)) {
+        globalTheme.primary = accent
+        globalTheme.secondary = secondary
+        globalTheme.hover = hover
+        globalTheme.version += 1
+      }
+    } catch {
+      // ignore
+    }
+  }
 }
 
 // Scene constants
@@ -92,47 +188,114 @@ const FresnelGlowMaterial = shaderMaterial(
 )
 extend({ FresnelGlowMaterial })
 
-// Ring Glow Custom Neon Material - clean, calm infrastructure look with distinct foreground / background depth
+// Realistic Depth-Aware Orbital Ring Shader Material
 const RingGlowMaterial = shaderMaterial(
   {
-    color: new THREE.Color('#2563eb'),
-    opacity: 0.35,
+    color: new THREE.Color(initialPalette.primary),
+    opacity: 0.50,
+    passMode: 0.0, // 0.0 = Background pass (renderOrder 0), 1.0 = Foreground pass (renderOrder 6)
   },
-  `varying vec3 vNormal; varying vec3 vViewPosition; varying vec2 vUv;
+  `varying vec3 vNormal;
+   varying vec3 vViewPosition;
+   varying vec3 vRelativeViewPos;
+   varying float vWorldScale;
+   
    void main() { 
-     vUv = uv; 
-     vNormal = normalize(normalMatrix * normal); 
-     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); 
-     vViewPosition = -mvPosition.xyz; 
+     vNormal = normalize(normalMatrix * normal);
+     vWorldScale = length(modelMatrix[0].xyz);
+     
+     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+     vViewPosition = -mvPosition.xyz;
+     
+     // Globe center in camera view space
+     vec4 globeCenterView = viewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+     
+     // Relative camera-space position (fragment relative to globe center along camera ray)
+     vRelativeViewPos = vec3(
+       mvPosition.x - globeCenterView.x,
+       mvPosition.y - globeCenterView.y,
+       mvPosition.z - globeCenterView.z
+     );
+     
      gl_Position = projectionMatrix * mvPosition; 
    }`,
   `uniform vec3 color; 
    uniform float opacity; 
+   uniform float passMode;
+   
    varying vec3 vNormal; 
    varying vec3 vViewPosition; 
-   varying vec2 vUv;
+   varying vec3 vRelativeViewPos;
+   varying float vWorldScale;
+   
    void main() { 
      vec3 normal = normalize(vNormal); 
      vec3 viewDir = normalize(vViewPosition); 
-     float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 1.5); 
      
-     // Depth relative to globe center (at 8.0 in view space)
-     float zRel = 8.0 - vViewPosition.z; // > 0: in front, < 0: behind
+     float s = max(vWorldScale, 0.001);
+     float globeRadius = 2.0 * s;
+     float maxZ = 2.45 * s;
      
-     // Continuous smooth depth gradient along the 3D trajectory
-     // Ranges from 0.0 at maximum back (zRel ~ -2.2) to 1.0 at maximum front (zRel ~ +2.2)
-     float depthFactor = clamp((zRel + 2.2) / 4.4, 0.0, 1.0);
+     // Normalized camera-space depth along viewing line of sight:
+     // +1.0 = front apex (closest to camera, passing in front of globe)
+     //  0.0 = center plane / equatorial limbs
+     // -1.0 = back apex (farthest from camera, passing behind globe)
+     float zRel = vRelativeViewPos.z;
+     float normZ = clamp(zRel / maxZ, -1.0, 1.0);
      
-     // Calibrated depth ratio: Front visibility 80%, Back visibility 60%
-     // Smooth transition from 0.60 (back) to 0.80 (front)
-     float visFactor = mix(0.60, 0.80, depthFactor);
+     // Smooth transition factor across the equatorial boundary
+     float transitionBand = 0.16;
+     float frontWeight = smoothstep(-transitionBand, transitionBand, normZ);
      
-     // Color intensity smoothly modulates from back (0.60 base) to front (0.80 base) with rim glow
-     float coreLuminance = mix(0.60, 0.80, depthFactor);
-     vec3 finalColor = color * (coreLuminance + fresnel * (1.1 + 0.4 * depthFactor));
+     // Dynamic depth partition check between passes:
+     // passMode == 0.0: Background pass (normZ <= transitionBand)
+     // passMode == 1.0: Foreground pass (normZ >= -transitionBand)
+     float passVisibility = 1.0;
+     if (passMode < 0.5) {
+       passVisibility = 1.0 - frontWeight;
+       if (passVisibility <= 0.001) {
+         discard;
+       }
+     } else {
+       passVisibility = frontWeight;
+       if (passVisibility <= 0.001) {
+         discard;
+       }
+     }
      
-     // Opacity smoothly modulates from back (0.60 scale) to front (0.80 scale)
-     float finalOpacity = opacity * (visFactor + fresnel * 0.45);
+     // 2D distance from camera ray through globe center (in camera projection plane)
+     float dist2D = length(vRelativeViewPos.xy);
+     float normDist = dist2D / globeRadius;
+     
+     // Spherical absorption factor: accounts for light passing through translucent globe body
+     float backFactor = clamp(-normZ / 0.45, 0.0, 1.0);
+     float insideSilhouette = sqrt(clamp(1.0 - normDist * normDist, 0.0, 1.0));
+     float globeOcclusion = backFactor * insideSilhouette;
+     
+     // Fresnel rim reflection: highlights the sleek 3D tubular curvature
+     float NdotV = max(dot(normal, viewDir), 0.0);
+     float fresnel = pow(1.0 - NdotV, 1.8);
+     
+     // Calibrated visual hierarchy:
+     // Foreground: Opacity 0.88, Luminance 1.15, Crisp Fresnel 0.60
+     // Background outside silhouette: Opacity 0.55, Luminance 0.70, Fresnel 0.22
+     // Background occluded by globe: Opacity 0.32, Luminance 0.46, Fresnel 0.10
+     float targetOpacity;
+     float targetLum;
+     float targetFresnel;
+     
+     if (passMode > 0.5) {
+       targetOpacity = 0.88;
+       targetLum = 1.15;
+       targetFresnel = 0.60;
+     } else {
+       targetOpacity = mix(0.55, 0.32, globeOcclusion);
+       targetLum = mix(0.70, 0.46, globeOcclusion);
+       targetFresnel = mix(0.22, 0.10, globeOcclusion);
+     }
+     
+     float finalOpacity = targetOpacity * passVisibility;
+     vec3 finalColor = color * (targetLum + fresnel * targetFresnel);
      
      gl_FragColor = vec4(finalColor, finalOpacity); 
    }`
@@ -146,16 +309,12 @@ const staticGeomPoints = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius
 const staticGeomGlass = new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 32, 32)
 const staticGeomHalo = new THREE.SphereGeometry(SCENE_CONFIG.globe.haloRadius, 32, 32)
 
-// 3 Graduated ring geometries with calibrated tube thickness for distinct visual hierarchy
-const ringGeometries = [
-  new THREE.TorusGeometry(2.45, 0.035, 16, 128),
-  new THREE.TorusGeometry(2.45, 0.031, 16, 128),
-  new THREE.TorusGeometry(2.45, 0.028, 16, 128),
-]
+// Unified orbital ring geometry shared by all three rings for 100% consistent thickness and smoothness
+const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.032, 16, 128)
 
 // Shared static materials - allocated once to completely eliminate GC churn
 const staticMatGlassCore = new THREE.MeshStandardMaterial({
-  color: new THREE.Color('#0a0814'),
+  color: new THREE.Color(initialPalette.primary).multiplyScalar(0.10).add(new THREE.Color('#05060a')),
   roughness: 0.25,
   metalness: 0.60,
   transparent: true,
@@ -164,7 +323,7 @@ const staticMatGlassCore = new THREE.MeshStandardMaterial({
 })
 
 const staticMatInnerWire = new THREE.MeshBasicMaterial({
-  color: new THREE.Color('#6366f1'),
+  color: new THREE.Color(initialPalette.secondary).multiplyScalar(0.70).lerp(new THREE.Color(initialPalette.primary), 0.30),
   wireframe: true,
   transparent: true,
   opacity: SCENE_CONFIG.globe.wireframeOpacity * 0.7,
@@ -173,7 +332,7 @@ const staticMatInnerWire = new THREE.MeshBasicMaterial({
 })
 
 const staticMatOuterWire = new THREE.MeshBasicMaterial({
-  color: new THREE.Color('#2563eb'),
+  color: new THREE.Color(initialPalette.primary),
   wireframe: true,
   transparent: true,
   opacity: SCENE_CONFIG.globe.wireframeOpacity,
@@ -182,7 +341,7 @@ const staticMatOuterWire = new THREE.MeshBasicMaterial({
 })
 
 const staticMatOuterPoints = new THREE.PointsMaterial({
-  color: new THREE.Color('#2563eb'),
+  color: new THREE.Color(initialPalette.primary).lerp(new THREE.Color('#ffffff'), 0.22),
   size: 0.026,
   transparent: true,
   opacity: SCENE_CONFIG.globe.pointsOpacity,
@@ -195,43 +354,37 @@ const staticMatAtmosphericHalo = new FresnelGlowMaterial()
 staticMatAtmosphericHalo.transparent = true
 staticMatAtmosphericHalo.depthWrite = false
 staticMatAtmosphericHalo.blending = THREE.AdditiveBlending
+staticMatAtmosphericHalo.uniforms.color.value.copy(new THREE.Color(initialPalette.primary))
 
-// 3 Tiered Ring Glow Materials: Ring 0 (Primary), Ring 1 (Secondary), Ring 2 (Hover/Tertiary)
-const staticRingMaterials = [
-  (() => {
-    const mat = new RingGlowMaterial()
-    mat.transparent = true
-    mat.blending = THREE.AdditiveBlending
-    mat.depthWrite = false
-    mat.depthTest = true
-    mat.color = new THREE.Color('#2563eb')
-    mat.opacity = 0.52
-    return mat
-  })(),
-  (() => {
-    const mat = new RingGlowMaterial()
-    mat.transparent = true
-    mat.blending = THREE.AdditiveBlending
-    mat.depthWrite = false
-    mat.depthTest = true
-    mat.color = new THREE.Color('#6366f1')
-    mat.opacity = 0.48
-    return mat
-  })(),
-  (() => {
-    const mat = new RingGlowMaterial()
-    mat.transparent = true
-    mat.blending = THREE.AdditiveBlending
-    mat.depthWrite = false
-    mat.depthTest = true
-    mat.color = new THREE.Color('#3b82f6')
-    mat.opacity = 0.45
-    return mat
-  })(),
-]
+// Calibrated orbital ring materials shared by all three rings:
+// 1. Background material: renders behind globe at renderOrder = 0
+const sharedRingMaterialBg = (() => {
+  const mat = new RingGlowMaterial()
+  mat.transparent = true
+  mat.blending = THREE.NormalBlending
+  mat.depthWrite = false
+  mat.depthTest = false
+  mat.uniforms.passMode.value = 0.0
+  mat.color = new THREE.Color(initialPalette.primary)
+  mat.opacity = 0.50
+  return mat
+})()
+
+// 2. Foreground material: renders in front of globe at renderOrder = 6
+const sharedRingMaterialFg = (() => {
+  const mat = new RingGlowMaterial()
+  mat.transparent = true
+  mat.blending = THREE.NormalBlending
+  mat.depthWrite = false
+  mat.depthTest = false
+  mat.uniforms.passMode.value = 1.0
+  mat.color = new THREE.Color(initialPalette.primary)
+  mat.opacity = 0.50
+  return mat
+})()
 
 const staticMatMicroParticles = new THREE.PointsMaterial({
-  color: new THREE.Color('#6366f1'),
+  color: new THREE.Color(initialPalette.secondary).lerp(new THREE.Color('#ffffff'), 0.15),
   size: 0.020,
   transparent: true,
   opacity: 0.18,
@@ -278,9 +431,14 @@ function CameraRig({ distanceFactor }) {
   return null
 }
 
-function Lights() {
+function Lights({ theme }) {
   const lightRef = useRef()
   const lastColorVersion = useRef(-1)
+
+  useEffect(() => {
+    lastColorVersion.current = -1
+  }, [theme])
+
   useFrame(() => {
     if (lastColorVersion.current !== globalTheme.version && lightRef.current) {
       lightRef.current.color.set(globalTheme.primary)
@@ -675,7 +833,6 @@ const OrbitalRing = memo(function OrbitalRing({
   isTransmit = false
 }) {
   const orbitGroupRef = useRef()
-  const meshRef = useRef()
   const pivotARef = useRef()
   const pivotBRef = useRef()
 
@@ -766,13 +923,26 @@ const OrbitalRing = memo(function OrbitalRing({
     return ORBIT_RING_QUATERNIONS[0]
   }, [quaternion, angle, myRingIndex])
 
-  const ringGeom = ringGeometries[myRingIndex % ringGeometries.length]
-  const ringMat = staticRingMaterials[myRingIndex % staticRingMaterials.length]
+  const ringGeom = sharedRingGeometry
 
   return (
     <group quaternion={ringQuaternion}>
       <group ref={orbitGroupRef}>
-        <mesh ref={meshRef} position={[0, 0, zOffset]} geometry={ringGeom} material={ringMat} renderOrder={7} />
+        {/* Pass 1: Background orbital ring portion - seamlessly renders behind the globe at renderOrder = 0 */}
+        <mesh
+          position={[0, 0, zOffset]}
+          geometry={ringGeom}
+          material={sharedRingMaterialBg}
+          renderOrder={0}
+        />
+
+        {/* Pass 2: Foreground orbital ring portion - crisp, prominent render in front of globe at renderOrder = 6 */}
+        <mesh
+          position={[0, 0, zOffset]}
+          geometry={ringGeom}
+          material={sharedRingMaterialFg}
+          renderOrder={6}
+        />
 
         {/* IconPivot A */}
         {ENABLE_ORBITING_ICONS && (
@@ -812,7 +982,7 @@ const OrbitalRing = memo(function OrbitalRing({
   )
 })
 
-function Scene({ distanceFactor, hoveredCountRef, hoveredOrbitRef, contactSystemState = 'dormant' }) {
+function Scene({ theme, distanceFactor, hoveredCountRef, hoveredOrbitRef, contactSystemState = 'dormant' }) {
   const isTransmit = contactSystemState === 'transmit'
   const { width } = useThree((state) => state.size)
 
@@ -825,11 +995,14 @@ function Scene({ distanceFactor, hoveredCountRef, hoveredOrbitRef, contactSystem
   // Synchronous material color update on theme state transitions
   const lastColorVersion = useRef(-1)
 
+  useEffect(() => {
+    lastColorVersion.current = -1
+  }, [theme])
+
   useFrame(() => {
     if (lastColorVersion.current !== globalTheme.version) {
       const primaryCol = new THREE.Color(globalTheme.primary)
       const secondaryCol = new THREE.Color(globalTheme.secondary)
-      const hoverCol = new THREE.Color(globalTheme.hover)
 
       // 1. Cosmic Obsidian Glass Core - 10% theme undertone on dark obsidian
       staticMatGlassCore.color
@@ -843,38 +1016,43 @@ function Scene({ distanceFactor, hoveredCountRef, hoveredOrbitRef, contactSystem
         .copy(secondaryCol)
         .multiplyScalar(0.70)
         .lerp(primaryCol, 0.30)
-      // 4. Primary Outer Geodesic Network
+
+      // 3. Primary Outer Geodesic Network
       staticMatOuterWire.color.copy(primaryCol)
 
-      // 5. Constellation Stars (delicate nodes with restrained luminous theme tint)
+      // 4. Constellation Stars (delicate nodes with restrained luminous theme tint)
       staticMatOuterPoints.color
         .copy(primaryCol)
         .lerp(new THREE.Color('#ffffff'), 0.22)
 
-      // 6. Atmospheric Rim Halo
+      // 5. Atmospheric Rim Halo
       staticMatAtmosphericHalo.uniforms.color.value.copy(primaryCol)
+      if (staticMatAtmosphericHalo.color) {
+        staticMatAtmosphericHalo.color.copy(primaryCol)
+      }
 
-      // 7. Three Tiered Orbital Rings
-      // Ring 0 (Equatorial primary)
-      staticRingMaterials[0].uniforms.color.value.copy(primaryCol)
+      // 6. Orbital Rings (100% consistent theme accent across all 3 rings in both depth passes)
+      sharedRingMaterialBg.uniforms.color.value.copy(primaryCol)
+      if (sharedRingMaterialBg.color) {
+        sharedRingMaterialBg.color.copy(primaryCol)
+      }
+      sharedRingMaterialFg.uniforms.color.value.copy(primaryCol)
+      if (sharedRingMaterialFg.color) {
+        sharedRingMaterialFg.color.copy(primaryCol)
+      }
 
-      // Ring 1 (Slanted left secondary)
-      staticRingMaterials[1].uniforms.color.value.copy(secondaryCol)
-
-      // Ring 2 (Slanted right tertiary/hover)
-      staticRingMaterials[2].uniforms.color.value.copy(hoverCol)
-
-      // 8. Floating MicroParticles
+      // 7. Floating MicroParticles
       staticMatMicroParticles.color
         .copy(secondaryCol)
         .lerp(new THREE.Color('#ffffff'), 0.15)
-lastColorVersion.current = globalTheme.version
+
+      lastColorVersion.current = globalTheme.version
     }
   })
 
   return (
     <group scale={scale}>
-      <Lights />
+      <Lights theme={theme} />
       <CameraRig distanceFactor={distanceFactor} />
       <Globe distanceFactor={distanceFactor} isTransmit={isTransmit} />
       <MicroParticles distanceFactor={distanceFactor} isTransmit={isTransmit} />
@@ -884,8 +1062,8 @@ lastColorVersion.current = globalTheme.version
         myRingIndex={0}
         angle={ORBIT_RING_ANGLES[0]}
         quaternion={ORBIT_RING_QUATERNIONS[0]}
-        ringSpeed={0.02}
-        iconSpeed={0.35}
+        ringSpeed={0.018}
+        iconSpeed={0.30}
         icons={STATIC_RING_ICONS[0]}
         zOffset={0.00}
         distanceFactor={distanceFactor}
@@ -897,8 +1075,8 @@ lastColorVersion.current = globalTheme.version
         myRingIndex={1}
         angle={ORBIT_RING_ANGLES[1]}
         quaternion={ORBIT_RING_QUATERNIONS[1]}
-        ringSpeed={-0.016}
-        iconSpeed={-0.28}
+        ringSpeed={-0.018}
+        iconSpeed={-0.30}
         icons={STATIC_RING_ICONS[1]}
         zOffset={0.00}
         distanceFactor={distanceFactor}
@@ -910,8 +1088,8 @@ lastColorVersion.current = globalTheme.version
         myRingIndex={2}
         angle={ORBIT_RING_ANGLES[2]}
         quaternion={ORBIT_RING_QUATERNIONS[2]}
-        ringSpeed={0.013}
-        iconSpeed={0.22}
+        ringSpeed={0.018}
+        iconSpeed={0.30}
         icons={STATIC_RING_ICONS[2]}
         zOffset={0.00}
         distanceFactor={distanceFactor}
@@ -934,35 +1112,24 @@ const Contact3DObject = memo(function Contact3DObject({ isInView, contactSystemS
   // WebGL Context Loss graceful UI recovery handler
   const [webglSupported, setWebglSupported] = useState(true)
 
-  // MutationObserver on <html> (retains theme synchronization, bypassing React renders)
-  useEffect(() => {
-    const readTheme = () => {
-      if (typeof document === 'undefined') return
-      const styles = getComputedStyle(document.documentElement)
-      const accent = styles.getPropertyValue("--accent").trim() || '#2563eb'
-      const secondary = styles.getPropertyValue("--accent-secondary").trim() || styles.getPropertyValue("--accent-hover").trim() || accent
-      const hover = styles.getPropertyValue("--accent-hover").trim() || accent
+  // React ThemeContext synchronization
+  const themeCtx = useThemeContext()
+  const currentThemeKey = themeCtx?.theme || (typeof document !== 'undefined' ? document.documentElement.getAttribute('data-theme') : null) || 'obsidian'
 
-      let updated = false
-      if (accent !== globalTheme.primary) {
-        globalTheme.primary = accent
-        updated = true
-      }
-      if (secondary !== globalTheme.secondary) {
-        globalTheme.secondary = secondary
-        updated = true
-      }
-      if (hover !== globalTheme.hover) {
-        globalTheme.hover = hover
-        updated = true
-      }
-      if (updated) {
-        globalTheme.version += 1
+  useEffect(() => {
+    applyThemeColors(currentThemeKey)
+  }, [currentThemeKey])
+
+  // MutationObserver on <html> (retains theme synchronization if changed outside React)
+  useEffect(() => {
+    const handleMutation = () => {
+      const docTheme = document.documentElement.getAttribute('data-theme')
+      if (docTheme) {
+        applyThemeColors(docTheme)
       }
     }
-    readTheme()
-    const observer = new MutationObserver(readTheme)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] })
+    const observer = new MutationObserver(handleMutation)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] })
     return () => observer.disconnect()
   }, [])
 
@@ -1084,6 +1251,7 @@ const Contact3DObject = memo(function Contact3DObject({ isInView, contactSystemS
               style={{ pointerEvents: 'auto', opacity: 1 }}
             >
               <Scene
+                theme={currentThemeKey}
                 distanceFactor={distanceFactor}
                 hoveredCountRef={hoveredCountRef}
                 hoveredOrbitRef={hoveredOrbitRef}
