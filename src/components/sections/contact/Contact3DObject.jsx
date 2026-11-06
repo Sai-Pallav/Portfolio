@@ -188,7 +188,25 @@ const FresnelGlowMaterial = shaderMaterial(
 )
 extend({ FresnelGlowMaterial })
 
-// Realistic Depth-Aware Orbital Ring Shader Material
+// Premium Glass-Like Orbital Ring Shader Material
+// Architecture: TorusGeometry(R=2.45, r=0.032, 16 radial, 128 tubular)
+// - Has full per-vertex 3D surface normals (radially outward from tube center)
+// - Has UVs: uv.x = along torus ring, uv.y = around tube cross-section (0..1)
+// - Is a true mesh — supports physically-grounded view-dependent shading
+//
+// Root causes of previous "transparent wire" appearance:
+// 1. edgeFade=smoothstep(0,0.08,NdotV) erased the glass RIMS (NdotV≈0 at tube sides)
+//    — the tube side-edges are where Fresnel rim highlights define the glass rod shape
+// 2. Flat body shading (color*baseLum) with no cross-section gradient → uniform wire look
+// 3. Back-facing tube fragments (NdotV_raw<0) contributed noise with depthTest=false
+// 4. uv.y (tube cross-section angle) was unused — no cylindrical graduation possible
+//
+// Correct glass rod appearance:
+// A) Tube rim highlights: Fresnel rim at tube sides (NdotV→0) brightens the glass edges
+// B) Body transparency gradient: tube center (NdotV=1) is most transparent; rim is denser
+// C) Specular stripe: NdotH sweeps continuously around the torus as a light stripe
+// D) Back-face discard: fragments where normal faces away from camera are culled
+// E) Cross-section curvature shading: body darkens toward tube sides, brightens at center
 const RingGlowMaterial = shaderMaterial(
   {
     color: new THREE.Color(initialPalette.primary),
@@ -199,10 +217,12 @@ const RingGlowMaterial = shaderMaterial(
    varying vec3 vViewPosition;
    varying vec3 vRelativeViewPos;
    varying float vWorldScale;
+   varying vec2 vUv;
    
    void main() { 
      vNormal = normalize(normalMatrix * normal);
      vWorldScale = length(modelMatrix[0].xyz);
+     vUv = uv;
      
      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
      vViewPosition = -mvPosition.xyz;
@@ -227,10 +247,21 @@ const RingGlowMaterial = shaderMaterial(
    varying vec3 vViewPosition; 
    varying vec3 vRelativeViewPos;
    varying float vWorldScale;
+   varying vec2 vUv;
+
+   #define PI 3.14159265359
    
    void main() { 
      vec3 normal = normalize(vNormal); 
-     vec3 viewDir = normalize(vViewPosition); 
+     vec3 viewDir = normalize(vViewPosition);
+
+     // --- Back-face tube cull ---
+     // The torus has real 3D normals. Fragments where the tube surface faces away from
+     // the camera contribute noise (back of the glass rod) and must be discarded.
+     // With depthTest=false, back-face discard is essential for clean glass appearance.
+     float NdotV_raw = dot(normal, viewDir);
+     if (NdotV_raw < -0.05) discard;
+     float NdotV = max(NdotV_raw, 0.0);
      
      float s = max(vWorldScale, 0.001);
      float globeRadius = 2.0 * s;
@@ -243,59 +274,137 @@ const RingGlowMaterial = shaderMaterial(
      float zRel = vRelativeViewPos.z;
      float normZ = clamp(zRel / maxZ, -1.0, 1.0);
      
-     // Smooth transition factor across the equatorial boundary
-     float transitionBand = 0.16;
-     float frontWeight = smoothstep(-transitionBand, transitionBand, normZ);
-     
-     // Dynamic depth partition check between passes:
-     // passMode == 0.0: Background pass (normZ <= transitionBand)
-     // passMode == 1.0: Foreground pass (normZ >= -transitionBand)
-     float passVisibility = 1.0;
-     if (passMode < 0.5) {
-       passVisibility = 1.0 - frontWeight;
-       if (passVisibility <= 0.001) {
-         discard;
-       }
-     } else {
-       passVisibility = frontWeight;
-       if (passVisibility <= 0.001) {
-         discard;
-       }
-     }
+     // Continuous depth factor: 0.0 at maximum back, 0.5 at equator, 1.0 at maximum front
+     float depthFactor = clamp((normZ + 1.0) * 0.5, 0.0, 1.0);
      
      // 2D distance from camera ray through globe center (in camera projection plane)
      float dist2D = length(vRelativeViewPos.xy);
      float normDist = dist2D / globeRadius;
      
      // Spherical absorption factor: accounts for light passing through translucent globe body
-     float backFactor = clamp(-normZ / 0.45, 0.0, 1.0);
-     float insideSilhouette = sqrt(clamp(1.0 - normDist * normDist, 0.0, 1.0));
-     float globeOcclusion = backFactor * insideSilhouette;
+     // Engages smoothly when segment is behind the globe (zRel < 0) and inside its projected silhouette (normDist < 1.0)
+     float behindFactor = smoothstep(0.0, -0.30 * maxZ, zRel);
+     float insideSilhouette = 1.0 - smoothstep(0.65, 1.0, normDist);
+     float globeOcclusion = behindFactor * insideSilhouette;
+
+     // =========================================================================
+     // GLASS ROD SURFACE SHADING
+     // =========================================================================
+     // The tube cross-section angle v = 2*PI * uv.y
+     // NdotV encodes tube-face orientation (0=tube side/rim, 1=tube center facing camera)
+     // This is the correct variable for cylindrical glass shading.
+
+     // --- A. Cylindrical body gradient ---
+     // Glass rod body: brighter at tube center (facing camera), darker toward tube sides
+     // This creates the essential "rounded glass rod" curvature impression
+     float bodyFacing = NdotV;                           // 1 at center, 0 at sides
+     float bodyGradient = 0.52 + 0.48 * bodyFacing;      // 0.52 at sides → 1.0 at center
+
+     // --- B. Fresnel glass rim highlights ---
+     // Real glass rods show bright caustic highlights along their edges (Fresnel reflection)
+     // These are the PRIMARY glass visual cue — the bright rim lines along the tube sides
+     // fresnel peaks at NdotV=0 (tube sides) and vanishes at NdotV=1 (tube center)
+     float rimFresnel = pow(1.0 - NdotV, 2.2);
+
+     // Rim highlight: directionally modulated so it varies along the orbital arc
+     // Key light is at [5,4,4] (normalized: ~[0.66, 0.53, 0.53])
+     // Modulate rim by light direction dot with normal to avoid uniform grey rims
+     vec3 keyLight = normalize(vec3(0.662, 0.530, 0.530));
+     float rimLightAlign = 0.45 + 0.55 * max(dot(normal, keyLight), 0.0);
+
+     // Crystal-clear glass rim color: predominantly clear/white with subtle theme resonance
+     vec3 crystalWhite = vec3(0.95, 0.97, 1.00);
+     vec3 rimColor = mix(crystalWhite, color * 1.3, 0.18) * rimFresnel * rimLightAlign;
+
+     // --- C. Curvature-following specular highlight stripe ---
+     // A glass rod illuminated from one direction shows a specular stripe along its length.
+     // This stripe is CONTINUOUS around the torus (not a point glint) because the tube 
+     // cross-section normal cycles through all orientations, and NdotH stays high wherever
+     // the illuminated tube face aligns with the half-vector.
+     vec3 viewDirN = normalize(vViewPosition);
+     vec3 halfVec = normalize(keyLight + viewDirN);
+     float NdotH = max(dot(normal, halfVec), 0.0);
+
+     // Dual-lobe specular: broad glass sheen + focused apex caustic
+     // These produce a natural-looking bright stripe on the glass surface
+     float specBroad  = pow(NdotH, 20.0) * 0.55;   // wide soft glass sheen
+     float specSharp  = pow(NdotH, 80.0) * 0.90;   // sharp caustic highlight at apex
+     float keySpecular = specBroad + specSharp;
+
+     // Secondary fill light from below-back (matching point light at [-4,-1,-4])
+     // Creates a subtle secondary rim highlight on the opposite tube side
+     vec3 fillLight = normalize(vec3(-0.55, -0.15, -0.80));
+     vec3 fillHalf = normalize(fillLight + viewDirN);
+     float NdotH_fill = max(dot(normal, fillHalf), 0.0);
+     float fillSpecular = pow(NdotH_fill, 24.0) * 0.28;
+
+     // Zenith ambient sheen: glass picks up ambient light from above
+     float zenithSheen = max(normal.y, 0.0) * 0.12 * (0.5 + 0.5 * depthFactor);
+
+     // Specular color: near-crystal glass with restrained theme accent (not metallic)
+     vec3 specColor = mix(crystalWhite, color, 0.15);
+     float specDepthMod = 0.45 + 0.55 * depthFactor; // specular dimmer on background ring
+     vec3 totalSpecular = specColor * (keySpecular + fillSpecular + zenithSheen) * specDepthMod;
+
+     // --- D. Internal glass transmission glow ---
+     // At the tube center (NdotV=1), light transmits through the glass body cleanly
+     // A very subtle internal brightening simulates internal light scatter (refraction 1/10)
+     float internalGlow = NdotV * NdotV * 0.08 * depthFactor;
+
+     // =========================================================================
+     // CALIBRATED VISUAL HIERARCHY (LOCKED — DO NOT MODIFY)
+     // =========================================================================
+     // Base Luminance:
+     // Foreground apex: 1.12
+     // Background outside silhouette: 0.65
+     // Background behind globe: 0.52
+     float baseLum = mix(0.65, 1.12, smoothstep(0.10, 0.90, depthFactor));
+     baseLum = mix(baseLum, 0.52, globeOcclusion * 0.55);
+
+     // Base Opacity:
+     // Foreground: 0.78  |  Background outside: 0.44  |  Background behind globe: 0.36
+     float baseOpacity = mix(0.44, 0.78, smoothstep(0.10, 0.90, depthFactor));
+     baseOpacity = mix(baseOpacity, 0.36, globeOcclusion * 0.45);
+
+     // Glass transmission alpha:
+     // Tube center (NdotV=1): high transmission → lower alpha (see through glass body)
+     // Tube sides (NdotV=0): Fresnel reflection → higher alpha (glass rim is denser)
+     // This is the key dielectric glass behaviour — edges are reflective, center is transmissive
+     float centerAlpha = baseOpacity * 0.38;    // transparent center (8.5/10 translucency)
+     float rimAlpha    = baseOpacity * 0.86;    // opaque rim (Fresnel reflection)
+     float specAlphaBoost = keySpecular * 0.12; // specular highlight slightly more opaque
+     float glassAlpha = clamp(mix(centerAlpha, rimAlpha, rimFresnel) + specAlphaBoost, 0.0, 1.0);
+
+     // =========================================================================
+     // CONTINUOUS EQUATORIAL TWO-PASS DEPTH PARTITION (LOCKED — DO NOT MODIFY)
+     // =========================================================================
+     // passMode == 0.0: Background pass (renderOrder 0, behind globe)
+     // passMode == 1.0: Foreground pass (renderOrder 6, in front of globe)
+     float transitionBand = 0.18 * maxZ;
+     float frontWeight = smoothstep(-transitionBand, transitionBand, zRel);
      
-     // Fresnel rim reflection: highlights the sleek 3D tubular curvature
-     float NdotV = max(dot(normal, viewDir), 0.0);
-     float fresnel = pow(1.0 - NdotV, 1.8);
-     
-     // Calibrated visual hierarchy:
-     // Foreground: Opacity 0.88, Luminance 1.15, Crisp Fresnel 0.60
-     // Background outside silhouette: Opacity 0.55, Luminance 0.70, Fresnel 0.22
-     // Background occluded by globe: Opacity 0.32, Luminance 0.46, Fresnel 0.10
-     float targetOpacity;
-     float targetLum;
-     float targetFresnel;
-     
-     if (passMode > 0.5) {
-       targetOpacity = 0.88;
-       targetLum = 1.15;
-       targetFresnel = 0.60;
+     float passWeight = 1.0;
+     if (passMode < 0.5) {
+       passWeight = 1.0 - frontWeight;
+       if (passWeight <= 0.001) {
+         discard;
+       }
      } else {
-       targetOpacity = mix(0.55, 0.32, globeOcclusion);
-       targetLum = mix(0.70, 0.46, globeOcclusion);
-       targetFresnel = mix(0.22, 0.10, globeOcclusion);
+       passWeight = frontWeight;
+       if (passWeight <= 0.001) {
+         discard;
+       }
      }
-     
-     float finalOpacity = targetOpacity * passVisibility;
-     vec3 finalColor = color * (targetLum + fresnel * targetFresnel);
+
+     // =========================================================================
+     // FINAL COMPOSITE
+     // =========================================================================
+     // Glass body: cylindrical gradient (bodyGradient) + subtle internal glow
+     // Rim: Fresnel rim highlights (primary glass definition cue)
+     // Specular: continuous curvature-following stripe along lit arc
+     float finalOpacity = glassAlpha * passWeight;
+     vec3 glassBody   = color * baseLum * bodyGradient + vec3(internalGlow);
+     vec3 finalColor  = glassBody + rimColor * 0.75 + totalSpecular * 0.90;
      
      gl_FragColor = vec4(finalColor, finalOpacity); 
    }`
