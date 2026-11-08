@@ -1,5 +1,5 @@
 import { useRef, memo, useMemo } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import SectionTitle from './SectionTitle'
 import BioBlock from './BioBlock'
 import PhotoCard from './PhotoCard'
@@ -7,7 +7,6 @@ import { staggerContainer } from './aboutVariants'
 
 function About() {
   const containerRef = useRef(null)
-  const shouldReduceMotion = useReducedMotion()
 
   const ambientBgStyle = useMemo(() => ({
     background:
@@ -56,7 +55,7 @@ function About() {
         viewport={{ once: true, amount: 0.1 }}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-          
+
           {/* Left Column: Text, Identity, Stats & Focus Areas */}
           <div className="lg:col-span-7 flex flex-col justify-center">
             <SectionTitle />

@@ -58,18 +58,18 @@ function Skills() {
   const [view, setView] = useState("3d");
 
   return (
-    <section id="skills" aria-labelledby="skills-heading" className="py-24 relative overflow-hidden bg-[#0A0A0C]">
+    <section id="skills" aria-labelledby="skills-heading" className="py-24 relative overflow-hidden bg-[var(--bg)]">
       {/* 5-Layer Premium Background System */}
-      <div 
+      <div
         className="absolute inset-0 overflow-hidden pointer-events-none"
         style={{ contain: "paint", transform: "translateZ(0)" }}
       >
         {/* Layer 1: Dark atmospheric foundation */}
-        <div className="absolute inset-0 bg-[#0A0A0C]" />
-        
+        <div className="absolute inset-0 bg-[var(--bg)]" />
+
         {/* Layer 2: Subtle technical grid texture */}
-        <div 
-          className="absolute inset-0 opacity-[0.4]" 
+        <div
+          className="absolute inset-0 opacity-[0.4]"
           style={{
             backgroundImage: `
               linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
@@ -83,11 +83,20 @@ function Skills() {
         />
 
         {/* Layer 3: Large blurred gradient meshes */}
-        <div className="absolute -top-[30%] left-[20%] w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(37,99,235,0.08)_0%,transparent_70%)] blur-[80px] will-change-transform" />
-        <div className="absolute -bottom-[20%] right-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(59,130,246,0.06)_0%,transparent_70%)] blur-[100px] will-change-transform" />
-        
+        <div
+          className="absolute -top-[30%] left-[20%] w-[600px] h-[600px] blur-[80px] will-change-transform"
+          style={{ background: "radial-gradient(circle, var(--accent-dim) 0%, transparent 70%)" }}
+        />
+        <div
+          className="absolute -bottom-[20%] right-[10%] w-[500px] h-[500px] blur-[100px] will-change-transform"
+          style={{ background: "radial-gradient(circle, var(--hover-color-skills) 0%, transparent 70%)" }}
+        />
+
         {/* Layer 4: Soft ambient center glow */}
-        <div className="absolute top-[20%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.04)_0%,transparent_60%)] blur-[60px] will-change-transform" />
+        <div
+          className="absolute top-[20%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] blur-[60px] will-change-transform"
+          style={{ background: "radial-gradient(ellipse at center, var(--hover-color-skills) 0%, transparent 60%)" }}
+        />
       </div>
 
       <div className="container mx-auto px-4 relative z-10 flex flex-col items-center">
@@ -137,7 +146,7 @@ function Skills() {
           {/* View Toggle */}
           <motion.div
             variants={toggleVariants}
-            className="flex items-center relative bg-[rgba(20,20,22,0.6)] border border-white/[0.06] p-1 rounded-full backdrop-blur-xl mb-16 shadow-[inset_0_1px_1px_rgba(255,255,255,0.02),0_12px_40px_rgba(0,0,0,0.5)]"
+            className="flex items-center relative bg-[var(--bg-surface)]/60 border border-white/[0.06] p-1 rounded-full backdrop-blur-xl mb-16 shadow-[inset_0_1px_1px_rgba(255,255,255,0.02),0_12px_40px_rgba(0,0,0,0.5)]"
           >
             <button
               onClick={() => setView("3d")}

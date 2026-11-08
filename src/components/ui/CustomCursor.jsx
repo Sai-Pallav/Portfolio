@@ -3,10 +3,6 @@ import { createPortal } from 'react-dom'
 import { isCursorOverText, isInteractiveHoverTarget, getPortraitRect, clearCursorCache } from '@/utils/cursorColors'
 import { useCursorAnimation } from '@/hooks/useCursorAnimation'
 
-function prefersFinePointer() {
-  return window.matchMedia('(hover: hover) and (pointer: fine)').matches
-}
-
 /**
  * Custom cursor with foreground-colored circle + mix-blend-mode: difference.
  * For each pixel under the circle: result = |pixel − foreground|, which swaps

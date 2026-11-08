@@ -126,9 +126,8 @@ const MarqueeCard = memo(({
         transition={prefersReducedMotion ? { duration: 0 } : { type: "spring", mass: 0.8, stiffness: 250, damping: 22 }}
         whileHover="hover"
         whileTap="active"
-        className={`absolute inset-0 overflow-hidden rounded-3xl border border-white/[0.04] transition-colors duration-200 ${
-          skill?.label ? "flex flex-col items-center justify-center" : "flex items-center justify-center"
-        } ${isFocused ? "ring-2 ring-[var(--accent)] ring-offset-4 ring-offset-[#0A0A0C]" : ""}`}
+        className={`absolute inset-0 overflow-hidden rounded-3xl border border-white/[0.04] transition-colors duration-200 ${skill?.label ? "flex flex-col items-center justify-center" : "flex items-center justify-center"
+          } ${isFocused ? "ring-2 ring-[var(--accent)] ring-offset-4 ring-offset-[var(--bg)]" : ""}`}
       >
         <div className="absolute inset-0 pointer-events-none bg-white/[0.02]" />
 
@@ -223,8 +222,8 @@ const MarqueeColumn = memo(({
   return (
     <div
       className={`flex flex-col items-start ${!prefersReducedMotion && isInView ? "animate-marquee-scroll" : ""}`}
-      style={{ 
-        gap: `var(--tile-gap)`, 
+      style={{
+        gap: `var(--tile-gap)`,
         contain: "layout style",
         "--max-items": maxItems,
       }}
@@ -256,12 +255,16 @@ const MarqueeColumn = memo(({
 // ─── Main Marquee ─────────────────────────────────────────────────────────────
 export const ThreeDMarquee = ({ images, className, directionPattern }) => {
   const [hoveredSkill, setHoveredSkill] = useState(null);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+    return false;
+  });
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-      setPrefersReducedMotion(mediaQuery.matches);
       const handleChange = (e) => setPrefersReducedMotion(e.matches);
       mediaQuery.addEventListener("change", handleChange);
       return () => mediaQuery.removeEventListener("change", handleChange);
@@ -358,7 +361,7 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
         }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div 
+        <div
           className="relative p-4 rounded-2xl min-w-[230px] max-w-[275px] border border-white/[0.06] backdrop-blur-md overflow-hidden transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)] hover:border-white/[0.12]"
           style={{
             background: `
@@ -388,7 +391,7 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
                   {hoveredSkill.icon && (
                     <div className="w-6.5 h-6.5 rounded-lg bg-white/[0.05] border border-white/10 p-1 flex items-center justify-center shrink-0 shadow-inner">
                       <img
-                        src={hoveredSkill.icon === "framer" 
+                        src={hoveredSkill.icon === "framer"
                           ? "https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0/icons/framermotion/framermotion-original.svg"
                           : `https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0/icons/${hoveredSkill.icon}/${hoveredSkill.icon}-original.svg`}
                         alt=""
@@ -465,7 +468,7 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
                     className="absolute transition-opacity duration-300"
                     style={{ top: `${topPos}px`, opacity: hoveredSkill ? 0 : 1 }}
                   >
-                    <div 
+                    <div
                       className="flex items-center justify-center px-5 py-2 rounded-full text-[10px] font-mono font-bold tracking-[0.2em] uppercase whitespace-nowrap border transition-all duration-300"
                       style={{
                         background: "rgba(12, 12, 16, 0.98)",

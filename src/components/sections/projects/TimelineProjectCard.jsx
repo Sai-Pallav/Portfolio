@@ -1,6 +1,6 @@
 import { memo } from "react";
 
-const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, isLeft, isHovered = false }) {
+const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, isLeft }) {
   return (
     <div className="relative group/card">
       {/* Card container */}
@@ -21,7 +21,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
         }}
       >
         {/* Directional top-left rim highlight */}
-        <div 
+        <div
           className="absolute top-0 left-0 right-0 h-px pointer-events-none"
           style={{ background: 'linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--text-primary) 14%, transparent) 10%, color-mix(in srgb, var(--text-primary) 4%, transparent) 55%, transparent 100%)' }}
           aria-hidden="true"
@@ -29,9 +29,8 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
 
         {/* Connection port indicator */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 w-2 h-7 rounded-full z-10 transition-all duration-250 border border-[var(--accent)]/30 ${
-            isLeft ? "-right-1" : "-left-1"
-          }`}
+          className={`absolute top-1/2 -translate-y-1/2 w-2 h-7 rounded-full z-10 transition-all duration-250 border border-[var(--accent)]/30 ${isLeft ? "-right-1" : "-left-1"
+            }`}
           style={{
             background: "linear-gradient(to bottom, var(--accent), var(--accent-hover))",
             boxShadow: "inset 0 1px 1px rgba(255, 255, 255, 0.3)",
@@ -58,7 +57,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
             }}
           />
           {/* Smooth image-to-content transition */}
-          <div 
+          <div
             className="absolute inset-0 pointer-events-none"
             style={{
               background: 'linear-gradient(to bottom, transparent 40%, color-mix(in srgb, var(--bg-surface) 40%, transparent) 70%, color-mix(in srgb, var(--bg-surface) 78%, #000) 100%)',
@@ -67,14 +66,14 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
         </div>
 
         {/* Card content */}
-        <div 
+        <div
           className="p-7 relative"
           style={{
             background: 'radial-gradient(ellipse 90% 70% at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 65%)',
           }}
         >
           {/* Project number */}
-          <div 
+          <div
             className="text-[10px] font-mono tracking-[0.22em] uppercase mb-2.5 transition-colors duration-300"
             style={{ color: 'rgba(255, 255, 255, 0.4)' }}
           >
@@ -90,7 +89,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
           </h3>
 
           {/* Metadata row */}
-          <div 
+          <div
             className="flex items-center gap-2 mb-4 text-[11px] transition-colors duration-300 font-mono"
             style={{ color: 'rgba(255, 255, 255, 0.45)' }}
           >
@@ -124,13 +123,13 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
                   const [, number, label] = parts;
                   return (
                     <div key={i} className="flex items-baseline gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.05]">
-                      <span 
+                      <span
                         className="text-base font-semibold tracking-tight transition-colors duration-300"
                         style={{ color: 'rgba(255, 255, 255, 0.95)' }}
                       >
                         {number}
                       </span>
-                      <span 
+                      <span
                         className="text-[11px] transition-colors duration-300"
                         style={{ color: 'rgba(255, 255, 255, 0.45)' }}
                       >
@@ -162,7 +161,7 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
           </div>
 
           {/* Divider */}
-          <div 
+          <div
             className="h-[1px] w-full mb-5"
             style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 15%, rgba(255, 255, 255, 0.08) 85%, transparent 100%)' }}
           />

@@ -1,12 +1,6 @@
 import { motion } from 'framer-motion'
 import { personal } from '@/data/personal'
-import {
-  fadeLeft,
-  drawLineY,
-  fadeUpSoft,
-  slideMaskUp,
-  staggerFast,
-} from './aboutVariants'
+import { fadeLeft } from './aboutVariants'
 
 const FOCUS_AREAS = [
   {

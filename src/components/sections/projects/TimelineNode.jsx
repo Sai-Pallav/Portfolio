@@ -1,7 +1,7 @@
 import { memo, useEffect } from "react";
 import { motion, useTransform, useMotionValue, animate } from "framer-motion";
 
-const TimelineNode = memo(function TimelineNode({ scrollYProgress, hasAwakened, isHovered = false }) {
+const TimelineNode = memo(function TimelineNode({ scrollYProgress, hasAwakened }) {
   // Always call useMotionValue unconditionally to satisfy the Rules of Hooks
   const fallback = useMotionValue(0.5);
   const progress = scrollYProgress || fallback;

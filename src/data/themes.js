@@ -7,21 +7,21 @@ export const themes = [
     dark:    true,
   },
   {
-    key:     'warm-slate',
-    label:   'Warm Slate',
-    preview: '#f97316',
+    key:     'electric-blue',
+    label:   'Electric Blue',
+    preview: '#00e5ff',
+    dark:    true,
+  },
+  {
+    key:     'nordic-frost',
+    label:   'Nordic Frost',
+    preview: '#3b82f6',
     dark:    true,
   },
   {
     key:     'midnight-violet',
     label:   'Midnight Violet',
     preview: '#a78bfa',
-    dark:    true,
-  },
-  {
-    key:     'steel-flame',
-    label:   'Steel & Flame',
-    preview: '#ff3c3c',
     dark:    true,
   },
   {
@@ -34,12 +34,6 @@ export const themes = [
     key:     'graphite',
     label:   'Graphite',
     preview: '#9ca3af',
-    dark:    true,
-  },
-  {
-    key:     'nordic-frost',
-    label:   'Nordic Frost',
-    preview: '#3b82f6',
     dark:    true,
   },
 ]

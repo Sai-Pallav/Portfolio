@@ -67,36 +67,36 @@ const DataPacketStream = ({ active, trace, delay = 0, reverse = false }) => {
 
 const AnimatedPulseItem = ({ active, item, reverse = false }) => {
   const [renderActive, setRenderActive] = useState(active);
+  const [prevActive, setPrevActive] = useState(active);
   const startTimeRef = useRef(0);
   const [hasStarted, setHasStarted] = useState(false);
 
-  useEffect(() => {
+  if (active !== prevActive) {
+    setPrevActive(active);
     if (active) {
       setRenderActive(true);
+    } else if (!hasStarted) {
+      setRenderActive(false);
     }
-  }, [active]);
+  }
 
   useEffect(() => {
-    if (!active && renderActive) {
-      if (!hasStarted) {
-        setRenderActive(false);
-        return;
-      }
+    if (!active && renderActive && hasStarted) {
       const now = Date.now();
       const elapsed = now - startTimeRef.current;
       const cycleDuration = 1800; // 1.8s
       const currentCycleTime = elapsed % cycleDuration;
-      
+
       let timeUntilSafeToUnmount = 0;
       if (currentCycleTime < (cycleDuration - 50)) {
         timeUntilSafeToUnmount = (cycleDuration - 50) - currentCycleTime;
       }
-      
+
       const timer = setTimeout(() => {
         setRenderActive(false);
         setHasStarted(false);
       }, timeUntilSafeToUnmount);
-      
+
       return () => clearTimeout(timer);
     }
   }, [active, renderActive, hasStarted]);
@@ -213,7 +213,7 @@ const drawLeftPCBPath = (x1, y1, x2, y2, category) => {
   return `M ${x1},${y1} L ${x2},${y2}`;
 };
 
-export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed, beamActive }) {
+export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSystemState = 'dormant', transmissionFailed }) {
   const shouldReduceMotion = useReducedMotion()
   const containerRef = useRef(null)
 
@@ -223,13 +223,18 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
 
   const [activatedNodes, setActivatedNodes] = useState({})
   const [isIlluminated, setIsIlluminated] = useState(false)
+  const [prevIsInView, setPrevIsInView] = useState(isInView)
 
-  useEffect(() => {
+  if (isInView !== prevIsInView) {
+    setPrevIsInView(isInView)
     if (!isInView) {
       setIsIlluminated(false)
       setActivatedNodes({})
-      return
     }
+  }
+
+  useEffect(() => {
+    if (!isInView) return
 
     // 0s - 2s: Baseline state
     // At 2.0s: Illumination power-up! Opacity jumps to 100%, nodes activate, beams & pulse light up
@@ -530,7 +535,6 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
   }), [CH1_Y, CH2_Y, CH3_Y, CH4_Y])
 
   const isTransmit = contactSystemState === 'transmit'
-  const isFormInteracting = Boolean(isTyping)
 
   const getTransitionStyle = React.useCallback(() => {
     if (contactSystemState === 'dormant') {
@@ -627,10 +631,6 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
     )
   }
 
-
-
-
-  const isTransmitOrFailed = isTransmit || transmissionFailed
 
   const getCorridorWidth = (traceWidth, layer) => {
     const base = 1.5
@@ -986,8 +986,6 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
       </g>
     )
   }
-  if (shouldReduceMotion) return null
-
   const pcbContainerStyle = useMemo(() => {
     if (contactSystemState !== 'dormant') return {}
     if (!isIlluminated) {
@@ -1003,6 +1001,8 @@ export default memo(function LeftPCB({ isInView, formRef, globeRef, contactSyste
       transition: 'opacity 500ms cubic-bezier(0.25, 1, 0.5, 1), filter 500ms cubic-bezier(0.25, 1, 0.5, 1)'
     }
   }, [contactSystemState, isIlluminated])
+
+  if (shouldReduceMotion) return null
 
   return (
     <div

@@ -63,7 +63,7 @@ const SkillsGrid = memo(function SkillsGrid() {
           <motion.div
             key={categoryKey}
             variants={categoryCardVariants}
-            className="flex flex-col gap-5 bg-[rgba(15,15,18,0.5)] border border-white/5 p-6 rounded-3xl backdrop-blur-xl relative overflow-hidden group hover:border-white/10 hover:bg-[rgba(20,20,24,0.6)] transition-all duration-500 shadow-[0_16px_32px_rgba(0,0,0,0.4)]"
+            className="flex flex-col gap-5 bg-[var(--bg-surface)]/50 border border-white/5 p-6 rounded-3xl backdrop-blur-xl relative overflow-hidden group hover:border-white/10 hover:bg-[var(--bg-raised)]/60 transition-all duration-500 shadow-[0_16px_32px_rgba(0,0,0,0.4)]"
           >
             {/* Decorative background accent glow */}
             <div className="absolute -right-8 -top-8 w-24 h-24 bg-[var(--accent)] opacity-[0.03] blur-2xl rounded-full group-hover:opacity-10 group-hover:scale-125 transition-all duration-500 pointer-events-none" />
@@ -85,20 +85,19 @@ const SkillsGrid = memo(function SkillsGrid() {
                   <div
                     key={idx}
                     onMouseMove={handleMouseMove}
-                    className={`flex flex-col gap-2 p-3.5 rounded-2xl bg-[rgba(20,20,22,0.45)] border border-white/[0.04] transition-all duration-300 relative group/item overflow-hidden ${
-                      !isPrimary ? "opacity-70 hover:opacity-100" : "opacity-100"
-                    }`}
+                    className={`flex flex-col gap-2 p-3.5 rounded-2xl bg-[var(--bg-raised)]/45 border border-white/[0.04] transition-all duration-300 relative group/item overflow-hidden ${!isPrimary ? "opacity-70 hover:opacity-100" : "opacity-100"
+                      }`}
                   >
                     {/* Spotlight glow overlay */}
-                    <div 
+                    <div
                       className="absolute inset-0 opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 pointer-events-none z-0"
                       style={{
-                        background: `radial-gradient(130px circle at var(--mouse-x, 0px) var(--mouse-y, 0px), rgba(37, 99, 235, 0.07), transparent 85%)`
+                        background: `radial-gradient(130px circle at var(--mouse-x, 0px) var(--mouse-y, 0px), var(--accent-dim), transparent 85%)`
                       }}
                     />
 
                     {/* Vercel-style illuminated border overlay */}
-                    <div 
+                    <div
                       className="absolute inset-0 rounded-2xl opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 pointer-events-none border border-[var(--accent)] z-0"
                       style={{
                         maskImage: `radial-gradient(90px circle at var(--mouse-x, 0px) var(--mouse-y, 0px), black, transparent)`,
@@ -126,11 +125,10 @@ const SkillsGrid = memo(function SkillsGrid() {
                             {item.name}
                           </span>
                           <span
-                            className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                              isPrimary
+                            className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${isPrimary
                                 ? "bg-[var(--accent)] shadow-[0_0_8px_var(--accent)] group-hover/item:scale-125"
                                 : "bg-white/20"
-                            }`}
+                              }`}
                             title={isPrimary ? "Primary Skill" : "Secondary Skill"}
                           />
                         </div>

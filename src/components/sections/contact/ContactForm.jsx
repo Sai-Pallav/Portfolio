@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, memo } from 'react'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import emailjs from '@emailjs/browser'
 import {
   Send,
@@ -37,9 +37,8 @@ const ControlInput = memo(function ControlInput({ id, label, type, value, onChan
     <div className="relative w-full group">
       {/* Icon — pinned at bottom-half of the 48px input so it aligns with the text cursor when focused */}
       <div
-        className={`absolute left-3.5 pointer-events-none transition-colors duration-150 z-10 ${
-          focused ? 'text-[#a78bfa]' : hasValue ? 'text-[#a78bfa]/80' : 'text-[#6b647e] group-hover:text-[#8b83a0]'
-        }`}
+        className={`absolute left-3.5 pointer-events-none transition-colors duration-150 z-10 ${focused ? 'text-[var(--accent)]' : hasValue ? 'text-[var(--accent)]/80' : 'text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]'
+          }`}
         style={{ top: '50%', transform: 'translateY(-50%)' }}
       >
         {Icon && <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />}
@@ -61,28 +60,26 @@ const ControlInput = memo(function ControlInput({ id, label, type, value, onChan
         }}
         placeholder=" "
         aria-required={isRequired ? "true" : "false"}
-        className={`peer w-full h-[48px] rounded-[12px] border pl-10 pr-3.5 text-xs sm:text-[13px] text-white font-medium placeholder-transparent outline-none transition-all duration-150 bg-[#0c0a18] ${
-          touched && error
+        className={`peer w-full h-[48px] rounded-[12px] border pl-10 pr-3.5 text-xs sm:text-[13px] text-[var(--text-primary)] font-medium placeholder-transparent outline-none transition-all duration-150 bg-[var(--bg-surface)] ${touched && error
             ? 'border-red-500/50 focus:border-red-500/80 focus:shadow-[0_0_8px_rgba(239,68,68,0.12)]'
             : focused
-            ? 'border-[#a78bfa] shadow-[0_0_8px_rgba(167,139,250,0.12)] bg-[#0e0c1b]'
-            : 'border-[#1c182e] hover:border-[#30284a]'
-        }`}
+              ? 'border-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)] bg-[var(--bg-raised)]'
+              : 'border-[var(--border)] hover:border-[var(--border-glow)]'
+          }`}
         aria-describedby={error ? `${id}-error` : undefined}
       />
 
       {/* Floating Monospace Label */}
       <label
         htmlFor={id}
-        className={`absolute transition-all duration-150 pointer-events-none select-none flex items-center ease-out ${
-          focused || hasValue
-            ? 'top-0 -translate-y-1/2 left-8 text-[9px] font-mono tracking-[0.1em] font-semibold text-[#a78bfa] uppercase px-1.5 rounded-[2px] z-10'
-            : 'top-0 h-full left-10 text-xs sm:text-[13px] font-medium text-[#8b859e] group-hover:text-[#a29bbb]'
-        }`}
-        style={focused || hasValue ? { backgroundColor: focused ? '#0e0c1b' : '#0c0a18' } : {}}
+        className={`absolute transition-all duration-150 pointer-events-none select-none flex items-center ease-out ${focused || hasValue
+            ? 'top-0 -translate-y-1/2 left-8 text-[9px] font-mono tracking-[0.1em] font-semibold text-[var(--accent)] uppercase px-1.5 rounded-[2px] z-10'
+            : 'top-0 h-full left-10 text-xs sm:text-[13px] font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'
+          }`}
+        style={focused || hasValue ? { backgroundColor: focused ? 'var(--bg-raised)' : 'var(--bg-surface)' } : {}}
       >
         <span>{focused || hasValue ? displayLabel : label}</span>
-        {(focused || hasValue) && isRequired && <span className="text-[#a78bfa]/60 text-[9px] ml-0.5 font-normal">*</span>}
+        {(focused || hasValue) && isRequired && <span className="text-[var(--accent)]/60 text-[9px] ml-0.5 font-normal">*</span>}
       </label>
 
       {/* Error State */}
@@ -121,9 +118,8 @@ const ControlTextarea = memo(function ControlTextarea({ id, label, value, onChan
     <div className="relative w-full group">
       {/* Icon pinned at pt-3.5 to align with first line of text */}
       <div
-        className={`absolute left-3.5 pointer-events-none transition-colors duration-150 z-10 flex items-center ${
-          focused ? 'text-[#a78bfa]' : hasValue ? 'text-[#a78bfa]/80' : 'text-[#6b647e] group-hover:text-[#8b83a0]'
-        }`}
+        className={`absolute left-3.5 pointer-events-none transition-colors duration-150 z-10 flex items-center ${focused ? 'text-[var(--accent)]' : hasValue ? 'text-[var(--accent)]/80' : 'text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]'
+          }`}
         style={{ top: '14px' }}
       >
         {Icon && <Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />}
@@ -145,39 +141,36 @@ const ControlTextarea = memo(function ControlTextarea({ id, label, value, onChan
         placeholder=" "
         rows={rows}
         aria-required={isRequired ? "true" : "false"}
-        className={`peer w-full rounded-[12px] border pl-10 pr-3.5 pt-3.5 pb-6 text-xs sm:text-[13px] text-white font-medium placeholder-transparent outline-none transition-all duration-150 resize-none bg-[#0c0a18] ${
-          touched && error
+        className={`peer w-full rounded-[12px] border pl-10 pr-3.5 pt-3.5 pb-6 text-xs sm:text-[13px] text-[var(--text-primary)] font-medium placeholder-transparent outline-none transition-all duration-150 resize-none bg-[var(--bg-surface)] ${touched && error
             ? 'border-red-500/50 focus:border-red-500/80 focus:shadow-[0_0_8px_rgba(239,68,68,0.12)]'
             : focused
-            ? 'border-[#a78bfa] shadow-[0_0_8px_rgba(167,139,250,0.12)] bg-[#0e0c1b]'
-            : 'border-[#1c182e] hover:border-[#30284a]'
-        }`}
+              ? 'border-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)] bg-[var(--bg-raised)]'
+              : 'border-[var(--border)] hover:border-[var(--border-glow)]'
+          }`}
         style={{ minHeight: '115px' }}
         aria-describedby={error ? `${id}-error` : undefined}
       />
 
       <label
         htmlFor={id}
-        className={`absolute transition-all duration-150 pointer-events-none select-none flex items-center ease-out ${
-          focused || hasValue
-            ? 'top-0 -translate-y-1/2 left-8 text-[9px] font-mono tracking-[0.1em] font-semibold text-[#a78bfa] uppercase px-1.5 rounded-[2px] z-10'
-            : 'left-10 text-xs sm:text-[13px] font-medium text-[#8b859e] group-hover:text-[#a29bbb]'
-        }`}
+        className={`absolute transition-all duration-150 pointer-events-none select-none flex items-center ease-out ${focused || hasValue
+            ? 'top-0 -translate-y-1/2 left-8 text-[9px] font-mono tracking-[0.1em] font-semibold text-[var(--accent)] uppercase px-1.5 rounded-[2px] z-10'
+            : 'left-10 text-xs sm:text-[13px] font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'
+          }`}
         style={{
-          ...(focused || hasValue ? { backgroundColor: focused ? '#0e0c1b' : '#0c0a18' } : { top: '14px' })
+          ...(focused || hasValue ? { backgroundColor: focused ? 'var(--bg-raised)' : 'var(--bg-surface)' } : { top: '14px' })
         }}
       >
         <span>{focused || hasValue ? displayLabel : label}</span>
-        {(focused || hasValue) && isRequired && <span className="text-[#a78bfa]/60 text-[9px] ml-0.5 font-normal">*</span>}
+        {(focused || hasValue) && isRequired && <span className="text-[var(--accent)]/60 text-[9px] ml-0.5 font-normal">*</span>}
       </label>
 
       {/* Integrated Monospace Counter */}
       <span
-        className={`absolute bottom-2.5 right-3 text-[10px] font-mono tracking-wider pointer-events-none select-none ${
-          characterCount > characterLimit
+        className={`absolute bottom-2.5 right-3 text-[10px] font-mono tracking-wider pointer-events-none select-none ${characterCount > characterLimit
             ? 'text-red-400 font-medium'
-            : 'text-[#5b5470]'
-        }`}
+            : 'text-[var(--text-muted)]'
+          }`}
       >
         {characterCount} / {characterLimit}
       </span>
@@ -233,7 +226,7 @@ function validateField(name, value) {
 }
 
 /* Continuous Smooth Animated Status Indicator Dots */
-const StatusDots = memo(function StatusDots({ isFormActive = true, subState = 'idle', isTyping = false }) {
+const StatusDots = memo(function StatusDots({ subState = 'idle', isTyping = false }) {
   const isSubmitting = subState === 'submitting'
   const isActive = isSubmitting || isTyping
 
@@ -244,13 +237,11 @@ const StatusDots = memo(function StatusDots({ isFormActive = true, subState = 'i
         return (
           <span
             key={idx}
-            className={`w-2 h-2 rounded-full border transition-colors duration-300 ease-out ${
-              isActive ? `status-dot-anim ${delayClass}` : ''
-            } ${
-              isActive
-                ? 'bg-[#a78bfa] border-[#c4b5fd] shadow-[0_0_5px_rgba(167,139,250,0.5)]'
-                : 'bg-[#141022] border-[#2d2547] opacity-40'
-            }`}
+            className={`w-2 h-2 rounded-full border transition-colors duration-300 ease-out ${isActive ? `status-dot-anim ${delayClass}` : ''
+              } ${isActive
+                ? 'bg-[var(--accent)] border-[var(--accent-hover)] shadow-[0_0_5px_var(--accent-glow-strong)]'
+                : 'bg-[var(--bg-raised)] border-[var(--border)] opacity-40'
+              }`}
           />
         )
       })}
@@ -263,21 +254,21 @@ const FormHeader = memo(function FormHeader() {
   return (
     <div className="mb-4 relative z-10">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="w-4 h-[1px] bg-gradient-to-r from-transparent via-[#2b2447] to-transparent"></span>
-        <span className="text-[10px] font-mono tracking-[0.2em] font-semibold text-[#8b859e] uppercase">
+        <span className="w-4 h-[1px] bg-gradient-to-r from-transparent via-[var(--border)] to-transparent"></span>
+        <span className="text-[10px] font-mono tracking-[0.2em] font-semibold text-[var(--text-muted)] uppercase">
           CONTACT SYSTEM
         </span>
-        <span className="w-4 h-[1px] bg-gradient-to-r from-[#2b2447] via-[#2b2447] to-transparent"></span>
+        <span className="w-4 h-[1px] bg-gradient-to-r from-[var(--border)] via-[var(--border)] to-transparent"></span>
       </div>
 
-      <h2 className="text-2xl sm:text-[28px] font-bold text-white tracking-tight leading-tight mb-1.5 font-sans">
+      <h2 className="text-2xl sm:text-[28px] font-bold text-[var(--text-heading)] tracking-tight leading-tight mb-1.5 font-sans">
         Let’s Build Something
-        <span className="block text-[#a78bfa] font-bold mt-0.5">
+        <span className="block text-[var(--accent)] font-bold mt-0.5">
           Exceptional
         </span>
       </h2>
 
-      <p className="text-xs sm:text-[13px] text-[#8b859e] leading-relaxed max-w-sm font-normal">
+      <p className="text-xs sm:text-[13px] text-[var(--text-secondary)] leading-relaxed max-w-sm font-normal">
         I usually respond within 24 hours. Let’s discuss your project and create something remarkable together.
       </p>
     </div>
@@ -305,12 +296,12 @@ const InquiryDropdown = memo(function InquiryDropdown({ inquiryType, onSelectInq
 
   return (
     <div className="space-y-1 relative z-30 mb-3" ref={dropdownRef}>
-      <label htmlFor="inquiry-type" className="block text-[10px] font-mono tracking-[0.15em] font-semibold text-[#8b859e] uppercase">
+      <label htmlFor="inquiry-type" className="block text-[10px] font-mono tracking-[0.15em] font-semibold text-[var(--text-muted)] uppercase">
         WHAT BRINGS YOU HERE?
       </label>
 
       <div className="relative group/dd">
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 text-[#6b647e] group-hover/dd:text-[#a78bfa]">
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-150 z-10 text-[var(--text-muted)] group-hover/dd:text-[var(--accent)]">
           <HelpCircle className="h-4 w-4" strokeWidth={1.5} />
         </div>
 
@@ -318,17 +309,16 @@ const InquiryDropdown = memo(function InquiryDropdown({ inquiryType, onSelectInq
           type="button"
           id="inquiry-type"
           onClick={() => setIsDropdownOpen(prev => !prev)}
-          className={`w-full h-[50px] rounded-[12px] border pl-10 pr-3.5 text-xs sm:text-[13px] font-semibold text-white outline-none transition-all duration-150 bg-[#0e0c1b] flex items-center justify-between ${
-            isDropdownOpen
-              ? 'border-[#a78bfa] shadow-[0_0_8px_rgba(167,139,250,0.12)]'
-              : 'border-[#221c38] hover:border-[#332b50]'
-          }`}
+          className={`w-full h-[50px] rounded-[12px] border pl-10 pr-3.5 text-xs sm:text-[13px] font-semibold text-[var(--text-primary)] outline-none transition-all duration-150 bg-[var(--bg-raised)] flex items-center justify-between ${isDropdownOpen
+              ? 'border-[var(--accent)] shadow-[0_0_8px_var(--accent-glow)]'
+              : 'border-[var(--border)] hover:border-[var(--border-glow)]'
+            }`}
           aria-haspopup="listbox"
           aria-expanded={isDropdownOpen}
         >
-          <span className="font-semibold text-white tracking-wide">{inquiryType}</span>
+          <span className="font-semibold text-[var(--text-primary)] tracking-wide">{inquiryType}</span>
           <ChevronDown
-            className={`h-4 w-4 text-[#6b647e] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[#a78bfa]' : ''}`}
+            className={`h-4 w-4 text-[var(--text-muted)] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-[var(--accent)]' : ''}`}
           />
         </button>
 
@@ -339,7 +329,7 @@ const InquiryDropdown = memo(function InquiryDropdown({ inquiryType, onSelectInq
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.99 }}
               transition={{ duration: 0.15 }}
-              className="absolute z-50 left-0 right-0 mt-1.5 rounded-[12px] border border-[#221c38] bg-[#0c0a18] py-1.5 shadow-[0_20px_40px_rgba(0,0,0,0.95)] overflow-hidden"
+              className="absolute z-50 left-0 right-0 mt-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--bg-surface)] py-1.5 shadow-[0_20px_40px_rgba(0,0,0,0.95)] overflow-hidden"
               role="listbox"
             >
               {INQUIRY_OPTIONS.map((option, index) => {
@@ -352,11 +342,10 @@ const InquiryDropdown = memo(function InquiryDropdown({ inquiryType, onSelectInq
                       onSelectInquiry(option)
                       setIsDropdownOpen(false)
                     }}
-                    className={`px-3.5 py-2.5 text-xs sm:text-[13px] cursor-pointer transition-colors duration-150 flex items-center justify-between ${
-                      isSelected
-                        ? 'text-[#a78bfa] font-semibold bg-white/[0.04]'
-                        : 'text-white/80 hover:text-white hover:bg-white/[0.03]'
-                    }`}
+                    className={`px-3.5 py-2.5 text-xs sm:text-[13px] cursor-pointer transition-colors duration-150 flex items-center justify-between ${isSelected
+                        ? 'text-[var(--accent)] font-semibold bg-[var(--accent)]/10'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent)]/5'
+                      }`}
                     role="option"
                     aria-selected={isSelected}
                   >
@@ -372,8 +361,7 @@ const InquiryDropdown = memo(function InquiryDropdown({ inquiryType, onSelectInq
   )
 })
 
-export default memo(function ContactForm({ contactSystemState, onTransmit, setContactSystemState, setTransmissionFailed, onTypingChange, isFormActive = true }) {
-  const shouldReduceMotion = useReducedMotion()
+export default memo(function ContactForm({ contactSystemState, onTransmit, setTransmissionFailed, onTypingChange, isFormActive = true }) {
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
   const [inquiryType, setInquiryType] = useState('Full-Time Opportunity')
   const [touched, setTouched] = useState({ name: false, email: false, subject: false, message: false })
@@ -569,15 +557,14 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className={`relative rounded-[20px] border p-6 sm:p-7 md:p-7.5 w-full overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${
-        isTransmit
-          ? 'border-[#a78bfa] bg-[#0c0a1b] shadow-[0_0_50px_rgba(167,139,250,0.35),0_25px_60px_-15px_rgba(0,0,0,0.95)]'
+      className={`relative rounded-[20px] border p-6 sm:p-7 md:p-7.5 w-full overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] ${isTransmit
+          ? 'border-[var(--accent)] bg-[var(--bg-surface)] shadow-[0_0_50px_var(--accent-glow-strong),0_25px_60px_-15px_rgba(0,0,0,0.95)]'
           : isFormActive
-          ? 'border-[#2d254a] bg-[#090812] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95),0_0_30px_rgba(167,139,250,0.10)]'
-          : 'border-[#191528] bg-[#07060e] shadow-none opacity-65'
-      }`}
+            ? 'border-[var(--border)] bg-[var(--bg-surface)] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95),0_0_30px_var(--accent-glow)]'
+            : 'border-[var(--border)] bg-[var(--bg)] shadow-none opacity-65'
+        }`}
     >
-      <StatusDots isFormActive={isFormActive} subState={subState} isTyping={isTyping} />
+      <StatusDots subState={subState} isTyping={isTyping} />
       <FormHeader />
 
       <form onSubmit={handleSubmit} className="relative z-10 space-y-3">
@@ -646,13 +633,12 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
           <motion.div
             initial={{ opacity: 0, y: -2 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`rounded-[8px] border p-2 text-xs flex items-center gap-2 font-mono ${
-              status.type === 'success'
-                ? 'border-[#a78bfa]/30 bg-[#a78bfa]/10 text-white'
+            className={`rounded-[8px] border p-2 text-xs flex items-center gap-2 font-mono ${status.type === 'success'
+                ? 'border-[var(--accent)]/30 bg-[var(--accent)]/10 text-[var(--text-primary)]'
                 : 'border-red-500/30 bg-red-500/10 text-red-400'
-            }`}
+              }`}
           >
-            {status.type === 'success' && <CheckCircle2 className="h-3.5 w-3.5 text-[#a78bfa]" strokeWidth={2} />}
+            {status.type === 'success' && <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={2} />}
             {status.type === 'error' && <AlertCircle className="h-3.5 w-3.5 text-red-400" strokeWidth={2} />}
             <span>{status.message}</span>
           </motion.div>
@@ -668,7 +654,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
               }
             }}
             disabled={subState === 'submitting' || subState === 'success'}
-            className="group relative overflow-hidden w-full h-[48px] rounded-[12px] bg-[#a78bfa] hover:bg-[#b498ff] active:scale-[0.995] text-white font-semibold text-xs sm:text-[13px] tracking-wide flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(167,139,250,0.2)] transition-all duration-150 cursor-pointer outline-none focus:ring-2 focus:ring-[#a78bfa]/50 disabled:opacity-75"
+            className="group relative overflow-hidden w-full h-[48px] rounded-[12px] bg-[var(--accent)] hover:bg-[var(--accent-hover)] active:scale-[0.995] text-[var(--accent-contrast)] font-semibold text-xs sm:text-[13px] tracking-wide flex items-center justify-center gap-2 shadow-[0_4px_16px_var(--accent-glow)] transition-all duration-150 cursor-pointer outline-none focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-75"
           >
             <AnimatePresence mode="wait">
               {subState === 'idle' && (
@@ -680,7 +666,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   className="flex items-center gap-2 relative z-10"
                 >
                   <span className="font-semibold">Send Inquiry</span>
-                  <Send className="h-3.5 w-3.5 text-white transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" strokeWidth={2} />
+                  <Send className="h-3.5 w-3.5 text-[var(--accent-contrast)] transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" strokeWidth={2} />
                 </motion.span>
               )}
               {subState === 'validation_error' && (
@@ -689,9 +675,9 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  className="flex items-center gap-2 text-white font-medium relative z-10"
+                  className="flex items-center gap-2 text-[var(--accent-contrast)] font-medium relative z-10"
                 >
-                  <AlertCircle className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                  <AlertCircle className="h-3.5 w-3.5 text-[var(--accent-contrast)]" strokeWidth={2} />
                   <span>Please complete required fields</span>
                 </motion.span>
               )}
@@ -701,9 +687,9 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  className="flex items-center gap-2 text-white font-medium relative z-10"
+                  className="flex items-center gap-2 text-[var(--accent-contrast)] font-medium relative z-10"
                 >
-                  <AlertCircle className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                  <AlertCircle className="h-3.5 w-3.5 text-[var(--accent-contrast)]" strokeWidth={2} />
                   <span>Something went wrong — try again</span>
                 </motion.span>
               )}
@@ -713,7 +699,7 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  className="flex items-center gap-2 text-white relative z-10"
+                  className="flex items-center gap-2 text-[var(--accent-contrast)] relative z-10"
                 >
                   <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" strokeWidth={2} />
                   <span>Sending...</span>
@@ -725,9 +711,9 @@ export default memo(function ContactForm({ contactSystemState, onTransmit, setCo
                   initial={{ opacity: 0, y: 2 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
-                  className="flex items-center gap-2 text-white font-semibold relative z-10"
+                  className="flex items-center gap-2 text-[var(--accent-contrast)] font-semibold relative z-10"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5 text-white" strokeWidth={2} />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[var(--accent-contrast)]" strokeWidth={2} />
                   <span>Message Sent</span>
                 </motion.span>
               )}

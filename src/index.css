@@ -119,12 +119,15 @@ main {
 /* Hide visible scrollbar across all browsers while maintaining smooth scroll */
 html,
 body {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
 }
 
 ::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Edge WebKit */
+  display: none;
+  /* Chrome, Safari, Edge WebKit */
   width: 0px;
   height: 0px;
 }
@@ -157,6 +160,7 @@ body {
 
 /* Minimal mobile adjustment: align anchor with subject center (72% X) on tall narrow viewports */
 @media (max-width: 640px) {
+
   .hero-image,
   .hero-video {
     object-position: 72% top;
@@ -291,13 +295,18 @@ body {
 }
 
 @keyframes statusDotPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.35;
     transform: scale(0.92);
+    filter: drop-shadow(0 0 0px transparent);
   }
+
   50% {
     opacity: 1.0;
     transform: scale(1.08);
+    filter: drop-shadow(0 0 4px var(--accent));
   }
 }
 
@@ -634,20 +643,6 @@ body {
   }
 }
 
-/* Status Indicator Dots Sequential Pulse Keyframe */
-@keyframes statusDotPulse {
-  0%, 100% {
-    opacity: 0.30;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 1.0;
-    transform: scale(1);
-    filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.6));
-  }
-}
-
 /* Background Atmosphere & God-Tier Elevation Keyframes (Disciplined Restraint Pass) */
 @keyframes pcbRadarPing {
   0% {
@@ -687,6 +682,7 @@ body {
 }
 
 @keyframes voidDriftField1 {
+
   0%,
   100% {
     transform: translate3d(0, 0, 0) scale(1);
@@ -705,6 +701,7 @@ body {
 }
 
 @keyframes voidDriftField2 {
+
   0%,
   100% {
     transform: translate3d(0, 0, 0) scale(1);
@@ -770,30 +767,40 @@ body {
 }
 
 @keyframes floatAtmosphere1 {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate3d(0px, 0px, 0);
   }
+
   25% {
     transform: translate3d(20px, -15px, 0);
   }
+
   50% {
     transform: translate3d(-10px, 10px, 0);
   }
+
   75% {
     transform: translate3d(10px, -5px, 0);
   }
 }
 
 @keyframes floatAtmosphere2 {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate3d(0px, 0px, 0);
   }
+
   25% {
     transform: translate3d(-20px, 20px, 0);
   }
+
   50% {
     transform: translate3d(20px, -15px, 0);
   }
+
   75% {
     transform: translate3d(-10px, 10px, 0);
   }
@@ -818,6 +825,7 @@ body {
     --tile-gap: 32px;
   }
 }
+
 @media (max-width: 480px) {
   :root {
     --tile-size: 120px;
@@ -829,6 +837,7 @@ body {
   0% {
     transform: translate3d(0, 0, 0);
   }
+
   100% {
     transform: translate3d(0, calc(-1 * var(--max-items) * var(--item-height)), 0);
   }
@@ -853,4 +862,3 @@ body {
 .animate-marquee-scroll:focus-within {
   animation-play-state: paused !important;
 }
-

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { motion } from 'framer-motion'
 import { Mail, MapPin } from 'lucide-react'
 import { personal } from '@/data/personal'
@@ -23,22 +23,22 @@ const CARD_VARIANTS = {
   }
 }
 
-export default React.memo(function ContactCards() {
+export default memo(function ContactCards() {
   const iconStatus = useMemo(() => (
     <div className="relative flex h-3 w-3 items-center justify-center">
-      <span className="h-3 w-3 rounded-full bg-[#d8b4fe] shadow-[0_0_12px_rgba(216,180,254,0.9)]" />
+      <span className="h-3 w-3 rounded-full bg-[var(--accent)] shadow-[0_0_12px_var(--accent-glow-strong)]" />
     </div>
   ), [])
 
-  const iconEmail = useMemo(() => <Mail className="h-5 w-5 text-[#d8b4fe]" strokeWidth={1.8} />, [])
+  const iconEmail = useMemo(() => <Mail className="h-5 w-5 text-[var(--accent)]" strokeWidth={1.8} />, [])
 
   const iconLinkedIn = useMemo(() => (
-    <svg className="h-5 w-5 fill-[#d8b4fe]" viewBox="0 0 24 24">
+    <svg className="h-5 w-5 fill-[var(--accent)]" viewBox="0 0 24 24">
       <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.779-1.75-1.75s.784-1.75 1.75-1.75 1.75.779 1.75 1.75-.784 1.75-1.75 1.75zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
     </svg>
   ), [])
 
-  const iconLocation = useMemo(() => <MapPin className="h-5 w-5 text-[#d8b4fe]" strokeWidth={1.8} />, [])
+  const iconLocation = useMemo(() => <MapPin className="h-5 w-5 text-[var(--accent)]" strokeWidth={1.8} />, [])
 
   return (
     <motion.div

@@ -3,36 +3,36 @@ import { useReducedMotion } from 'framer-motion'
 
 const AnimatedPulseItem = ({ active, item, reverse = false }) => {
   const [renderActive, setRenderActive] = useState(active);
+  const [prevActive, setPrevActive] = useState(active);
   const startTimeRef = useRef(0);
   const [hasStarted, setHasStarted] = useState(false);
 
-  useEffect(() => {
+  if (active !== prevActive) {
+    setPrevActive(active);
     if (active) {
       setRenderActive(true);
+    } else if (!hasStarted) {
+      setRenderActive(false);
     }
-  }, [active]);
+  }
 
   useEffect(() => {
-    if (!active && renderActive) {
-      if (!hasStarted) {
-        setRenderActive(false);
-        return;
-      }
+    if (!active && renderActive && hasStarted) {
       const now = Date.now();
       const elapsed = now - startTimeRef.current;
       const cycleDuration = 1800; // 1.8s
       const currentCycleTime = elapsed % cycleDuration;
-      
+
       let timeUntilSafeToUnmount = 0;
       if (currentCycleTime < (cycleDuration - 50)) {
         timeUntilSafeToUnmount = (cycleDuration - 50) - currentCycleTime;
       }
-      
+
       const timer = setTimeout(() => {
         setRenderActive(false);
         setHasStarted(false);
       }, timeUntilSafeToUnmount);
-      
+
       return () => clearTimeout(timer);
     }
   }, [active, renderActive, hasStarted]);
@@ -589,8 +589,6 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
   const Y_center = H_ref / 2
   const endX = G - 15
   const isTransmit = contactSystemState === 'transmit'
-  const isTransmitOrFailed = isTransmit || transmissionFailed
-  const isFormInteracting = Boolean(isTyping)
 
   const getTransitionStyle = useCallback(() => {
     if (contactSystemState === 'dormant') {
@@ -608,10 +606,6 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
   const W_mid = Math.max(50, middleTargetLimit - midStart)
   const W_right = Math.max(50, endX - rightTargetLimit)
 
-  const speedRatio = Math.max(0.2, W_right / W_mid)
-  const rightDuration = (3.2 * speedRatio).toFixed(2)
-  const rightDashPulse = (10 / speedRatio).toFixed(1)
-  const rightDashGap = (40 / speedRatio).toFixed(1)
 
   const pcbComponentsData = useMemo(() => {
     // Hardware Components (Aligned horizontally on trace flat sections)
@@ -844,64 +838,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     ...pcbTracesData
   }), [pcbComponentsData, pcbTracesData]);
 
-  // Group pulse animation data for middle PCB traces:
-  // Group 1: 2nd (email) & 3rd (subject) -> start at starting point together & reach end together
-  // Group 2: 1st (name) & 4th (message) -> start at starting point together & reach end together
-  const middlePulseElements = useMemo(() => {
-    if (!pcbData?.middleTraces) return []
 
-    const channels = [
-      { chKey: 'name', index: 1, group: 2 },
-      { chKey: 'email', index: 2, group: 1 },
-      { chKey: 'subject', index: 3, group: 1 },
-      { chKey: 'message', index: 4, group: 2 }
-    ]
-
-    return channels.map(({ chKey, index, group }) => {
-      const mainTrace = pcbData.middleTraces.find(t => t.chKey === chKey && t.main)
-      if (!mainTrace) return null
-
-      // Remove 0.6s delay to prevent late-spawning pulses after typing stops
-      const delay = '0s'
-
-      return {
-        chKey,
-        index,
-        group,
-        d: mainTrace.rawD || mainTrace.d,
-        delay
-      }
-    }).filter(Boolean)
-  }, [pcbData.middleTraces]);
-
-  // Group pulse animation data for Right PCB traces (exiting globe):
-  // Group 1: 2nd & 3rd -> start together & reach end together
-  // Group 2: 1st & 4th -> start together & reach end together
-  const rightPulseElements = useMemo(() => {
-    if (!pcbData?.rightTraces) return []
-
-    const mainTraces = pcbData.rightTraces.filter(t => t.main)
-    if (mainTraces.length < 4) return []
-
-    // 1st (index 0) & 4th (index 3) -> Group 2
-    // 2nd (index 1) & 3rd (index 2) -> Group 1
-    const mappings = [
-      { trace: mainTraces[0], id: 'r1', group: 2 },
-      { trace: mainTraces[1], id: 'r2', group: 1 },
-      { trace: mainTraces[2], id: 'r3', group: 1 },
-      { trace: mainTraces[3], id: 'r4', group: 2 }
-    ]
-
-    return mappings.map(({ trace, id, group }) => {
-      const delay = '0s'
-      return {
-        id,
-        group,
-        d: trace.rawD || trace.d,
-        delay
-      }
-    })
-  }, [pcbData.rightTraces]);
 
 
 
@@ -909,13 +846,13 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
   // Enhanced opacity hierarchy — clear visual depth at all states
   const getTargetOpacity = useCallback((chKey, elementType = 'trace', isRightSection = false) => {
     const isHero = ['name', 'email', 'subject', 'message'].includes(chKey)
-    
+
     // Transmit state: Everything fades except particles
     if (isTransmit) return elementType === 'particle' ? 1.0 : 0
-    
+
     // Failed state: Heroes fade, infrastructure remains
     if (transmissionFailed && isHero) return 0
-    
+
     const sectionActive = isRightSection ? isRightActive : isMiddleActive
     const illumFactor = sectionActive ? 1.0 : 0.65
 
@@ -955,29 +892,29 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         <rect x={w / 2 - 1.2} y={-h / 2 + 0.2} width={1.4} height={h - 0.4} fill="url(#solder-fillet-gradient)" rx="0.2" />
 
         {/* Component main package body */}
-        <rect 
-          x={-w / 2 + 1.2} 
-          y={-h / 2 + 0.3} 
-          width={w - 2.4} 
-          height={h - 0.6} 
-          rx={0.3} 
-          fill={isCap ? "url(#capacitor-body)" : "url(#resistor-body)"} 
-          stroke={isCap ? "#333644" : "#22222a"} 
-          strokeWidth="0.35" 
+        <rect
+          x={-w / 2 + 1.2}
+          y={-h / 2 + 0.3}
+          width={w - 2.4}
+          height={h - 0.6}
+          rx={0.3}
+          fill={isCap ? "url(#capacitor-body)" : "url(#resistor-body)"}
+          stroke={isCap ? "#333644" : "#22222a"}
+          strokeWidth="0.35"
         />
 
         {/* Direction marker */}
-        <circle cx={-w/2 + 2.0} cy={0} r="0.25" fill="rgba(255,255,255,0.25)" />
+        <circle cx={-w / 2 + 2.0} cy={0} r="0.25" fill="rgba(255,255,255,0.25)" />
 
         {/* Tiny industrial designator silkscreen */}
-        <text 
-          x={0} 
-          y={-h / 2 - 2.2} 
-          textAnchor="middle" 
-          fontFamily="monospace" 
-          fontSize="4.2" 
-          fill="var(--accent)" 
-          opacity="0.38" 
+        <text
+          x={0}
+          y={-h / 2 - 2.2}
+          textAnchor="middle"
+          fontFamily="monospace"
+          fontSize="4.2"
+          fill="var(--accent)"
+          opacity="0.38"
           style={{ userSelect: 'none', pointerEvents: 'none' }}
         >
           {label}
@@ -986,96 +923,6 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
     )
   }
 
-  // Micro Via Renderer (Plated through-holes with dark wells and metallic rim highlights)
-  const renderVia = (x, y, label, chKey = null) => {
-    const targetOpacity = getTargetOpacity(chKey, 'component') * 0.85
-    const shadowFilter = contactSystemState !== 'dormant' ? 'url(#pcb-component-shadow)' : 'none'
-
-    return (
-      <g
-        key={`via-${x}-${y}`}
-        transform={`translate(${x}, ${y})`}
-        opacity={targetOpacity}
-        filter={shadowFilter}
-        style={getTransitionStyle()}
-      >
-        {/* Negative space clearance gap */}
-        <circle cx="0" cy="0" r="3.2" fill="#030304" />
-
-        {/* Via depth well with radial gradient */}
-        <circle cx="0" cy="0" r="2.2" fill="url(#via-depth-well)" />
-
-        {/* Outer copper pad ring */}
-        <circle cx="0" cy="0" r="2.0" fill="none" stroke="url(#gold-plated)" strokeWidth="0.45" />
-
-        {/* Internal plated hole barrel */}
-        <circle cx="0" cy="0" r="1.1" fill="none" stroke="#222" strokeWidth="0.3" />
-
-        {/* Drilled hole (center void) */}
-        <circle cx="0" cy="0" r="0.6" fill="#000000" />
-
-        {/* Reflective light glint on the metal rim */}
-        <circle cx="-0.4" cy="-0.4" r="1.3" fill="none" stroke="rgba(255, 255, 255, 0.22)" strokeWidth="0.25" opacity="0.75" />
-
-        {/* Tiny silkscreen code designator */}
-        <text 
-          x={0} 
-          y={4.5} 
-          textAnchor="middle" 
-          fontFamily="monospace" 
-          fontSize="3.5" 
-          fill="var(--accent)" 
-          opacity="0.32" 
-          style={{ userSelect: 'none', pointerEvents: 'none' }}
-        >
-          {label}
-        </text>
-      </g>
-    )
-  }
-
-  // Exposed copper Test Point Pad
-  const renderPad = (x, y, label, chKey = null) => {
-    const targetOpacity = getTargetOpacity(chKey, 'component')
-
-    return (
-      <g
-        key={`pad-${x}-${y}`}
-        transform={`translate(${x}, ${y})`}
-        opacity={targetOpacity}
-        style={getTransitionStyle()}
-      >
-        {/* Negative space clearance gap */}
-        <circle cx="0" cy="0" r="4.2" fill="#030304" />
-
-        {/* Outer silkscreen identifier ring */}
-        <circle cx="0" cy="0" r="3.4" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="0.35" strokeDasharray="1.5 1.5" />
-
-        {/* Plated copper landing pad (gold gradient) */}
-        <circle cx="0" cy="0" r="2.2" fill="url(#gold-plated)" stroke="rgba(0,0,0,0.12)" strokeWidth="0.25" />
-
-        {/* Concentric probe alignment ring */}
-        <circle cx="0" cy="0" r="1.2" fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="0.2" />
-
-        {/* Tiny center probe dimple */}
-        <circle cx="0" cy="0" r="0.4" fill="#000000" />
-
-        {/* Tiny test point label */}
-        <text 
-          x={0} 
-          y={5.5} 
-          textAnchor="middle" 
-          fontFamily="monospace" 
-          fontSize="3.8" 
-          fill="var(--accent)" 
-          opacity="0.35" 
-          style={{ userSelect: 'none', pointerEvents: 'none' }}
-        >
-          {label}
-        </text>
-      </g>
-    )
-  }
 
   // Grounded Mechanical Mounting Screw Hole
   const renderMountingHole = (x, y) => {
@@ -1253,48 +1100,48 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         {/* ========================================================
             AMBIENT RING PARTICLES (Scattered unlit rings with zero-gravity float & twinkle)
          ======================================================== */}
-      <g className="ambient-ring-particles" opacity={isTransmit ? 0 : 1} style={{ pointerEvents: 'none' }}>
-        {[
-          { x: rightTargetLimit + W_right * 0.18, y: Y_center - 110, r: 5.5, delay: '0s', twinkleDelay: '3.2s' },
-          { x: rightTargetLimit + W_right * 0.32, y: Y_center - 45, r: 3.5, delay: '6.5s', twinkleDelay: '11.8s' },
-          { x: rightTargetLimit + W_right * 0.55, y: Y_center - 95, r: 6.5, delay: '13.2s', twinkleDelay: '19.4s' },
-          { x: rightTargetLimit + W_right * 0.25, y: Y_center + 70, r: 4.2, delay: '4.8s', twinkleDelay: '8.5s' },
-          { x: rightTargetLimit + W_right * 0.48, y: Y_center + 115, r: 5.8, delay: '10.4s', twinkleDelay: '16.0s' },
-          { x: rightTargetLimit + W_right * 0.70, y: Y_center + 40, r: 3.2, delay: '16.1s', twinkleDelay: '23.5s' }
-        ].map((ring, rIdx) => (
-          <g
-            key={`ambient-ring-${rIdx}`}
-            transform={`translate(${ring.x}, ${ring.y})`}
-            style={{
-              animation: 'ringFloatDrift 24s ease-in-out infinite',
-              animationDelay: ring.delay
-            }}
-          >
-            <circle
-              cx="0"
-              cy="0"
-              r={ring.r}
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth="0.35"
-              opacity="0.035"
+        <g className="ambient-ring-particles" opacity={isTransmit ? 0 : 1} style={{ pointerEvents: 'none' }}>
+          {[
+            { x: rightTargetLimit + W_right * 0.18, y: Y_center - 110, r: 5.5, delay: '0s', twinkleDelay: '3.2s' },
+            { x: rightTargetLimit + W_right * 0.32, y: Y_center - 45, r: 3.5, delay: '6.5s', twinkleDelay: '11.8s' },
+            { x: rightTargetLimit + W_right * 0.55, y: Y_center - 95, r: 6.5, delay: '13.2s', twinkleDelay: '19.4s' },
+            { x: rightTargetLimit + W_right * 0.25, y: Y_center + 70, r: 4.2, delay: '4.8s', twinkleDelay: '8.5s' },
+            { x: rightTargetLimit + W_right * 0.48, y: Y_center + 115, r: 5.8, delay: '10.4s', twinkleDelay: '16.0s' },
+            { x: rightTargetLimit + W_right * 0.70, y: Y_center + 40, r: 3.2, delay: '16.1s', twinkleDelay: '23.5s' }
+          ].map((ring, rIdx) => (
+            <g
+              key={`ambient-ring-${rIdx}`}
+              transform={`translate(${ring.x}, ${ring.y})`}
               style={{
-                animation: 'ringTwinkle 28s ease-in-out infinite',
-                animationDelay: ring.twinkleDelay
+                animation: 'ringFloatDrift 24s ease-in-out infinite',
+                animationDelay: ring.delay
               }}
-            />
-            <circle
-              cx="0"
-              cy="0"
-              r={ring.r * 0.45}
-              fill="none"
-              stroke="rgba(255, 255, 255, 0.15)"
-              strokeWidth="0.2"
-              opacity="0.02"
-            />
-          </g>
-        ))}
-      </g>
+            >
+              <circle
+                cx="0"
+                cy="0"
+                r={ring.r}
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="0.35"
+                opacity="0.035"
+                style={{
+                  animation: 'ringTwinkle 28s ease-in-out infinite',
+                  animationDelay: ring.twinkleDelay
+                }}
+              />
+              <circle
+                cx="0"
+                cy="0"
+                r={ring.r * 0.45}
+                fill="none"
+                stroke="rgba(255, 255, 255, 0.15)"
+                strokeWidth="0.2"
+                opacity="0.02"
+              />
+            </g>
+          ))}
+        </g>
       </g>
 
       {/* ========================================================
@@ -1322,7 +1169,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
         const w = getWidthForCategory(t.category)
         return (
           <React.Fragment key={`m-corridor-${idx}`}>
-            
+
             {/* Layer 1: Ambient Field (soft outer glow) */}
             <path
               d={t.d}
@@ -1331,7 +1178,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
               opacity={targetOpacity * 0.7}
               style={getTransitionStyle()}
             />
-            
+
             {/* Layer 2: Recessed Well (gradient for depth) */}
             <path
               d={t.d}
@@ -1387,7 +1234,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
               opacity={targetOpacity * 0.7}
               style={getTransitionStyle()}
             />
-            
+
             {/* Layer 2: Recessed Well */}
             <path
               d={t.d}
@@ -1540,7 +1387,7 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
               <feMergeNode in="glowCore" />
             </feMerge>
           </filter>
-          
+
           {/* TIER 2 REFACTOR — Issue #11: Component micro-shadow filter */}
           <filter id="pcb-component-shadow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceAlpha" stdDeviation="0.8" result="blur" />
@@ -1558,57 +1405,57 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
             <stop offset="0%" stopColor="var(--accent)" stopOpacity="0" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.8" />
           </linearGradient>
-          
+
           {/* TIER 1 REFACTOR — Issue #18: Substrate vignette for depth perception */}
           <radialGradient id="substrate-vignette" cx="50%" cy="50%">
             <stop offset="0%" stopColor="#05090c" stopOpacity="1.0" />
             <stop offset="100%" stopColor="#030607" stopOpacity="0.7" />
           </radialGradient>
-          
+
           {/* Routing field grid pattern for negative space */}
           <pattern id="routing-field-grid" width="20" height="20" patternUnits="userSpaceOnUse">
             <circle cx="0" cy="0" r="0.3" fill="var(--accent)" fillOpacity="0" />
             <circle cx="10" cy="10" r="0.3" fill="var(--accent)" fillOpacity="0" />
           </pattern>
-          
+
           {/* TIER 2 REFACTOR — Issue #5: Multi-layer corridor gradients */}
           <linearGradient id="corridor-recess-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#030305" />
             <stop offset="50%" stopColor="#04040a" />
             <stop offset="100%" stopColor="#060610" />
           </linearGradient>
-          
+
           <pattern id="corridor-texture" width="3" height="3" patternUnits="userSpaceOnUse">
             <rect width="3" height="3" fill="transparent" />
             <circle cx="1.5" cy="1.5" r="0.35" fill="#ffffff" opacity="0.015" />
           </pattern>
-          
+
           {/* TIER 2 REFACTOR — Issue #11: Radial depth gradient for clearances */}
           <radialGradient id="radial-depth-gradient">
             <stop offset="0%" stopColor="#020204" />
             <stop offset="70%" stopColor="#040408" />
             <stop offset="100%" stopColor="#050508" />
           </radialGradient>
-          
+
           {/* TIER 2 REFACTOR — Issue #11: Via depth well gradient */}
           <radialGradient id="via-depth-well">
             <stop offset="0%" stopColor="#000000" stopOpacity="0.6" />
             <stop offset="50%" stopColor="#020204" stopOpacity="0.3" />
             <stop offset="100%" stopColor="transparent" />
           </radialGradient>
-          
+
           {/* TIER 2 REFACTOR — Issue #19: Copper trace material gradient */}
           <linearGradient id="copper-material-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="var(--accent)" stopOpacity="1.0" />
             <stop offset="50%" stopColor="var(--accent)" stopOpacity="0.96" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="1.0" />
           </linearGradient>
-          
+
           {/* TIER 2 REFACTOR — Issue #19: Brushed copper texture */}
           <pattern id="copper-texture" width="8" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(3)">
             <line x1="0" y1="1" x2="8" y2="1" stroke="rgba(255,255,255,0.025)" strokeWidth="0.4" />
           </pattern>
-          
+
           <pattern id="pcbFiberglassWeaveR" width="6" height="6" patternUnits="userSpaceOnUse">
             {/* TIER 1 REFACTOR — Issue #18: Enhanced fiberglass weave visibility */}
             <path d="M 0 3 L 6 3 M 3 0 L 3 6" stroke="rgba(255,255,255,0.018)" strokeWidth="0.4" />
@@ -1670,10 +1517,10 @@ export default memo(function RightPCB({ isInView, formRef, globeRef, contactSyst
               filter="url(#pcbSubstrateBlur)"
             />
           </mask>
-          
+
           <mask id="copperHatchMask" x="-100%" y="-100%" width="300%" height="300%">
             <rect x="-100%" y="-100%" width="300%" height="300%" fill="white" />
-            
+
             {/* Cut out black clearance rectangles for SMT components */}
             {pcbData.components.map((comp, idx) => (
               <rect

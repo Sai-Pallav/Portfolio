@@ -30,6 +30,9 @@ dist-ssr
 
 # Local Agent folder
 .agent/
+.gemini/
+verification-screenshots/
+final-audit-results.json
 
 # Exclude docs directory
 docs/

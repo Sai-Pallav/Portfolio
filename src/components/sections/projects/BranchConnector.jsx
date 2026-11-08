@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { BRANCH_WIDTH } from "./timelineAnimation";
 
-const BranchConnector = memo(function BranchConnector({ isLeft, isHovered = false }) {
+const BranchConnector = memo(function BranchConnector({ isLeft }) {
   return (
     <div className="relative" style={{ width: `${BRANCH_WIDTH}px`, height: "6px" }}>
       {/* Flowing Data Signal SVG */}

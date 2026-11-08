@@ -1,9 +1,8 @@
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { personal } from '@/data/personal'
 import { drawLineX, fadeUp, fadeUpSoft, staggerFast } from './aboutVariants'
 
 export default function SectionTitle() {
-  const reduceMotion = useReducedMotion()
 
   return (
     <motion.header variants={staggerFast} className="max-w-3xl relative mb-8 sm:mb-10">

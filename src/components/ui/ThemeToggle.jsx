@@ -15,6 +15,7 @@ function ThemeToggle({ showPicker, setShowPicker }) {
   const prevShowPickerRef = useRef(false)
   const targetOffsetRef = useRef(0)
   const currentOffsetRef = useRef(0)
+  const lastWheelTimeRef = useRef(0)
 
   // Stagger reveal delay helper: set to fully open after entry spring ends
   useEffect(() => {
@@ -31,7 +32,8 @@ function ThemeToggle({ showPicker, setShowPicker }) {
   useEffect(() => {
     if (showPicker && !prevShowPickerRef.current) {
       const activeIndex = themes.findIndex(t => t.key === theme)
-      const initialOffset = (activeIndex - 1.5 + themes.length) % themes.length
+      const maxScroll = Math.max(0, themes.length - 4)
+      const initialOffset = activeIndex <= 2 ? 0 : Math.min(activeIndex - 1, maxScroll)
       setScrollOffset(initialOffset)
       targetOffsetRef.current = initialOffset
       currentOffsetRef.current = initialOffset
@@ -82,6 +84,9 @@ function ThemeToggle({ showPicker, setShowPicker }) {
 
     const handleMouseMove = (e) => {
       if (!pickerRef.current) return
+      // Don't interrupt deliberate wheel scrolling with accidental micro-movements
+      if (Date.now() - lastWheelTimeRef.current < 600) return
+
       const rect = pickerRef.current.getBoundingClientRect()
       const fabX = rect.left + rect.width / 2
       const fabY = rect.top + rect.height / 2
@@ -111,7 +116,8 @@ function ThemeToggle({ showPicker, setShowPicker }) {
 
       const clamped = Math.max(minAngle, Math.min(maxAngle, targetAngle))
       const pct = (clamped - minAngle) / (maxAngle - minAngle)
-      targetOffsetRef.current = pct * (themes.length - 4)
+      const maxScroll = Math.max(0, themes.length - 4)
+      targetOffsetRef.current = pct * maxScroll
     }
 
     window.addEventListener('mousemove', handleMouseMove)
@@ -125,6 +131,7 @@ function ThemeToggle({ showPicker, setShowPicker }) {
     const handleWheel = (e) => {
       if (pickerRef.current && pickerRef.current.contains(e.target)) {
         e.preventDefault()
+        lastWheelTimeRef.current = Date.now()
         const delta = e.deltaY > 0 ? 0.35 : -0.35
         targetOffsetRef.current = (targetOffsetRef.current + delta) % themes.length
         if (targetOffsetRef.current < 0) {
@@ -168,12 +175,13 @@ function ThemeToggle({ showPicker, setShowPicker }) {
           
           const visibleCount = 4
           const N = themes.length
+          const center = (visibleCount - 1) / 2
           
-          // Wrap relative position using modular arithmetic around the closest viewport center
-          let relPos = index - scrollOffset
-          relPos = ((relPos + N / 2) % N)
-          if (relPos < 0) relPos += N
-          relPos -= N / 2
+          // Wrap relative position using modular arithmetic around the viewport center
+          let diff = (index - scrollOffset - center) % N
+          if (diff < -N / 2) diff += N
+          if (diff >= N / 2) diff -= N
+          const relPos = diff + center
           
           // Calculate radial offset: arc sweeps upper-left (195°→305° with clean gaps)
           const radius = 80 // Orbit radius in pixels
@@ -182,14 +190,16 @@ function ThemeToggle({ showPicker, setShowPicker }) {
           const x = radius * Math.cos(angleRad)
           const y = radius * Math.sin(angleRad)
 
-          // Visibility factor using trapezoidal function (1 when in [0, 3], fades to 0 as it approaches -0.3 or 3.3)
+          // Visibility factor using trapezoidal function (1 when in [0, 3], fades smoothly in buffer zones)
           let v = 0
-          if (relPos >= 0 && relPos <= 3) {
+          const maxPos = visibleCount - 1
+          const buffer = 0.4
+          if (relPos >= 0 && relPos <= maxPos) {
             v = 1
-          } else if (relPos > -0.3 && relPos < 0) {
-            v = 1 + relPos / 0.3 // Fast linear fade-out in a 0.3 buffer zone
-          } else if (relPos > 3 && relPos < 3.3) {
-            v = 1 - (relPos - 3) / 0.3 // Fast linear fade-out in a 0.3 buffer zone
+          } else if (relPos > -buffer && relPos < 0) {
+            v = 1 + relPos / buffer // Smooth linear fade-in
+          } else if (relPos > maxPos && relPos < maxPos + buffer) {
+            v = 1 - (relPos - maxPos) / buffer // Smooth linear fade-out
           }
 
           const isActiveSlot = v > 0

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import { useCallback } from 'react'
 import { personal } from '@/data/personal'
 
 function Footer() {
@@ -17,7 +17,7 @@ function Footer() {
   }, [])
 
   return (
-    <footer className="w-full bg-gradient-to-b from-transparent via-[#020408]/80 to-[#020306] relative z-20 border-t border-white/[0.04]">
+    <footer className="w-full bg-gradient-to-b from-transparent via-[var(--bg-surface)]/80 to-[var(--bg)] relative z-20 border-t border-white/[0.04]">
       {/* Top CTA Block: Controlled vertical rhythm with zero dead space */}
       <div className="max-w-6xl mx-auto w-full pt-14 pb-12 md:pt-16 md:pb-14 flex flex-col items-center justify-center text-center px-6">
         <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-[var(--text-muted)] mb-2.5 select-none">
@@ -28,7 +28,7 @@ function Footer() {
         </h2>
         <button
           onClick={handleStartConversation}
-          className="group inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-6 py-2.5 sm:py-3 text-xs font-semibold text-[var(--text-primary)] transform-gpu transition-[transform,background-color,border-color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform hover:bg-white/[0.05] hover:border-white/[0.16] hover:shadow-[0_6px_20px_rgba(0,0,0,0.6)] hover:-translate-y-[1.5px] active:translate-y-0 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#020306]"
+          className="group inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-6 py-2.5 sm:py-3 text-xs font-semibold text-[var(--text-primary)] transform-gpu transition-[transform,background-color,border-color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform hover:bg-white/[0.05] hover:border-white/[0.16] hover:shadow-[0_6px_20px_rgba(0,0,0,0.6)] hover:-translate-y-[1.5px] active:translate-y-0 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
         >
           <span>Start a Conversation</span>
           <span className="text-[var(--accent)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-1">

@@ -9,91 +9,121 @@
   inherits: true;
   initial-value: #0A0A0B;
 }
+
 @property --bg-surface {
   syntax: '<color>';
   inherits: true;
   initial-value: #18181B;
 }
+
 @property --bg-raised {
   syntax: '<color>';
   inherits: true;
   initial-value: #27272A;
 }
+
 @property --border {
   syntax: '<color>';
   inherits: true;
   initial-value: rgba(255, 255, 255, 0.08);
 }
+
 @property --border-glow {
   syntax: '<color>';
   inherits: true;
   initial-value: rgba(37, 99, 235, 0.25);
 }
+
 @property --text-primary {
   syntax: '<color>';
   inherits: true;
   initial-value: #FAFAFA;
 }
+
 @property --text-heading {
   syntax: '<color>';
   inherits: true;
   initial-value: #EEF4FF;
 }
+
 @property --text-secondary {
   syntax: '<color>';
   inherits: true;
   initial-value: #A1A1AA;
 }
+
 @property --text-muted {
   syntax: '<color>';
   inherits: true;
-  initial-value: #52525B;
+  initial-value: #808090;
 }
+
 @property --accent {
   syntax: '<color>';
   inherits: true;
   initial-value: #2563EB;
 }
+
 @property --accent-dim {
   syntax: '<color>';
   inherits: true;
   initial-value: rgba(37, 99, 235, 0.08);
 }
+
+@property --accent-glow {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(37, 99, 235, 0.18);
+}
+
+@property --accent-glow-strong {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(37, 99, 235, 0.30);
+}
+
 @property --accent-hover {
   syntax: '<color>';
   inherits: true;
   initial-value: #3B82F6;
 }
+
 @property --accent-contrast {
   syntax: '<color>';
   inherits: true;
   initial-value: #FAFAFA;
 }
+
 @property --nav-bg {
   syntax: '<color>';
   inherits: true;
   initial-value: rgba(10, 10, 11, 0.85);
 }
+
 @property --shadow-color {
   syntax: '<color>';
   inherits: true;
   initial-value: rgba(0, 0, 0, 0.6);
 }
+
 @property --hover-color-about {
   syntax: '<color>';
   inherits: true;
   initial-value: rgba(37, 99, 235, 0.08);
 }
+
 @property --hover-color-skills {
   syntax: '<color>';
   inherits: true;
   initial-value: rgba(59, 130, 246, 0.08);
 }
+
 @property --hover-color-projects {
   syntax: '<color>';
   inherits: true;
   initial-value: rgba(37, 99, 235, 0.10);
 }
+
 @property --hover-color-contact {
   syntax: '<color>';
   inherits: true;
@@ -121,62 +151,69 @@
 :root,
 [data-theme="professional"] {
   /* Core Colors - Monochrome + Blue Accent */
-  --bg:              #0A0A0B;
-  --bg-surface:      #18181B;
-  --bg-raised:       #27272A;
-  --border:          rgba(255, 255, 255, 0.08);
-  --border-glow:     rgba(37, 99, 235, 0.25);
+  --bg: #0A0A0B;
+  --bg-surface: #18181B;
+  --bg-raised: #27272A;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-glow: rgba(37, 99, 235, 0.24);
 
-  --text-primary:    #FAFAFA;
-  --text-heading:    #EEF4FF;
-  --text-secondary:  #A1A1AA;
-  --text-muted:      #52525B;
+  --text-primary: #FAFAFA;
+  --text-heading: #EEF4FF;
+  --text-secondary: #A1A1AA;
+  --text-muted: #808090;
 
-  --accent:          #2563EB;
-  --accent-dim:      rgba(37, 99, 235, 0.08);
-  --accent-hover:    #3B82F6;
+  --accent: #2563EB;
+  --accent-dim: rgba(37, 99, 235, 0.08);
+  --accent-hover: #3B82F6;
   --accent-contrast: #FAFAFA;
 
-  --nav-bg:          rgba(10, 10, 11, 0.85);
-  
-  /* Tokenized Shadow and Radial Hover colors */
-  --shadow-color:    rgba(0, 0, 0, 0.6);
-  --card-shadow:     0 10px 40px 0 var(--shadow-color);
+  --nav-bg: rgba(10, 10, 11, 0.85);
 
-  --danger:   #EF4444;
-  --warning:  #F59E0B;
-  --success:  #10B981;
+  /* Tokenized Shadow and Radial Hover colors */
+  --shadow-color: rgba(0, 0, 0, 0.6);
+  --card-shadow: 0 10px 40px 0 var(--shadow-color);
+
+  --danger: #EF4444;
+  --warning: #F59E0B;
+  --success: #10B981;
 
   /* Typography - Professional Design System */
-  --font-heading:    'Space Grotesk', 'Inter', sans-serif;
-  --font-body:       'DM Sans', 'Inter', sans-serif;
-  --font-mono:       'JetBrains Mono', monospace;
+  --font-heading: 'Space Grotesk', 'Inter', sans-serif;
+  --font-body: 'DM Sans', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 
   /* Spacing System */
-  --space-xs:  0.25rem;  /* 4px */
-  --space-sm:  0.5rem;   /* 8px */
-  --space-md:  1rem;     /* 16px */
-  --space-lg:  1.5rem;   /* 24px */
-  --space-xl:  2rem;     /* 32px */
-  --space-2xl: 3rem;     /* 48px */
-  --space-3xl: 4rem;     /* 64px */
+  --space-xs: 0.25rem;
+  /* 4px */
+  --space-sm: 0.5rem;
+  /* 8px */
+  --space-md: 1rem;
+  /* 16px */
+  --space-lg: 1.5rem;
+  /* 24px */
+  --space-xl: 2rem;
+  /* 32px */
+  --space-2xl: 3rem;
+  /* 48px */
+  --space-3xl: 4rem;
+  /* 64px */
 
   /* Shadow Depths */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
-  --shadow-lg: 0 10px 15px rgba(0,0,0,0.15);
-  --shadow-xl: 0 20px 25px rgba(0,0,0,0.2);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.2);
 
   /* Hover Gradient Colors & Formulas */
-  --hover-color-about:    rgba(37, 99, 235, 0.08);
-  --hover-color-skills:   rgba(59, 130, 246, 0.08);
+  --hover-color-about: rgba(37, 99, 235, 0.08);
+  --hover-color-skills: rgba(59, 130, 246, 0.08);
   --hover-color-projects: rgba(37, 99, 235, 0.10);
-  --hover-color-contact:  rgba(239, 68, 68, 0.06);
+  --hover-color-contact: rgba(239, 68, 68, 0.06);
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-about: radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills: radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
   --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+  --bg-hover-contact: radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
 
   /* Hero Redesign Variables */
   --hero-img-blend: luminosity;
@@ -189,18 +226,19 @@
      UNIFIED GRADIENT SYSTEM - CONTACT SECTION
      Single source of truth for all accent gradients, glows, and highlights
      ======================================== */
-  
+
   /* Primary Gradient - Headlines, CTAs, Primary Elements */
   --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
-  
+
   /* Glow Gradient - Card hovers, Icon badges, Ambient glows */
   --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
-  
+
   /* Accent Colors - Consistent accent variations */
   --accent-primary: var(--accent);
-  --accent-secondary: #6366f1;  /* Blue-indigo midpoint (theme-appropriate for blue) */
-  --accent-glow: rgba(99, 102, 241, 0.15);
-  --accent-glow-strong: rgba(99, 102, 241, 0.25);
+  --accent-secondary: #6366f1;
+  /* Blue-indigo midpoint (theme-appropriate for blue) */
+  --accent-glow: rgba(37, 99, 235, 0.18);
+  --accent-glow-strong: rgba(37, 99, 235, 0.30);
 
   /* Ambient Intensity Multiplier - Controls large decorative glow/wash opacity
      Cool hues (blue, cyan, green, purple) use 1.0 (full intensity)
@@ -209,40 +247,40 @@
 }
 
 [data-theme="obsidian"] {
-  --bg:              #030303;
-  --bg-surface:      #08080c;
-  --bg-raised:       #111116;
-  --border:          rgba(255, 255, 255, 0.05);
-  --border-glow:     rgba(37, 99, 235, 0.15);
+  --bg: #030303;
+  --bg-surface: #08080c;
+  --bg-raised: #111116;
+  --border: rgba(255, 255, 255, 0.05);
+  --border-glow: rgba(37, 99, 235, 0.24);
 
-  --text-primary:    #f5f5f7;
-  --text-heading:    #EEF4FF;
-  --text-secondary:  #a1a1a6;
-  --text-muted:      #515156;
+  --text-primary: #f5f5f7;
+  --text-heading: #EEF4FF;
+  --text-secondary: #a1a1a6;
+  --text-muted: #7a7a81;
 
-  --accent:          #2563EB;
-  --accent-dim:      rgba(37, 99, 235, 0.06);
-  --accent-hover:    #3B82F6;
+  --accent: #2563EB;
+  --accent-dim: rgba(37, 99, 235, 0.08);
+  --accent-hover: #3B82F6;
   --accent-contrast: #FAFAFA;
 
-  --nav-bg:          rgba(3, 3, 3, 0.75);
-  
-  --shadow-color:    rgba(0, 0, 0, 0.8);
-  --card-shadow:     0 8px 32px 0 var(--shadow-color);
+  --nav-bg: rgba(3, 3, 3, 0.75);
 
-  --danger:   #ff4d4d;
-  --warning:  #ffaa00;
-  --success:  #10B981;
+  --shadow-color: rgba(0, 0, 0, 0.8);
+  --card-shadow: 0 8px 32px 0 var(--shadow-color);
 
-  --hover-color-about:    rgba(37, 99, 235, 0.05);
-  --hover-color-skills:   rgba(59, 130, 246, 0.05);
-  --hover-color-projects: rgba(37, 99, 235, 0.07);
-  --hover-color-contact:  rgba(239, 68, 68, 0.05);
+  --danger: #ff4d4d;
+  --warning: #ffaa00;
+  --success: #10B981;
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --hover-color-about: rgba(37, 99, 235, 0.06);
+  --hover-color-skills: rgba(59, 130, 246, 0.06);
+  --hover-color-projects: rgba(37, 99, 235, 0.08);
+  --hover-color-contact: rgba(239, 68, 68, 0.05);
+
+  --bg-hover-about: radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills: radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
   --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+  --bg-hover-contact: radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
 
   /* Hero Redesign Variables */
   --hero-img-blend: luminosity;
@@ -255,117 +293,59 @@
      UNIFIED GRADIENT SYSTEM - CONTACT SECTION
      Single source of truth for all accent gradients, glows, and highlights
      ======================================== */
-  
+
   /* Primary Gradient - Headlines, CTAs, Primary Elements */
   --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
-  
+
   /* Glow Gradient - Card hovers, Icon badges, Ambient glows */
   --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
-  
+
   /* Accent Colors - Consistent accent variations */
   --accent-primary: var(--accent);
-  --accent-secondary: #6366f1;  /* Blue-indigo midpoint (theme-appropriate for blue) */
-  --accent-glow: rgba(99, 102, 241, 0.15);
-  --accent-glow-strong: rgba(99, 102, 241, 0.25);
+  --accent-secondary: #6366f1;
+  /* Blue-indigo midpoint (theme-appropriate for blue) */
+  --accent-glow: rgba(37, 99, 235, 0.18);
+  --accent-glow-strong: rgba(37, 99, 235, 0.30);
 
   /* Ambient Intensity Multiplier */
   --ambient-intensity: 1.0;
 }
 
-[data-theme="warm-slate"] {
-  --bg:              #050403;
-  --bg-surface:      #0c0a08;
-  --bg-raised:       #151310;
-  --border:          rgba(255, 255, 255, 0.04);
-  --border-glow:     rgba(249, 115, 22, 0.15);
-
-  --text-primary:    #fdfbf7;
-  --text-heading:    #FFF3E6;
-  --text-secondary:  #a69e96;
-  --text-muted:      #605750;
-
-  --accent:          #f97316;
-  --accent-dim:      rgba(249, 115, 22, 0.06);
-  --accent-hover:    #fb8f3f;
-  --accent-contrast: #050403;
-
-  --nav-bg:          rgba(5, 4, 3, 0.75);
-  
-  --shadow-color:    rgba(0, 0, 0, 0.85);
-  --card-shadow:     0 8px 32px 0 var(--shadow-color);
-
-  --danger:   #ef4444;
-  --warning:  #eab308;
-  --success:  #22c55e;
-
-  --hover-color-about:    rgba(251, 191, 36, 0.05);
-  --hover-color-skills:   rgba(249, 115, 22, 0.05);
-  --hover-color-projects: rgba(249, 115, 22, 0.07);
-  --hover-color-contact:  rgba(239, 68, 68, 0.04);
-
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
-  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
-
-  /* Hero Redesign Variables */
-  --hero-img-blend: luminosity;
-  --hero-img-opacity: 0.7;
-  --hero-noise-opacity: 0.08;
-  --hero-shadow-opacity: 0.9;
-  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
-
-  /* ========================================
-     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
-     ======================================== */
-  
-  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
-  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
-  
-  --accent-primary: var(--accent);
-  --accent-secondary: #fb923c;  /* Warm amber midpoint (stays in orange-yellow range, no cool shift) */
-  --accent-glow: rgba(249, 115, 22, 0.12);
-  --accent-glow-strong: rgba(249, 115, 22, 0.2);
-
-  /* Ambient Intensity Multiplier - WARM HUE (orange #f97316 at 25°) */
-  --ambient-intensity: 0.5;
-}
-
 [data-theme="midnight-violet"] {
-  --bg:              #040308;
-  --bg-surface:      #090712;
-  --bg-raised:       #131023;
-  --border:          rgba(255, 255, 255, 0.04);
-  --border-glow:     rgba(167, 139, 250, 0.15);
+  --bg: #040308;
+  --bg-surface: #090712;
+  --bg-raised: #131023;
+  --border: rgba(255, 255, 255, 0.04);
+  --border-glow: rgba(167, 139, 250, 0.16);
 
-  --text-primary:    #f1eff9;
-  --text-heading:    #F4F0FF;
-  --text-secondary:  #9c95be;
-  --text-muted:      #5e597c;
+  --text-primary: #f1eff9;
+  --text-heading: #F4F0FF;
+  --text-secondary: #9c95be;
+  --text-muted: #7c75a3;
 
-  --accent:          #a78bfa;
-  --accent-dim:      rgba(167, 139, 250, 0.06);
-  --accent-hover:    #c4b5fd;
+  --accent: #a78bfa;
+  --accent-dim: rgba(167, 139, 250, 0.06);
+  --accent-hover: #c4b5fd;
   --accent-contrast: #040308;
 
-  --nav-bg:          rgba(4, 3, 8, 0.75);
-  
-  --shadow-color:    rgba(0, 0, 0, 0.85);
-  --card-shadow:     0 8px 32px 0 var(--shadow-color);
+  --nav-bg: rgba(4, 3, 8, 0.75);
 
-  --danger:   #f87171;
-  --warning:  #fbbf24;
-  --success:  #34d399;
+  --shadow-color: rgba(0, 0, 0, 0.85);
+  --card-shadow: 0 8px 32px 0 var(--shadow-color);
 
-  --hover-color-about:    rgba(167, 139, 250, 0.05);
-  --hover-color-skills:   rgba(196, 181, 253, 0.04);
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --success: #34d399;
+
+  --hover-color-about: rgba(167, 139, 250, 0.05);
+  --hover-color-skills: rgba(196, 181, 253, 0.04);
   --hover-color-projects: rgba(167, 139, 250, 0.07);
-  --hover-color-contact:  rgba(248, 113, 113, 0.04);
+  --hover-color-contact: rgba(248, 113, 113, 0.04);
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-about: radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills: radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
   --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+  --bg-hover-contact: radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
 
   /* Hero Redesign Variables */
   --hero-img-blend: luminosity;
@@ -377,12 +357,13 @@
   /* ========================================
      UNIFIED GRADIENT SYSTEM - CONTACT SECTION
      ======================================== */
-  
+
   --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
   --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
-  
+
   --accent-primary: var(--accent);
-  --accent-secondary: #9f7aea;  /* Purple-violet midpoint (stays in purple range, slightly warmer than indigo) */
+  --accent-secondary: #9f7aea;
+  /* Purple-violet midpoint (stays in purple range, slightly warmer than indigo) */
   --accent-glow: rgba(167, 139, 250, 0.15);
   --accent-glow-strong: rgba(167, 139, 250, 0.25);
 
@@ -390,100 +371,41 @@
   --ambient-intensity: 1.0;
 }
 
-[data-theme="steel-flame"] {
-  --bg:              #050101;
-  --bg-surface:      #0c0404;
-  --bg-raised:       #150909;
-  --border:          rgba(255, 255, 255, 0.04);
-  --border-glow:     rgba(255, 60, 60, 0.15);
-
-  --text-primary:    #fff5f5;
-  --text-heading:    #FFF1F1;
-  --text-secondary:  #aa9a9a;
-  --text-muted:      #664a4a;
-
-  --accent:          #ff3c3c;
-  --accent-dim:      rgba(255, 60, 60, 0.06);
-  --accent-hover:    #ff6060;
-  --accent-contrast: #050101;
-
-  --nav-bg:          rgba(5, 1, 1, 0.75);
-  
-  --shadow-color:    rgba(0, 0, 0, 0.85);
-  --card-shadow:     0 8px 32px 0 var(--shadow-color);
-
-  --danger:   #ff1a1a;
-  --warning:  #ff9500;
-  --success:  #00d67c;
-
-  --hover-color-about:    rgba(255, 149, 0, 0.04);
-  --hover-color-skills:   rgba(255, 60, 60, 0.04);
-  --hover-color-projects: rgba(255, 60, 60, 0.07);
-  --hover-color-contact:  rgba(255, 60, 60, 0.05);
-
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
-  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
-
-  /* Hero Redesign Variables */
-  --hero-img-blend: luminosity;
-  --hero-img-opacity: 0.7;
-  --hero-noise-opacity: 0.09;
-  --hero-shadow-opacity: 0.9;
-  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
-
-  /* ========================================
-     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
-     ======================================== */
-  
-  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
-  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
-  
-  --accent-primary: var(--accent);
-  --accent-secondary: #ff6b9d;  /* Warm pink-coral midpoint (stays in red-pink range, avoids indigo cool shift) */
-  --accent-glow: rgba(255, 60, 60, 0.12);
-  --accent-glow-strong: rgba(255, 60, 60, 0.2);
-
-  /* Ambient Intensity Multiplier - WARM HUE (red #ff3c3c at 0°) */
-  --ambient-intensity: 0.45;
-}
-
 [data-theme="emerald-noir"] {
-  --bg:              #020a06;
-  --bg-surface:      #061210;
-  --bg-raised:       #0c1e18;
-  --border:          rgba(255, 255, 255, 0.04);
-  --border-glow:     rgba(16, 185, 129, 0.18);
+  --bg: #020a06;
+  --bg-surface: #061210;
+  --bg-raised: #0c1e18;
+  --border: rgba(255, 255, 255, 0.04);
+  --border-glow: rgba(16, 185, 129, 0.16);
 
-  --text-primary:    #f0fdf8;
-  --text-heading:    #e6fff5;
-  --text-secondary:  #8fad9e;
-  --text-muted:      #4a6a5a;
+  --text-primary: #f0fdf8;
+  --text-heading: #e6fff5;
+  --text-secondary: #8fad9e;
+  --text-muted: #5c8471;
 
-  --accent:          #10b981;
-  --accent-dim:      rgba(16, 185, 129, 0.06);
-  --accent-hover:    #34d399;
+  --accent: #10b981;
+  --accent-dim: rgba(16, 185, 129, 0.06);
+  --accent-hover: #34d399;
   --accent-contrast: #020a06;
 
-  --nav-bg:          rgba(2, 10, 6, 0.78);
-  
-  --shadow-color:    rgba(0, 0, 0, 0.85);
-  --card-shadow:     0 8px 32px 0 var(--shadow-color);
+  --nav-bg: rgba(2, 10, 6, 0.78);
 
-  --danger:   #f87171;
-  --warning:  #fbbf24;
-  --success:  #34d399;
+  --shadow-color: rgba(0, 0, 0, 0.85);
+  --card-shadow: 0 8px 32px 0 var(--shadow-color);
 
-  --hover-color-about:    rgba(16, 185, 129, 0.05);
-  --hover-color-skills:   rgba(52, 211, 153, 0.04);
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --success: #34d399;
+
+  --hover-color-about: rgba(16, 185, 129, 0.05);
+  --hover-color-skills: rgba(52, 211, 153, 0.04);
   --hover-color-projects: rgba(16, 185, 129, 0.07);
-  --hover-color-contact:  rgba(248, 113, 113, 0.04);
+  --hover-color-contact: rgba(248, 113, 113, 0.04);
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-about: radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills: radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
   --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+  --bg-hover-contact: radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
 
   /* Hero Redesign Variables */
   --hero-img-blend: luminosity;
@@ -495,12 +417,13 @@
   /* ========================================
      UNIFIED GRADIENT SYSTEM - CONTACT SECTION
      ======================================== */
-  
+
   --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
   --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
-  
+
   --accent-primary: var(--accent);
-  --accent-secondary: #14b8a6;  /* Teal midpoint (green→cyan transition, stays in cool-green range) */
+  --accent-secondary: #14b8a6;
+  /* Teal midpoint (green→cyan transition, stays in cool-green range) */
   --accent-glow: rgba(16, 185, 129, 0.15);
   --accent-glow-strong: rgba(16, 185, 129, 0.25);
 
@@ -509,40 +432,40 @@
 }
 
 [data-theme="graphite"] {
-  --bg:              #030712;
-  --bg-surface:      #0b1329;
-  --bg-raised:       #111d3a;
-  --border:          rgba(255, 255, 255, 0.05);
-  --border-glow:     rgba(156, 163, 175, 0.15);
+  --bg: #030712;
+  --bg-surface: #0b1329;
+  --bg-raised: #111d3a;
+  --border: rgba(255, 255, 255, 0.05);
+  --border-glow: rgba(156, 163, 175, 0.15);
 
-  --text-primary:    #f0f9ff;
-  --text-heading:    #f8fafc;
-  --text-secondary:  #94a3b8;
-  --text-muted:      #475569;
+  --text-primary: #f0f9ff;
+  --text-heading: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #767e90;
 
-  --accent:          #9ca3af;
-  --accent-dim:      rgba(156, 163, 175, 0.06);
-  --accent-hover:    #d1d5db;
+  --accent: #9ca3af;
+  --accent-dim: rgba(156, 163, 175, 0.06);
+  --accent-hover: #d1d5db;
   --accent-contrast: #030712;
 
-  --nav-bg:          rgba(3, 7, 18, 0.80);
-  
-  --shadow-color:    rgba(0, 0, 0, 0.85);
-  --card-shadow:     0 8px 32px 0 var(--shadow-color);
+  --nav-bg: rgba(3, 7, 18, 0.80);
 
-  --danger:   #f87171;
-  --warning:  #fbbf24;
-  --success:  #34d399;
+  --shadow-color: rgba(0, 0, 0, 0.85);
+  --card-shadow: 0 8px 32px 0 var(--shadow-color);
 
-  --hover-color-about:    rgba(156, 163, 175, 0.04);
-  --hover-color-skills:   rgba(209, 213, 219, 0.03);
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --success: #34d399;
+
+  --hover-color-about: rgba(156, 163, 175, 0.04);
+  --hover-color-skills: rgba(209, 213, 219, 0.03);
   --hover-color-projects: rgba(156, 163, 175, 0.05);
-  --hover-color-contact:  rgba(248, 113, 113, 0.04);
+  --hover-color-contact: rgba(248, 113, 113, 0.04);
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-about: radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills: radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
   --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+  --bg-hover-contact: radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
 
   /* Hero Redesign Variables */
   --hero-img-blend: luminosity;
@@ -554,12 +477,13 @@
   /* ========================================
      UNIFIED GRADIENT SYSTEM - CONTACT SECTION
      ======================================== */
-  
+
   --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
   --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(107, 114, 128, 0.4) 50%, transparent 100%);
-  
+
   --accent-primary: var(--accent);
-  --accent-secondary: #6b7280;  /* Darker gray midpoint (monochrome gradient, no color bleed) */
+  --accent-secondary: #6b7280;
+  /* Darker gray midpoint (monochrome gradient, no color bleed) */
   --accent-glow: rgba(156, 163, 175, 0.12);
   --accent-glow-strong: rgba(156, 163, 175, 0.20);
 
@@ -568,40 +492,40 @@
 }
 
 [data-theme="nordic-frost"] {
-  --bg:              #050814;
-  --bg-surface:      #0c1122;
-  --bg-raised:       #172038;
-  --border:          rgba(255, 255, 255, 0.05);
-  --border-glow:     rgba(59, 130, 246, 0.20);
+  --bg: #050814;
+  --bg-surface: #0c1122;
+  --bg-raised: #172038;
+  --border: rgba(255, 255, 255, 0.05);
+  --border-glow: rgba(59, 130, 246, 0.19);
 
-  --text-primary:    #f1f5f9;
-  --text-heading:    #f8fafc;
-  --text-secondary:  #94a3b8;
-  --text-muted:      #475569;
+  --text-primary: #f1f5f9;
+  --text-heading: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #6882a1;
 
-  --accent:          #3b82f6;
-  --accent-dim:      rgba(59, 130, 246, 0.08);
-  --accent-hover:    #60a5fa;
+  --accent: #3b82f6;
+  --accent-dim: rgba(59, 130, 246, 0.08);
+  --accent-hover: #60a5fa;
   --accent-contrast: #050814;
 
-  --nav-bg:          rgba(5, 8, 20, 0.78);
-  
-  --shadow-color:    rgba(0, 0, 0, 0.85);
-  --card-shadow:     0 8px 32px 0 var(--shadow-color);
+  --nav-bg: rgba(5, 8, 20, 0.78);
 
-  --danger:   #ef4444;
-  --warning:  #f59e0b;
-  --success:  #10b981;
+  --shadow-color: rgba(0, 0, 0, 0.85);
+  --card-shadow: 0 8px 32px 0 var(--shadow-color);
 
-  --hover-color-about:    rgba(59, 130, 246, 0.06);
-  --hover-color-skills:   rgba(96, 165, 250, 0.05);
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+
+  --hover-color-about: rgba(59, 130, 246, 0.06);
+  --hover-color-skills: rgba(96, 165, 250, 0.05);
   --hover-color-projects: rgba(59, 130, 246, 0.08);
-  --hover-color-contact:  rgba(239, 68, 68, 0.04);
+  --hover-color-contact: rgba(239, 68, 68, 0.04);
 
-  --bg-hover-about:    radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
-  --bg-hover-skills:   radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-about: radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills: radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
   --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
-  --bg-hover-contact:  radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+  --bg-hover-contact: radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
 
   /* Hero Redesign Variables */
   --hero-img-blend: luminosity;
@@ -613,16 +537,76 @@
   /* ========================================
      UNIFIED GRADIENT SYSTEM - CONTACT SECTION
      ======================================== */
-  
+
   --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
   --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
-  
+
   --accent-primary: var(--accent);
-  --accent-secondary: #6366f1;  /* Blue-indigo midpoint (theme-appropriate for blue) */
+  --accent-secondary: #6366f1;
+  /* Blue-indigo midpoint (theme-appropriate for blue) */
   --accent-glow: rgba(59, 130, 246, 0.15);
   --accent-glow-strong: rgba(59, 130, 246, 0.25);
 
   /* Ambient Intensity Multiplier - COOL HUE (blue #3b82f6 at 217°) */
+  --ambient-intensity: 1.0;
+}
+
+[data-theme="electric-blue"] {
+  --bg: #030712;
+  --bg-surface: #070e1e;
+  --bg-raised: #0f1c36;
+  --border: rgba(255, 255, 255, 0.05);
+  --border-glow: rgba(0, 229, 255, 0.13);
+
+  --text-primary: #f0f9ff;
+  --text-heading: #e0f2fe;
+  --text-secondary: #7dd3fc;
+  --text-muted: #5880b2;
+
+  --accent: #00e5ff;
+  --accent-dim: rgba(0, 229, 255, 0.04);
+  --accent-hover: #38bdf8;
+  --accent-contrast: #030712;
+
+  --nav-bg: rgba(3, 7, 18, 0.78);
+
+  --shadow-color: rgba(0, 0, 0, 0.85);
+  --card-shadow: 0 8px 32px 0 var(--shadow-color);
+
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+
+  --hover-color-about: rgba(0, 229, 255, 0.04);
+  --hover-color-skills: rgba(56, 189, 248, 0.04);
+  --hover-color-projects: rgba(0, 229, 255, 0.04);
+  --hover-color-contact: rgba(239, 68, 68, 0.04);
+
+  --bg-hover-about: radial-gradient(ellipse at 30% 60%, var(--hover-color-about) 0%, transparent 70%);
+  --bg-hover-skills: radial-gradient(ellipse at 70% 40%, var(--hover-color-skills) 0%, transparent 70%);
+  --bg-hover-projects: radial-gradient(ellipse at 50% 70%, var(--hover-color-projects) 0%, transparent 65%);
+  --bg-hover-contact: radial-gradient(ellipse at 40% 50%, var(--hover-color-contact) 0%, transparent 70%);
+
+  /* Hero Redesign Variables */
+  --hero-img-blend: luminosity;
+  --hero-img-opacity: 0.7;
+  --hero-noise-opacity: 0.07;
+  --hero-shadow-opacity: 0.85;
+  --hero-ambient-glow: radial-gradient(circle at 60% 50%, var(--accent-dim) 0%, transparent 70%);
+
+  /* ========================================
+     UNIFIED GRADIENT SYSTEM - CONTACT SECTION
+     ======================================== */
+
+  --gradient-primary: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent-hover) 100%);
+  --gradient-glow: radial-gradient(circle, var(--accent) 0%, rgba(0, 119, 255, 0.5) 50%, transparent 100%);
+
+  --accent-primary: var(--accent);
+  --accent-secondary: #0077ff;
+  --accent-glow: rgba(0, 229, 255, 0.10);
+  --accent-glow-strong: rgba(0, 229, 255, 0.18);
+
+  /* Ambient Intensity Multiplier - COOL HUE */
   --ambient-intensity: 1.0;
 }
 
@@ -633,7 +617,7 @@
    ======================================================== */
 
 html {
-  transition: 
+  transition:
     --bg 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     --bg-surface 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     --bg-raised 0.5s cubic-bezier(0.22, 1, 0.36, 1),
@@ -645,6 +629,8 @@ html {
     --text-muted 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     --accent 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     --accent-dim 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --accent-glow 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    --accent-glow-strong 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     --accent-hover 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     --accent-contrast 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     --nav-bg 0.5s cubic-bezier(0.22, 1, 0.36, 1),
@@ -678,7 +664,7 @@ html {
 .theme-transitioning textarea,
 .theme-transitioning label {
   /* Standard transition fallbacks for colors/shapes during theme switch to guarantee cross-browser compatibility */
-  transition: 
+  transition:
     background-color 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.5s cubic-bezier(0.22, 1, 0.36, 1),
     color 0.5s cubic-bezier(0.22, 1, 0.36, 1) !important;
@@ -700,6 +686,7 @@ canvas {
 
 /* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

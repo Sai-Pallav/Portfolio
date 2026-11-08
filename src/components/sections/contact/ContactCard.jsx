@@ -1,44 +1,43 @@
-import React, { useRef, useState, useEffect, useCallback, memo } from 'react'
+import { useRef, useState, useEffect, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check } from 'lucide-react'
 
 /**
  * Per-card subtle environmental lighting & material depth configs.
- * Base surfaces are layered near-black (#0e0b1c -> #080612 -> #04030a), with soft, asymmetric
- * ambient violet reflections and crisp upper edge highlights.
+ * Base surfaces adapt dynamically to the active theme surfaces and accents.
  */
 const CARD_LIGHT_CONFIGS = [
   // Card 0 — STATUS: upper-left environmental light bleed
   {
-    gradient: 'linear-gradient(150deg, #0e0b1c 0%, #080613 50%, #04030a 100%)',
-    sheen: 'radial-gradient(ellipse 110% 80% at 15% -10%, rgba(167, 139, 250, 0.085) 0%, rgba(139, 92, 246, 0.02) 55%, transparent 80%)',
-    borderDefault: '#231c38',
-    borderHover: '#3d315d',
-    topHighlight: 'rgba(167, 139, 250, 0.22)',
+    gradient: 'linear-gradient(150deg, var(--bg-surface) 0%, color-mix(in srgb, var(--bg-surface) 65%, var(--bg)) 50%, var(--bg) 100%)',
+    sheen: 'radial-gradient(ellipse 110% 80% at 15% -10%, color-mix(in srgb, var(--accent) 8.5%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 2%, transparent) 55%, transparent 80%)',
+    borderDefault: 'var(--border)',
+    borderHover: 'var(--border-glow)',
+    topHighlight: 'color-mix(in srgb, var(--accent) 22%, transparent)',
   },
   // Card 1 — EMAIL: top-center balanced environmental light bleed
   {
-    gradient: 'linear-gradient(155deg, #0e0b1c 0%, #080613 50%, #04030a 100%)',
-    sheen: 'radial-gradient(ellipse 100% 75% at 50% -10%, rgba(167, 139, 250, 0.095) 0%, rgba(139, 92, 246, 0.025) 55%, transparent 80%)',
-    borderDefault: '#231c38',
-    borderHover: '#3d315d',
-    topHighlight: 'rgba(167, 139, 250, 0.24)',
+    gradient: 'linear-gradient(155deg, var(--bg-surface) 0%, color-mix(in srgb, var(--bg-surface) 65%, var(--bg)) 50%, var(--bg) 100%)',
+    sheen: 'radial-gradient(ellipse 100% 75% at 50% -10%, color-mix(in srgb, var(--accent) 9.5%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 2.5%, transparent) 55%, transparent 80%)',
+    borderDefault: 'var(--border)',
+    borderHover: 'var(--border-glow)',
+    topHighlight: 'color-mix(in srgb, var(--accent) 24%, transparent)',
   },
   // Card 2 — LINKEDIN: upper-right environmental light bleed
   {
-    gradient: 'linear-gradient(145deg, #0e0b1c 0%, #080613 50%, #04030a 100%)',
-    sheen: 'radial-gradient(ellipse 110% 80% at 85% -10%, rgba(167, 139, 250, 0.09) 0%, rgba(139, 92, 246, 0.02) 55%, transparent 80%)',
-    borderDefault: '#231c38',
-    borderHover: '#3d315d',
-    topHighlight: 'rgba(167, 139, 250, 0.22)',
+    gradient: 'linear-gradient(145deg, var(--bg-surface) 0%, color-mix(in srgb, var(--bg-surface) 65%, var(--bg)) 50%, var(--bg) 100%)',
+    sheen: 'radial-gradient(ellipse 110% 80% at 85% -10%, color-mix(in srgb, var(--accent) 9%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 2%, transparent) 55%, transparent 80%)',
+    borderDefault: 'var(--border)',
+    borderHover: 'var(--border-glow)',
+    topHighlight: 'color-mix(in srgb, var(--accent) 22%, transparent)',
   },
   // Card 3 — LOCATION: soft right environmental light bleed
   {
-    gradient: 'linear-gradient(140deg, #0e0b1c 0%, #080613 50%, #04030a 100%)',
-    sheen: 'radial-gradient(ellipse 100% 75% at 90% 0%, rgba(167, 139, 250, 0.08) 0%, rgba(139, 92, 246, 0.018) 55%, transparent 80%)',
-    borderDefault: '#231c38',
-    borderHover: '#3d315d',
-    topHighlight: 'rgba(167, 139, 250, 0.20)',
+    gradient: 'linear-gradient(140deg, var(--bg-surface) 0%, color-mix(in srgb, var(--bg-surface) 65%, var(--bg)) 50%, var(--bg) 100%)',
+    sheen: 'radial-gradient(ellipse 100% 75% at 90% 0%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, color-mix(in srgb, var(--accent-secondary) 1.8%, transparent) 55%, transparent 80%)',
+    borderDefault: 'var(--border)',
+    borderHover: 'var(--border-glow)',
+    topHighlight: 'color-mix(in srgb, var(--accent) 20%, transparent)',
   },
 ]
 
@@ -106,21 +105,21 @@ export default memo(function ContactCard({
       const Component = href ? 'a' : 'button'
       const linkProps = href
         ? {
-            href,
-            target: href.startsWith('http') ? '_blank' : undefined,
-            rel: href.startsWith('http') ? 'noopener noreferrer' : undefined,
-            onClick: (e) => e.stopPropagation()
-          }
+          href,
+          target: href.startsWith('http') ? '_blank' : undefined,
+          rel: href.startsWith('http') ? 'noopener noreferrer' : undefined,
+          onClick: (e) => e.stopPropagation()
+        }
         : {
-            type: 'button',
-            onClick: handleAction
-          }
+          type: 'button',
+          onClick: handleAction
+        }
 
       if (actionType === 'copy') {
         return (
           <Component
             {...linkProps}
-            className="group/cta inline-flex items-center gap-1 text-xs font-semibold text-white transition-colors duration-200 cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none hover:text-[#a78bfa]"
+            className="group/cta inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-primary)] transition-colors duration-200 cursor-pointer text-left w-full border-none bg-transparent p-0 outline-none hover:text-[var(--accent)]"
             aria-label={copied ? 'Email copied to clipboard' : 'Copy email address'}
           >
             <AnimatePresence mode="wait" initial={false}>
@@ -131,7 +130,7 @@ export default memo(function ContactCard({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
                   transition={{ duration: 0.18 }}
-                  className="inline-flex items-center gap-1 font-semibold text-[#a78bfa]"
+                  className="inline-flex items-center gap-1 font-semibold text-[var(--accent)]"
                 >
                   <span>Copied!</span>
                   <Check className="h-3 w-3 stroke-[2.5]" />
@@ -143,7 +142,7 @@ export default memo(function ContactCard({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -2 }}
                   transition={{ duration: 0.18 }}
-                  className="inline-flex items-center gap-1 text-white group-hover/cta:text-[#a78bfa] transition-colors"
+                  className="inline-flex items-center gap-1 text-[var(--text-primary)] group-hover/cta:text-[var(--accent)] transition-colors"
                 >
                   <span>Copy Email →</span>
                 </motion.span>
@@ -156,7 +155,7 @@ export default memo(function ContactCard({
       return (
         <Component
           {...linkProps}
-          className="group/cta inline-flex items-center gap-1 text-xs font-semibold text-white transition-colors duration-200 cursor-pointer text-left border-none bg-transparent p-0 outline-none hover:text-[#a78bfa]"
+          className="group/cta inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-primary)] transition-colors duration-200 cursor-pointer text-left border-none bg-transparent p-0 outline-none hover:text-[var(--accent)]"
         >
           <span>{footer}</span>
         </Component>
@@ -164,7 +163,7 @@ export default memo(function ContactCard({
     }
 
     return (
-      <span className="text-[11px] text-[#6e6785] font-normal text-left select-text">
+      <span className="text-[11px] text-[var(--text-muted)] font-normal text-left select-text">
         {footer}
       </span>
     )
@@ -178,9 +177,8 @@ export default memo(function ContactCard({
       <div
         ref={cardRef}
         onClick={isInteractive ? handleAction : undefined}
-        className={`relative overflow-hidden rounded-[18px] p-5 sm:p-5.5 min-h-[215px] h-full flex flex-col justify-between transform-gpu select-none ${
-          isInteractive ? 'cursor-pointer' : 'cursor-default'
-        }`}
+        className={`relative overflow-hidden rounded-[18px] p-5 sm:p-5.5 min-h-[215px] h-full flex flex-col justify-between transform-gpu select-none ${isInteractive ? 'cursor-pointer' : 'cursor-default'
+          }`}
         style={{
           border: `1px solid ${isHighlighted ? cfg.borderHover : cfg.borderDefault}`,
           background: cardBackground,
@@ -206,37 +204,37 @@ export default memo(function ContactCard({
             <div
               className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] transition-colors duration-200"
               style={{
-                background: '#0d0a1b',
-                border: '1px solid #251e3a',
+                background: 'var(--bg-raised)',
+                border: '1px solid var(--border)',
                 boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
               }}
             >
               {typeof icon === 'function' ? icon(isHighlighted) : icon}
             </div>
 
-            <span className="text-[10px] font-mono font-semibold tracking-[0.18em] text-[#938ba8] uppercase">
+            <span className="text-[10px] font-mono font-semibold tracking-[0.18em] text-[var(--text-secondary)] uppercase">
               {label}
             </span>
           </div>
 
-          <span className="font-mono text-[10px] font-medium text-[#5c5473] tracking-wider">
+          <span className="font-mono text-[10px] font-medium text-[var(--text-muted)] tracking-wider">
             0{index}
           </span>
         </div>
 
         {/* Content Area */}
         <div className="flex-1 flex flex-col justify-start my-1 relative z-10">
-          <h4 className="text-[15px] font-bold text-white tracking-tight leading-snug text-left group-hover:text-white transition-colors duration-200">
+          <h4 className="text-[15px] font-bold text-[var(--text-heading)] tracking-tight leading-snug text-left group-hover:text-[var(--text-heading)] transition-colors duration-200">
             {title}
           </h4>
-          <p className="text-xs leading-relaxed text-[#938ba8] font-normal text-left mt-1.5 max-w-[270px]">
+          <p className="text-xs leading-relaxed text-[var(--text-secondary)] font-normal text-left mt-1.5 max-w-[270px]">
             {description}
           </p>
         </div>
 
         {/* Footer Divider & Action */}
         <div
-          className="flex items-center justify-between pt-3 w-full mt-auto relative z-10 border-t border-[#1e1932]"
+          className="flex items-center justify-between pt-3 w-full mt-auto relative z-10 border-t border-[var(--border)]"
         >
           {renderFooter()}
         </div>

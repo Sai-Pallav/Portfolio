@@ -14,20 +14,10 @@ const THEME_PALETTES = {
     secondary: '#6366f1',
     hover: '#3b82f6',
   },
-  'warm-slate': {
-    primary: '#f97316',
-    secondary: '#fb923c',
-    hover: '#fb8f3f',
-  },
   'midnight-violet': {
     primary: '#a78bfa',
     secondary: '#9f7aea',
     hover: '#c4b5fd',
-  },
-  'steel-flame': {
-    primary: '#ff3c3c',
-    secondary: '#ff6b9d',
-    hover: '#ff6060',
   },
   'emerald-noir': {
     primary: '#10b981',
@@ -43,6 +33,11 @@ const THEME_PALETTES = {
     primary: '#3b82f6',
     secondary: '#6366f1',
     hover: '#60a5fa',
+  },
+  'electric-blue': {
+    primary: '#00e5ff',
+    secondary: '#0077ff',
+    hover: '#38bdf8',
   },
   'professional': {
     primary: '#2563eb',
@@ -67,11 +62,25 @@ const getInitialThemeKey = () => {
 
 const initialPalette = THEME_PALETTES[getInitialThemeKey()] || THEME_PALETTES['obsidian']
 
+// --- Universal Perceptual Luminance Normalization Helper ---
+// Computes ITU-R BT.709 relative luminance and applies a continuous photometric
+// power curve to achieve consistent perceived brightness across all hues without hardcoding.
+const computeThemeLuminanceComp = (hex) => {
+  try {
+    const col = new THREE.Color(hex)
+    const lum = 0.2126 * col.r + 0.7152 * col.g + 0.0722 * col.b
+    return Math.pow(0.38 / Math.max(0.15, Math.min(0.85, lum)), 0.35)
+  } catch {
+    return 1.0
+  }
+}
+
 // --- Global Theme Ref for Imperative Material Updates (No React Re-renders) ---
 const globalTheme = {
   primary: initialPalette.primary,
   secondary: initialPalette.secondary,
   hover: initialPalette.hover,
+  lumComp: computeThemeLuminanceComp(initialPalette.primary),
   version: 0,
 }
 
@@ -86,6 +95,7 @@ function applyThemeColors(themeKey) {
       globalTheme.primary = palette.primary
       globalTheme.secondary = palette.secondary
       globalTheme.hover = palette.hover
+      globalTheme.lumComp = computeThemeLuminanceComp(palette.primary)
       globalTheme.version += 1
     }
     return
@@ -102,6 +112,7 @@ function applyThemeColors(themeKey) {
         globalTheme.primary = accent
         globalTheme.secondary = secondary
         globalTheme.hover = hover
+        globalTheme.lumComp = computeThemeLuminanceComp(accent)
         globalTheme.version += 1
       }
     } catch {
@@ -357,17 +368,30 @@ const RingGlowMaterial = shaderMaterial(
      float rimDot = max(dot(reflectRay, secLight), 0.0);
      float backRimGlint = pow(rimDot, 5.0) * 0.18;
 
+     // =========================================================================
+     // UNIVERSAL THEME-AWARE PERCEPTUAL NORMALIZATION
+     // =========================================================================
+     // Standard Rec. 709 / CIE 1931 relative luminance of the active theme color:
+     float colorLum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+     float lumComp = pow(0.38 / clamp(colorLum, 0.15, 0.85), 0.35);
+
+     // Chromatic saturation of active theme color:
+     float maxC = max(color.r, max(color.g, color.b));
+     float minC = min(color.r, min(color.g, color.b));
+     float colorSat = maxC > 0.001 ? clamp((maxC - minC) / maxC, 0.0, 1.0) : 0.0;
+
      // Theme-adaptive optical glass specular & reflection color:
      // Dielectric glass exhibits a brilliant neutral white specular core:
      vec3 specWhiteCore = vec3(0.98, 0.99, 1.00);
-     // Subtle theme-adaptive reflection sheen:
-     vec3 themeSheen = mix(color, specWhiteCore, 0.55);
-     vec3 keySpecColor = mix(themeSheen, specWhiteCore, 0.75);
+     // Subtle theme-adaptive reflection sheen with chromatic purity scaling:
+     float sheenAccentWeight = mix(0.22, 0.45, colorSat);
+     vec3 themeSheen = mix(specWhiteCore, color, sheenAccentWeight);
+     vec3 keySpecColor = mix(themeSheen, specWhiteCore, 0.70);
      vec3 fillSpecColor = themeSheen;
 
      // Depth modulation: foreground shines crisply; background is naturally subdued:
      float specDepthMod = mix(0.35, 1.0, depthFactor) * (1.0 - globeOcclusion * 0.42);
-     vec3 totalSpecular = (keySpecColor * (primarySpecular * 1.40) + fillSpecColor * (secSpecular * 1.10 + backRimGlint)) * specDepthMod;
+     vec3 totalSpecular = (keySpecColor * (primarySpecular * (1.35 * lumComp)) + fillSpecColor * (secSpecular * (1.05 * lumComp) + backRimGlint * lumComp)) * specDepthMod;
 
      // =========================================================================
      // 2. VIEW-DEPENDENT REFLECTIVE EDGE DEFINITION
@@ -381,21 +405,23 @@ const RingGlowMaterial = shaderMaterial(
      float rimGlint = pow(rimGlanceKey, 4.0) * 0.30;
      float rimDirectional = 0.55 + 0.35 * rimSky + rimGlint;
 
-     // Delicate theme-adaptive reflective edge highlight:
-     vec3 edgeTint = mix(themeSheen, specWhiteCore, 0.45);
+     // Delicate theme-adaptive reflective edge highlight with saturation adaptation:
+     float edgeAccentWeight = mix(0.25, 0.50, colorSat);
+     vec3 edgeTint = mix(specWhiteCore, color, edgeAccentWeight);
      float edgeDepthMod = mix(0.50, 1.0, depthFactor) * (1.0 - globeOcclusion * 0.35);
-     vec3 edgeColor = edgeTint * (edgeFresnel * rimDirectional * 1.05 * edgeDepthMod);
+     // Calibrated orbital ring glow intensity (+6.7% subtle increase within 5-8% target range):
+     vec3 edgeColor = edgeTint * (edgeFresnel * rimDirectional * (1.12 * lumComp) * edgeDepthMod);
 
      // =========================================================================
      // 3. NATURAL GLASS-LIKE SURFACE SHADING
      // =========================================================================
-     // Translucent optical glass body with smooth subtle tint:
-     vec3 glassBodyTint = mix(color, specWhiteCore, 0.40);
+     // Translucent optical glass body with smooth subtle tint and luminance compensation:
+     vec3 glassBodyTint = mix(color, specWhiteCore, mix(0.25, 0.40, colorSat));
      float bodyTransmission = 0.50 + 0.50 * NdotV;
-     vec3 glassBody = glassBodyTint * (baseLum * 0.32 * bodyTransmission);
+     vec3 glassBody = glassBodyTint * (baseLum * (0.32 * lumComp) * bodyTransmission);
 
      // Subtle internal light transmission / caustic:
-     float internalCaustic = pow(NdotV, 2.0) * max(dot(normal, keyLight), 0.0) * (0.08 * depthFactor);
+     float internalCaustic = pow(NdotV, 2.0) * max(dot(normal, keyLight), 0.0) * (0.08 * depthFactor * lumComp);
      glassBody += glassBodyTint * internalCaustic;
 
      // =========================================================================
@@ -571,6 +597,7 @@ function CameraRig({ distanceFactor }) {
 
 function Lights({ theme }) {
   const lightRef = useRef()
+  const ambientRef = useRef()
   const lastColorVersion = useRef(-1)
 
   useEffect(() => {
@@ -578,19 +605,26 @@ function Lights({ theme }) {
   }, [theme])
 
   useFrame(() => {
-    if (lastColorVersion.current !== globalTheme.version && lightRef.current) {
-      lightRef.current.color.set(globalTheme.primary)
+    if (lastColorVersion.current !== globalTheme.version) {
+      if (lightRef.current) {
+        lightRef.current.color.set(globalTheme.primary)
+        lightRef.current.intensity = 2.2 * globalTheme.lumComp
+      }
+      if (ambientRef.current) {
+        ambientRef.current.color.set('#ffffff').lerp(new THREE.Color(globalTheme.primary), 0.08)
+        ambientRef.current.intensity = 0.25 * Math.min(1.15, Math.max(0.85, globalTheme.lumComp))
+      }
       lastColorVersion.current = globalTheme.version
     }
   })
   return (
     <>
-      <ambientLight intensity={0.25} />
+      <ambientLight ref={ambientRef} intensity={0.25} />
       <hemisphereLight args={['#ffffff', '#090913', 0.30]} />
       {/* Specular directional light creating subtle highlight on upper-right */}
       <directionalLight position={[5, 4, 4]} intensity={1.2} color="#ffffff" />
       {/* Deep back rim light */}
-      <pointLight ref={lightRef} position={[-4, -1, -4]} intensity={2.2} color={globalTheme.primary} distance={12} decay={2.2} />
+      <pointLight ref={lightRef} position={[-4, -1, -4]} intensity={2.2 * globalTheme.lumComp} color={globalTheme.primary} distance={12} decay={2.2} />
     </>
   )
 }
@@ -1142,10 +1176,10 @@ function Scene({ theme, distanceFactor, hoveredCountRef, hoveredOrbitRef, contac
       const primaryCol = new THREE.Color(globalTheme.primary)
       const secondaryCol = new THREE.Color(globalTheme.secondary)
 
-      // 1. Cosmic Obsidian Glass Core - 10% theme undertone on dark obsidian
+      // 1. Cosmic Obsidian Glass Core - theme undertone on dark obsidian with luminance compensation
       staticMatGlassCore.color
         .copy(primaryCol)
-        .multiplyScalar(0.10)
+        .multiplyScalar(0.10 * globalTheme.lumComp)
         .add(new THREE.Color('#05060a'))
       staticMatGlassCore.emissive.setHex(0x000000)
 
@@ -1157,17 +1191,20 @@ function Scene({ theme, distanceFactor, hoveredCountRef, hoveredOrbitRef, contac
 
       // 3. Primary Outer Geodesic Network
       staticMatOuterWire.color.copy(primaryCol)
+      staticMatOuterWire.opacity = SCENE_CONFIG.globe.wireframeOpacity * Math.min(1.2, Math.max(0.85, globalTheme.lumComp))
 
       // 4. Constellation Stars (delicate nodes with restrained luminous theme tint)
       staticMatOuterPoints.color
         .copy(primaryCol)
         .lerp(new THREE.Color('#ffffff'), 0.22)
+      staticMatOuterPoints.opacity = SCENE_CONFIG.globe.pointsOpacity * Math.min(1.15, Math.max(0.88, globalTheme.lumComp))
 
       // 5. Atmospheric Rim Halo
       staticMatAtmosphericHalo.uniforms.color.value.copy(primaryCol)
       if (staticMatAtmosphericHalo.color) {
         staticMatAtmosphericHalo.color.copy(primaryCol)
       }
+      staticMatAtmosphericHalo.uniforms.glowIntensity.value = SCENE_CONFIG.globe.glowIntensity * globalTheme.lumComp
 
       // 6. Orbital Rings (100% consistent theme accent across all 3 rings in both depth passes)
       sharedRingMaterialBg.uniforms.color.value.copy(primaryCol)
