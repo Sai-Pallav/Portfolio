@@ -265,11 +265,12 @@ const RingGlowMaterial = shaderMaterial(
      vec3 tangent = normalize(rawTangent - dot(rawTangent, normal) * normal);
      vec3 viewDir = normalize(vViewPosition);
 
-     // --- Back-face tube cull ---
+     // --- Back-face tube cull with smooth antialiased edge feather ---
      // TorusGeometry has 3D outward normals. With depthTest=false, back-facing tube fragments
-     // (facing away from camera) are culled to avoid double-layer rendering.
+     // are softly culled to avoid double-layer rendering while preventing jagged edge noise.
      float NdotV_raw = dot(normal, viewDir);
-     if (NdotV_raw < -0.01) discard;
+     if (NdotV_raw < -0.06) discard;
+     float edgeFeather = smoothstep(-0.06, 0.04, NdotV_raw);
      float NdotV = max(NdotV_raw, 0.0);
      
      float s = max(vWorldScale, 0.001);
@@ -312,7 +313,7 @@ const RingGlowMaterial = shaderMaterial(
      baseOpacity = mix(baseOpacity, 0.36, globeOcclusion * 0.45);
 
      // =========================================================================
-     // 1. CONTINUOUS CURVATURE-FOLLOWING SPECULAR REFLECTION (Section 2.B)
+     // 1. SILKY-SMOOTH CURVATURE-FOLLOWING SPECULAR REFLECTION
      // =========================================================================
      // Primary key directional light vector at [5, 4, 4] in view space:
      vec3 keyLight = normalize(vec3(0.662, 0.530, 0.530));
@@ -325,95 +326,85 @@ const RingGlowMaterial = shaderMaterial(
      vec3 H1_perp_norm = H1_perp / max(length(H1_perp), 0.001);
 
      // Cross-sectional crest alignment:
-     // Light reflects along the crest of the cylindrical tube where normal aligns with H_perp_norm.
-     // Optical glass with low roughness (0.12-0.22) exhibits narrow, crisp specular crest highlights
-     // without subpixel extinction:
+     // Calibrated for a polished, silky-smooth optical glass surface without harsh banding:
      float crossSpec1 = max(dot(normal, H1_perp_norm), 0.0);
-     float specCore1  = pow(crossSpec1, 24.0); // sharp optical specular core
-     float specSheen1 = pow(crossSpec1, 7.0);  // narrow dielectric gloss
-     float crossProfile1 = specCore1 * 0.72 + specSheen1 * 0.28;
+     float specCore1  = pow(crossSpec1, 14.0); // smooth, polished optical specular core
+     float specSheen1 = pow(crossSpec1, 4.0);  // gentle dielectric gloss
+     float crossProfile1 = specCore1 * 0.65 + specSheen1 * 0.35;
 
-     // Localized arc envelope along the ring path (~60°-75° visible arc):
-     float longArc1 = exp(-H1_dot_T * H1_dot_T * 4.2);
+     // Continuous smooth ribbon envelope along the ring path:
+     float longArc1 = exp(-H1_dot_T * H1_dot_T * 3.0);
 
-     // Directional gating: smooth terminator prevents phantom reflections on back-facing segments
-     float lightGate1 = smoothstep(-0.05, 0.28, dot(normal, keyLight));
+     // Directional gating: silky smooth terminator falloff
+     float lightGate1 = smoothstep(-0.08, 0.30, dot(normal, keyLight));
 
-     // Smooth harmonic variation along the ring path (Requirement 2.B: natural variation in intensity):
-     float ringVariation = 0.82 + 0.18 * sin(vUv.x * 6.2831853 * 2.0 + 1.2);
+     float primarySpecular = crossProfile1 * longArc1 * lightGate1;
 
-     float primarySpecular = crossProfile1 * longArc1 * lightGate1 * ringVariation;
-
-     // Secondary front-left celestial fill reflection (subtle localized optical glint):
+     // Secondary front-left celestial fill reflection (soft optical glint):
      vec3 secLight = normalize(vec3(-0.696, -0.174, -0.696));
      vec3 halfVec2 = normalize(secLight + viewDir);
      float H2_dot_T = dot(tangent, halfVec2);
      vec3 H2_perp = halfVec2 - H2_dot_T * tangent;
      vec3 H2_perp_norm = H2_perp / max(length(H2_perp), 0.001);
      float crossSpec2 = max(dot(normal, H2_perp_norm), 0.0);
-     float specCore2  = pow(crossSpec2, 18.0);
-     float longArc2   = exp(-H2_dot_T * H2_dot_T * 5.0);
-     float lightGate2 = smoothstep(-0.05, 0.25, dot(normal, secLight));
-     float secSpecular = specCore2 * longArc2 * lightGate2 * 0.35;
+     float specCore2  = pow(crossSpec2, 10.0);
+     float longArc2   = exp(-H2_dot_T * H2_dot_T * 3.6);
+     float lightGate2 = smoothstep(-0.08, 0.25, dot(normal, secLight));
+     float secSpecular = specCore2 * longArc2 * lightGate2 * 0.30;
 
      // Back rim light reflection (matching point light at [-4, -1, -4] in view space):
      vec3 reflectRay = reflect(-viewDir, normal);
      float rimDot = max(dot(reflectRay, secLight), 0.0);
-     float backRimGlint = pow(rimDot, 8.0) * 0.28;
+     float backRimGlint = pow(rimDot, 5.0) * 0.18;
 
-     // Theme-adaptive optical glass specular & reflection color (Section 2.C & 7):
+     // Theme-adaptive optical glass specular & reflection color:
      // Dielectric glass exhibits a brilliant neutral white specular core:
      vec3 specWhiteCore = vec3(0.98, 0.99, 1.00);
-     // Subtle theme-adaptive reflection sheen (luminous icy-blue for blue theme, violet for violet theme,
-     // adapting naturally to active theme without hardcoded color contamination):
+     // Subtle theme-adaptive reflection sheen:
      vec3 themeSheen = mix(color, specWhiteCore, 0.55);
      vec3 keySpecColor = mix(themeSheen, specWhiteCore, 0.75);
      vec3 fillSpecColor = themeSheen;
 
-     // Depth modulation: foreground shines crisply (target 6/10); background is naturally subdued:
+     // Depth modulation: foreground shines crisply; background is naturally subdued:
      float specDepthMod = mix(0.35, 1.0, depthFactor) * (1.0 - globeOcclusion * 0.42);
-     vec3 totalSpecular = (keySpecColor * (primarySpecular * 2.60) + fillSpecColor * (secSpecular * 1.50 + backRimGlint)) * specDepthMod;
+     vec3 totalSpecular = (keySpecColor * (primarySpecular * 1.40) + fillSpecColor * (secSpecular * 1.10 + backRimGlint)) * specDepthMod;
 
      // =========================================================================
-     // 2. VIEW-DEPENDENT REFLECTIVE EDGE DEFINITION (Section 2.D)
+     // 2. VIEW-DEPENDENT REFLECTIVE EDGE DEFINITION
      // =========================================================================
-     // Dielectric Fresnel edge definition calibrated to thin glass cylinder optics:
-     // Exponent 2.4 creates delicate, crisp boundary definition without thick outlines:
-     float edgeFresnel = pow(1.0 - NdotV, 2.4);
+     // Smooth dielectric Fresnel edge definition calibrated to glass cylinder optics:
+     float edgeFresnel = pow(1.0 - NdotV, 2.0);
 
      // Directional & view-dependent modulation:
      float rimSky = smoothstep(-0.2, 0.8, reflectRay.y);
      float rimGlanceKey = max(dot(reflectRay, keyLight), 0.0);
-     float rimGlint = pow(rimGlanceKey, 5.0) * 0.45;
+     float rimGlint = pow(rimGlanceKey, 4.0) * 0.30;
      float rimDirectional = 0.55 + 0.35 * rimSky + rimGlint;
 
-     // Delicate theme-adaptive reflective edge highlight (target 6.5/10):
+     // Delicate theme-adaptive reflective edge highlight:
      vec3 edgeTint = mix(themeSheen, specWhiteCore, 0.45);
      float edgeDepthMod = mix(0.50, 1.0, depthFactor) * (1.0 - globeOcclusion * 0.35);
-     vec3 edgeColor = edgeTint * (edgeFresnel * rimDirectional * 1.10 * edgeDepthMod);
+     vec3 edgeColor = edgeTint * (edgeFresnel * rimDirectional * 1.05 * edgeDepthMod);
 
      // =========================================================================
-     // 3. NATURAL GLASS-LIKE SURFACE SHADING (Section 2.A & 2.C)
+     // 3. NATURAL GLASS-LIKE SURFACE SHADING
      // =========================================================================
-     // Translucent optical glass body with refined subtle tint (Translucency 8.5/10, Transmission 8/10, Definition 6/10):
-     // Clear optical glass body with clean transmission through center facing camera:
+     // Translucent optical glass body with smooth subtle tint:
      vec3 glassBodyTint = mix(color, specWhiteCore, 0.40);
      float bodyTransmission = 0.50 + 0.50 * NdotV;
      vec3 glassBody = glassBodyTint * (baseLum * 0.32 * bodyTransmission);
 
-     // Subtle internal light transmission / caustic (refraction 1.0/10, emissive 0.5/10):
-     float internalCaustic = pow(NdotV, 2.4) * max(dot(normal, keyLight), 0.0) * (0.12 * depthFactor);
+     // Subtle internal light transmission / caustic:
+     float internalCaustic = pow(NdotV, 2.0) * max(dot(normal, keyLight), 0.0) * (0.08 * depthFactor);
      glassBody += glassBodyTint * internalCaustic;
 
      // =========================================================================
-     // 4. GLASS TRANSMISSION ALPHA & VISUAL HIERARCHY (LOCKED — DO NOT MODIFY)
+     // 4. GLASS TRANSMISSION ALPHA & VISUAL HIERARCHY
      // =========================================================================
      // Glass transmission alpha:
-     // Tube center (NdotV=1): high transmission -> transparent body (8.5/10 translucency)
-     // Tube sides (NdotV=0): Fresnel reflection -> denser rim defining glass boundary
-     float centerAlpha = baseOpacity * 0.28;    // transparent center (8.5/10 translucency)
-     float rimAlpha    = baseOpacity * 0.84;    // crisp, delicate glass boundary rim
-     float specAlphaBoost = (specCore1 * longArc1 * 0.45 + specSheen1 * longArc1 * 0.18 + secSpecular * 0.15) * specDepthMod;
+     float centerAlpha = baseOpacity * 0.30;
+     float rimAlpha    = baseOpacity * 0.82;
+     float specAlphaBoost = (specCore1 * longArc1 * 0.25 + specSheen1 * longArc1 * 0.12 + secSpecular * 0.10) * specDepthMod;
      float glassAlpha = clamp(mix(centerAlpha, rimAlpha, edgeFresnel) + specAlphaBoost, 0.0, 1.0);
 
      // =========================================================================
@@ -440,12 +431,9 @@ const RingGlowMaterial = shaderMaterial(
      // =========================================================================
      // 6. FINAL COMPOSITE (OPTICAL GLASS REFLECTION REFINEMENT)
      // =========================================================================
-     // In physical optics, surface reflections (specular + Fresnel edge) are additive
-     // onto the transmitted glass body. Under WebGL NormalBlending (SRC_ALPHA, ONE_MINUS_SRC_ALPHA),
-     // the surface reflections and translucent glass body composite naturally with the background:
      vec3 surfaceReflections = edgeColor + totalSpecular;
      vec3 finalColor = glassBody + surfaceReflections;
-     float finalOpacity = glassAlpha * passWeight;
+     float finalOpacity = glassAlpha * passWeight * edgeFeather;
      
      gl_FragColor = vec4(finalColor, finalOpacity); 
    }`
@@ -459,8 +447,8 @@ const staticGeomPoints = new THREE.IcosahedronGeometry(SCENE_CONFIG.globe.radius
 const staticGeomGlass = new THREE.SphereGeometry(SCENE_CONFIG.globe.glassRadius, 32, 32)
 const staticGeomHalo = new THREE.SphereGeometry(SCENE_CONFIG.globe.haloRadius, 32, 32)
 
-// Unified orbital ring geometry shared by all three rings for 100% consistent thickness and smoothness
-const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.0346, 16, 128)
+// Unified orbital ring geometry shared by all three rings with silky-smooth tessellation
+const sharedRingGeometry = new THREE.TorusGeometry(2.45, 0.0346, 32, 256)
 
 // Shared static materials - allocated once to completely eliminate GC churn
 const staticMatGlassCore = new THREE.MeshStandardMaterial({
