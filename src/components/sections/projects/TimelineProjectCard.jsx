@@ -39,7 +39,14 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
         />
 
         {/* Project image */}
-        <div className="relative h-48 overflow-hidden">
+        <div
+          className="relative h-48 overflow-hidden isolate"
+          style={{
+            clipPath: "inset(0)",
+            WebkitClipPath: "inset(0)",
+            transform: "translateZ(0)",
+          }}
+        >
           <div
             className="absolute inset-0"
             style={{
@@ -50,26 +57,32 @@ const TimelineProjectCard = memo(function TimelineProjectCard({ project, index, 
             src={project.image}
             alt={`Screenshot of ${project.title}`}
             className="w-full h-full object-cover transition-transform duration-[700ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/card:scale-[1.03]"
+            style={{
+              willChange: "transform",
+            }}
             loading="lazy"
             decoding="async"
             onError={(e) => {
               e.target.style.display = "none";
             }}
           />
-          {/* Smooth image-to-content transition */}
+          {/* Smooth image-to-content transition with extended opaque bottom to eliminate subpixel seam bleed */}
           <div
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-x-0 top-0 -bottom-1 pointer-events-none z-10"
             style={{
-              background: 'linear-gradient(to bottom, transparent 40%, color-mix(in srgb, var(--bg-surface) 40%, transparent) 70%, color-mix(in srgb, var(--bg-surface) 78%, #000) 100%)',
+              background: 'linear-gradient(to bottom, transparent 35%, color-mix(in srgb, var(--bg-surface) 40%, transparent) 65%, color-mix(in srgb, var(--bg-surface) 78%, #000) 88%, color-mix(in srgb, var(--bg-surface) 78%, #000) 100%)',
             }}
           />
         </div>
 
         {/* Card content */}
         <div
-          className="p-7 relative"
+          className="p-7 relative z-10 -mt-px"
           style={{
-            background: 'radial-gradient(ellipse 90% 70% at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 65%)',
+            background: `
+              radial-gradient(ellipse 90% 70% at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 65%),
+              color-mix(in srgb, var(--bg-surface) 78%, #000)
+            `,
           }}
         >
           {/* Project number */}

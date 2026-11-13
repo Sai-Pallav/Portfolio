@@ -652,6 +652,7 @@ const staticGeomMicroParticles = (() => {
 })()
 
 const tempIconVec = new THREE.Vector3()
+const tempScaleVec = new THREE.Vector3()
 
 function MicroParticles({ distanceFactor, isTransmit = false }) {
   const pointsRef = useRef()
@@ -741,8 +742,8 @@ function Globe({ distanceFactor, isTransmit = false }) {
   )
 }
 
-// Toggle to temporarily enable/disable the orbiting social & contact icons on the rings
-const ENABLE_ORBITING_ICONS = false
+// Toggle to enable/disable the orbiting social & contact icons on the rings
+const ENABLE_ORBITING_ICONS = true
 
 const STATIC_RING_ICONS = [
   [
@@ -751,7 +752,7 @@ const STATIC_RING_ICONS = [
   ],
   [
     { key: 'leetcode', platform: 'leetcode', url: personal.socials.leetcode },
-    { key: 'gfg', platform: 'gfg', url: personal.socials.gfg },
+    { key: 'instagram', platform: 'instagram', url: personal.socials.instagram },
   ],
   [
     { key: 'email', platform: 'email', url: personal.email, isSpecial: true, specialType: 'email' },
@@ -760,19 +761,35 @@ const STATIC_RING_ICONS = [
 ]
 const STATIC_ALL_ICONS = STATIC_RING_ICONS.flat()
 
-const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onHoverChange, hoveredCountRef }) {
+// Static reusable math objects for SocialIconsCoordinator to avoid GC pressure
+const _tempIconWorld = new THREE.Vector3()
+const _tempCamWorld = new THREE.Vector3()
+const _tempRayDir = new THREE.Vector3()
+const _tempCamToGlobe = new THREE.Vector3()
+const _tempClosestPoint = new THREE.Vector3()
+const _tempIconCam = new THREE.Vector3()
+const _tempGlobeProj = new THREE.Vector3()
+const _tempRimWorld = new THREE.Vector3()
+const _tempRimProj = new THREE.Vector3()
+const _tempIconProj = new THREE.Vector3()
+const _tempGlobeCam = new THREE.Vector3()
+const _vGlobeWorld = new THREE.Vector3(0, 0, 0)
+const _activeIcons = []
+
+const OrbitingIcon = memo(function OrbitingIcon({
+  iconData,
+  reactionGlowRef,
+  onHoverChange,
+  hoveredCountRef,
+  iconsRegistryRef,
+}) {
   const iconGroupRef = useRef()
+  const containerRef = useRef()
   const htmlRef = useRef()
   const glowRef = useRef()
 
   const hoverRef = useRef(false)
   const shouldReduceMotion = useReducedMotion()
-
-  const hoverGlowFactor = useRef(0.0)
-  const lastStyle = useRef({ opacity: -1, scaleVal: -1, glowOpacity: -1, brightnessVal: -1, saturateVal: -1 })
-  const STYLE_THRESHOLD = 0.005
-  const FILTER_THRESHOLD = 0.015
-  const GLOW_THRESHOLD = 0.015
 
   const { platform, url, specialType } = iconData
   const [copied, setCopied] = useState(false)
@@ -816,80 +833,46 @@ const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onH
     }
   }, [specialType, url])
 
-  // Combined physics loop and theme shadow synchronization
-  const lastColorVersion = useRef(-1)
+  // Register this icon into the centralized coordinator registry
+  useEffect(() => {
+    const registry = iconsRegistryRef?.current
+    if (!registry) return
 
-  useFrame((state, delta) => {
-    if (shouldReduceMotion) return
-    const safeDelta = Math.min(delta, 0.05)
-    const hovered = hoverRef.current
-
-    const targetGlow = hovered ? 1.0 : 0.0
-    const glowSpeed = hovered ? LERP.hoverGlowIn : LERP.hoverGlowOut
-    hoverGlowFactor.current = lerpFI(hoverGlowFactor.current, targetGlow, glowSpeed, safeDelta)
-
-    // Depth-based opacity, scale, and brightness
-    if (iconGroupRef.current && htmlRef.current) {
-      iconGroupRef.current.getWorldPosition(tempIconVec)
-      tempIconVec.applyMatrix4(state.camera.matrixWorldInverse)
-
-      const camZ = state.camera.position.z || SCENE_CONFIG.depth.cameraZ
-      const zWorld = tempIconVec.z + camZ
-      // Streamlined depth calculation: (zWorld + 2.94) / 5.88
-      const depth = THREE.MathUtils.clamp((zWorld + 2.94) * 0.170068, 0, 1)
-
-      const baseScale = 0.95 + depth * 0.08
-      const scaleVal = baseScale * (1.0 + hoverGlowFactor.current * 0.03)
-
-      // 2D distance from globe center in camera plane for realistic planetary occlusion
-      const dist2D = Math.sqrt(tempIconVec.x * tempIconVec.x + tempIconVec.y * tempIconVec.y)
-      const isBehindGlobe = zWorld < -0.3 && dist2D < 2.05
-
-      let opacityVal = 0.55 + depth * 0.45
-      if (isBehindGlobe) {
-        const occlusionFade = THREE.MathUtils.clamp((dist2D - 1.35) / 0.70, 0.0, 1.0)
-        opacityVal = Math.min(opacityVal, 0.08 + occlusionFade * 0.35)
-      }
-
-      const brightnessVal = 0.8 + depth * 0.2
-      const saturateVal = 0.85 + depth * 0.15
-      const reactionGlow = reactionGlowRef ? reactionGlowRef.current : 0.0
-      const glowOpacity = Math.max(hoverGlowFactor.current, reactionGlow)
-
-      // Dirty-check style updates to eliminate unnecessary DOM writes
-      const prev = lastStyle.current
-      if (Math.abs(opacityVal - prev.opacity) > STYLE_THRESHOLD) {
-        htmlRef.current.style.opacity = opacityVal.toFixed(3)
-        prev.opacity = opacityVal
-      }
-      if (Math.abs(scaleVal - prev.scaleVal) > STYLE_THRESHOLD) {
-        htmlRef.current.style.transform = `scale(${scaleVal.toFixed(3)})`
-        prev.scaleVal = scaleVal
-      }
-      if (Math.abs(brightnessVal - prev.brightnessVal) > FILTER_THRESHOLD || Math.abs(saturateVal - prev.saturateVal) > FILTER_THRESHOLD) {
-        htmlRef.current.style.filter = `brightness(${brightnessVal.toFixed(2)}) saturate(${saturateVal.toFixed(2)})`
-        prev.brightnessVal = brightnessVal
-        prev.saturateVal = saturateVal
-      }
-      if (glowRef.current && Math.abs(glowOpacity - prev.glowOpacity) > GLOW_THRESHOLD) {
-        glowRef.current.style.opacity = glowOpacity.toFixed(2)
-        prev.glowOpacity = glowOpacity
-      }
+    const entry = {
+      key: iconData.key,
+      iconGroupRef,
+      containerRef,
+      htmlRef,
+      glowRef,
+      hoverRef,
+      reactionGlowRef,
+      iconData,
+      currentOpacity: 1.0,
+      currentScale: 1.0,
+      currentPointerEvents: 'auto',
+      camDist: 8.0,
+      occlusion: 0.0,
+      targetOpacity: 1.0,
+      hoverGlowFactor: 0.0,
+      normalizedDepth: 0.5,
+      stableZIndex: 10,
+      prevDepthRank: undefined,
+      htmlRootEl: null,
+      lastMask: null,
+      isInitialized: false,
     }
-
-    // Theme shadow synchronization
-    if (lastColorVersion.current !== globalTheme.version && glowRef.current) {
-      glowRef.current.style.boxShadow = `0 0 16px ${globalTheme.primary}`
-      lastColorVersion.current = globalTheme.version
+    registry.set(iconData.key, entry)
+    return () => {
+      registry.delete(iconData.key)
     }
-  })
+  }, [iconData.key, iconsRegistryRef, reactionGlowRef])
 
   const renderLink = () => {
     const iconContent = (
       <>
         <SocialIcon
           platform={platform}
-          className="h-4.5 w-4.5 text-[var(--text-secondary)] group-hover/icon:text-[var(--text-heading)] group-hover/icon:drop-shadow-[0_0_8px_var(--accent)] transition-all duration-200"
+          className="w-[18px] h-[18px] text-[var(--text-secondary)] group-hover/icon:text-[var(--text-heading)] group-hover/icon:drop-shadow-[0_0_8px_var(--accent)] transition-all duration-200"
         />
         <div
           ref={glowRef}
@@ -899,7 +882,7 @@ const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onH
       </>
     )
 
-    const baseClass = "group/icon relative flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-surface)]/85 border border-[var(--border)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--accent)]/60 transition-all duration-300 backdrop-blur-md cursor-pointer shadow-[0_4px_20px_var(--shadow-color),0_0_12px_var(--accent-glow)] hover:shadow-[0_4px_24px_var(--shadow-color),0_0_20px_var(--accent-glow-strong)] outline-none focus-visible:ring-2 focus-visible:ring-accent after:absolute after:inset-[-12px] after:content-['']"
+    const baseClass = "group/icon relative flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-surface)]/95 border border-[var(--border)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--accent)]/60 transition-[color,background-color,border-color,box-shadow] duration-300 cursor-pointer shadow-[0_4px_20px_var(--shadow-color),0_0_12px_var(--accent-glow)] hover:shadow-[0_4px_24px_var(--shadow-color),0_0_20px_var(--accent-glow-strong)] outline-none focus-visible:ring-2 focus-visible:ring-accent after:absolute after:inset-[-12px] after:content-[''] will-change-transform"
 
     if (specialType === 'email') {
       return (
@@ -953,12 +936,20 @@ const OrbitingIcon = memo(function OrbitingIcon({ iconData, reactionGlowRef, onH
 
   return (
     <group ref={iconGroupRef}>
-      <Html center transform sprite distanceFactor={8} pointerEvents="auto">
-        <div className="relative group/tooltip pointer-events-auto">
+      <Html center pointerEvents="auto" wrapperClass="social-icon-html-root">
+        <div
+          ref={containerRef}
+          className="relative flex items-center justify-center group/tooltip pointer-events-auto"
+          style={{
+            width: '40px',
+            height: '40px',
+            willChange: 'opacity, mask-image',
+          }}
+        >
           {renderLink()}
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 px-3 py-1.5 rounded-lg bg-[var(--bg-raised)]/95 border border-[var(--border)] backdrop-blur-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-300 pointer-events-none shadow-[0_4px_16px_var(--shadow-color)] scale-90 group-hover/tooltip:scale-100">
             <span className="text-[10px] font-bold tracking-wider uppercase text-[var(--text-heading)] whitespace-nowrap">
-              {specialType === 'email' && copied ? 'Copied!' : platform}
+              {specialType === 'email' && copied ? 'Copied!' : (platform === 'gfg' ? 'GeeksforGeeks' : platform)}
             </span>
             <div className="absolute top-full left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[var(--bg-raised)] border-t border-l border-[var(--border)] rotate-45 -translate-y-[4px]" />
           </div>
@@ -1002,7 +993,8 @@ const OrbitalRing = memo(function OrbitalRing({
   distanceFactor,
   hoveredCountRef,
   hoveredOrbitRef,
-  isTransmit = false
+  isTransmit = false,
+  iconsRegistryRef,
 }) {
   const orbitGroupRef = useRef()
   const pivotARef = useRef()
@@ -1020,6 +1012,7 @@ const OrbitalRing = memo(function OrbitalRing({
   const hoverFactorA = useRef(0)
   const hoverFactorB = useRef(0)
   const easedDistance = useRef(1.0)
+  const easedHoverDecel = useRef(1.0)
 
   const handleHoverA = useCallback((hovered) => {
     isHoveredARef.current = hovered
@@ -1049,9 +1042,14 @@ const OrbitalRing = memo(function OrbitalRing({
     const transmitSurge = targetTransmit * (ringSpeed >= 0 ? 3.5 : -3.5)
     const iconTransmitSurge = targetTransmit * (iconSpeed >= 0 ? 4.8 : -4.8)
 
+    // Buttery smooth hover deceleration: smoothly lerp the hover speed multiplier
+    const isRingHovered = isHoveredARef.current || isHoveredBRef.current || (hoveredCountRef && hoveredCountRef.current > 0)
+    const targetHoverDecel = isRingHovered ? 0.08 : 1.0
+    easedHoverDecel.current = lerpFI(easedHoverDecel.current, targetHoverDecel, 4.5, safeDelta)
+
     // Orbital speed governed smoothly by cursor proximity and dynamic transmit surge
-    const activeIconSpeed = (iconSpeed * proximitySpeedFactor) + iconTransmitSurge
-    const activeRingSpeed = (ringSpeed * proximitySpeedFactor) + transmitSurge
+    const activeIconSpeed = ((iconSpeed * proximitySpeedFactor) + iconTransmitSurge) * easedHoverDecel.current
+    const activeRingSpeed = ((ringSpeed * proximitySpeedFactor) + transmitSurge) * easedHoverDecel.current
 
     // 1. Monotonic continuous phase integration (immune to negative modulo jumps)
     orbitGroupPhase.current += safeDelta * activeRingSpeed
@@ -1127,6 +1125,7 @@ const OrbitalRing = memo(function OrbitalRing({
                   distanceFactor={distanceFactor}
                   hoveredCountRef={hoveredCountRef}
                   hoveredOrbitRef={hoveredOrbitRef}
+                  iconsRegistryRef={iconsRegistryRef}
                 />
               )}
             </group>
@@ -1144,6 +1143,7 @@ const OrbitalRing = memo(function OrbitalRing({
                   distanceFactor={distanceFactor}
                   hoveredCountRef={hoveredCountRef}
                   hoveredOrbitRef={hoveredOrbitRef}
+                  iconsRegistryRef={iconsRegistryRef}
                 />
               )}
             </group>
@@ -1154,9 +1154,258 @@ const OrbitalRing = memo(function OrbitalRing({
   )
 })
 
+// =============================================================================
+// SOCIAL ICONS DEPTH OCCLUSION & OVERLAPPING LAYER COORDINATOR
+// =============================================================================
+// 1. Front-to-Back 3D Visibility:
+//    - Evaluates 3D sphere ray-intersection between each icon, the globe, and camera.
+//    - Seamlessly interpolates opacity: 1.0 (crisp foreground) down to 0.20 (behind globe).
+//    - Continuous boundary transition following the true globe silhouette and atmosphere.
+//    - Opacity is 100% independent per icon, purely based on globe occlusion.
+// 2. Natural Overlapping & Stable Layering:
+//    - Zero collision avoidance, zero positional separation, zero trajectory alteration.
+//    - Icons follow their exact original orbital trajectories and naturally overlap.
+//    - Camera-space depth determines which icon renders in front (closer = higher z-index).
+//    - Depth hysteresis (0.04 units) prevents rapid z-index flipping / flickering during crossings.
+//    - Smooth perspective scaling and lighting transitions ensure stable, natural visual layering.
+// =============================================================================
+function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
+  const shouldReduceMotion = useReducedMotion()
+  const lastColorVersion = useRef(-1)
+
+  useFrame((state, delta) => {
+    const registry = iconsRegistryRef?.current
+    if (!registry || registry.size === 0) return
+
+    const safeDelta = Math.min(delta, 0.05)
+    _activeIcons.length = 0
+
+    // Reduced motion graceful fallback: full visibility, default stacking
+    if (shouldReduceMotion) {
+      for (const entry of registry.values()) {
+        if (!entry.isInitialized && entry.containerRef.current) {
+          entry.containerRef.current.style.opacity = '1.0'
+          entry.containerRef.current.style.zIndex = '20'
+          entry.containerRef.current.style.webkitMaskImage = ''
+          entry.containerRef.current.style.maskImage = ''
+          entry.isInitialized = true
+        }
+      }
+      return
+    }
+
+    // Collect valid active icons
+    for (const entry of registry.values()) {
+      if (entry.iconGroupRef.current && (entry.containerRef.current || entry.htmlRef.current)) {
+        _activeIcons.push(entry)
+      }
+    }
+
+    if (_activeIcons.length === 0) return
+
+    // 1. Globe center, screen projection, and effective silhouette radius
+    const effectiveGlobeRadius = 2.03 * scale
+    state.camera.getWorldPosition(_tempCamWorld)
+
+    _tempGlobeProj.set(0, 0, 0).project(state.camera)
+    const globeScreenX = (_tempGlobeProj.x * 0.5 + 0.5) * state.size.width
+    const globeScreenY = (-_tempGlobeProj.y * 0.5 + 0.5) * state.size.height
+    _tempGlobeCam.copy(_vGlobeWorld).applyMatrix4(state.camera.matrixWorldInverse)
+
+    // Projected silhouette rim radius on screen (accounting for atmospheric boundary)
+    _tempRimWorld.set(effectiveGlobeRadius, 0, 0)
+    _tempRimProj.copy(_tempRimWorld).project(state.camera)
+    const rScreen = Math.abs((_tempRimProj.x - _tempGlobeProj.x) * (state.size.width * 0.5))
+
+    // 2. Compute 3D occlusion, screen projection, and depth for each icon independently
+    for (let i = 0; i < _activeIcons.length; i++) {
+      const entry = _activeIcons[i]
+      const group = entry.iconGroupRef.current
+
+      // World position of icon
+      group.getWorldPosition(_tempIconWorld)
+
+      // Unit vector from camera to icon
+      _tempRayDir.subVectors(_tempIconWorld, _tempCamWorld)
+      const camDist = _tempRayDir.length()
+      entry.camDist = camDist
+      if (camDist > 0.0001) {
+        _tempRayDir.divideScalar(camDist)
+      }
+
+      // Camera-space position of icon
+      _tempIconCam.copy(_tempIconWorld).applyMatrix4(state.camera.matrixWorldInverse)
+
+      // Physical camera-space line-of-sight check:
+      // In camera view space (-Z is forward), an icon is behind the globe strictly when
+      // its camera-space depth is deeper than the globe's center depth
+      const isBehindGlobe = _tempIconCam.z < _tempGlobeCam.z
+      entry.isBehindGlobe = isBehindGlobe
+
+      // Screen-space projected coordinates
+      _tempIconProj.copy(_tempIconWorld).project(state.camera)
+      entry.screenX = (_tempIconProj.x * 0.5 + 0.5) * state.size.width
+      entry.screenY = (-_tempIconProj.y * 0.5 + 0.5) * state.size.height
+      entry.dScreen = Math.hypot(entry.screenX - globeScreenX, entry.screenY - globeScreenY)
+
+      // Normalized depth across orbital space (-2.45 to +2.45) for perspective scale
+      const camZ = state.camera.position.z || 8.0
+      const zRel = (_tempIconCam.z + camZ) / scale
+      entry.normalizedDepth = THREE.MathUtils.clamp((zRel + 2.45) / 4.90, 0, 1)
+
+      // Crossing zone threshold: calibrated 28.5px band covers 40px icon box (half-diagonal ~28.3px)
+      const CROSSING_HALF_BAND = 28.5
+      entry.isCrossingLimb = isBehindGlobe && Math.abs(entry.dScreen - rScreen) < CROSSING_HALF_BAND
+      entry.isDeeplyBehind = isBehindGlobe && (entry.dScreen <= rScreen - CROSSING_HALF_BAND)
+    }
+
+    // 3. Stable Depth Ordering with Hysteresis
+    // Determines front-to-back layering using actual camera-space depth.
+    // Hysteresis prevents rapid z-index flipping / flickering when icons cross paths.
+    _activeIcons.sort((a, b) => {
+      // Hovered icon always takes topmost rendering priority
+      if (a.hoverRef.current && !b.hoverRef.current) return 1
+      if (!a.hoverRef.current && b.hoverRef.current) return -1
+
+      const distDiff = a.camDist - b.camDist
+      const HYSTERESIS = 0.04 // ~4cm in scene space
+
+      if (Math.abs(distDiff) < HYSTERESIS && a.prevDepthRank !== undefined && b.prevDepthRank !== undefined) {
+        return a.prevDepthRank - b.prevDepthRank
+      }
+
+      return b.camDist - a.camDist
+    })
+
+    _activeIcons.forEach((entry, rank) => {
+      entry.depthRank = rank
+      entry.prevDepthRank = rank
+      entry.stableZIndex = 10 + rank * 10
+      if (entry.hoverRef.current) {
+        entry.stableZIndex += 1000
+      }
+    })
+
+    // 4. Frame-Rate Independent Interpolation and DOM Styling Updates
+    const isThemeChanged = lastColorVersion.current !== globalTheme.version
+
+    for (let i = 0; i < _activeIcons.length; i++) {
+      const entry = _activeIcons[i]
+      const hovered = entry.hoverRef.current
+
+      // Hover glow factor
+      const targetGlow = hovered ? 1.0 : 0.0
+      const glowSpeed = hovered ? LERP.hoverGlowIn : LERP.hoverGlowOut
+      entry.hoverGlowFactor = lerpFI(entry.hoverGlowFactor, targetGlow, glowSpeed, safeDelta)
+
+      // Perspective scale (0.94 in back to 1.02 in front, slightly boosted on hover)
+      const baseScale = 0.94 + entry.normalizedDepth * 0.08
+      const targetScale = baseScale * (1.0 + entry.hoverGlowFactor * 0.04)
+
+      // Smooth frame-rate independent scale interpolation
+      if (!entry.isInitialized) {
+        entry.currentScale = targetScale
+        entry.isInitialized = true
+      } else {
+        entry.currentScale = lerpFI(entry.currentScale, targetScale, 14.0, safeDelta)
+      }
+
+      // Apply to container DOM
+      const container = entry.containerRef.current
+      if (container) {
+        // Physical Silhouette Occlusion & Emergence Mask
+        if (hovered) {
+          // Hovered icon: full visibility, topmost interaction
+          if (entry.lastMask) {
+            container.style.webkitMaskImage = ''
+            container.style.maskImage = ''
+            entry.lastMask = null
+          }
+          container.style.opacity = '1.0'
+        } else if (entry.isCrossingLimb) {
+          // Progressive spatial occlusion mask crossing the globe silhouette limb
+          // Relative coordinates of globe center inside the 40px x 40px icon box (center is at 20px, 20px)
+          const cx = 20.0 + (globeScreenX - entry.screenX)
+          const cy = 20.0 + (globeScreenY - entry.screenY)
+          const rInner = (rScreen - 2.0).toFixed(1)
+          const rOuter = (rScreen + 2.0).toFixed(1)
+          const mask = `radial-gradient(circle at ${cx.toFixed(1)}px ${cy.toFixed(1)}px, rgba(0,0,0,0.20) 0px, rgba(0,0,0,0.20) ${rInner}px, rgba(0,0,0,1.0) ${rOuter}px)`
+          
+          if (entry.lastMask !== mask) {
+            container.style.webkitMaskImage = mask
+            container.style.maskImage = mask
+            entry.lastMask = mask
+          }
+          // Full opacity so mask alpha directly modulates spatial visibility
+          container.style.opacity = '1.0'
+        } else if (entry.isDeeplyBehind) {
+          // Completely occluded behind the globe body: intended subtle rear-state visibility
+          if (entry.lastMask) {
+            container.style.webkitMaskImage = ''
+            container.style.maskImage = ''
+            entry.lastMask = null
+          }
+          container.style.opacity = '0.20'
+        } else {
+          // In front of the globe or in open space outside silhouette: 100% full visibility, no premature fading
+          if (entry.lastMask) {
+            container.style.webkitMaskImage = ''
+            container.style.maskImage = ''
+            entry.lastMask = null
+          }
+          container.style.opacity = '1.0'
+        }
+
+        // Stable z-index on inner container
+        container.style.zIndex = entry.stableZIndex
+
+        // Locate Drei HTML wrapper element once and synchronize z-index
+        if (!entry.htmlRootEl) {
+          entry.htmlRootEl = container.closest('.social-icon-html-root') || container.parentElement?.parentElement
+        }
+        if (entry.htmlRootEl) {
+          entry.htmlRootEl.style.zIndex = entry.stableZIndex
+        }
+
+        // Pointer events: only disable when deeply occluded behind globe body
+        const targetPointer = entry.isDeeplyBehind ? 'none' : 'auto'
+        if (entry.currentPointerEvents !== targetPointer) {
+          container.style.pointerEvents = targetPointer
+          entry.currentPointerEvents = targetPointer
+        }
+      }
+
+      // Apply to inner button / link element
+      // Perspective scale applied smoothly without modifying brightness/contrast between card and logo
+      const htmlEl = entry.htmlRef.current
+      if (htmlEl) {
+        htmlEl.style.transform = `scale(${entry.currentScale.toFixed(3)})`
+      }
+
+      // Apply to glow element
+      const glow = entry.glowRef.current
+      if (glow) {
+        const reactionGlow = entry.reactionGlowRef ? entry.reactionGlowRef.current : 0.0
+        const glowOpacity = Math.max(entry.hoverGlowFactor, reactionGlow) * (entry.isBehindGlobe ? 0.30 : 1.0)
+        glow.style.opacity = glowOpacity.toFixed(2)
+        if (isThemeChanged) {
+          glow.style.boxShadow = `0 0 16px ${globalTheme.primary}`
+        }
+      }
+    }
+
+    if (isThemeChanged) {
+      lastColorVersion.current = globalTheme.version
+    }
+  })
+
+  return null
+}
+
 function Scene({ theme, distanceFactor, hoveredCountRef, hoveredOrbitRef, contactSystemState = 'dormant' }) {
   const isTransmit = contactSystemState === 'transmit'
   const { width } = useThree((state) => state.size)
+  const iconsRegistryRef = useRef(new Map())
 
   const scale = useMemo(() => {
     if (width < 300) return 0.55
@@ -1245,6 +1494,7 @@ function Scene({ theme, distanceFactor, hoveredCountRef, hoveredOrbitRef, contac
         hoveredCountRef={hoveredCountRef}
         hoveredOrbitRef={hoveredOrbitRef}
         isTransmit={isTransmit}
+        iconsRegistryRef={iconsRegistryRef}
       />
       <OrbitalRing
         myRingIndex={1}
@@ -1258,6 +1508,7 @@ function Scene({ theme, distanceFactor, hoveredCountRef, hoveredOrbitRef, contac
         hoveredCountRef={hoveredCountRef}
         hoveredOrbitRef={hoveredOrbitRef}
         isTransmit={isTransmit}
+        iconsRegistryRef={iconsRegistryRef}
       />
       <OrbitalRing
         myRingIndex={2}
@@ -1271,6 +1522,12 @@ function Scene({ theme, distanceFactor, hoveredCountRef, hoveredOrbitRef, contac
         hoveredCountRef={hoveredCountRef}
         hoveredOrbitRef={hoveredOrbitRef}
         isTransmit={isTransmit}
+        iconsRegistryRef={iconsRegistryRef}
+      />
+
+      <SocialIconsCoordinator
+        iconsRegistryRef={iconsRegistryRef}
+        scale={scale}
       />
     </group>
   )

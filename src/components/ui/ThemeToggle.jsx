@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useThemeContext } from '@/context/ThemeContext'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -9,39 +9,51 @@ function ThemeToggle({ showPicker, setShowPicker }) {
   // Find active theme object to style FAB button border/glow
   const activeTheme = themes.find(t => t.key === theme) || themes[0]
 
-  const [scrollOffset, setScrollOffset] = useState(0)
-  const [isFullyOpen, setIsFullyOpen] = useState(false)
+  const visibleCount = 4
+  const maxScroll = Math.max(0, themes.length - visibleCount)
+
+  const getInitialOffset = useCallback((currentTheme) => {
+    const activeIndex = themes.findIndex(t => t.key === currentTheme)
+    return activeIndex <= 1 ? 0 : Math.min(activeIndex - 1, maxScroll)
+  }, [themes, maxScroll])
+
+  const [scrollOffset, setScrollOffset] = useState(() => getInitialOffset(theme))
   const [hoveredTheme, setHoveredTheme] = useState(null)
-  const prevShowPickerRef = useRef(false)
-  const targetOffsetRef = useRef(0)
-  const currentOffsetRef = useRef(0)
+  const [isFullyOpen, setIsFullyOpen] = useState(false)
+  const [prevShowPicker, setPrevShowPicker] = useState(showPicker)
+
+  const targetOffsetRef = useRef(getInitialOffset(theme))
+  const currentOffsetRef = useRef(getInitialOffset(theme))
   const lastWheelTimeRef = useRef(0)
 
-  // Stagger reveal delay helper: set to fully open after entry spring ends
+  // Synchronously initialize state to active theme whenever picker opens
+  if (showPicker !== prevShowPicker) {
+    setPrevShowPicker(showPicker)
+    if (showPicker) {
+      const initial = getInitialOffset(theme)
+      if (scrollOffset !== initial) {
+        setScrollOffset(initial)
+      }
+    } else {
+      setIsFullyOpen(false)
+      setHoveredTheme(null)
+    }
+  }
+
+  // Manage entry animation timing and synchronize refs outside render
   useEffect(() => {
     if (showPicker) {
-      const timer = setTimeout(() => setIsFullyOpen(true), 500)
-      return () => clearTimeout(timer)
-    } else {
-      const timer = setTimeout(() => setIsFullyOpen(false), 0)
+      const initial = getInitialOffset(theme)
+      targetOffsetRef.current = initial
+      currentOffsetRef.current = initial
+      const timer = setTimeout(() => {
+        setIsFullyOpen(true)
+      }, 450)
       return () => clearTimeout(timer)
     }
-  }, [showPicker])
+  }, [showPicker, theme, getInitialOffset])
 
-  // Center scroll position on active theme upon opening (with loop wrap)
-  useEffect(() => {
-    if (showPicker && !prevShowPickerRef.current) {
-      const activeIndex = themes.findIndex(t => t.key === theme)
-      const maxScroll = Math.max(0, themes.length - 4)
-      const initialOffset = activeIndex <= 2 ? 0 : Math.min(activeIndex - 1, maxScroll)
-      setScrollOffset(initialOffset)
-      targetOffsetRef.current = initialOffset
-      currentOffsetRef.current = initialOffset
-    }
-    prevShowPickerRef.current = showPicker
-  }, [showPicker, theme, themes])
-
-  // Dismiss picker on clicking outside
+  // Dismiss picker on clicking/touching outside
   useEffect(() => {
     const handleOutsideClick = (e) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target)) {
@@ -49,36 +61,36 @@ function ThemeToggle({ showPicker, setShowPicker }) {
       }
     }
     document.addEventListener('mousedown', handleOutsideClick)
-    return () => document.removeEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('touchstart', handleOutsideClick, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('touchstart', handleOutsideClick)
+    }
   }, [setShowPicker])
 
-  // Smooth lerp loop for the scrollOffset (momentum effect)
+  // Smooth momentum lerp loop for bounded carousel scrolling
   useEffect(() => {
     if (!showPicker) return
 
     let rafId
     const tick = () => {
-      const N = themes.length
-      let diff = targetOffsetRef.current - currentOffsetRef.current
+      const diff = targetOffsetRef.current - currentOffsetRef.current
 
-      // Shortest path wrap
-      diff = ((diff + N / 2) % N)
-      if (diff < 0) diff += N
-      diff -= N / 2
-
-      if (Math.abs(diff) > 0.0001) {
-        currentOffsetRef.current = (currentOffsetRef.current + diff * 0.15) % N
-        if (currentOffsetRef.current < 0) currentOffsetRef.current += N
+      if (Math.abs(diff) > 0.001) {
+        currentOffsetRef.current += diff * 0.15
         setScrollOffset(currentOffsetRef.current)
+      } else if (currentOffsetRef.current !== targetOffsetRef.current) {
+        currentOffsetRef.current = targetOffsetRef.current
+        setScrollOffset(targetOffsetRef.current)
       }
       rafId = requestAnimationFrame(tick)
     }
 
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
-  }, [showPicker, themes.length])
+  }, [showPicker])
 
-  // Track mouse angle relative to the FAB to rotate/scroll themes
+  // Track mouse movement and angle relative to the FAB to rotate/scroll themes
   useEffect(() => {
     if (!showPicker || !isFullyOpen) return
 
@@ -95,36 +107,33 @@ function ThemeToggle({ showPicker, setShowPicker }) {
       const dy = e.clientY - fabY
       const distance = Math.sqrt(dx * dx + dy * dy)
       
-      // Only track movement when mouse is hovering exactly on the swatches ring (radius 80px ± 22px swatch width)
-      if (distance < 55 || distance > 105) return
+      // Only track movement when mouse is hovering on the swatches ring (radius 80px ± 25px swatch width)
+      if (distance < 55 || distance > 110) return
 
       let angle = Math.atan2(dy, dx) * (180 / Math.PI)
       if (angle < 0) angle += 360
 
-      // Map mouse angle from 185° to 315° onto scroll range [0, themes.length - 4]
-      const minAngle = 185
-      const maxAngle = 315
+      // Map mouse angle from 160° to 290° onto scroll range [0, maxScroll]
+      const minAngle = 160
+      const maxAngle = 290
       
       let targetAngle = angle
       if (angle < 90) {
-        // Bottom-right quadrant
         targetAngle = maxAngle
-      } else if (angle < 135) {
-        // Bottom-left quadrant
+      } else if (angle < 130) {
         targetAngle = minAngle
       }
 
       const clamped = Math.max(minAngle, Math.min(maxAngle, targetAngle))
       const pct = (clamped - minAngle) / (maxAngle - minAngle)
-      const maxScroll = Math.max(0, themes.length - 4)
       targetOffsetRef.current = pct * maxScroll
     }
 
     window.addEventListener('mousemove', handleMouseMove)
     return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [showPicker, isFullyOpen, themes.length])
+  }, [showPicker, isFullyOpen, maxScroll])
 
-  // Support scroll wheel behavior inside the theme selector for extra control
+  // Mouse wheel scroll navigation inside the theme selector
   useEffect(() => {
     if (!showPicker) return
 
@@ -132,20 +141,48 @@ function ThemeToggle({ showPicker, setShowPicker }) {
       if (pickerRef.current && pickerRef.current.contains(e.target)) {
         e.preventDefault()
         lastWheelTimeRef.current = Date.now()
-        const delta = e.deltaY > 0 ? 0.35 : -0.35
-        targetOffsetRef.current = (targetOffsetRef.current + delta) % themes.length
-        if (targetOffsetRef.current < 0) {
-          targetOffsetRef.current += themes.length
-        }
+        setIsFullyOpen(true)
+        const step = Math.sign(e.deltaY) * 0.45
+        targetOffsetRef.current = Math.max(0, Math.min(maxScroll, targetOffsetRef.current + step))
       }
     }
 
     window.addEventListener('wheel', handleWheel, { passive: false })
     return () => window.removeEventListener('wheel', handleWheel)
-  }, [showPicker, themes.length])
+  }, [showPicker, maxScroll])
+
+  // Touch swipe support for mobile
+  const touchStartY = useRef(null)
+  const touchStartOffset = useRef(0)
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      touchStartY.current = e.touches[0].clientY
+      touchStartOffset.current = targetOffsetRef.current
+      setIsFullyOpen(true)
+    }
+  }
+
+  const handleTouchMove = (e) => {
+    if (touchStartY.current !== null && e.touches.length === 1) {
+      const deltaY = e.touches[0].clientY - touchStartY.current
+      const offsetDelta = -deltaY / 65
+      targetOffsetRef.current = Math.max(0, Math.min(maxScroll, touchStartOffset.current + offsetDelta))
+    }
+  }
+
+  const handleTouchEnd = () => {
+    touchStartY.current = null
+  }
 
   return (
-    <div ref={pickerRef} className="fixed bottom-8 right-8 z-[999] w-12 h-12 flex items-center justify-center">
+    <div 
+      ref={pickerRef} 
+      className="fixed bottom-8 right-8 z-[999] w-12 h-12 flex items-center justify-center"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Floating Theme Label Tooltip above the picker */}
       <AnimatePresence>
         {showPicker && (
@@ -154,7 +191,7 @@ function ThemeToggle({ showPicker, setShowPicker }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-            className="absolute bottom-36 whitespace-nowrap px-3.5 py-2 rounded-full bg-bg-surface/90 backdrop-blur-md border border-white/10 text-xs font-semibold text-[var(--text-heading)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] pointer-events-none select-none flex items-center gap-2 z-20"
+            className="absolute bottom-36 right-0 whitespace-nowrap px-3.5 py-2 rounded-full bg-bg-surface/90 backdrop-blur-md border border-white/10 text-xs font-semibold text-[var(--text-heading)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] pointer-events-none select-none flex items-center gap-2 z-20"
           >
             <span 
               className="w-2.5 h-2.5 rounded-full transition-all duration-300" 
@@ -168,32 +205,25 @@ function ThemeToggle({ showPicker, setShowPicker }) {
         )}
       </AnimatePresence>
 
-      {/* Theme picker swatches (Orbiting Concentric Ring - showing 4 at a time with overlap) */}
+      {/* Theme picker swatches (Orbiting Concentric Ring - showing 4 at a time with smooth buffer fade) */}
       <AnimatePresence>
         {showPicker && themes.map((t, index) => {
           const isActive = theme === t.key
           
-          const visibleCount = 4
-          const N = themes.length
-          const center = (visibleCount - 1) / 2
+          // Continuous relative position along the arc (no discontinuous modulo jumps)
+          const relPos = index - scrollOffset
           
-          // Wrap relative position using modular arithmetic around the viewport center
-          let diff = (index - scrollOffset - center) % N
-          if (diff < -N / 2) diff += N
-          if (diff >= N / 2) diff -= N
-          const relPos = diff + center
-          
-          // Calculate radial offset: arc sweeps upper-left (195°→305° with clean gaps)
-          const radius = 80 // Orbit radius in pixels
-          const angle = 195 + (relPos * 110) / (visibleCount - 1)
+          // Calculate radial offset: arc sweeps upper-left (169°→281° with clean gaps and symmetric margins)
+          const radius = 82 // Orbit radius in pixels
+          const angle = 169 + (relPos * 112) / (visibleCount - 1)
           const angleRad = (angle * Math.PI) / 180
           const x = radius * Math.cos(angleRad)
           const y = radius * Math.sin(angleRad)
 
-          // Visibility factor using trapezoidal function (1 when in [0, 3], fades smoothly in buffer zones)
+          // Visibility factor using smooth linear buffer (1 when in [0, 3], fades smoothly in buffer zones)
           let v = 0
           const maxPos = visibleCount - 1
-          const buffer = 0.4
+          const buffer = 0.5
           if (relPos >= 0 && relPos <= maxPos) {
             v = 1
           } else if (relPos > -buffer && relPos < 0) {
@@ -205,9 +235,8 @@ function ThemeToggle({ showPicker, setShowPicker }) {
           const isActiveSlot = v > 0
           const targetX = x
           const targetY = y
-          // Clamp target scale so it doesn't shrink to a tiny dot before fading out
-          const targetScale = v > 0 ? (0.65 + v * 0.35) * (isActive ? 1.12 : 1.0) : 0
-          const targetOpacity = v
+          const targetScale = v > 0 ? (0.7 + v * 0.3) * (isActive ? 1.08 : 1.0) : 0
+          const targetOpacity = Math.max(0, Math.min(1, v))
 
           return (
             <motion.button
@@ -226,43 +255,54 @@ function ThemeToggle({ showPicker, setShowPicker }) {
                 scale: 0,
                 transition: {
                   type: 'spring',
-                  stiffness: 300,
-                  damping: 25,
-                  delay: (themes.length - 1 - index) * 0.03
+                  stiffness: 320,
+                  damping: 26,
+                  delay: (themes.length - 1 - index) * 0.025
                 }
               }}
-              transition={{
-                type: 'spring',
-                stiffness: 220,
-                damping: 18,
-                mass: 0.8,
-                delay: isFullyOpen ? 0 : index * 0.05,
-              }}
+              transition={
+                isFullyOpen
+                  ? {
+                      x: { duration: 0 },
+                      y: { duration: 0 },
+                      scale: { type: 'spring', stiffness: 300, damping: 25 },
+                      opacity: { duration: 0.12, ease: 'easeOut' },
+                    }
+                  : {
+                      type: 'spring',
+                      stiffness: 260,
+                      damping: 22,
+                      mass: 0.8,
+                      delay: index * 0.045,
+                    }
+              }
               onMouseEnter={() => {
-                if (isActiveSlot) setHoveredTheme(t)
+                if (isActiveSlot && v > 0.3) setHoveredTheme(t)
               }}
               onMouseLeave={() => setHoveredTheme(null)}
               onClick={() => { 
-                setTheme(t.key) 
+                setTheme(t.key)
+                const targetOffset = index <= 1 ? 0 : Math.min(index - 1, maxScroll)
+                targetOffsetRef.current = targetOffset
                 // Tactical delay for visual satisfaction before collapsing
                 setTimeout(() => {
                   setShowPicker(false)
                 }, 350)
               }}
               whileHover={{ 
-                scale: isActiveSlot ? (isActive ? 1.2 : 1.15) : 0,
-                transition: { type: 'spring', stiffness: 400, damping: 15 }
+                scale: isActiveSlot && v > 0.3 ? (isActive ? 1.15 : 1.1) : targetScale,
+                transition: { scale: { type: 'spring', stiffness: 350, damping: 18 } }
               }}
-              whileTap={{ scale: isActiveSlot ? 0.9 : 0 }}
+              whileTap={{ scale: isActiveSlot ? 0.92 : 0 }}
               style={{
-                width: '44px',
-                height: '44px',
+                width: '40px',
+                height: '40px',
                 borderColor: isActive ? `${t.preview}aa` : 'rgba(255, 255, 255, 0.1)',
                 boxShadow: isActive 
                   ? `0 0 20px ${t.preview}33, 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)`
                   : `0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)`,
                 zIndex: isActive ? 100 : 50 - Math.round(Math.abs(relPos) * 10),
-                pointerEvents: isActiveSlot && v > 0.2 ? 'auto' : 'none'
+                pointerEvents: isActiveSlot && v > 0.3 ? 'auto' : 'none'
               }}
               aria-current={isActive ? "true" : undefined}
               aria-label={`Switch to ${t.label}`}
@@ -273,15 +313,15 @@ function ThemeToggle({ showPicker, setShowPicker }) {
                 className="rounded-full flex-shrink-0 relative transition-all duration-300"
                 style={{ 
                   background: t.preview,
-                  width: isActive ? '20px' : '16px',
-                  height: isActive ? '20px' : '16px',
+                  width: isActive ? '18px' : '15px',
+                  height: isActive ? '18px' : '15px',
                   boxShadow: isActive 
                     ? `0 0 16px ${t.preview}66, inset 0 1px 1px rgba(255,255,255,0.2)`
                     : `0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)`,
                   border: '1px solid rgba(255, 255, 255, 0.15)'
                 }}
-                animate={isActive ? { scale: [1, 1.05, 1] } : {}}
-                transition={isActive ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : {}}
+                animate={isActive ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                transition={isActive ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
               />
               
               {/* Animated outer ring */}
@@ -355,4 +395,3 @@ function ThemeToggle({ showPicker, setShowPicker }) {
 }
 
 export default ThemeToggle
-

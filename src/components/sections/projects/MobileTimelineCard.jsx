@@ -185,8 +185,11 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
 
           {/* Project Image Container */}
           <div
-            className="relative h-40 overflow-hidden border-b border-white/[0.04]"
+            className="relative h-40 overflow-hidden isolate"
             style={{
+              clipPath: "inset(0)",
+              WebkitClipPath: "inset(0)",
+              transform: "translateZ(0)",
               background:
                 "linear-gradient(135deg, var(--accent-dim), rgba(0,0,0,0.3))",
             }}
@@ -217,16 +220,20 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
               src={project.image}
               alt={`Screenshot of ${project.title}`}
               className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover/item:scale-105"
+              style={{
+                willChange: "transform",
+              }}
               loading="lazy"
               decoding="async"
               onError={(e) => {
                 e.target.style.display = "none";
               }}
             />
+            {/* Smooth image-to-content transition with extended opaque bottom to eliminate subpixel seam bleed */}
             <div 
-              className="absolute inset-0 pointer-events-none"
+              className="absolute inset-x-0 top-0 -bottom-1 pointer-events-none z-10"
               style={{
-                background: 'linear-gradient(to bottom, transparent 40%, color-mix(in srgb, var(--bg-surface) 40%, transparent) 70%, color-mix(in srgb, var(--bg-surface) 78%, #000) 100%)',
+                background: 'linear-gradient(to bottom, transparent 35%, color-mix(in srgb, var(--bg-surface) 40%, transparent) 65%, color-mix(in srgb, var(--bg-surface) 78%, #000) 88%, color-mix(in srgb, var(--bg-surface) 78%, #000) 100%)',
               }}
             />
 
@@ -250,9 +257,12 @@ const MobileTimelineCard = memo(function MobileTimelineCard({
           </div>
 
           <div 
-            className="p-4 relative"
+            className="p-4 relative z-10 -mt-px"
             style={{
-              background: 'radial-gradient(ellipse 90% 70% at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 65%)',
+              background: `
+                radial-gradient(ellipse 90% 70% at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 65%),
+                color-mix(in srgb, var(--bg-surface) 78%, #000)
+              `,
             }}
           >
             <span className="font-mono text-[9px] tracking-[0.22em] text-white/40 uppercase">
