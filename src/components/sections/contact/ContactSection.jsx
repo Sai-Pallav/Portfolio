@@ -7,6 +7,7 @@ import ContactHero from './ContactHero'
 import Contact3DObject from './Contact3DObject'
 // import LeftPCB from './LeftPCB'
 // import RightPCB from './RightPCB'
+import SideWireNetwork from './neuralWire/SideWireNetwork'
 
 export default memo(function ContactSection() {
   const [contactSystemState, setContactSystemState] = useState('dormant')
@@ -146,6 +147,11 @@ export default memo(function ContactSection() {
 
       {/* Zone 2: Interaction Area */}
       <div className="relative w-full mt-8 lg:mt-10">
+        {/* Full-width 3D Neural Wire Structures extending horizontally on both sides of the globe */}
+        <div className="absolute -inset-y-24 md:-inset-y-32 lg:-inset-y-44 left-1/2 -translate-x-1/2 w-screen pointer-events-none z-10 overflow-hidden flex items-center justify-center">
+          <SideWireNetwork isInView={isInViewRepeat} />
+        </div>
+
         {/* Full-width backdrop wrapper for Left and Right PCB (Disabled) */}
         {/*
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen pointer-events-none z-0 hidden lg:block">
