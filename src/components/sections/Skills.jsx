@@ -54,7 +54,7 @@ const marqueeVariants = {
 
 function Skills() {
   const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-120px 0px" });
+  const isInView = useInView(ref, { once: true, margin: "-60px 0px" });
   const [view, setView] = useState("3d");
 
   return (

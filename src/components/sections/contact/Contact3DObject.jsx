@@ -1233,8 +1233,7 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
 
     if (_activeIcons.length === 0) return
 
-    // 1. Globe center, screen projection, and effective silhouette radius (matching outer atmospheric halo boundary)
-    const effectiveGlobeRadius = SCENE_CONFIG.globe.haloRadius * scale
+    // 1. Globe center, screen projection, core radius, and outer dim atmospheric radius
     state.camera.getWorldPosition(_tempCamWorld)
 
     _tempGlobeProj.set(0, 0, 0).project(state.camera)
@@ -1242,10 +1241,16 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
     const globeScreenY = (-_tempGlobeProj.y * 0.5 + 0.5) * state.size.height
     _tempGlobeCam.copy(_vGlobeWorld).applyMatrix4(state.camera.matrixWorldInverse)
 
-    // Projected silhouette rim radius on screen (accounting for atmospheric boundary)
-    _tempRimWorld.set(effectiveGlobeRadius, 0, 0)
+    // Projected globe boundary radius (where icon converts fully to 20% opacity at globe limb)
+    _tempRimWorld.set(2.05 * scale, 0, 0)
     _tempRimProj.copy(_tempRimWorld).project(state.camera)
-    const rScreen = Math.abs((_tempRimProj.x - _tempGlobeProj.x) * (state.size.width * 0.5))
+    const rCoreScreen = Math.abs((_tempRimProj.x - _tempGlobeProj.x) * (state.size.width * 0.5))
+
+    // Projected outer dim atmospheric radius (where dynamic mask begins softening before reaching globe dim)
+    // Calibrated to 2.46 * scale: begins masking a small distance before reaching the globe's outer dim
+    _tempRimWorld.set(2.46 * scale, 0, 0)
+    _tempRimProj.copy(_tempRimWorld).project(state.camera)
+    const rOuterDimScreen = Math.abs((_tempRimProj.x - _tempGlobeProj.x) * (state.size.width * 0.5))
 
     // 2. Compute 3D occlusion, screen projection, and depth for each icon independently
     for (let i = 0; i < _activeIcons.length; i++) {
@@ -1283,10 +1288,10 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
       const zRel = (_tempIconCam.z + camZ) / scale
       entry.normalizedDepth = THREE.MathUtils.clamp((zRel + 2.45) / 4.90, 0, 1)
 
-      // Crossing zone threshold: calibrated 28.5px band covers 40px icon box (half-diagonal ~28.3px)
-      const CROSSING_HALF_BAND = 28.5
-      entry.isCrossingLimb = isBehindGlobe && Math.abs(entry.dScreen - rScreen) < CROSSING_HALF_BAND
-      entry.isDeeplyBehind = isBehindGlobe && (entry.dScreen <= rScreen - CROSSING_HALF_BAND)
+      // Crossing & deep behind zones: calibrated 28.5px band covers 40px icon box (half-diagonal ~28.3px)
+      const ICON_HALF_SIZE = 28.5
+      entry.isDeeplyBehind = isBehindGlobe && (entry.dScreen <= rCoreScreen - ICON_HALF_SIZE)
+      entry.isCrossingLimb = isBehindGlobe && !entry.isDeeplyBehind && (entry.dScreen < rOuterDimScreen + ICON_HALF_SIZE)
     }
 
     // 3. Stable Depth Ordering with Hysteresis
@@ -1353,12 +1358,12 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
           }
           container.style.opacity = '1.0'
         } else if (entry.isCrossingLimb) {
-          // Progressive spatial occlusion mask crossing the globe silhouette limb
+          // Progressive spatial occlusion mask as icon approaches outer dimming atmosphere & crosses into core
           // Relative coordinates of globe center inside the 40px x 40px icon box (center is at 20px, 20px)
           const cx = 20.0 + (globeScreenX - entry.screenX)
           const cy = 20.0 + (globeScreenY - entry.screenY)
-          const rInner = (rScreen - 2.0).toFixed(1)
-          const rOuter = (rScreen + 2.0).toFixed(1)
+          const rInner = rCoreScreen.toFixed(1)
+          const rOuter = rOuterDimScreen.toFixed(1)
           const mask = `radial-gradient(circle at ${cx.toFixed(1)}px ${cy.toFixed(1)}px, rgba(0,0,0,0.20) 0px, rgba(0,0,0,0.20) ${rInner}px, rgba(0,0,0,1.0) ${rOuter}px)`
 
           if (entry.lastMask !== mask) {
@@ -1369,7 +1374,7 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
           // Full opacity so mask alpha directly modulates spatial visibility
           container.style.opacity = '1.0'
         } else if (entry.isDeeplyBehind) {
-          // Completely occluded behind the globe body: intended subtle rear-state visibility
+          // Completely occluded behind the globe body: convert cleanly to 20% opacity
           if (entry.lastMask) {
             container.style.webkitMaskImage = ''
             container.style.maskImage = ''
@@ -1377,7 +1382,7 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
           }
           container.style.opacity = '0.20'
         } else {
-          // In front of the globe or in open space outside silhouette: 100% full visibility, no premature fading
+          // In front of the globe or in open space outside outer dim: 100% full visibility, no premature fading
           if (entry.lastMask) {
             container.style.webkitMaskImage = ''
             container.style.maskImage = ''

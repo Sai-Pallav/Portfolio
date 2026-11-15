@@ -27,6 +27,8 @@ const MarqueeCard = memo(({
   prefersReducedMotion,
   onSkillHover,
   subarrayLength,
+  onPause,
+  onResume,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isKeyPressed, setIsKeyPressed] = useState(false);
@@ -58,18 +60,22 @@ const MarqueeCard = memo(({
       }}
       whileHover="hover"
       onPointerEnter={(e) => {
+        onPause();
         if (skill) onSkillHover(skill, 'mouse', e);
       }}
       onPointerLeave={() => {
+        onResume();
         onSkillHover(null, 'mouse');
       }}
       onFocus={(e) => {
         setIsFocused(true);
+        onPause();
         if (skill) onSkillHover(skill, 'keyboard', e);
       }}
       onBlur={() => {
         setIsFocused(false);
         setIsKeyPressed(false);
+        onResume();
         onSkillHover(null, 'keyboard');
       }}
       onKeyDown={(e) => {
@@ -84,11 +90,11 @@ const MarqueeCard = memo(({
         }
       }}
       tabIndex={copyIndex === 0 ? 0 : -1}
-      className="relative cursor-default pointer-events-auto rounded-3xl focus-visible:outline-none group/card"
+      className="relative cursor-default pointer-events-auto rounded-3xl focus-visible:outline-none"
       style={{
-        width: `var(--tile-size)`,
-        height: `var(--tile-size)`,
-        contain: "layout style paint",
+        width: `${SCROLL_CONFIG.TILE_SIZE}px`,
+        height: `${SCROLL_CONFIG.TILE_SIZE}px`,
+        contain: "layout style",
       }}
       role={copyIndex === 0 ? "listitem" : undefined}
       aria-label={
@@ -126,18 +132,22 @@ const MarqueeCard = memo(({
         transition={prefersReducedMotion ? { duration: 0 } : { type: "spring", mass: 0.8, stiffness: 250, damping: 22 }}
         whileHover="hover"
         whileTap="active"
-        className={`absolute inset-0 overflow-hidden rounded-3xl border border-white/[0.04] transition-colors duration-200 ${skill?.label ? "flex flex-col items-center justify-center" : "flex items-center justify-center"
-          } ${isFocused ? "ring-2 ring-[var(--accent)] ring-offset-4 ring-offset-[var(--bg)]" : ""}`}
+        className={`absolute inset-0 overflow-hidden rounded-3xl border border-white/[0.04] transition-colors duration-200 ${
+          skill?.label ? "flex flex-col items-center justify-center" : "flex items-center justify-center"
+        } ${isFocused ? "ring-2 ring-[var(--accent)] ring-offset-4 ring-offset-[var(--bg)]" : ""}`}
       >
         <div className="absolute inset-0 pointer-events-none bg-white/[0.02]" />
 
-        {/* Hover blur overlay with GPU acceleration */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-0 group-hover/card:opacity-100 transition-opacity duration-200 backdrop-blur-[12px]"
+        <motion.div
+          variants={{
+            hover: { backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", opacity: 1 }
+          }}
+          initial={{ backdropFilter: "none", WebkitBackdropFilter: "none", opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="absolute inset-0 pointer-events-none"
           style={{ transform: "translateZ(0)" }}
         />
 
-        {/* Icon container */}
         <motion.div
           variants={{
             hover: {
@@ -156,18 +166,26 @@ const MarqueeCard = memo(({
               alt=""
               loading="lazy"
               decoding="async"
-              variants={{
-                hover: {
-                  opacity: isPrimary ? 1 : 0.75,
-                  filter: isDark ? "invert(1) grayscale(0)" : "grayscale(0)",
-                }
-              }}
-              initial={{
-                opacity: isPrimary ? 0.45 : 0.35,
+              initial={{ opacity: isPrimary ? 0.45 : 0.35 }}
+              variants={{ hover: { opacity: 0 } }}
+              transition={{ duration: prefersReducedMotion ? 0 : SCROLL_CONFIG.ICON_HOVER_DURATION }}
+              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+              style={{
                 filter: isDark ? "invert(1) grayscale(1)" : "grayscale(1)",
               }}
+            />
+            <motion.img
+              src={image}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              initial={{ opacity: 0 }}
+              variants={{ hover: { opacity: isPrimary ? 1 : 0.75 } }}
               transition={{ duration: prefersReducedMotion ? 0 : SCROLL_CONFIG.ICON_HOVER_DURATION }}
-              className="w-full h-full object-contain pointer-events-none transition-all duration-200"
+              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+              style={{
+                filter: isDark ? "invert(1)" : "none",
+              }}
             />
           </div>
         </motion.div>
@@ -181,7 +199,7 @@ const MarqueeCard = memo(({
               letterSpacing: "0.05em",
               textTransform: "uppercase",
               color: "rgba(255,255,255,0.65)",
-              maxWidth: `calc(var(--tile-size) - 16px)`,
+              maxWidth: `${SCROLL_CONFIG.TILE_SIZE - 16}px`,
               wordBreak: "break-word",
             }}
           >
@@ -189,25 +207,83 @@ const MarqueeCard = memo(({
           </div>
         )}
 
-        {/* Border glow on hover */}
-        <div
-          className="absolute inset-0 rounded-3xl pointer-events-none opacity-0 group-hover/card:opacity-100 transition-opacity duration-250"
-          style={{ border: "1px solid var(--accent)" }}
+        <motion.div
+          variants={{ hover: { opacity: 1 } }}
+          transition={{ duration: 0.25 }}
+          className="absolute inset-0 rounded-3xl pointer-events-none"
+          style={{ border: "1px solid var(--accent)", opacity: 0 }}
         />
       </motion.div>
     </motion.div>
   );
 });
 
-// ─── Single column: scrolls continuously when in view ───────────────────────
+// ─── Single column: scrolls forever once isInView fires ──────────────────────
 const MarqueeColumn = memo(({
   subarray, colIndex, chunkSize, isInView, maxItems,
-  directionPattern, onSkillHover, prefersReducedMotion
+  directionPattern, onSkillHover, prefersReducedMotion = false,
 }) => {
-  const pattern = directionPattern || DEFAULT_DIRECTION_PATTERN;
-  const direction = pattern[colIndex] ?? -1;
+  const scrollRef = useRef(null);
+  const scrollPositionRef = useRef(null);
+  const isPausedRef = useRef(false);
+  const rafIdRef = useRef(null);
 
-  // Keep 5 full copies for seamless infinite scroll
+  useEffect(() => {
+    if (!isInView || prefersReducedMotion || !scrollRef.current) {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      return;
+    }
+
+    const startScroll = () => {
+      const pattern = directionPattern || DEFAULT_DIRECTION_PATTERN;
+      const direction = pattern[colIndex] ?? -1;
+      const totalHeight = maxItems * SCROLL_CONFIG.ITEM_HEIGHT;
+      const pixelsPerMs = (SCROLL_CONFIG.SPEED_PX_PER_S || 40) / 1000;
+
+      if (scrollPositionRef.current === null) {
+        scrollPositionRef.current = -totalHeight;
+        if (scrollRef.current) {
+          scrollRef.current.style.transform = `translate3d(0, ${-totalHeight}px, 0)`;
+        }
+      }
+
+      let lastTime;
+      const animate = (time) => {
+        if (lastTime === undefined) lastTime = time;
+        const deltaTime = time - lastTime;
+        lastTime = time;
+
+        if (!isPausedRef.current) {
+          const clampedDelta = Math.min(deltaTime, 50);
+          scrollPositionRef.current += direction * pixelsPerMs * clampedDelta;
+          if (scrollPositionRef.current <= -2 * totalHeight) {
+            scrollPositionRef.current += totalHeight;
+          } else if (scrollPositionRef.current >= 0) {
+            scrollPositionRef.current -= totalHeight;
+          }
+          if (scrollRef.current) {
+            scrollRef.current.style.transform = `translate3d(0, ${scrollPositionRef.current}px, 0)`;
+          }
+        }
+        rafIdRef.current = requestAnimationFrame(animate);
+      };
+
+      rafIdRef.current = requestAnimationFrame(animate);
+    };
+
+    startScroll();
+
+    return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
+  }, [isInView, prefersReducedMotion, directionPattern, colIndex, maxItems, chunkSize, subarray.length]);
+
   const duplicatedArray = useMemo(() => {
     const padded = Array.from({ length: maxItems }, (_, i) => subarray[i % subarray.length]);
     return [
@@ -219,15 +295,19 @@ const MarqueeColumn = memo(({
     ];
   }, [subarray, maxItems]);
 
+  const handlePause = useCallback(() => {
+    isPausedRef.current = true;
+  }, []);
+
+  const handleResume = useCallback(() => {
+    isPausedRef.current = false;
+  }, []);
+
   return (
     <div
-      className={`flex flex-col items-start ${!prefersReducedMotion && isInView ? "animate-marquee-scroll" : ""}`}
-      style={{
-        gap: `var(--tile-gap)`,
-        contain: "layout style",
-        "--max-items": maxItems,
-      }}
-      data-direction={direction}
+      ref={scrollRef}
+      className="flex flex-col items-start"
+      style={{ gap: `${SCROLL_CONFIG.TILE_GAP}px`, willChange: "transform" }}
       role="list"
       aria-label={`Technology icons column ${colIndex + 1}`}
     >
@@ -245,6 +325,8 @@ const MarqueeColumn = memo(({
             prefersReducedMotion={prefersReducedMotion}
             onSkillHover={onSkillHover}
             subarrayLength={subarray.length}
+            onPause={handlePause}
+            onResume={handleResume}
           />
         );
       })}
@@ -316,11 +398,13 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
   }, [mouseX, mouseY]);
 
   const { chunks, maxItems, chunkSize } = useMemo(() => {
+    // Support explicitly grouped columns (2D array)
     if (images.length > 0 && Array.isArray(images[0])) {
       const max = Math.max(...images.map(col => col.length), 4);
       return { chunks: images, maxItems: max, chunkSize: max };
     }
 
+    // Fallback: auto-distribute flat array
     const columns = 5;
     const max = Math.max(Math.ceil(images.length / columns), 4);
 
@@ -335,7 +419,6 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
   }, [images]);
 
   const ref = useRef(null);
-  // Viewport observation: responsive margin to smoothly trigger and pause off-screen rAF
   const isInView = useInView(ref, { margin: "100px 0px" });
 
   return (
@@ -434,8 +517,8 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
 
         <div className="absolute inset-0 flex items-center justify-center">
           <div
-            style={{ transform: "rotateX(55deg) rotateY(0deg) rotateZ(-45deg)", gap: `var(--tile-gap)` }}
-            className="relative grid grid-cols-5 scale-[0.65] sm:scale-[0.7] md:scale-[0.85] lg:scale-100 transform-3d origin-center pointer-events-none"
+            style={{ transform: "rotateX(55deg) rotateY(0deg) rotateZ(-45deg)", gap: `${SCROLL_CONFIG.TILE_GAP}px` }}
+            className="relative grid grid-cols-5 scale-75 sm:scale-90 lg:scale-100 transform-3d origin-center pointer-events-none"
           >
             {chunks.map((subarray, colIndex) => (
               <MarqueeColumn
@@ -456,14 +539,14 @@ export const ThreeDMarquee = ({ images, className, directionPattern }) => {
           <div
             style={{
               transform: "rotateX(55deg) rotateY(0deg) rotateZ(-45deg) translateZ(30px)",
-              gap: `var(--tile-gap)`
+              gap: `${SCROLL_CONFIG.TILE_GAP}px`
             }}
-            className="relative grid grid-cols-5 scale-[0.65] sm:scale-[0.7] md:scale-[0.85] lg:scale-100 transform-3d origin-center"
+            className="relative grid grid-cols-5 scale-75 sm:scale-90 lg:scale-100 transform-3d origin-center"
           >
             {["Languages", "CS Concepts", "Frontend", "Backend", "Tools & DBs"].map((header, i) => {
               const topPos = -360 + i * 114;
               return (
-                <div key={i} className="flex justify-center relative" style={{ width: "var(--tile-size)" }}>
+                <div key={i} className="flex justify-center relative" style={{ width: SCROLL_CONFIG.TILE_SIZE }}>
                   <div
                     className="absolute transition-opacity duration-300"
                     style={{ top: `${topPos}px`, opacity: hoveredSkill ? 0 : 1 }}
