@@ -651,8 +651,6 @@ const staticGeomMicroParticles = (() => {
   return geom
 })()
 
-const tempIconVec = new THREE.Vector3()
-const tempScaleVec = new THREE.Vector3()
 
 function MicroParticles({ distanceFactor, isTransmit = false }) {
   const pointsRef = useRef()
@@ -765,8 +763,6 @@ const STATIC_ALL_ICONS = STATIC_RING_ICONS.flat()
 const _tempIconWorld = new THREE.Vector3()
 const _tempCamWorld = new THREE.Vector3()
 const _tempRayDir = new THREE.Vector3()
-const _tempCamToGlobe = new THREE.Vector3()
-const _tempClosestPoint = new THREE.Vector3()
 const _tempIconCam = new THREE.Vector3()
 const _tempGlobeProj = new THREE.Vector3()
 const _tempRimWorld = new THREE.Vector3()
@@ -774,6 +770,7 @@ const _tempRimProj = new THREE.Vector3()
 const _tempIconProj = new THREE.Vector3()
 const _tempGlobeCam = new THREE.Vector3()
 const _vGlobeWorld = new THREE.Vector3(0, 0, 0)
+const _tempRingDir = new THREE.Vector3()
 const _activeIcons = []
 
 const OrbitingIcon = memo(function OrbitingIcon({
@@ -789,7 +786,6 @@ const OrbitingIcon = memo(function OrbitingIcon({
   const glowRef = useRef()
 
   const hoverRef = useRef(false)
-  const shouldReduceMotion = useReducedMotion()
 
   const { platform, url, specialType } = iconData
   const [copied, setCopied] = useState(false)
@@ -865,7 +861,7 @@ const OrbitingIcon = memo(function OrbitingIcon({
     return () => {
       registry.delete(iconData.key)
     }
-  }, [iconData.key, iconsRegistryRef, reactionGlowRef])
+  }, [iconData, iconsRegistryRef, reactionGlowRef])
 
   const renderLink = () => {
     const iconContent = (
@@ -981,6 +977,8 @@ const ORBIT_RING_QUATERNIONS = ORBIT_RING_ANGLES.map((deg) => {
   return qZ.multiply(qTilt).normalize()
 })
 
+const SLANTED_RING_EDGE_GLIDE = 0.38
+
 
 const OrbitalRing = memo(function OrbitalRing({
   myRingIndex,
@@ -996,6 +994,7 @@ const OrbitalRing = memo(function OrbitalRing({
   isTransmit = false,
   iconsRegistryRef,
 }) {
+  const radius = 2.45
   const orbitGroupRef = useRef()
   const pivotARef = useRef()
   const pivotBRef = useRef()
@@ -1021,6 +1020,18 @@ const OrbitalRing = memo(function OrbitalRing({
   const handleHoverB = useCallback((hovered) => {
     isHoveredBRef.current = hovered
   }, [])
+
+  const ringQuaternion = useMemo(() => {
+    if (quaternion) return quaternion
+    if (typeof angle === 'number') {
+      const qZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle * (Math.PI / 180))
+      return qZ.multiply(qTilt).normalize()
+    }
+    if (typeof myRingIndex === 'number') {
+      return ORBIT_RING_QUATERNIONS[((myRingIndex % ORBIT_RING_QUATERNIONS.length) + ORBIT_RING_QUATERNIONS.length) % ORBIT_RING_QUATERNIONS.length]
+    }
+    return ORBIT_RING_QUATERNIONS[0]
+  }, [quaternion, angle, myRingIndex])
 
   useFrame((state, delta) => {
     // Delta spike protection (50ms ceiling prevents teleportation on tab switch / scroll return)
@@ -1068,6 +1079,38 @@ const OrbitalRing = memo(function OrbitalRing({
       pivotBRef.current.rotation.z = pivotBPhase.current
     }
 
+    // Dynamic edge glide: smoothly and dynamically shifts icons toward the outer edge of the
+    // ring track as they revolve along the lower and upper arc (going behind and coming in front),
+    // naturally and cleanly clearing the globe outer surface and atmospheric halo without any lateral tilt.
+    // Unified continuous C1-smooth trajectory with zero secondary sudden movement or wobble.
+    // Ring 0 is the equatorial anchor; slanted rings 1 and 2 pass near the top/bottom poles.
+    const isSlantedRing = (myRingIndex === 1 || myRingIndex === 2 || angle === -60 || angle === 60)
+
+    // 1. Unified dynamic edge glide for Icon A
+    const totalPhaseA = orbitGroupPhase.current + pivotAPhase.current
+    _tempRingDir.set(Math.cos(totalPhaseA), Math.sin(totalPhaseA), 0).applyQuaternion(ringQuaternion)
+    const normYA = Math.min(1.0, Math.abs(_tempRingDir.y) / 0.8914)
+    const tA = Math.max(0, Math.min(1, (normYA - 0.20) / 0.65))
+    const smoothA = tA * tA * (3 - 2 * tA)
+    const glideA = isSlantedRing ? smoothA * SLANTED_RING_EDGE_GLIDE : 0
+    const currentRadiusA = radius + glideA
+
+    // 2. Unified dynamic edge glide for Icon B
+    const totalPhaseB = orbitGroupPhase.current + pivotBPhase.current
+    _tempRingDir.set(Math.cos(totalPhaseB), Math.sin(totalPhaseB), 0).applyQuaternion(ringQuaternion)
+    const normYB = Math.min(1.0, Math.abs(_tempRingDir.y) / 0.8914)
+    const tB = Math.max(0, Math.min(1, (normYB - 0.20) / 0.65))
+    const smoothB = tB * tB * (3 - 2 * tB)
+    const glideB = isSlantedRing ? smoothB * SLANTED_RING_EDGE_GLIDE : 0
+    const currentRadiusB = radius + glideB
+
+    if (iconWrapperARef.current) {
+      iconWrapperARef.current.position.set(currentRadiusA, 0, zOffset)
+    }
+    if (iconWrapperBRef.current) {
+      iconWrapperBRef.current.position.set(currentRadiusB, 0, zOffset)
+    }
+
     // Hover scale applied to icon wrappers
     const hoverScaleA = 1.0 + hoverFactorA.current * 0.05
     if (iconWrapperARef.current) {
@@ -1079,19 +1122,6 @@ const OrbitalRing = memo(function OrbitalRing({
       iconWrapperBRef.current.scale.set(hoverScaleB, hoverScaleB, hoverScaleB)
     }
   })
-
-  const radius = 2.45
-  const ringQuaternion = useMemo(() => {
-    if (quaternion) return quaternion
-    if (typeof angle === 'number') {
-      const qZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle * (Math.PI / 180))
-      return qZ.multiply(qTilt).normalize()
-    }
-    if (typeof myRingIndex === 'number') {
-      return ORBIT_RING_QUATERNIONS[((myRingIndex % ORBIT_RING_QUATERNIONS.length) + ORBIT_RING_QUATERNIONS.length) % ORBIT_RING_QUATERNIONS.length]
-    }
-    return ORBIT_RING_QUATERNIONS[0]
-  }, [quaternion, angle, myRingIndex])
 
   const ringGeom = sharedRingGeometry
 
@@ -1203,8 +1233,8 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
 
     if (_activeIcons.length === 0) return
 
-    // 1. Globe center, screen projection, and effective silhouette radius
-    const effectiveGlobeRadius = 2.03 * scale
+    // 1. Globe center, screen projection, and effective silhouette radius (matching outer atmospheric halo boundary)
+    const effectiveGlobeRadius = SCENE_CONFIG.globe.haloRadius * scale
     state.camera.getWorldPosition(_tempCamWorld)
 
     _tempGlobeProj.set(0, 0, 0).project(state.camera)
@@ -1330,7 +1360,7 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
           const rInner = (rScreen - 2.0).toFixed(1)
           const rOuter = (rScreen + 2.0).toFixed(1)
           const mask = `radial-gradient(circle at ${cx.toFixed(1)}px ${cy.toFixed(1)}px, rgba(0,0,0,0.20) 0px, rgba(0,0,0,0.20) ${rInner}px, rgba(0,0,0,1.0) ${rOuter}px)`
-          
+
           if (entry.lastMask !== mask) {
             container.style.webkitMaskImage = mask
             container.style.maskImage = mask
