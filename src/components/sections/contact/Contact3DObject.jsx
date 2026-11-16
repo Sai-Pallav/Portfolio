@@ -770,7 +770,6 @@ const _tempRimProj = new THREE.Vector3()
 const _tempIconProj = new THREE.Vector3()
 const _tempGlobeCam = new THREE.Vector3()
 const _vGlobeWorld = new THREE.Vector3(0, 0, 0)
-const _tempRingDir = new THREE.Vector3()
 const _activeIcons = []
 
 const OrbitingIcon = memo(function OrbitingIcon({
@@ -935,19 +934,21 @@ const OrbitingIcon = memo(function OrbitingIcon({
       <Html center pointerEvents="auto" wrapperClass="social-icon-html-root">
         <div
           ref={containerRef}
-          className="relative flex items-center justify-center group/tooltip pointer-events-auto"
+          className="relative flex items-center justify-center pointer-events-none"
           style={{
-            width: '40px',
-            height: '40px',
+            width: '80px',
+            height: '80px',
             willChange: 'opacity, mask-image',
           }}
         >
-          {renderLink()}
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 px-3 py-1.5 rounded-lg bg-[var(--bg-raised)]/95 border border-[var(--border)] backdrop-blur-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-300 pointer-events-none shadow-[0_4px_16px_var(--shadow-color)] scale-90 group-hover/tooltip:scale-100">
-            <span className="text-[10px] font-bold tracking-wider uppercase text-[var(--text-heading)] whitespace-nowrap">
-              {specialType === 'email' && copied ? 'Copied!' : (platform === 'gfg' ? 'GeeksforGeeks' : platform)}
-            </span>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[var(--bg-raised)] border-t border-l border-[var(--border)] rotate-45 -translate-y-[4px]" />
+          <div className="relative flex items-center justify-center group/tooltip w-10 h-10 pointer-events-auto">
+            {renderLink()}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 px-3 py-1.5 rounded-lg bg-[var(--bg-raised)]/95 border border-[var(--border)] backdrop-blur-md opacity-0 group-hover/tooltip:opacity-100 transition-all duration-300 pointer-events-none shadow-[0_4px_16px_var(--shadow-color)] scale-90 group-hover/tooltip:scale-100">
+              <span className="text-[10px] font-bold tracking-wider uppercase text-[var(--text-heading)] whitespace-nowrap">
+                {specialType === 'email' && copied ? 'Copied!' : (platform === 'gfg' ? 'GeeksforGeeks' : platform)}
+              </span>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[var(--bg-raised)] border-t border-l border-[var(--border)] rotate-45 -translate-y-[4px]" />
+            </div>
           </div>
         </div>
       </Html>
@@ -977,7 +978,7 @@ const ORBIT_RING_QUATERNIONS = ORBIT_RING_ANGLES.map((deg) => {
   return qZ.multiply(qTilt).normalize()
 })
 
-const SLANTED_RING_EDGE_GLIDE = 0.38
+const DYNAMIC_RING_EDGE_GLIDE = 0.14
 
 
 const OrbitalRing = memo(function OrbitalRing({
@@ -1080,28 +1081,24 @@ const OrbitalRing = memo(function OrbitalRing({
     }
 
     // Dynamic edge glide: smoothly and dynamically shifts icons toward the outer edge of the
-    // ring track as they revolve along the lower and upper arc (going behind and coming in front),
-    // naturally and cleanly clearing the globe outer surface and atmospheric halo without any lateral tilt.
+    // ring track as they revolve along the horizon crossing arcs (going behind and coming in front),
+    // naturally and cleanly clearing the globe outer surface and atmospheric halo across all orbital rings.
     // Unified continuous C1-smooth trajectory with zero secondary sudden movement or wobble.
-    // Ring 0 is the equatorial anchor; slanted rings 1 and 2 pass near the top/bottom poles.
-    const isSlantedRing = (myRingIndex === 1 || myRingIndex === 2 || angle === -60 || angle === 60)
 
     // 1. Unified dynamic edge glide for Icon A
     const totalPhaseA = orbitGroupPhase.current + pivotAPhase.current
-    _tempRingDir.set(Math.cos(totalPhaseA), Math.sin(totalPhaseA), 0).applyQuaternion(ringQuaternion)
-    const normYA = Math.min(1.0, Math.abs(_tempRingDir.y) / 0.8914)
-    const tA = Math.max(0, Math.min(1, (normYA - 0.20) / 0.65))
+    const cosA = Math.abs(Math.cos(totalPhaseA))
+    const tA = Math.max(0, Math.min(1, (cosA - 0.20) / 0.65))
     const smoothA = tA * tA * (3 - 2 * tA)
-    const glideA = isSlantedRing ? smoothA * SLANTED_RING_EDGE_GLIDE : 0
+    const glideA = smoothA * DYNAMIC_RING_EDGE_GLIDE
     const currentRadiusA = radius + glideA
 
     // 2. Unified dynamic edge glide for Icon B
     const totalPhaseB = orbitGroupPhase.current + pivotBPhase.current
-    _tempRingDir.set(Math.cos(totalPhaseB), Math.sin(totalPhaseB), 0).applyQuaternion(ringQuaternion)
-    const normYB = Math.min(1.0, Math.abs(_tempRingDir.y) / 0.8914)
-    const tB = Math.max(0, Math.min(1, (normYB - 0.20) / 0.65))
+    const cosB = Math.abs(Math.cos(totalPhaseB))
+    const tB = Math.max(0, Math.min(1, (cosB - 0.20) / 0.65))
     const smoothB = tB * tB * (3 - 2 * tB)
-    const glideB = isSlantedRing ? smoothB * SLANTED_RING_EDGE_GLIDE : 0
+    const glideB = smoothB * DYNAMIC_RING_EDGE_GLIDE
     const currentRadiusB = radius + glideB
 
     if (iconWrapperARef.current) {
@@ -1247,8 +1244,8 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
     const rCoreScreen = Math.abs((_tempRimProj.x - _tempGlobeProj.x) * (state.size.width * 0.5))
 
     // Projected outer dim atmospheric radius (where dynamic mask begins softening before reaching globe dim)
-    // Calibrated to 2.46 * scale: begins masking a small distance before reaching the globe's outer dim
-    _tempRimWorld.set(2.46 * scale, 0, 0)
+    // Calibrated to 2.48 * scale: begins masking smoothly just before reaching the globe's outer dimming halo
+    _tempRimWorld.set(2.48 * scale, 0, 0)
     _tempRimProj.copy(_tempRimWorld).project(state.camera)
     const rOuterDimScreen = Math.abs((_tempRimProj.x - _tempGlobeProj.x) * (state.size.width * 0.5))
 
@@ -1256,6 +1253,9 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
     for (let i = 0; i < _activeIcons.length; i++) {
       const entry = _activeIcons[i]
       const group = entry.iconGroupRef.current
+
+      // Ensure matrixWorld is fully up to date with the latest frame's dynamic movement before sampling
+      group.updateWorldMatrix(true, false)
 
       // World position of icon
       group.getWorldPosition(_tempIconWorld)
@@ -1272,10 +1272,13 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
       _tempIconCam.copy(_tempIconWorld).applyMatrix4(state.camera.matrixWorldInverse)
 
       // Physical camera-space line-of-sight check:
-      // In camera view space (-Z is forward), an icon is behind the globe strictly when
-      // its camera-space depth is deeper than the globe's center depth
-      const isBehindGlobe = _tempIconCam.z < _tempGlobeCam.z
+      // In camera view space (-Z is forward), an icon is behind the globe's atmospheric envelope
+      // whenever its camera depth is behind the globe's front atmospheric curvature (+0.55 * scale).
+      // Truly in-front foreground icons have depth forward of this threshold (ranging from +1.10 to +2.22 * scale).
+      const zDepthFromCenter = (_tempIconCam.z - _tempGlobeCam.z) / scale
+      const isBehindGlobe = zDepthFromCenter < 0.55
       entry.isBehindGlobe = isBehindGlobe
+      entry.zDepthFromCenter = zDepthFromCenter
 
       // Screen-space projected coordinates
       _tempIconProj.copy(_tempIconWorld).project(state.camera)
@@ -1288,8 +1291,8 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
       const zRel = (_tempIconCam.z + camZ) / scale
       entry.normalizedDepth = THREE.MathUtils.clamp((zRel + 2.45) / 4.90, 0, 1)
 
-      // Crossing & deep behind zones: calibrated 28.5px band covers 40px icon box (half-diagonal ~28.3px)
-      const ICON_HALF_SIZE = 28.5
+      // Crossing & deep behind zones: calibrated 34px band covers 40px icon box + outer shadow falloff
+      const ICON_HALF_SIZE = 34.0
       entry.isDeeplyBehind = isBehindGlobe && (entry.dScreen <= rCoreScreen - ICON_HALF_SIZE)
       entry.isCrossingLimb = isBehindGlobe && !entry.isDeeplyBehind && (entry.dScreen < rOuterDimScreen + ICON_HALF_SIZE)
     }
@@ -1358,13 +1361,22 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
           }
           container.style.opacity = '1.0'
         } else if (entry.isCrossingLimb) {
+          // Continuous depth transition factor:
+          // Maps zDepthFromCenter from +0.55 (fully in front, zero occlusion) down to -0.05 (behind globe limb, full occlusion).
+          // Smooth C1 Hermite interpolation guarantees buttery-smooth transition on going behind and coming out.
+          const zFrontLimb = 0.55
+          const zBackLimb = -0.05
+          const depthT = Math.max(0, Math.min(1, (entry.zDepthFromCenter - zBackLimb) / (zFrontLimb - zBackLimb)))
+          const smoothDepth = depthT * depthT * (3 - 2 * depthT)
+          const coreAlpha = (0.20 + 0.80 * smoothDepth).toFixed(2)
+
           // Progressive spatial occlusion mask as icon approaches outer dimming atmosphere & crosses into core
-          // Relative coordinates of globe center inside the 40px x 40px icon box (center is at 20px, 20px)
-          const cx = 20.0 + (globeScreenX - entry.screenX)
-          const cy = 20.0 + (globeScreenY - entry.screenY)
+          // Relative coordinates of globe center inside the 80px x 80px icon wrapper (center is at 40px, 40px)
+          const cx = 40.0 + (globeScreenX - entry.screenX)
+          const cy = 40.0 + (globeScreenY - entry.screenY)
           const rInner = rCoreScreen.toFixed(1)
           const rOuter = rOuterDimScreen.toFixed(1)
-          const mask = `radial-gradient(circle at ${cx.toFixed(1)}px ${cy.toFixed(1)}px, rgba(0,0,0,0.20) 0px, rgba(0,0,0,0.20) ${rInner}px, rgba(0,0,0,1.0) ${rOuter}px)`
+          const mask = `radial-gradient(circle at ${cx.toFixed(1)}px ${cy.toFixed(1)}px, rgba(0,0,0,${coreAlpha}) 0px, rgba(0,0,0,${coreAlpha}) ${rInner}px, rgba(0,0,0,1.0) ${rOuter}px)`
 
           if (entry.lastMask !== mask) {
             container.style.webkitMaskImage = mask
@@ -1402,10 +1414,10 @@ function SocialIconsCoordinator({ iconsRegistryRef, scale }) {
           entry.htmlRootEl.style.zIndex = entry.stableZIndex
         }
 
-        // Pointer events: only disable when deeply occluded behind globe body
+        // Pointer events: only disable on interactive button when deeply occluded behind globe body
         const targetPointer = entry.isDeeplyBehind ? 'none' : 'auto'
-        if (entry.currentPointerEvents !== targetPointer) {
-          container.style.pointerEvents = targetPointer
+        if (entry.htmlRef?.current && entry.currentPointerEvents !== targetPointer) {
+          entry.htmlRef.current.style.pointerEvents = targetPointer
           entry.currentPointerEvents = targetPointer
         }
       }
