@@ -1,8 +1,9 @@
-import { useMemo, useEffect, useState, memo } from 'react'
+import { useMemo, useEffect, useState, useCallback, memo } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { useThemeContext } from '@/context/ThemeContext'
 import { getWireThemeConfig } from './wireThemeConfig'
 import { getSideWireData } from './generateWireGeometry'
+import { useWireframeConfig } from './WireframeConfigContext'
 import { WirePaths } from './WirePaths'
 import { BeadedStreams } from './BeadedStreams'
 import { NetworkConnections } from './NetworkConnections'
@@ -10,141 +11,144 @@ import { NetworkNodes } from './NetworkNodes'
 import { NetworkParticles } from './NetworkParticles'
 
 /**
- * Responsive 3D scene containing both Left and Right neural wave networks.
+ * A single ribbon group with responsive layout, transform & positioning.
+ */
+function RibbonGroup({ ribbon, layout, children }) {
+  const isLeft = ribbon.side === 'left'
+
+  const posX = isLeft
+    ? -layout.xStart - (ribbon.xOffset ?? 0)
+    : layout.xStart + (ribbon.xOffset ?? 0)
+
+  return (
+    <group
+      position={[
+        posX,
+        ribbon.yOffset ?? 0,
+        ribbon.zOffset ?? 0,
+      ]}
+      scale={[layout.scaleX, layout.scaleY, layout.scaleZ]}
+      rotation={[
+        ((ribbon.pitchX ?? 0) * Math.PI) / 180,
+        isLeft
+          ? ((ribbon.yawY ?? 0) * Math.PI) / 180
+          : -((ribbon.yawY ?? 0) * Math.PI) / 180,
+        isLeft
+          ? -((ribbon.tiltZ ?? 0) * Math.PI) / 180
+          : ((ribbon.tiltZ ?? 0) * Math.PI) / 180,
+      ]}
+    >
+      {children}
+    </group>
+  )
+}
+
+/**
+ * Responsive 3D scene containing 4 independent ribbon groups.
  */
 function NeuralScene({ themeKey, isInView }) {
   const { viewport, invalidate } = useThree()
-  const themeConfig = useMemo(() => getWireThemeConfig(themeKey), [themeKey])
+  const baseThemeConfig = useMemo(() => getWireThemeConfig(themeKey), [themeKey])
+  const { ribbons, leftConfig, rightConfig } = useWireframeConfig()
 
-  // Invalidate canvas to re-render when theme, inView, or viewport updates
+  // Invalidate canvas to re-render when theme, inView, viewport, or ribbon configs update
   useEffect(() => {
     invalidate()
     const r1 = requestAnimationFrame(() => invalidate())
-    const t1 = setTimeout(() => invalidate(), 150)
-    const t2 = setTimeout(() => invalidate(), 550)
+    const t1 = setTimeout(() => invalidate(), 100)
     return () => {
       cancelAnimationFrame(r1)
       clearTimeout(t1)
-      clearTimeout(t2)
     }
-  }, [themeConfig, isInView, viewport.width, viewport.height, invalidate])
+  }, [baseThemeConfig, isInView, viewport.width, viewport.height, leftConfig, rightConfig, ribbons, invalidate])
 
-  // Retrieve cached static geometry once per side
-  const leftData = useMemo(() => getSideWireData('left'), [])
-  const rightData = useMemo(() => getSideWireData('right'), [])
-
-  // Responsive layout calculation:
-  // Maps the canonical 10.0-unit wide wire geometry to fit cleanly between
-  // the globe's orbital rings and extend smoothly past outer viewport edges.
-  const layout = useMemo(() => {
+  // Responsive layout calculation per ribbon config
+  const calculateLayout = useCallback((ribbonConfig) => {
     const halfWidth = viewport.width / 2
 
-    // Responsive xStart (gap from globe center):
-    // Starts closer to the globe ring (matching wider horizontal proportion)
-    let xStart
+    let baseStart
     if (viewport.width >= 8.5) {
-      xStart = 2.30 // Desktop & wide tablet
+      baseStart = 2.30
     } else if (viewport.width <= 5.5) {
-      xStart = 1.65 // Mobile
+      baseStart = 1.65
     } else {
-      xStart = 1.65 + ((viewport.width - 5.5) / 3.0) * 0.65
+      baseStart = 1.65 + ((viewport.width - 5.5) / 3.0) * 0.65
     }
 
-    // Outer edge: extend past the screen edge so wires sweep smoothly off-screen
-    const targetXEnd = halfWidth * 1.06
-    const xEnd = Math.max(xStart + 3.0, targetXEnd)
-    const span = xEnd - xStart
+    const innerExt = (ribbonConfig.innerExtension ?? 0.0) - (ribbonConfig.innerGap ?? 0.0)
+    const xInner = Math.max(0.05, baseStart - innerExt)
 
-    // Canonical span is 10.0 units
+    const baseEnd = Math.max(halfWidth * 1.28, 7.2)
+    const outerExt = (ribbonConfig.outerExtension ?? 1.5) * 1.2 + (ribbonConfig.outerXOffset ?? 0.0)
+    const xOuter = Math.max(xInner + 2.0, baseEnd + outerExt)
+
+    const span = (xOuter - xInner) * (ribbonConfig.lengthMultiplier ?? 1.0)
     const scaleX = span / 10.0
+    const scaleY = Math.max(0.60, Math.min(1.35, span * 0.18)) * (ribbonConfig.breadthMultiplier ?? 1.0)
+    const scaleZ = ribbonConfig.depthMultiplier ?? 1.0
+    const nodeScale = Math.max(0.65, Math.min(1.35, scaleY)) * (ribbonConfig.nodeScale ?? 1.0)
 
-    // Scale Y: Bounded vertical scale keeping wave stream at ~34% of canvas half-height
-    const scaleY = Math.max(0.92, Math.min(1.05, span * 0.18))
-
-    // Node scale factor to keep stars and glow points in proportion with the volumetric height
-    const nodeScale = Math.max(0.85, Math.min(1.10, scaleY))
-
-    return {
-      xStart,
-      xEnd,
-      span,
-      scaleX,
-      scaleY,
-      nodeScale,
-    }
+    return { xStart: xInner, xEnd: xOuter, span, scaleX, scaleY, scaleZ, nodeScale }
   }, [viewport.width])
+
+  // Per-ribbon geometry & layout (memoized per ribbon's shape params)
+  const ribbonData = useMemo(() => {
+    return ribbons.map(ribbon => {
+      const wireData = getSideWireData(ribbon.side, ribbon)
+      const layout = calculateLayout(ribbon)
+      const themeConfig = {
+        ...baseThemeConfig,
+        glowIntensity: (baseThemeConfig.glowIntensity || 1.0) * (ribbon.glowIntensity ?? 1.0),
+        wireOpacity: (baseThemeConfig.wireOpacity || 0.94) * (ribbon.wireOpacity ?? 1.0),
+      }
+      return { ribbon, wireData, layout, themeConfig }
+    })
+  }, [
+    baseThemeConfig,
+    calculateLayout,
+    ribbons,
+  ])
 
   return (
     <group>
-      {/* ── LEFT SIDE NEURAL WAVE NETWORK (x < 0) ── */}
-      <group
-        position={[-layout.xStart, 0, 0]}
-        scale={[layout.scaleX, layout.scaleY, 1]}
-      >
-        <WirePaths
-          primaryCoreGeo={leftData.primaryCoreGeo}
-          primaryHaloGeo={leftData.primaryHaloGeo}
-          secondaryGeo={leftData.secondaryGeo}
-          depthGeo={leftData.depthGeo}
-          subFilamentsGeo={leftData.subFilamentsGeo}
-          themeConfig={themeConfig}
-        />
-        <BeadedStreams
-          beadedStreamsGeo={leftData.beadedStreamsGeo}
-          themeConfig={themeConfig}
-          nodeScale={layout.nodeScale}
-        />
-        <NetworkConnections
-          constellationGeo={leftData.constellationGeo}
-          themeConfig={themeConfig}
-        />
-        <NetworkNodes
-          focalFlaresGeo={leftData.focalFlaresGeo}
-          intersectionNodesGeo={leftData.intersectionNodesGeo}
-          themeConfig={themeConfig}
-          nodeScale={layout.nodeScale}
-        />
-        <NetworkParticles
-          stardustGeo={leftData.stardustGeo}
-          bokehGeo={leftData.bokehGeo}
-          themeConfig={themeConfig}
-        />
-      </group>
-
-      {/* ── RIGHT SIDE NEURAL WAVE NETWORK (x > 0) ── */}
-      <group
-        position={[layout.xStart, 0, 0]}
-        scale={[layout.scaleX, layout.scaleY, 1]}
-      >
-        <WirePaths
-          primaryCoreGeo={rightData.primaryCoreGeo}
-          primaryHaloGeo={rightData.primaryHaloGeo}
-          secondaryGeo={rightData.secondaryGeo}
-          depthGeo={rightData.depthGeo}
-          subFilamentsGeo={rightData.subFilamentsGeo}
-          themeConfig={themeConfig}
-        />
-        <BeadedStreams
-          beadedStreamsGeo={rightData.beadedStreamsGeo}
-          themeConfig={themeConfig}
-          nodeScale={layout.nodeScale}
-        />
-        <NetworkConnections
-          constellationGeo={rightData.constellationGeo}
-          themeConfig={themeConfig}
-        />
-        <NetworkNodes
-          focalFlaresGeo={rightData.focalFlaresGeo}
-          intersectionNodesGeo={rightData.intersectionNodesGeo}
-          themeConfig={themeConfig}
-          nodeScale={layout.nodeScale}
-        />
-        <NetworkParticles
-          stardustGeo={rightData.stardustGeo}
-          bokehGeo={rightData.bokehGeo}
-          themeConfig={themeConfig}
-        />
-      </group>
+      {ribbonData.map(({ ribbon, wireData, layout, themeConfig }) => (
+        <RibbonGroup
+          key={ribbon.id}
+          ribbon={ribbon}
+          layout={layout}
+        >
+          <WirePaths
+            primaryCoreGeo={wireData.primaryCoreGeo}
+            primaryHaloGeo={wireData.primaryHaloGeo}
+            secondaryGeo={wireData.secondaryGeo}
+            depthGeo={wireData.depthGeo}
+            subFilamentsGeo={wireData.subFilamentsGeo}
+            themeConfig={themeConfig}
+            innerFade={ribbon.innerFade ?? 0.04}
+          />
+          <BeadedStreams
+            beadedStreamsGeo={wireData.beadedStreamsGeo}
+            themeConfig={themeConfig}
+            nodeScale={layout.nodeScale}
+          />
+          <NetworkConnections
+            constellationGeo={wireData.constellationGeo}
+            themeConfig={themeConfig}
+            innerFade={ribbon.innerFade ?? 0.04}
+          />
+          <NetworkNodes
+            focalFlaresGeo={wireData.focalFlaresGeo}
+            intersectionNodesGeo={wireData.intersectionNodesGeo}
+            themeConfig={themeConfig}
+            nodeScale={layout.nodeScale}
+          />
+          <NetworkParticles
+            stardustGeo={wireData.stardustGeo}
+            bokehGeo={wireData.bokehGeo}
+            themeConfig={themeConfig}
+          />
+        </RibbonGroup>
+      ))}
     </group>
   )
 }
@@ -187,7 +191,7 @@ export default memo(function SideWireNetwork({ isInView = true }) {
   return (
     <div className="w-full h-full pointer-events-none relative flex items-center justify-center">
       <Canvas
-        frameloop={isInView ? 'demand' : 'never'}
+        frameloop={isInView ? 'always' : 'never'}
         dpr={[1, 1.5]}
         gl={{
           powerPreference: 'high-performance',

@@ -33,55 +33,151 @@ export function computeConstraintWeight(u) {
 }
 
 /**
- * Whisper-faint inner tip fade near the globe gap:
- * pow(smoothstep(0.0, 0.28, u), 2.2)
- * Strictly preserves the soft, dark inner tip near the globe.
+ * Feather fade at inner tip (near globe) and outer tip (extended outer reach):
+ * Softens both endpoints so ribbons dissolve seamlessly into the cosmos rather than cutting off bluntly.
  */
-export function computeVertexAlpha(u) {
-  const s = THREE.MathUtils.smoothstep(u, 0.0, 0.28)
-  return Math.pow(s, 2.2)
+export function computeVertexAlpha(u, innerFade = 0.04, outerFade = 0.08, maxU = 1.0) {
+  const fadeDist = Math.max(0.005, innerFade)
+  const innerAlpha = THREE.MathUtils.smoothstep(u, 0.0, fadeDist)
+
+  if (outerFade <= 0.001) return innerAlpha
+  const safeMax = Math.max(0.2, maxU)
+  const outerStart = safeMax - Math.max(0.01, outerFade * safeMax)
+  const outerEnd = safeMax
+  // As u increases from outerStart to outerEnd, smoothstep goes from 0.0 to 1.0,
+  // so (1.0 - smoothstep) smoothly fades the tip from 1.0 down to 0.0!
+  const outerS = Math.max(0.0, Math.min(1.0, 1.0 - THREE.MathUtils.smoothstep(u, outerStart, outerEnd)))
+  return innerAlpha * Math.pow(outerS, 1.5)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. SMOOTH ANALYTICAL HERO WAVES (EXACT FORMULA LOCK)
+// 1. SMOOTH ANALYTICAL HERO WAVES (EXACT FORMULA LOCK + PARAMETRIC CONTROLLERS)
 // Continuous harmonic functions with N = 200 points per wave.
 // Zero sparse 5-point CatmullRom keyframes that kink at the apex!
 // ─────────────────────────────────────────────────────────────────────────────
 
-function wingSweep(u, H) {
-  return 0.28 * H * Math.pow(u, 2.0)
+export function wingSweep(u, H, sweepVal = 0.28) {
+  return sweepVal * H * Math.pow(u, 2.0)
 }
 
-function env(u, H) {
-  return H * Math.pow(u, 0.85) * THREE.MathUtils.smoothstep(u, 0.0, 0.18)
+export function env(u, H) {
+  return H * Math.pow(u, 0.85) * THREE.MathUtils.smootherstep(u, 0.0, 0.20)
 }
 
-// Hero Wave 0 (Upper Almond Arch -> Pinch at u=0.58 -> Lower Outer Arc, Cyan-White Core)
-function heroY0(u, H) {
-  return wingSweep(u, H) + env(u, H) * (0.52 * Math.sin(u * Math.PI * 1.72) + 0.12 * Math.sin(u * Math.PI * 3.4))
+/**
+ * Core mathematical wave evaluator supporting live parametric adjustments:
+ * - amplitude: scales vertical wave oscillation peaks
+ * - frequency: scales wave cycle density
+ * - wingSweep: controls outer parabolic wing lift
+ * - innerYOffset: shifts inner connection point near the globe
+ * - outerYOffset: lifts or lowers the outer wingtips
+ * - outerFlexibility: fluid wave harmonic whip & flutter at the outer ends
+ * - outerFlare: vertical separation & fanning out of the 4 ribbons at outer tips
+ */
+export function computeHeroWaveY(index, u, H, config = {}) {
+  const amp = config.amplitude !== undefined ? config.amplitude : 1.0
+  const freq = config.frequency !== undefined ? config.frequency : 1.0
+  const sweep = config.wingSweep !== undefined ? config.wingSweep : 0.28
+  const innerY = config.innerYOffset !== undefined ? config.innerYOffset : 0.0
+  const outerY = config.outerYOffset !== undefined ? config.outerYOffset : 0.0
+
+  const r1Amp = config.ribbon1Amp !== undefined ? config.ribbon1Amp : 1.0
+  const r2Amp = config.ribbon2Amp !== undefined ? config.ribbon2Amp : 1.0
+  const r3Amp = config.ribbon3Amp !== undefined ? config.ribbon3Amp : 1.0
+  const r4Amp = config.ribbon4Amp !== undefined ? config.ribbon4Amp : 1.0
+
+  const r1Y = config.ribbon1YOffset !== undefined ? config.ribbon1YOffset : 0.0
+  const r2Y = config.ribbon2YOffset !== undefined ? config.ribbon2YOffset : 0.0
+  const r3Y = config.ribbon3YOffset !== undefined ? config.ribbon3YOffset : 0.0
+  const r4Y = config.ribbon4YOffset !== undefined ? config.ribbon4YOffset : 0.0
+
+  const r1Freq = config.ribbon1Freq !== undefined ? config.ribbon1Freq : 1.0
+  const r2Freq = config.ribbon2Freq !== undefined ? config.ribbon2Freq : 1.0
+  const r3Freq = config.ribbon3Freq !== undefined ? config.ribbon3Freq : 1.0
+  const r4Freq = config.ribbon4Freq !== undefined ? config.ribbon4Freq : 1.0
+
+  const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
+  const outerFlare = config.outerFlare !== undefined ? config.outerFlare : 0.6
+
+  // Two ends differential placement:
+  // innerY dominates at u=0 and tapers off; outerY dominates as u approaches/exceeds 1.0
+  const endsY = (1.0 - Math.pow(Math.min(1.0, u), 0.5)) * innerY + Math.pow(u, 1.6) * outerY
+  const baseSweep = wingSweep(u, H, sweep)
+  const e = env(u, H)
+
+  // Outer end flexibility & harmonic wave whip (activates gracefully for u > 0.55):
+  const outerT = Math.max(0.0, (u - 0.55) / 0.45)
+  const outerWhip = Math.pow(outerT, 1.7) * 0.22 * H * outerFlex * Math.sin(u * Math.PI * 2.8 * freq + index * 0.9)
+
+  // Outer flare offsets (fans out the 4 ribbons gracefully at the outer tips):
+  // Ribbon 0 (Upper Arch): flares upward
+  // Ribbon 1 (Lower Arch): flares downward
+  // Ribbon 2 (Violet Accent): flows downward-mid
+  // Ribbon 3 (Counter-Braid): flows upward-mid
+  const flareSigns = [0.85, -0.85, -0.45, 0.45]
+  const flareOffset = Math.pow(outerT, 1.7) * 0.28 * H * outerFlare * (flareSigns[index] ?? 0.0)
+
+  switch (index) {
+    case 0: {
+      // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
+      // Pure harmonic formulation with natural outer lift, matching Ribbon 2's organic continuity with zero angular kinks
+      const wave = 0.48 * Math.sin(u * Math.PI * 1.62 * freq * r1Freq + 0.08) - 0.14 * Math.cos(u * Math.PI * 2.8 * freq * r1Freq) + 0.32 * Math.pow(u, 1.8)
+      return baseSweep + endsY + r1Y + flareOffset + outerWhip + e * amp * r1Amp * wave
+    }
+    case 1:
+      // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
+      return baseSweep + endsY + r2Y + flareOffset + outerWhip + e * amp * r2Amp * (-0.50 * Math.sin(u * Math.PI * 1.68 * freq * r2Freq + 0.08) + 0.14 * Math.cos(u * Math.PI * 2.9 * freq * r2Freq))
+    case 2: {
+      // Ribbon 3 (Violet/Magenta Accent Wave #b83dff, Threads Center -> Lower Outer Sweep)
+      // Inner boost enhances amplitude sensitivity at inner end (u < 0.65) while preserving outer change setting as it is:
+      const r3InnerT = Math.max(0.0, Math.min(1.0, u / 0.65))
+      const r3InnerTaper = 1.0 - r3InnerT * r3InnerT * (3.0 - 2.0 * r3InnerT)
+      const r3InnerBoost = 0.52 * r3InnerTaper * Math.sin(u * Math.PI * 1.65 * freq * r3Freq)
+      return baseSweep + endsY + r3Y + flareOffset + outerWhip + e * amp * r3Amp * (0.18 * Math.sin(u * Math.PI * 2.2 * freq * r3Freq - 0.5) - 0.42 * Math.pow(u, 1.4) * Math.sin(u * Math.PI * 1.35 * freq * r3Freq) + r3InnerBoost)
+    }
+    case 3:
+      // Ribbon 4 (Secondary Inner-to-Outer Counter-Braid, Electric Blue-Cyan)
+      return baseSweep + endsY + r4Y + flareOffset + outerWhip + e * amp * r4Amp * (-0.24 * Math.sin(u * Math.PI * 2.6 * freq * r4Freq + 0.9) + 0.30 * Math.pow(u, 1.6))
+    default:
+      return 0
+  }
 }
 
-// Hero Wave 1 (Lower Almond Arch -> Pinch at u=0.58 -> Upper Outer Wing, Cyan-White Core)
-function heroY1(u, H) {
-  return wingSweep(u, H) + env(u, H) * (-0.50 * Math.sin(u * Math.PI * 1.68 + 0.08) + 0.14 * Math.cos(u * Math.PI * 2.9))
+/**
+ * Smooth Z-depth oscillation with optional zAmplitude control, outer flexibility and 3D end placement
+ */
+export function computeHeroWaveZ(index, u, H, config = {}) {
+  const zAmp = config.zAmplitude !== undefined ? config.zAmplitude : 1.0
+  const outerZ = config.outerZOffset !== undefined ? config.outerZOffset : 0.0
+  const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
+  const rAmp = [
+    config.ribbon1Amp ?? 1.0,
+    config.ribbon2Amp ?? 1.0,
+    config.ribbon3Amp ?? 1.0,
+    config.ribbon4Amp ?? 1.0,
+  ][index] ?? 1.0
+  const rFreq = [
+    config.ribbon1Freq ?? 1.0,
+    config.ribbon2Freq ?? 1.0,
+    config.ribbon3Freq ?? 1.0,
+    config.ribbon4Freq ?? 1.0,
+  ][index] ?? 1.0
+
+  const outerT = Math.max(0.0, (u - 0.55) / 0.45)
+  const zEnds = Math.pow(u, 1.6) * outerZ + Math.pow(outerT, 1.8) * 0.12 * H * outerFlex * Math.cos(u * Math.PI * 2.4 * rFreq)
+  const rAmpClamped = Math.min(1.2, rAmp)
+
+  return zEnds + 0.25 * H * zAmp * rAmpClamped * Math.cos(u * Math.PI * 2.0 * rFreq + index * 1.3)
 }
 
-// Hero Wave 2 (Violet/Magenta Accent Wave #b83dff, Threads Center -> Lower Outer Sweep)
-function heroY2(u, H) {
-  return wingSweep(u, H) + env(u, H) * (0.18 * Math.sin(u * Math.PI * 2.2 - 0.5) - 0.42 * Math.pow(u, 1.4) * Math.sin(u * Math.PI * 1.35))
-}
+// Backward-compatible individual functions
+export function heroY0(u, H, config) { return computeHeroWaveY(0, u, H, config) }
+export function heroY1(u, H, config) { return computeHeroWaveY(1, u, H, config) }
+export function heroY2(u, H, config) { return computeHeroWaveY(2, u, H, config) }
+export function heroY3(u, H, config) { return computeHeroWaveY(3, u, H, config) }
+export function heroZ(i, u, H, config) { return computeHeroWaveZ(i, u, H, config) }
 
-// Hero Wave 3 (Secondary Inner-to-Outer Counter-Braid, Electric Blue-Cyan)
-function heroY3(u, H) {
-  return wingSweep(u, H) + env(u, H) * (-0.24 * Math.sin(u * Math.PI * 2.6 + 0.9) + 0.30 * Math.pow(u, 1.6))
-}
-
-// Smooth Z-depth oscillation
-function heroZ(i, u, H) {
-  return 0.25 * H * Math.cos(u * Math.PI * 2.0 + i * 1.3)
-}
-
-const HERO_FUNCS = [heroY0, heroY1, heroY2, heroY3]
+export const HERO_FUNCS = [heroY0, heroY1, heroY2, heroY3]
 
 /**
  * 6-pass micro-offset additive glow bundle for each Hero Wave.
@@ -110,7 +206,9 @@ export const WIRE_ANIMATION_PARAMS = {
  * Parameterized line geometry builder for animation-ready BufferGeometries.
  */
 class ParameterizedLineBuilder {
-  constructor() {
+  constructor(innerFade = 0.04, outerFade = 0.15) {
+    this.innerFade = innerFade
+    this.outerFade = outerFade
     this.positions = []
     this.basePositions = []
     this.uParams = []
@@ -120,9 +218,9 @@ class ParameterizedLineBuilder {
     this.colors = []
   }
 
-  addSegment(p1, u1, wireId1, w1, p2, u2, wireId2, w2, a1 = null, a2 = null, c1 = null, c2 = null) {
-    const alpha1 = a1 !== null ? a1 : computeVertexAlpha(u1)
-    const alpha2 = a2 !== null ? a2 : computeVertexAlpha(u2)
+  addSegment(p1, u1, wireId1, w1, p2, u2, wireId2, w2, a1 = null, a2 = null, c1 = null, c2 = null, maxU = 1.0) {
+    const alpha1 = a1 !== null ? a1 : computeVertexAlpha(u1, this.innerFade, this.outerFade, maxU)
+    const alpha2 = a2 !== null ? a2 : computeVertexAlpha(u2, this.innerFade, this.outerFade, maxU)
 
     this.positions.push(p1.x, p1.y, p1.z)
     this.basePositions.push(p1.x, p1.y, p1.z)
@@ -211,21 +309,33 @@ class ParameterizedPointsBuilder {
 // 2. COMPANION SILK STRANDS BUNDLED ALONG HERO WAVES (ZERO HAMMOCK NET!)
 // 11 companion silk strands per Hero Wave (44 total per side).
 // NEVER bridges across to the opposite Hero Wave — keeps almond eye dark & open!
+// Organic trailing lengths at outer ends for natural silk flexibility.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function generateCompanionSilkStrands(side, H) {
+function generateCompanionSilkStrands(side, H, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
-  const N_SILK = 160
-  const builder = new ParameterizedLineBuilder()
+  const N_SILK = 180
+  const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
+  const outerFade = config.outerFade !== undefined ? config.outerFade : 0.15
+  const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
+  const strandSpread = config.strandSpread !== undefined ? config.strandSpread : 1.0
+  const stringCount = config.stringCount !== undefined ? Math.max(2, Math.min(32, Math.round(config.stringCount))) : 11
+  const stringWidth = config.stringWidth !== undefined ? Math.max(0.1, config.stringWidth) : 1.0
+  const builder = new ParameterizedLineBuilder(innerFade, outerFade)
 
   for (let i = 0; i < 4; i++) {
-    for (let k = 0; k < 11; k++) {
+    for (let k = 0; k < stringCount; k++) {
       const spreadSign = (k % 2 === 0 ? 1.0 : -1.0)
-      const radialSpread = (0.03 + 0.13 * (k / 10.0)) * spreadSign
+      const kFrac = stringCount > 1 ? k / (stringCount - 1) : 0.5
+      const radialSpread = (0.03 + 0.13 * kFrac) * spreadSign * strandSpread * stringWidth
       const freq_k = 1.3 + (k % 4) * 0.45
-      const phase_k = (k * 2.0 * Math.PI) / 11.0 + i * 0.8
-      const strandAlpha = 0.16 + 0.18 * ((k % 5) / 4.0)
+      const phase_k = (k * 2.0 * Math.PI) / stringCount + i * 0.8
+      const strandAlpha = (0.16 + 0.18 * ((k % 5) / 4.0)) * Math.min(1.5, 0.7 + 0.3 * stringWidth)
+
+      // Organic staggered tip extensions so outer ends trail off like real silk fibers:
+      const staggerFrac = ((k * 7 + i * 3) % 13) / 12.0 // [0.0, 1.0]
+      const strandMaxU = 1.0 + (staggerFrac * 0.16 - 0.04) * outerFlex
 
       let hexColor
       if (i === 2) {
@@ -244,15 +354,19 @@ function generateCompanionSilkStrands(side, H) {
       let prevU = null
 
       for (let s = 0; s < N_SILK; s++) {
-        const u = s / (N_SILK - 1)
+        const u = (s / (N_SILK - 1)) * strandMaxU
         const x = sign * 10.0 * u
         const e = env(u, H)
-        const y = HERO_FUNCS[i](u, H) + e * (radialSpread * Math.sin(u * Math.PI * freq_k + phase_k))
-        const z = heroZ(i, u, H) + e * (0.08 * Math.cos(u * Math.PI * freq_k + phase_k))
+        // Soft tip taper for Ribbon 1 companion silk strands to prevent outer tangling/bunching:
+        const tipTaper = i === 0 ? (1.0 - 0.35 * THREE.MathUtils.smootherstep(u, 0.75, strandMaxU)) : 1.0
+        const y = HERO_FUNCS[i](u, H, config) + e * (radialSpread * tipTaper * Math.sin(u * Math.PI * freq_k + phase_k))
+        const z = heroZ(i, u, H, config) + e * (0.08 * stringWidth * tipTaper * Math.cos(u * Math.PI * freq_k + phase_k))
         const pt = new THREE.Vector3(x, y, z)
         const w = computeConstraintWeight(u)
 
         if (prevPt) {
+          const a1 = strandAlpha * computeVertexAlpha(prevU, innerFade, outerFade, strandMaxU)
+          const a2 = strandAlpha * computeVertexAlpha(u, innerFade, outerFade, strandMaxU)
           builder.addSegment(
             prevPt,
             prevU,
@@ -262,10 +376,11 @@ function generateCompanionSilkStrands(side, H) {
             u,
             10 + i * 11 + k,
             w,
-            strandAlpha,
-            strandAlpha,
+            a1,
+            a2,
             color,
-            color
+            color,
+            strandMaxU
           )
         }
         prevPt = pt
@@ -283,9 +398,10 @@ function generateCompanionSilkStrands(side, H) {
 // Connected to 2-3 nearest neighbors strictly within d < 0.28 * H.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function generate3DNeuralTriangulation(side, H, prng) {
+function generate3DNeuralTriangulation(side, H, prng, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
+  const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
   const nodes = []
 
   // Generate 65 Graph Nodes inside u in [0.18, 0.95]
@@ -294,8 +410,8 @@ function generate3DNeuralTriangulation(side, H, prng) {
     // Stratified distribution along u
     const u = 0.20 + uNorm * (0.92 - 0.20) + (prng() - 0.5) * 0.03
     const clampedU = Math.min(0.95, Math.max(0.18, u))
-    const yA = heroY0(clampedU, H)
-    const yB = heroY1(clampedU, H)
+    const yA = heroY0(clampedU, H, config)
+    const yB = heroY1(clampedU, H, config)
     const yMin = Math.min(yA, yB)
     const yMax = Math.max(yA, yB)
     const gap = Math.max(0.04, yMax - yMin)
@@ -352,7 +468,7 @@ function generate3DNeuralTriangulation(side, H, prng) {
   }
 
   // Build LineSegments geometry for delicate geometric neural triangles (opacity: 0.18)
-  const lineBuilder = new ParameterizedLineBuilder()
+  const lineBuilder = new ParameterizedLineBuilder(innerFade)
   const lineColor = new THREE.Color('#0a52ff').lerp(new THREE.Color('#30d5ff'), 0.45)
 
   edges.forEach(({ i, j }) => {
@@ -395,10 +511,11 @@ function generate3DNeuralTriangulation(side, H, prng) {
 // 5-6 exact curve-crossing flares strictly on intersections for u >= 0.35.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function generate5SweepingOuterBeadedStreams(side, H) {
+function generate5SweepingOuterBeadedStreams(side, H, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
   const N_DOTS = 75
+  const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
   const pointsBuilder = new ParameterizedPointsBuilder()
   const beadColor = new THREE.Color('#30d5ff').lerp(new THREE.Color('#0055ff'), 0.35)
 
@@ -406,31 +523,31 @@ function generate5SweepingOuterBeadedStreams(side, H) {
   const arcConfigs = [
     // Arc 0: High upper canopy arc well above top wave
     {
-      calcY: (u) => heroY0(u, H) + (0.28 + 0.35 * u) * H + 0.04 * H * Math.sin(u * Math.PI * 2.2),
-      calcZ: (u) => heroZ(0, u, H) + 0.08 * Math.cos(u * Math.PI * 2.0),
+      calcY: (u) => heroY0(u, H, config) + (0.28 + 0.35 * u) * H + 0.04 * H * Math.sin(u * Math.PI * 2.2),
+      calcZ: (u) => heroZ(0, u, H, config) + 0.08 * Math.cos(u * Math.PI * 2.0),
       wireId: 80,
     },
     // Arc 1: Mid-high upper canopy arc
     {
-      calcY: (u) => heroY0(u, H) + (0.20 + 0.26 * u) * H + 0.03 * H * Math.cos(u * Math.PI * 2.6),
-      calcZ: (u) => heroZ(0, u, H) + 0.05 * Math.sin(u * Math.PI * 2.2),
+      calcY: (u) => heroY0(u, H, config) + (0.20 + 0.26 * u) * H + 0.03 * H * Math.cos(u * Math.PI * 2.6),
+      calcZ: (u) => heroZ(0, u, H, config) + 0.05 * Math.sin(u * Math.PI * 2.2),
       wireId: 81,
     },
     // Arc 2: Deep lower root arc well below bottom wave
     {
-      calcY: (u) => heroY1(u, H) - (0.28 + 0.35 * u) * H - 0.04 * H * Math.cos(u * Math.PI * 2.2),
-      calcZ: (u) => heroZ(1, u, H) - 0.08 * Math.cos(u * Math.PI * 2.0),
+      calcY: (u) => heroY1(u, H, config) - (0.28 + 0.35 * u) * H - 0.04 * H * Math.cos(u * Math.PI * 2.2),
+      calcZ: (u) => heroZ(1, u, H, config) - 0.08 * Math.cos(u * Math.PI * 2.0),
       wireId: 82,
     },
     // Arc 3: Mid-deep lower root arc
     {
-      calcY: (u) => heroY1(u, H) - (0.20 + 0.26 * u) * H - 0.03 * H * Math.sin(u * Math.PI * 2.6),
-      calcZ: (u) => heroZ(1, u, H) - 0.05 * Math.sin(u * Math.PI * 2.2),
+      calcY: (u) => heroY1(u, H, config) - (0.20 + 0.26 * u) * H - 0.03 * H * Math.sin(u * Math.PI * 2.6),
+      calcZ: (u) => heroZ(1, u, H, config) - 0.05 * Math.sin(u * Math.PI * 2.2),
       wireId: 83,
     },
     // Arc 4: Outer flaring canopy arc
     {
-      calcY: (u) => (u < 0.58 ? heroY0(u, H) : heroY1(u, H)) + (0.35 + 0.40 * u) * H,
+      calcY: (u) => (u < 0.58 ? heroY0(u, H, config) : heroY1(u, H, config)) + (0.35 + 0.40 * u) * H,
       calcZ: (u) => 0.10 * H * Math.sin(u * Math.PI * 2.4),
       wireId: 84,
     },
@@ -444,7 +561,7 @@ function generate5SweepingOuterBeadedStreams(side, H) {
       const y = calcY(u)
       const z = calcZ(u)
       const weight = computeConstraintWeight(u)
-      const feather = computeVertexAlpha(u)
+      const feather = computeVertexAlpha(u, innerFade)
 
       // Fading at both ends: Math.sin(t * PI)
       const fade = Math.sin(t * Math.PI)
@@ -477,7 +594,7 @@ function generate25BackgroundBokehCircles(side, H, prng) {
     const feather = computeVertexAlpha(u)
     const weight = computeConstraintWeight(u)
 
-    const x = sign * 10.0 * u + (prng() - 0.5) * 0.40
+    const x = sign * (10.0 * u + (prng() - 0.5) * 0.40)
     const y = (prng() - 0.5) * 1.6 * H
     const z = -0.38 - prng() * 0.35
 
@@ -498,18 +615,19 @@ function generate25BackgroundBokehCircles(side, H, prng) {
   return pointsBuilder.buildGeometry(true, true)
 }
 
-function get6ExactCurveCrossingFlares(side, H) {
+function get6ExactCurveCrossingFlares(side, H, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
+  const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
 
   // Exact mathematical intersection coordinates of Hero Waves 0, 1, 2, 3 for u >= 0.35:
   const crossings = [
-    { u: 0.565, y: heroY0(0.565, H), z: heroZ(0, 0.565, H) }, // Hero 0 & Hero 1 (Primary Pinch)
-    { u: 0.415, y: heroY0(0.415, H), z: heroZ(0, 0.415, H) }, // Hero 0 & Hero 3
-    { u: 0.526, y: heroY1(0.526, H), z: heroZ(1, 0.526, H) }, // Hero 1 & Hero 2
-    { u: 0.620, y: heroY1(0.620, H), z: heroZ(1, 0.620, H) }, // Hero 1 & Hero 3
-    { u: 0.706, y: heroY0(0.706, H), z: heroZ(0, 0.706, H) }, // Hero 0 & Hero 2
-    { u: 0.842, y: heroY2(0.842, H), z: heroZ(2, 0.842, H) }, // Hero 2 & Hero 3
+    { u: 0.565, y: heroY0(0.565, H, config), z: heroZ(0, 0.565, H, config) }, // Hero 0 & Hero 1 (Primary Pinch)
+    { u: 0.415, y: heroY0(0.415, H, config), z: heroZ(0, 0.415, H, config) }, // Hero 0 & Hero 3
+    { u: 0.526, y: heroY1(0.526, H, config), z: heroZ(1, 0.526, H, config) }, // Hero 1 & Hero 2
+    { u: 0.620, y: heroY1(0.620, H, config), z: heroZ(1, 0.620, H, config) }, // Hero 1 & Hero 3
+    { u: 0.706, y: heroY0(0.706, H, config), z: heroZ(0, 0.706, H, config) }, // Hero 0 & Hero 2
+    { u: 0.842, y: heroY2(0.842, H, config), z: heroZ(2, 0.842, H, config) }, // Hero 2 & Hero 3
   ]
 
   const pointsBuilder = new ParameterizedPointsBuilder()
@@ -517,7 +635,7 @@ function get6ExactCurveCrossingFlares(side, H) {
   crossings.forEach(({ u, y, z }, idx) => {
     const x = sign * 10.0 * u
     const weight = computeConstraintWeight(u)
-    const feather = computeVertexAlpha(u)
+    const feather = computeVertexAlpha(u, innerFade)
     pointsBuilder.addPoint(
       new THREE.Vector3(x, y, z),
       u,
@@ -531,10 +649,11 @@ function get6ExactCurveCrossingFlares(side, H) {
   return pointsBuilder.buildGeometry(true, false)
 }
 
-function generate900PinpointStardust(side, H, prng) {
+function generate900PinpointStardust(side, H, prng, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
   const STARDUST_COUNT = 900
+  const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
   const pointsBuilder = new ParameterizedPointsBuilder()
 
   const colorPalette = [
@@ -550,20 +669,20 @@ function generate900PinpointStardust(side, H, prng) {
   for (let p = 0; p < STARDUST_COUNT; p++) {
     const u = 0.20 + prng() * (0.98 - 0.20)
     const curveId = Math.floor(prng() * 4)
-    const yBase = HERO_FUNCS[curveId](u, H)
-    const zBase = heroZ(curveId, u, H)
+    const yBase = HERO_FUNCS[curveId](u, H, config)
+    const zBase = heroZ(curveId, u, H, config)
 
     const r1 = prng()
     const r2 = prng()
     const gaussY = Math.sqrt(-2.0 * Math.log(Math.max(1e-5, r1))) * Math.cos(2.0 * Math.PI * r2)
     const gaussZ = Math.sqrt(-2.0 * Math.log(Math.max(1e-5, r1))) * Math.sin(2.0 * Math.PI * r2)
 
-    const x = sign * 10.0 * u + (prng() - 0.5) * 0.08
+    const x = sign * (10.0 * u + (prng() - 0.5) * 0.08)
     const y = yBase + gaussY * 0.07 * H
     const z = zBase + gaussZ * 0.07 * H
 
     const weight = computeConstraintWeight(u)
-    const feather = computeVertexAlpha(u)
+    const feather = computeVertexAlpha(u, innerFade)
 
     // Tiny 1.0px - 2.2px pinpoint stardust
     const size = (0.16 + prng() * 0.14) * (0.5 + 0.5 * feather)
@@ -585,62 +704,68 @@ function generate900PinpointStardust(side, H, prng) {
 }
 
 /**
- * Generates all graph-based animation-ready geometries for one side ('left' or 'right').
+ * Generates all graph-based animation-ready geometries for one side ('left' or 'right'),
+ * supporting live parametric adjustments from the wireframe controller.
  *
  * @param {'left' | 'right'} side
+ * @param {object} [config]
  */
-export function generateSideWireData(side) {
-  const prng = createPrng(side === 'left' ? 7771 : 8881)
+export function generateSideWireData(side, config = {}) {
+  const prng = createPrng(7771)
   const graph = new NeuralWireGraph(side)
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
   const H = H_VAL
-  const N_HERO = 200
+  const N_HERO = 240
+  const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
+  const outerFade = config.outerFade !== undefined ? config.outerFade : 0.15
+  const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
 
-  // 1. Build smooth continuous Hero Wave paths (N = 200 points per wave)
+  // 1. Build smooth continuous Hero Wave paths (N = 240 points per wave) with organic staggered outer tips
   const heroStrands = []
   for (let i = 0; i < 4; i++) {
     const pts = []
+    const heroMaxU = 1.0 + ([0.05, 0.02, 0.07, 0.04][i] ?? 0.0) * outerFlex
     for (let s = 0; s < N_HERO; s++) {
-      const u = s / (N_HERO - 1)
+      const u = (s / (N_HERO - 1)) * heroMaxU
       const x = sign * 10.0 * u
-      const y = HERO_FUNCS[i](u, H)
-      const z = heroZ(i, u, H)
+      const y = HERO_FUNCS[i](u, H, config)
+      const z = heroZ(i, u, H, config)
       pts.push(new THREE.Vector3(x, y, z))
     }
-    heroStrands.push({ wireId: i, pts })
+    heroStrands.push({ wireId: i, pts, maxU: heroMaxU })
     graph.primaryFilamentPaths.push({ wireId: i, length: pts.length })
   }
 
   // 2. 6-pass micro-offset additive glow bundle builder for Hero Waves
   function buildCoreLineGeo(strandList) {
-    const builder = new ParameterizedLineBuilder()
-    strandList.forEach(({ wireId, pts }) => {
+    const builder = new ParameterizedLineBuilder(innerFade, outerFade)
+    strandList.forEach(({ wireId, pts, maxU = 1.0 }) => {
       const count = pts.length
       for (let i = 0; i < count - 1; i++) {
-        const u1 = i / (count - 1)
-        const u2 = (i + 1) / (count - 1)
+        const u1 = (i / (count - 1)) * maxU
+        const u2 = ((i + 1) / (count - 1)) * maxU
         const w1 = computeConstraintWeight(u1)
         const w2 = computeConstraintWeight(u2)
-        builder.addSegment(pts[i], u1, wireId, w1, pts[i + 1], u2, wireId, w2)
+        builder.addSegment(pts[i], u1, wireId, w1, pts[i + 1], u2, wireId, w2, null, null, null, null, maxU)
       }
     })
     return builder.buildGeometry()
   }
 
   function buildOffsetAuraLineGeo(strandList, offsets) {
-    const builder = new ParameterizedLineBuilder()
-    strandList.forEach(({ wireId, pts }) => {
+    const builder = new ParameterizedLineBuilder(innerFade, outerFade)
+    strandList.forEach(({ wireId, pts, maxU = 1.0 }) => {
       const count = pts.length
       offsets.forEach(({ dy, dz }) => {
         for (let i = 0; i < count - 1; i++) {
-          const u1 = i / (count - 1)
-          const u2 = (i + 1) / (count - 1)
+          const u1 = (i / (count - 1)) * maxU
+          const u2 = ((i + 1) / (count - 1)) * maxU
           const w1 = computeConstraintWeight(u1)
           const w2 = computeConstraintWeight(u2)
           const p1 = new THREE.Vector3(pts[i].x, pts[i].y + dy, pts[i].z + dz)
           const p2 = new THREE.Vector3(pts[i + 1].x, pts[i + 1].y + dy, pts[i + 1].z + dz)
-          builder.addSegment(p1, u1, wireId, w1, p2, u2, wireId, w2)
+          builder.addSegment(p1, u1, wireId, w1, p2, u2, wireId, w2, null, null, null, null, maxU)
         }
       })
     })
@@ -648,21 +773,26 @@ export function generateSideWireData(side) {
   }
 
   // Hero Waves 0, 1, 3: Cyan-White Core & 6-Pass Royal-Blue (#0048ff) Aura
+  const stringWidth = config.stringWidth !== undefined ? Math.max(0.1, config.stringWidth) : 1.0
+  const auraOffsets = HERO_AURA_OFFSETS.map(({ dy, dz }) => ({
+    dy: dy * stringWidth,
+    dz: dz * stringWidth,
+  }))
   const cyanBlueStrands = [heroStrands[0], heroStrands[1], heroStrands[3]]
   const primaryCoreGeo = buildCoreLineGeo(cyanBlueStrands)
-  const primaryHaloGeo = buildOffsetAuraLineGeo(cyanBlueStrands, HERO_AURA_OFFSETS)
+  const primaryHaloGeo = buildOffsetAuraLineGeo(cyanBlueStrands, auraOffsets)
 
   // Hero Wave 2: Violet/Magenta (#b83dff) Core & 6-Pass Violet Aura
   const violetStrand = [heroStrands[2]]
   const secondaryGeo = buildCoreLineGeo(violetStrand)
-  const depthGeo = buildOffsetAuraLineGeo(violetStrand, HERO_AURA_OFFSETS)
+  const depthGeo = buildOffsetAuraLineGeo(violetStrand, auraOffsets)
 
-  // 3. 44 Companion Silk Strands bundled tightly along Hero Waves (ZERO HAMMOCK NET!)
-  const subFilamentsGeo = generateCompanionSilkStrands(side, H)
+  // 3. Companion Silk Strands bundled tightly along Hero Waves (ZERO HAMMOCK NET!)
+  const subFilamentsGeo = generateCompanionSilkStrands(side, H, config)
 
   // 4. 3D Neural Triangulation Mesh & 65 Graph Nodes inside the dark almond chamber
   const { triangulationGeo: constellationGeo, nodesGeo: intersectionNodesGeo, rawNodes } =
-    generate3DNeuralTriangulation(side, H, prng)
+    generate3DNeuralTriangulation(side, H, prng, config)
 
   rawNodes.forEach((n) => {
     graph.addNode(new GraphNode({
@@ -677,16 +807,16 @@ export function generateSideWireData(side) {
   })
 
   // 5. 5 Sweeping Outer Beaded Dot-Streams floating well outside the main waves
-  const beadedStreamsGeo = generate5SweepingOuterBeadedStreams(side, H)
+  const beadedStreamsGeo = generate5SweepingOuterBeadedStreams(side, H, config)
 
   // 6. 25 Soft Out-of-Focus Background Bokeh Discs
   const bokehGeo = generate25BackgroundBokehCircles(side, H, prng)
 
   // 7. 6 Exact Curve-Crossing Flares strictly on Hero wave intersections
-  const focalFlaresGeo = get6ExactCurveCrossingFlares(side, H)
+  const focalFlaresGeo = get6ExactCurveCrossingFlares(side, H, config)
 
   // 8. 900 Tiny Pinpoint Stardust Specks
-  const stardustGeo = generate900PinpointStardust(side, H, prng)
+  const stardustGeo = generate900PinpointStardust(side, H, prng, config)
 
   // Canonical graph exports
   const canonicalModel = graph.exportCanonicalModel()
@@ -720,14 +850,62 @@ export function generateSideWireData(side) {
 }
 
 /**
- * Module-level deterministic geometry cache.
+ * Module-level deterministic geometry cache with LRU cleanup to prevent leaks.
  */
-const cachedData = { left: null, right: null }
-export function getSideWireData(side) {
-  if (!cachedData[side]) {
-    cachedData[side] = generateSideWireData(side)
+const cachedGeometryMap = new Map()
+
+export function getGeometryCacheKey(side, config = {}) {
+  const amp = (config.amplitude !== undefined ? config.amplitude : 1.0).toFixed(2)
+  const freq = (config.frequency !== undefined ? config.frequency : 1.0).toFixed(2)
+  const sweep = (config.wingSweep !== undefined ? config.wingSweep : 0.28).toFixed(2)
+  const innerY = (config.innerYOffset !== undefined ? config.innerYOffset : 0.0).toFixed(2)
+  const outerY = (config.outerYOffset !== undefined ? config.outerYOffset : 0.0).toFixed(2)
+  const zAmp = (config.zAmplitude !== undefined ? config.zAmplitude : 1.0).toFixed(2)
+  const strandSpread = (config.strandSpread !== undefined ? config.strandSpread : 1.0).toFixed(2)
+  const innerFade = (config.innerFade !== undefined ? config.innerFade : 0.04).toFixed(2)
+  const strCount = (config.stringCount !== undefined ? config.stringCount : 11)
+  const strWidth = (config.stringWidth !== undefined ? config.stringWidth : 1.0).toFixed(2)
+
+  const r1Amp = (config.ribbon1Amp !== undefined ? config.ribbon1Amp : 1.0).toFixed(2)
+  const r2Amp = (config.ribbon2Amp !== undefined ? config.ribbon2Amp : 1.0).toFixed(2)
+  const r3Amp = (config.ribbon3Amp !== undefined ? config.ribbon3Amp : 1.0).toFixed(2)
+  const r4Amp = (config.ribbon4Amp !== undefined ? config.ribbon4Amp : 1.0).toFixed(2)
+
+  const r1Y = (config.ribbon1YOffset !== undefined ? config.ribbon1YOffset : 0.0).toFixed(2)
+  const r2Y = (config.ribbon2YOffset !== undefined ? config.ribbon2YOffset : 0.0).toFixed(2)
+  const r3Y = (config.ribbon3YOffset !== undefined ? config.ribbon3YOffset : 0.0).toFixed(2)
+  const r4Y = (config.ribbon4YOffset !== undefined ? config.ribbon4YOffset : 0.0).toFixed(2)
+
+  const r1F = (config.ribbon1Freq !== undefined ? config.ribbon1Freq : 1.0).toFixed(2)
+  const r2F = (config.ribbon2Freq !== undefined ? config.ribbon2Freq : 1.0).toFixed(2)
+  const r3F = (config.ribbon3Freq !== undefined ? config.ribbon3Freq : 1.0).toFixed(2)
+  const r4F = (config.ribbon4Freq !== undefined ? config.ribbon4Freq : 1.0).toFixed(2)
+
+  const oFlex = (config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0).toFixed(2)
+  const oFlare = (config.outerFlare !== undefined ? config.outerFlare : 0.6).toFixed(2)
+  const oFade = (config.outerFade !== undefined ? config.outerFade : 0.15).toFixed(2)
+  const oZ = (config.outerZOffset !== undefined ? config.outerZOffset : 0.0).toFixed(2)
+
+  return `v5:${side}:${amp}:${freq}:${sweep}:${innerY}:${outerY}:${zAmp}:${strandSpread}:${innerFade}:${strCount}:${strWidth}:${r1Amp}:${r2Amp}:${r3Amp}:${r4Amp}:${r1Y}:${r2Y}:${r3Y}:${r4Y}:${r1F}:${r2F}:${r3F}:${r4F}:${oFlex}:${oFlare}:${oFade}:${oZ}`
+}
+
+export function getSideWireData(side, config = {}) {
+  const key = getGeometryCacheKey(side, config)
+  if (!cachedGeometryMap.has(key)) {
+    // Keep at most 16 entries in cache to bound GPU memory
+    if (cachedGeometryMap.size > 16) {
+      const oldestKey = cachedGeometryMap.keys().next().value
+      const oldData = cachedGeometryMap.get(oldestKey)
+      if (oldData) {
+        Object.values(oldData).forEach((v) => {
+          if (v && typeof v.dispose === 'function') v.dispose()
+        })
+      }
+      cachedGeometryMap.delete(oldestKey)
+    }
+    cachedGeometryMap.set(key, generateSideWireData(side, config))
   }
-  return cachedData[side]
+  return cachedGeometryMap.get(key)
 }
 
 /**

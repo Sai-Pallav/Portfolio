@@ -8,6 +8,8 @@ import Contact3DObject from './Contact3DObject'
 // import LeftPCB from './LeftPCB'
 // import RightPCB from './RightPCB'
 import SideWireNetwork from './neuralWire/SideWireNetwork'
+import { WireframeConfigProvider } from './neuralWire/WireframeConfigContext'
+import WireframeController from './neuralWire/WireframeController'
 
 export default memo(function ContactSection() {
   const [contactSystemState, setContactSystemState] = useState('dormant')
@@ -77,12 +79,13 @@ export default memo(function ContactSection() {
   }, [])
 
   return (
-    <section
-      id="contact"
-      ref={sectionRef}
-      data-inview={isInViewRepeat ? 'true' : 'false'}
-      className="relative isolate min-h-screen overflow-hidden px-6 lg:px-0 pt-16 pb-12 md:pt-24 md:pb-16 group/section"
-    >
+    <WireframeConfigProvider>
+      <section
+        id="contact"
+        ref={sectionRef}
+        data-inview={isInViewRepeat ? 'true' : 'false'}
+        className="relative isolate min-h-screen overflow-hidden px-6 lg:px-0 pt-16 pb-12 md:pt-24 md:pb-16 group/section"
+      >
       {/* ═══════════════════════════════════════════════════════════
            ULTRA-REFINED BACKGROUND ATMOSPHERE SYSTEM
            Quiet luxury aesthetic: 90% dark obsidian foundation,
@@ -228,7 +231,11 @@ export default memo(function ContactSection() {
         <ContactCards />
       </div>
       */}
+
+      {/* Interactive Floating Wireframe Controller Panel */}
+      <WireframeController />
     </section>
+  </WireframeConfigProvider>
   )
 })
 

@@ -7,12 +7,13 @@ const ConstellationShader = {
     attribute float aAlpha;
     attribute vec3 color;
     uniform float uOpacity;
+    uniform float uInnerFade;
     varying float vAlpha;
     varying vec3 vColor;
 
     void main() {
-      float s = smoothstep(0.0, 0.28, aU);
-      float feather = pow(s, 2.2);
+      float fadeDist = max(0.005, uInnerFade);
+      float feather = smoothstep(0.0, fadeDist, aU);
       vAlpha = aAlpha * feather * uOpacity;
       vColor = color;
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -39,6 +40,7 @@ export const NetworkConnections = memo(function NetworkConnections({
   constellationGeo,
   primaryConnectionsGeo,
   themeConfig,
+  innerFade = 0.04,
 }) {
   const glow = themeConfig.glowIntensity || 1.0
   const opacity = themeConfig.wireOpacity || 0.94
@@ -50,6 +52,7 @@ export const NetworkConnections = memo(function NetworkConnections({
       uniforms: {
         uColor: { value: col },
         uOpacity: { value: Math.min(0.22, Math.max(0.14, 0.18 * opacity * glow)) },
+        uInnerFade: { value: innerFade },
       },
       vertexShader: ConstellationShader.vertexShader,
       fragmentShader: ConstellationShader.fragmentShader,
@@ -57,7 +60,7 @@ export const NetworkConnections = memo(function NetworkConnections({
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
-  }, [opacity, glow])
+  }, [opacity, glow, innerFade])
 
   const prevMatRef = useRef(constellationMat)
   useEffect(() => {
