@@ -65,6 +65,63 @@ export function env(u, H) {
 }
 
 /**
+ * Computes live inter-ribbon distance & spacing offsets for ribbon index (0, 1, 2, 3) along coordinate u:
+ * 1. Pairwise distance adjustments:
+ *    - distRibbon01: distance between Ribbon 0 (Upper Arch) and Ribbon 1 (Lower Arch)
+ *    - distRibbon12: distance between Ribbon 1 (Lower Arch) and Ribbon 2 (Violet Accent)
+ *    - distRibbon23: distance between Ribbon 2 (Violet Accent) and Ribbon 3 (Counter-Braid)
+ *    Uses exact linear decomposition ensuring zero global center drift:
+ *      dy0 =  0.75 * d01 + 0.50 * d12 + 0.25 * d23
+ *      dy1 = -0.25 * d01 + 0.50 * d12 + 0.25 * d23
+ *      dy2 = -0.25 * d01 - 0.50 * d12 + 0.25 * d23
+ *      dy3 = -0.25 * d01 - 0.50 * d12 - 0.75 * d23
+ *
+ * 2. Outer vs. Inner Spacing Taper:
+ *    - ribbonSpacingOuter: multiplier for distance at outer wingtip (u=1)
+ *    - ribbonSpacingInner: multiplier for distance at inner globe connection (u=0)
+ */
+export function computeRibbonSpacingOffset(index, u, H, config = {}) {
+  const dist01 = config.distRibbon01 !== undefined ? config.distRibbon01 : 0.0
+  const dist12 = config.distRibbon12 !== undefined ? config.distRibbon12 : 0.0
+  const dist23 = config.distRibbon23 !== undefined ? config.distRibbon23 : 0.0
+  const spOuter = config.ribbonSpacingOuter !== undefined ? config.ribbonSpacingOuter : 1.0
+  const spInner = config.ribbonSpacingInner !== undefined ? config.ribbonSpacingInner : 1.0
+
+  // If all parameters are at baseline defaults, return exactly 0.0 for zero perturbation
+  if (dist01 === 0.0 && dist12 === 0.0 && dist23 === 0.0 && spOuter === 1.0 && spInner === 1.0) {
+    return 0.0
+  }
+
+  // Exact linear decomposition for pairwise distance adjustments
+  const pairwiseOffsets = [
+     0.75 * dist01 + 0.50 * dist12 + 0.25 * dist23,
+    -0.25 * dist01 + 0.50 * dist12 + 0.25 * dist23,
+    -0.25 * dist01 - 0.50 * dist12 + 0.25 * dist23,
+    -0.25 * dist01 - 0.50 * dist12 - 0.75 * dist23,
+  ]
+  const pairwiseDy = pairwiseOffsets[index] ?? 0.0
+
+  const uNorm = Math.max(0.0, Math.min(1.0, u))
+
+  // Smooth taper from inner (spInner) to outer (spOuter)
+  const tTaper = spInner + (spOuter - spInner) * THREE.MathUtils.smootherstep(uNorm, 0.0, 1.0)
+
+  // Smooth connection to globe at u=0 (ensures clean socket connection without tearing)
+  const tGlobe = THREE.MathUtils.smootherstep(uNorm, 0.0, 0.22)
+
+  // Natural vertical fanning signs for global outer/inner spacing multiplier:
+  // Ribbon 0: expands upward (+0.45)
+  // Ribbon 1: expands downward (-0.45)
+  // Ribbon 2: expands downward-mid (-0.20)
+  // Ribbon 3: expands upward-mid (+0.20)
+  const fanSigns = [0.45, -0.45, -0.20, 0.20]
+  const globalFanOuter = (spOuter - 1.0) * THREE.MathUtils.smootherstep(uNorm, 0.35, 1.0) * (fanSigns[index] ?? 0.0) * H
+  const globalFanInner = (spInner - 1.0) * (1.0 - THREE.MathUtils.smootherstep(uNorm, 0.0, 0.50)) * (fanSigns[index] ?? 0.0) * H * THREE.MathUtils.smootherstep(uNorm, 0.0, 0.15)
+
+  return pairwiseDy * tGlobe * tTaper + globalFanOuter + globalFanInner
+}
+
+/**
  * Core mathematical wave evaluator supporting live parametric adjustments:
  * - amplitude: scales vertical wave oscillation peaks
  * - frequency: scales wave cycle density
@@ -117,27 +174,30 @@ export function computeHeroWaveY(index, u, H, config = {}) {
   const flareSigns = [0.85, -0.85, -0.45, 0.45]
   const flareOffset = Math.pow(outerT, 1.7) * 0.28 * H * outerFlare * (flareSigns[index] ?? 0.0)
 
+  // Live inter-ribbon distance & spacing offset (pairwise dist01/dist12/dist23 and outer/inner taper):
+  const spacingOffset = computeRibbonSpacingOffset(index, u, H, config)
+
   switch (index) {
     case 0: {
       // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
       // Pure harmonic formulation with natural outer lift, matching Ribbon 2's organic continuity with zero angular kinks
       const wave = 0.48 * Math.sin(u * Math.PI * 1.62 * freq * r1Freq + 0.08) - 0.14 * Math.cos(u * Math.PI * 2.8 * freq * r1Freq) + 0.32 * Math.pow(u, 1.8)
-      return baseSweep + endsY + r1Y + flareOffset + outerWhip + e * amp * r1Amp * wave
+      return baseSweep + endsY + r1Y + flareOffset + outerWhip + spacingOffset + e * amp * r1Amp * wave
     }
     case 1:
       // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
-      return baseSweep + endsY + r2Y + flareOffset + outerWhip + e * amp * r2Amp * (-0.50 * Math.sin(u * Math.PI * 1.68 * freq * r2Freq + 0.08) + 0.14 * Math.cos(u * Math.PI * 2.9 * freq * r2Freq))
+      return baseSweep + endsY + r2Y + flareOffset + outerWhip + spacingOffset + e * amp * r2Amp * (-0.50 * Math.sin(u * Math.PI * 1.68 * freq * r2Freq + 0.08) + 0.14 * Math.cos(u * Math.PI * 2.9 * freq * r2Freq))
     case 2: {
       // Ribbon 3 (Violet/Magenta Accent Wave #b83dff, Threads Center -> Lower Outer Sweep)
       // Inner boost enhances amplitude sensitivity at inner end (u < 0.65) while preserving outer change setting as it is:
       const r3InnerT = Math.max(0.0, Math.min(1.0, u / 0.65))
       const r3InnerTaper = 1.0 - r3InnerT * r3InnerT * (3.0 - 2.0 * r3InnerT)
       const r3InnerBoost = 0.52 * r3InnerTaper * Math.sin(u * Math.PI * 1.65 * freq * r3Freq)
-      return baseSweep + endsY + r3Y + flareOffset + outerWhip + e * amp * r3Amp * (0.18 * Math.sin(u * Math.PI * 2.2 * freq * r3Freq - 0.5) - 0.42 * Math.pow(u, 1.4) * Math.sin(u * Math.PI * 1.35 * freq * r3Freq) + r3InnerBoost)
+      return baseSweep + endsY + r3Y + flareOffset + outerWhip + spacingOffset + e * amp * r3Amp * (0.18 * Math.sin(u * Math.PI * 2.2 * freq * r3Freq - 0.5) - 0.42 * Math.pow(u, 1.4) * Math.sin(u * Math.PI * 1.35 * freq * r3Freq) + r3InnerBoost)
     }
     case 3:
       // Ribbon 4 (Secondary Inner-to-Outer Counter-Braid, Electric Blue-Cyan)
-      return baseSweep + endsY + r4Y + flareOffset + outerWhip + e * amp * r4Amp * (-0.24 * Math.sin(u * Math.PI * 2.6 * freq * r4Freq + 0.9) + 0.30 * Math.pow(u, 1.6))
+      return baseSweep + endsY + r4Y + flareOffset + outerWhip + spacingOffset + e * amp * r4Amp * (-0.24 * Math.sin(u * Math.PI * 2.6 * freq * r4Freq + 0.9) + 0.30 * Math.pow(u, 1.6))
     default:
       return 0
   }
@@ -886,7 +946,13 @@ export function getGeometryCacheKey(side, config = {}) {
   const oFade = (config.outerFade !== undefined ? config.outerFade : 0.15).toFixed(2)
   const oZ = (config.outerZOffset !== undefined ? config.outerZOffset : 0.0).toFixed(2)
 
-  return `v5:${side}:${amp}:${freq}:${sweep}:${innerY}:${outerY}:${zAmp}:${strandSpread}:${innerFade}:${strCount}:${strWidth}:${r1Amp}:${r2Amp}:${r3Amp}:${r4Amp}:${r1Y}:${r2Y}:${r3Y}:${r4Y}:${r1F}:${r2F}:${r3F}:${r4F}:${oFlex}:${oFlare}:${oFade}:${oZ}`
+  const d01 = (config.distRibbon01 !== undefined ? config.distRibbon01 : 0.0).toFixed(2)
+  const d12 = (config.distRibbon12 !== undefined ? config.distRibbon12 : 0.0).toFixed(2)
+  const d23 = (config.distRibbon23 !== undefined ? config.distRibbon23 : 0.0).toFixed(2)
+  const spOuter = (config.ribbonSpacingOuter !== undefined ? config.ribbonSpacingOuter : 1.0).toFixed(2)
+  const spInner = (config.ribbonSpacingInner !== undefined ? config.ribbonSpacingInner : 1.0).toFixed(2)
+
+  return `v11:${side}:${amp}:${freq}:${sweep}:${innerY}:${outerY}:${zAmp}:${strandSpread}:${innerFade}:${strCount}:${strWidth}:${r1Amp}:${r2Amp}:${r3Amp}:${r4Amp}:${r1Y}:${r2Y}:${r3Y}:${r4Y}:${r1F}:${r2F}:${r3F}:${r4F}:${oFlex}:${oFlare}:${oFade}:${oZ}:${d01}:${d12}:${d23}:${spOuter}:${spInner}`
 }
 
 export function getSideWireData(side, config = {}) {

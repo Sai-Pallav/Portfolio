@@ -4,14 +4,14 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 export const DEFAULT_SIDE_CONFIG = {
   // ── Dimensions ──
   lengthMultiplier: 1.0,     // Total wireframe length multiplier
-  breadthMultiplier: 1.6,    // Vertical ribbon breadth / height multiplier
+  breadthMultiplier: 1.75,   // Vertical ribbon breadth / height multiplier
   depthMultiplier: 0.3,      // Depth thickness multiplier
-  strandSpread: 0.9,         // Companion silk strands width/spread multiplier
+  strandSpread: 0.75,        // Companion silk strands width/spread multiplier
   stringCount: 11,           // Number of strings/strands per hero wave
   stringWidth: 1.1,          // Width and thickness of individual strings
 
   // ── Independent End Lengths & Outer Flexibility ──
-  innerExtension: 0.95,      // Lengthens inner end inward towards globe (positive = closer / into globe)
+  innerExtension: 1.3,       // Lengthens inner end inward towards globe (positive = closer / into globe)
   outerExtension: -2.0,      // Lengthens outer end outward past screen edge
   outerFlexibility: 0.0,     // Wave flexibility & harmonic whip at outer ends (0.0 = rigid, 1.0 = natural silk)
   outerFlare: 0.0,           // Vertical fan-out & separation of ribbon streams at outer tips
@@ -24,25 +24,32 @@ export const DEFAULT_SIDE_CONFIG = {
   wingSweep: 0.28,           // Wing sweep curvature (outer parabolic lift)
 
   // ── 4 Hero Waves (Individual Ribbon Controls - Mirrored Symmetrically) ──
-  ribbon1Amp: 0.9,           // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
-  ribbon2Amp: 0.7,           // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
-  ribbon3Amp: 0.65,          // Ribbon 3 (Violet/Magenta Accent Wave #b83dff)
-  ribbon4Amp: 0.9,           // Ribbon 4 (Counter-Braid, Electric Blue-Cyan)
+  ribbon1Amp: 0.65,          // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
+  ribbon2Amp: 0.5,           // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
+  ribbon3Amp: 0.9,           // Ribbon 3 (Violet/Magenta Accent Wave #b83dff)
+  ribbon4Amp: 1.05,          // Ribbon 4 (Counter-Braid, Electric Blue-Cyan)
 
-  ribbon1YOffset: 0.0,       // Vertical shift for Ribbon 1
-  ribbon2YOffset: 0.0,       // Vertical shift for Ribbon 2
-  ribbon3YOffset: 0.0,       // Vertical shift for Ribbon 3
-  ribbon4YOffset: 0.02,      // Vertical shift for Ribbon 4
+  ribbon1YOffset: 0.06,      // Vertical shift for Ribbon 1
+  ribbon2YOffset: -0.04,     // Vertical shift for Ribbon 2
+  ribbon3YOffset: -0.1,      // Vertical shift for Ribbon 3
+  ribbon4YOffset: 0.04,      // Vertical shift for Ribbon 4
 
-  ribbon1Freq: 1.05,         // Frequency/cycle density for Ribbon 1
-  ribbon2Freq: 1.0,          // Frequency/cycle density for Ribbon 2
+  ribbon1Freq: 1.0,          // Frequency/cycle density for Ribbon 1
+  ribbon2Freq: 1.05,         // Frequency/cycle density for Ribbon 2
   ribbon3Freq: 1.1,          // Frequency/cycle density for Ribbon 3
   ribbon4Freq: 0.9,          // Frequency/cycle density for Ribbon 4
 
+  // ── Inter-Ribbon Spacing & Distances (Pairwise & Outer/Inner Taper) ──
+  distRibbon01: -0.04,       // Distance offset between Ribbon 0 (Upper Arch) and Ribbon 1 (Lower Arch)
+  distRibbon12: 0.02,        // Distance offset between Ribbon 1 (Lower Arch) and Ribbon 2 (Violet Accent)
+  distRibbon23: 0.0,         // Distance offset between Ribbon 2 (Violet Accent) and Ribbon 3 (Counter-Braid)
+  ribbonSpacingOuter: 0.4,   // Distance multiplier between all ribbons at outer wingtips (fanning out)
+  ribbonSpacingInner: 0.85,  // Distance multiplier between all ribbons at inner globe connection (converging)
+
   // ── Two Ends Placement ──
-  innerGap: 0.0,             // Fine inner gap offset from globe center
+  innerGap: 0.7,             // Fine inner gap offset from globe center
   innerYOffset: 0.0,         // Inner end height offset
-  innerFade: 0.23,           // Inner tip feather distance (smoothstep cutoff)
+  innerFade: 0.41,           // Inner tip feather distance (smoothstep cutoff)
   outerXOffset: 0.0,         // Fine outer X offset
   outerYOffset: -0.3,        // Outer end lift/drop
   outerZOffset: -0.7,        // Outer end depth offset
@@ -135,7 +142,7 @@ export const PRESETS = {
   },
 }
 
-const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v14'
+const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v18'
 
 const WireframeConfigContext = createContext(null)
 

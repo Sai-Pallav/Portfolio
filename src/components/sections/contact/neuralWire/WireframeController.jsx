@@ -805,6 +805,24 @@ export default memo(function WireframeController() {
               defaultValue={DEFAULT_SIDE_CONFIG.outerFlare}
               onChange={handleSliderChange} onReset={handleSliderReset}
             />
+            <ControlSlider
+              label="Ribbon Spacing: Outer Wingtips"
+              description="Distance multiplier between all ribbons at outer wingtips (fanning out)"
+              paramKey="ribbonSpacingOuter"
+              min={0.0} max={3.0} step={0.05} unit="x"
+              value={currentConfig.ribbonSpacingOuter ?? 1.0}
+              defaultValue={DEFAULT_SIDE_CONFIG.ribbonSpacingOuter}
+              onChange={handleSliderChange} onReset={handleSliderReset}
+            />
+            <ControlSlider
+              label="Ribbon Spacing: Inner Globe End"
+              description="Distance multiplier between all ribbons at inner globe connection (converging)"
+              paramKey="ribbonSpacingInner"
+              min={0.0} max={2.0} step={0.05} unit="x"
+              value={currentConfig.ribbonSpacingInner ?? 1.0}
+              defaultValue={DEFAULT_SIDE_CONFIG.ribbonSpacingInner}
+              onChange={handleSliderChange} onReset={handleSliderReset}
+            />
 
             <SectionLabel right="Inner End">Inner End & Globe Connection</SectionLabel>
             <ControlSlider
@@ -1151,6 +1169,63 @@ export default memo(function WireframeController() {
               min={0.2} max={3.0} step={0.05} unit="x"
               value={currentConfig.ribbon4Freq ?? 1.0}
               defaultValue={DEFAULT_SIDE_CONFIG.ribbon4Freq}
+              onChange={handleSliderChange} onReset={handleSliderReset}
+            />
+
+            {/* ── Inter-Ribbon Distance / Spacing Controls ── */}
+            <SectionLabel right="Inter-Ribbon Gaps">🔗 Inter-Ribbon Distances</SectionLabel>
+            <div className="px-2.5 py-2 rounded-lg bg-cyan-950/40 border border-cyan-800/40 text-[11px] text-cyan-200">
+              <span className="font-semibold block text-cyan-300">Pairwise Distances & Spacing:</span>
+              <span className="text-[10px] text-neutral-400">
+                Increase or decrease the distance between adjacent ribbons.
+              </span>
+            </div>
+
+            <ControlSlider
+              label="Distance: Ribbon 0 ↔ Ribbon 1"
+              description="Vertical distance / gap between Ribbon 0 (Upper Arch) and Ribbon 1 (Lower Arch)"
+              paramKey="distRibbon01"
+              min={-0.8} max={1.5} step={0.02} unit="u"
+              value={currentConfig.distRibbon01 ?? 0.0}
+              defaultValue={DEFAULT_SIDE_CONFIG.distRibbon01}
+              onChange={handleSliderChange} onReset={handleSliderReset}
+            />
+            <ControlSlider
+              label="Distance: Ribbon 1 ↔ Ribbon 2"
+              description="Vertical distance / gap between Ribbon 1 (Lower Arch) and Ribbon 2 (Violet Accent)"
+              paramKey="distRibbon12"
+              min={-0.8} max={1.5} step={0.02} unit="u"
+              value={currentConfig.distRibbon12 ?? 0.0}
+              defaultValue={DEFAULT_SIDE_CONFIG.distRibbon12}
+              onChange={handleSliderChange} onReset={handleSliderReset}
+            />
+            <ControlSlider
+              label="Distance: Ribbon 2 ↔ Ribbon 3"
+              description="Vertical distance / gap between Ribbon 2 (Violet Accent) and Ribbon 3 (Counter-Braid)"
+              paramKey="distRibbon23"
+              min={-0.8} max={1.5} step={0.02} unit="u"
+              value={currentConfig.distRibbon23 ?? 0.0}
+              defaultValue={DEFAULT_SIDE_CONFIG.distRibbon23}
+              onChange={handleSliderChange} onReset={handleSliderReset}
+            />
+
+            <SectionLabel right="Outer / Inner Taper">Global Ribbon Spacing (Outer vs Inner)</SectionLabel>
+            <ControlSlider
+              label="Ribbon Spacing: Outer Wingtips"
+              description="Distance multiplier between all ribbons at outer wingtips (fanning out)"
+              paramKey="ribbonSpacingOuter"
+              min={0.0} max={3.0} step={0.05} unit="x"
+              value={currentConfig.ribbonSpacingOuter ?? 1.0}
+              defaultValue={DEFAULT_SIDE_CONFIG.ribbonSpacingOuter}
+              onChange={handleSliderChange} onReset={handleSliderReset}
+            />
+            <ControlSlider
+              label="Ribbon Spacing: Inner Globe End"
+              description="Distance multiplier between all ribbons at inner globe connection (converging)"
+              paramKey="ribbonSpacingInner"
+              min={0.0} max={2.0} step={0.05} unit="x"
+              value={currentConfig.ribbonSpacingInner ?? 1.0}
+              defaultValue={DEFAULT_SIDE_CONFIG.ribbonSpacingInner}
               onChange={handleSliderChange} onReset={handleSliderReset}
             />
           </div>
