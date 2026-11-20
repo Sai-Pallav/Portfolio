@@ -18,12 +18,12 @@ function About() {
       id="about"
       ref={containerRef}
       aria-label="About Sai Pallav"
-      className="relative min-h-screen w-full flex flex-col justify-center py-20 sm:py-24 md:py-28 overflow-hidden bg-bg border-t border-white/[0.04]"
+      className="relative min-h-screen lg:h-screen lg:max-h-screen w-full flex flex-col justify-center py-12 lg:py-6 xl:py-8 overflow-hidden bg-bg border-t border-white/[0.04]"
     >
-      {/* Top Center Glowing Pill Indicator (Matching Reference Image) */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-        <div className="w-12 h-4 rounded-full bg-white/[0.04] border border-white/10 backdrop-blur-md flex items-center justify-center shadow-lg shadow-black/40">
-          <div className="w-3 h-1 rounded-full bg-accent/80 animate-pulse" />
+      {/* Top Center Glowing Pill Indicator */}
+      <div className="absolute top-2.5 sm:top-3.5 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+        <div className="w-10 h-3.5 sm:w-12 sm:h-4 rounded-full bg-white/[0.04] border border-white/10 backdrop-blur-md flex items-center justify-center shadow-lg shadow-black/40">
+          <div className="w-2.5 h-1 sm:w-3 sm:h-1 rounded-full bg-accent/80 animate-pulse" />
         </div>
       </div>
 
@@ -48,13 +48,13 @@ function About() {
       />
 
       <motion.div
-        className="relative z-10 max-w-7xl w-full mx-auto px-6 sm:px-10 md:px-12 lg:px-16"
+        className="relative z-10 max-w-7xl w-full mx-auto px-6 sm:px-10 md:px-12 lg:px-16 my-auto"
         variants={staggerContainer}
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, amount: 0.1 }}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-14 items-center">
 
           {/* Left Column: Text, Identity, Stats & Focus Areas */}
           <div className="lg:col-span-7 flex flex-col justify-center">
@@ -63,7 +63,7 @@ function About() {
           </div>
 
           {/* Right Column: Seamless Background-Blended Portrait Photo */}
-          <div className="lg:col-span-5 flex flex-col items-center lg:items-end">
+          <div className="lg:col-span-5 flex flex-col items-center lg:items-end justify-center">
             <PhotoCard />
           </div>
 
