@@ -1,6 +1,6 @@
-import { memo, useMemo, useEffect, useRef } from 'react'
+import { memo, useMemo, useEffect } from 'react'
 import * as THREE from 'three'
-import { useFrame, useThree, createPortal } from '@react-three/fiber'
+import { useThree, createPortal } from '@react-three/fiber'
 import { H_VAL } from './generateWireGeometry'
 import { generateRefinedNeuralField } from './neuralPocketBounds'
 import { useWireframeConfig } from './WireframeConfigContext'
@@ -93,8 +93,15 @@ function mergeTransformedGeometries(geoA, matA, geoB, matB) {
     const attrB = geoB.attributes[attrName]
     if (!attrB) continue
 
+    // Both fields store immutable rest positions once. Preserve both names for
+    // shader-based deformation without a second transform or GPU upload.
+    if (attrName === 'aBasePos' && attrA === geoA.attributes.position && attrB === geoB.attributes.position) {
+      merged.setAttribute('aBasePos', merged.getAttribute('position'))
+      continue
+    }
+    if (attrName === 'aU') continue
     const itemSize = attrA.itemSize
-    const arr = new Float32Array(total * itemSize)
+    const arr = new attrA.array.constructor(total * itemSize)
 
     if (attrName === 'position' || attrName === 'aBasePos') {
       const srcA = attrA.array
@@ -120,8 +127,20 @@ function mergeTransformedGeometries(geoA, matA, geoB, matB) {
     merged.setAttribute(attrName, new THREE.BufferAttribute(arr, itemSize))
   }
 
+  // aU is exactly aRelativeCoord.x. Keep the full Vector4 contract and share
+  // its immutable storage through attribute views (no quantization).
+  const relative = new THREE.InterleavedBuffer(merged.getAttribute('aRelativeCoord').array, 4)
+  merged.setAttribute('aRelativeCoord', new THREE.InterleavedBufferAttribute(relative, 4, 0))
+  merged.setAttribute('aU', new THREE.InterleavedBufferAttribute(relative, 1, 0))
+  merged.computeBoundingBox()
   merged.computeBoundingSphere()
   return merged
+}
+
+function disposeNeuralField(field) {
+  field.linesGeo?.dispose()
+  field.pointsGeo?.dispose()
+  field.hazeGeo?.dispose()
 }
 
 const NeuralLineShader = {
@@ -179,7 +198,6 @@ const NeuralPointShader = {
     uniform float uGlowIntensity;
     uniform float uNodeScale;
     uniform float uInnerFade;
-    uniform float uTime;
 
     varying float vAlpha;
     varying vec3 vColor;
@@ -193,15 +211,10 @@ const NeuralPointShader = {
       float outerFeather = 1.0 - smoothstep(0.995, 1.02, aU);
 
       // 3-layer Z-depth contrast cue
-      float depthCue = aLayer > 0.5 ? 1.25 : (aLayer < -0.5 ? 0.38 : 0.88);
+      float depthCue = aLayer > 0.5 ? 1.15 : (aLayer < -0.5 ? 0.48 : 0.88);
 
-      // Fine twinkling starlight sparkle modulation across micro-nodes
-      float twinkle = 0.74 + 0.26 * sin(uTime * 4.2 + pos.x * 22.0 + pos.y * 34.0 + pos.z * 26.0);
-      if (aIsHighlight > 0.5) {
-        twinkle = 0.94 + 0.06 * sin(uTime * 2.6 + pos.x * 12.0);
-      }
-
-      vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity * depthCue * twinkle;
+      // Stable starlight: no frame-time uniform uploads or blinking isolated dots.
+      vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity * depthCue;
       vIsHighlight = aIsHighlight;
 
       // Hoisted static color, tier, and rim-tint calculations out of fragment shader (Requirement 3)
@@ -216,13 +229,12 @@ const NeuralPointShader = {
 
       if (aIsHighlight > 0.5) {
         vec3 halo = mix(cobaltCyan, electricCyan, 0.65);
-        halo = mix(halo, indigoViolet, rimTint * 0.35);
         vHaloCol = halo;
         vColor = iceWhite;
       } else {
         vec3 nodeCol = color;
         float coreMix = aLayer > 0.5 ? 0.45 : (aLayer < -0.5 ? 0.0 : 0.25);
-        nodeCol = mix(nodeCol, indigoViolet, rimTint * 0.45);
+        nodeCol = mix(nodeCol, indigoViolet, rimTint * 0.18);
         vColor = nodeCol;
         vHaloCol = vec3(coreMix);
       }
@@ -234,8 +246,8 @@ const NeuralPointShader = {
       float feather = innerFeather * outerFeather;
       float scaleFeather = 0.25 + 0.75 * innerFeather;
       float baseSize = size * uNodeScale * depthCue * (30.0 / -mvPosition.z) * min(1.15, uGlowIntensity) * max(0.20, feather);
-      float maxPointSize = aIsHighlight > 0.5 ? 20.0 : (aLayer > 0.5 ? 9.5 : (aLayer < -0.5 ? 3.0 : 6.8));
-      float minPointSize = aIsHighlight > 0.5 ? 13.0 : (aLayer > 0.5 ? 5.5 : (aLayer < -0.5 ? 1.4 : 3.8));
+      float maxPointSize = aIsHighlight > 0.5 ? 12.0 : (aLayer > 0.5 ? 6.0 : (aLayer < -0.5 ? 2.5 : 4.8));
+      float minPointSize = aIsHighlight > 0.5 ? 5.0 : (aLayer > 0.5 ? 2.6 : (aLayer < -0.5 ? 1.0 : 2.0));
       gl_PointSize = clamp(baseSize * scaleFeather, minPointSize * scaleFeather, maxPointSize);
       gl_Position = projectionMatrix * mvPosition;
     }
@@ -257,22 +269,22 @@ const NeuralPointShader = {
       float circleCutoff = clamp(1.0 - 4.0 * r2, 0.0, 1.0);
 
       if (vIsHighlight > 0.5) {
-        // Purely circular ice-white pinpoint hub: sharp core + tight exponential cyan halo
-        float sharpCore = exp(-260.0 * r2);
-        float whiteCore = exp(-400.0 * r2) * clamp(1.0 - 25.0 * r2, 0.0, 1.0);
-        float expHalo = (exp(-60.0 * r2) * 0.55 + exp(-10.0 * r2) * 0.27) * circleCutoff;
+        // Purely circular ice-white pinpoint hub: needle-sharp core + tight exponential cyan halo
+        float sharpCore = exp(-150.0 * r2);
+        float whiteCore = exp(-240.0 * r2) * clamp(1.0 - 25.0 * r2, 0.0, 1.0);
+        float expHalo = (exp(-110.0 * r2) * 0.40 + exp(-42.0 * r2) * 0.12) * circleCutoff;
 
-        vec3 col = mix(vHaloCol, vec3(1.0), clamp(whiteCore * 1.7 + sharpCore * 0.95, 0.0, 1.0));
+        vec3 col = mix(vHaloCol, vec3(1.0), clamp(whiteCore * 1.8 + sharpCore * 0.95, 0.0, 1.0));
         float hubAlpha = clamp(whiteCore * 0.96 + sharpCore * 0.60 + expHalo, 0.0, 0.98);
 
         gl_FragColor = vec4(col, min(vAlpha * hubAlpha, 0.98));
       } else {
-        // Multi-scale starlight nodes: brilliant core + whispering halo
-        float core = exp(-144.0 * r2);
-        float expHalo = (exp(-48.0 * r2) * 0.40 + exp(-12.0 * r2) * 0.25) * circleCutoff;
+        // Multi-scale starlight nodes: brilliant core + restrained whispering halo
+        float core = exp(-190.0 * r2);
+        float expHalo = (exp(-68.0 * r2) * 0.32 + exp(-26.0 * r2) * 0.12) * circleCutoff;
 
         vec3 nodeCol = mix(vColor, vec3(1.0), core * vHaloCol.r);
-        float radialAlpha = core * 0.72 + expHalo * 0.58;
+        float radialAlpha = core * 0.76 + expHalo * 0.48;
 
         gl_FragColor = vec4(nodeCol, min(vAlpha * radialAlpha, 0.96));
       }
@@ -307,11 +319,11 @@ const NeuralHazeShader = {
       vColor = color;
 
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-      // Tightened gl_PointSize around visible falloff radius to crush overdraw without shrinking physical presence (Requirement 3)
+      // Small rear-core sprites keep additive haze localized and limit overdraw.
       float pointSize = clamp(
         size * uNodeScale * (65.0 / -mvPosition.z) * min(1.15, uGlowIntensity),
         14.0,
-        44.0
+        36.0
       );
       gl_PointSize = pointSize;
       gl_Position = projectionMatrix * mvPosition;
@@ -328,10 +340,10 @@ const NeuralHazeShader = {
       if (r2 > 0.25) discard;
       if (vAlpha < 0.001) discard;
 
-      // Fast r2-based Gaussian falloff calibrated proportionally to 44.0 quad ceiling (8.0 * (44/58)^2 = 4.60)
+      // Radial sapphire falloff with a soft circular cutoff; no bright bokeh rim.
       float falloff = exp(-4.60 * r2) * clamp(1.0 - 4.0 * r2, 0.0, 1.0);
 
-      gl_FragColor = vec4(vColor, clamp(vAlpha * falloff, 0.0, 0.032));
+      gl_FragColor = vec4(vColor, clamp(vAlpha * falloff, 0.0, 0.024));
     }
   `,
 }
@@ -373,9 +385,13 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
   const glow = themeConfig.glowIntensity || 1.0
   const primaryWire = themeConfig.primaryWire || ''
 
-  if (typeof window !== 'undefined') {
+  useEffect(() => {
+    if (typeof window === 'undefined') return
     window.__neuralRenderer = gl
-  }
+    return () => {
+      if (window.__neuralRenderer === gl) delete window.__neuralRenderer
+    }
+  }, [gl])
 
   const wireframeCtx = useWireframeConfig()
   const leftConfig = wireframeCtx.leftConfig
@@ -390,65 +406,33 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
   const leftFieldData = useMemo(() => {
     const t0 = performance.now()
     const leftFullConfig = { ...leftConfig, ...themeConfig, innerFade, nodeScale }
-    const field = generateRefinedNeuralField('left', H_VAL, leftFullConfig)
+    const layout = calculateRibbonLayout(vpWidth, leftConfig)
+    const aspect = layout.scaleY / (layout.scaleX * Math.max(0.25, Math.abs(Math.cos((leftConfig.yawY ?? 0) * Math.PI / 180))))
+    const field = generateRefinedNeuralField('left', H_VAL, leftFullConfig, aspect)
     return {
       field,
       dt: performance.now() - t0,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leftKey, innerFade, nodeScale, primaryWire])
+  }, [leftKey, innerFade, nodeScale, primaryWire, vpWidth])
 
   // 2. Generate refined neural field for right wing independently so tweaking left never rebuilds right
   const rightFieldData = useMemo(() => {
     const t0 = performance.now()
     const rightFullConfig = { ...rightConfig, ...themeConfig, innerFade, nodeScale }
-    const field = generateRefinedNeuralField('right', H_VAL, rightFullConfig)
+    const layout = calculateRibbonLayout(vpWidth, rightConfig)
+    const aspect = layout.scaleY / (layout.scaleX * Math.max(0.25, Math.abs(Math.cos((rightConfig.yawY ?? 0) * Math.PI / 180))))
+    const field = generateRefinedNeuralField('right', H_VAL, rightFullConfig, aspect)
     return {
       field,
       dt: performance.now() - t0,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rightKey, innerFade, nodeScale, primaryWire])
+  }, [rightKey, innerFade, nodeScale, primaryWire, vpWidth])
 
-  // Clean disposal of previous unmerged single-wing fields when they change or unmount
-  const prevLeftRef = useRef(leftFieldData.field)
-  useEffect(() => {
-    if (prevLeftRef.current && prevLeftRef.current !== leftFieldData.field) {
-      const f = prevLeftRef.current
-      if (f.linesGeo) f.linesGeo.dispose()
-      if (f.pointsGeo) f.pointsGeo.dispose()
-      if (f.hazeGeo) f.hazeGeo.dispose()
-    }
-    prevLeftRef.current = leftFieldData.field
-  }, [leftFieldData])
-
-  const prevRightRef = useRef(rightFieldData.field)
-  useEffect(() => {
-    if (prevRightRef.current && prevRightRef.current !== rightFieldData.field) {
-      const f = prevRightRef.current
-      if (f.linesGeo) f.linesGeo.dispose()
-      if (f.pointsGeo) f.pointsGeo.dispose()
-      if (f.hazeGeo) f.hazeGeo.dispose()
-    }
-    prevRightRef.current = rightFieldData.field
-  }, [rightFieldData])
-
-  useEffect(() => {
-    return () => {
-      if (prevLeftRef.current) {
-        const f = prevLeftRef.current
-        if (f.linesGeo) f.linesGeo.dispose()
-        if (f.pointsGeo) f.pointsGeo.dispose()
-        if (f.hazeGeo) f.hazeGeo.dispose()
-      }
-      if (prevRightRef.current) {
-        const f = prevRightRef.current
-        if (f.linesGeo) f.linesGeo.dispose()
-        if (f.pointsGeo) f.pointsGeo.dispose()
-        if (f.hazeGeo) f.hazeGeo.dispose()
-      }
-    }
-  }, [])
+  // Each geometry owner releases exactly its own resources on replacement/unmount.
+  useEffect(() => () => disposeNeuralField(leftFieldData.field), [leftFieldData])
+  useEffect(() => () => disposeNeuralField(rightFieldData.field), [rightFieldData])
 
   // 3. Fast rigid transform & merge into at most 3 total BufferGeometries
   const mergedGeometries = useMemo(() => {
@@ -482,28 +466,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leftFieldData, rightFieldData, vpWidth, leftKey, rightKey])
 
-  // Dispose previous merged geometries when mergedGeometries changes or unmounts
-  const prevMergedRef = useRef(mergedGeometries)
-  useEffect(() => {
-    if (prevMergedRef.current && prevMergedRef.current !== mergedGeometries) {
-      const m = prevMergedRef.current
-      if (m.linesGeo) m.linesGeo.dispose()
-      if (m.pointsGeo) m.pointsGeo.dispose()
-      if (m.hazeGeo) m.hazeGeo.dispose()
-    }
-    prevMergedRef.current = mergedGeometries
-  }, [mergedGeometries])
-
-  useEffect(() => {
-    return () => {
-      if (prevMergedRef.current) {
-        const m = prevMergedRef.current
-        if (m.linesGeo) m.linesGeo.dispose()
-        if (m.pointsGeo) m.pointsGeo.dispose()
-        if (m.hazeGeo) m.hazeGeo.dispose()
-      }
-    }
-  }, [])
+  useEffect(() => () => disposeNeuralField(mergedGeometries), [mergedGeometries])
 
   // Strict useMemo for materials with stable primitive dependencies (Requirement 1)
   const lineMat = useMemo(() => {
@@ -520,15 +483,12 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     })
   }, [glow, innerFade])
 
-  const pointMatRef = useRef(null)
-
   const pointMat = useMemo(() => {
     const mat = new THREE.ShaderMaterial({
       uniforms: {
         uGlowIntensity: { value: glow },
         uNodeScale: { value: nodeScale },
         uInnerFade: { value: innerFade },
-        uTime: { value: 0.0 },
       },
       vertexShader: NeuralPointShader.vertexShader,
       fragmentShader: NeuralPointShader.fragmentShader,
@@ -536,16 +496,8 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
-    pointMatRef.current = mat
     return mat
   }, [glow, nodeScale, innerFade])
-
-  // Lightweight per-frame animation: strictly updates uniform value, zero allocations (Requirement 1)
-  useFrame((state) => {
-    if (pointMatRef.current) {
-      pointMatRef.current.uniforms.uTime.value = state.clock.elapsedTime
-    }
-  })
 
   const hazeMat = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -562,28 +514,14 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     })
   }, [glow, nodeScale, innerFade])
 
-  // Disposal on unmount or re-creation (Requirement 1)
-  useEffect(() => {
-    return () => {
-      lineMat.dispose()
-      pointMat.dispose()
-      hazeMat.dispose()
-    }
-  }, [lineMat, pointMat, hazeMat])
-
-  useEffect(() => {
-    return () => {
-      if (mergedGeometries) {
-        if (mergedGeometries.linesGeo) mergedGeometries.linesGeo.dispose()
-        if (mergedGeometries.pointsGeo) mergedGeometries.pointsGeo.dispose()
-        if (mergedGeometries.hazeGeo) mergedGeometries.hazeGeo.dispose()
-      }
-    }
-  }, [mergedGeometries])
+  // Separate lifetimes: a point-only material change must not dispose a live line material.
+  useEffect(() => () => lineMat.dispose(), [lineMat])
+  useEffect(() => () => pointMat.dispose(), [pointMat])
+  useEffect(() => () => hazeMat.dispose(), [hazeMat])
 
   // Render merged meshes directly at scene level with matrixAutoUpdate = false (Requirements 1 & 2)
   return createPortal(
-    <group matrixAutoUpdate={false}>
+    <group matrixAutoUpdate={false} dispose={null}>
       {/* 1. Restrained Volumetric Nebula Glow (Merged Points) */}
       {mergedGeometries.hazeGeo && (
         <points
