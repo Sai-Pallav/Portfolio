@@ -1,6 +1,7 @@
-import { memo, useMemo, useEffect, useRef } from 'react'
+import { memo, useMemo, useEffect, useRef, useContext } from 'react'
 import * as THREE from 'three'
 import { getGlowTexture } from './generateWireGeometry'
+import { FlowTimeContext, TRAVEL_DEFORMATION_GLSL } from './animationContract'
 
 const BeadedShader = {
   vertexShader: `
@@ -11,11 +12,17 @@ const BeadedShader = {
     uniform float uNodeScale;
     varying float vAlpha;
     varying vec3 vColor;
+    ${TRAVEL_DEFORMATION_GLSL}
 
     void main() {
       vAlpha = alpha * uGlowIntensity;
+      if (uTime > 0.0) {
+        float phase = 6.28318530718 * aRelativeCoord.x;
+        vAlpha *= 1.0 + 0.020 *
+          (sin(phase - 0.44 * uTime) - sin(phase));
+      }
       vColor = color;
-      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      vec4 mvPosition = flowViewPosition(position);
       gl_PointSize = clamp(size * uNodeScale * (28.0 / -mvPosition.z) * min(1.25, uGlowIntensity), 1.6, 4.0);
       gl_Position = projectionMatrix * mvPosition;
     }
@@ -44,6 +51,7 @@ export const BeadedStreams = memo(function BeadedStreams({
   themeConfig,
   nodeScale = 1.0,
 }) {
+  const timeUniform = useContext(FlowTimeContext)
   const glow = themeConfig.glowIntensity || 1.0
   const glowTexture = useMemo(() => getGlowTexture(64), [])
 
@@ -55,6 +63,7 @@ export const BeadedStreams = memo(function BeadedStreams({
         uTexture: { value: glowTexture },
         uGlowIntensity: { value: glow },
         uNodeScale: { value: nodeScale },
+        uTime: timeUniform,
       },
       vertexShader: BeadedShader.vertexShader,
       fragmentShader: BeadedShader.fragmentShader,
@@ -62,7 +71,7 @@ export const BeadedStreams = memo(function BeadedStreams({
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
-  }, [glowTexture, glow, nodeScale])
+  }, [glowTexture, glow, nodeScale, timeUniform])
 
   const prevMatRef = useRef(beadedMat)
   useEffect(() => {
@@ -88,6 +97,7 @@ export const BeadedStreams = memo(function BeadedStreams({
       geometry={beadedStreamsGeo}
       material={beadedMat}
       matrixAutoUpdate={false}
+      frustumCulled={false}
       onUpdate={(self) => self.updateMatrix()}
     />
   )

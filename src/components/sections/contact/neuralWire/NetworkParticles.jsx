@@ -1,6 +1,7 @@
-import { memo, useMemo, useEffect, useRef } from 'react'
+import { memo, useMemo, useEffect, useRef, useContext } from 'react'
 import * as THREE from 'three'
 import { getGlowTexture, getBokehTexture } from './generateWireGeometry'
+import { FlowTimeContext, TRAVEL_DEFORMATION_GLSL } from './animationContract'
 
 const StardustShader = {
   vertexShader: `
@@ -10,11 +11,12 @@ const StardustShader = {
     uniform float uGlowIntensity;
     varying float vAlpha;
     varying vec3 vColor;
+    ${TRAVEL_DEFORMATION_GLSL}
 
     void main() {
       vAlpha = alpha * uGlowIntensity;
       vColor = color;
-      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      vec4 mvPosition = flowViewPosition(position);
       // Crisp 1.0px - 2.2px pinpoint stardust
       gl_PointSize = clamp(size * (20.0 / -mvPosition.z) * min(1.25, uGlowIntensity), 1.0, 2.2);
       gl_Position = projectionMatrix * mvPosition;
@@ -42,6 +44,7 @@ export const NetworkParticles = memo(function NetworkParticles({
   bokehGeo,
   themeConfig,
 }) {
+  const timeUniform = useContext(FlowTimeContext)
   const glowTexture = useMemo(() => getGlowTexture(32), [])
   const bokehTexture = useMemo(() => getBokehTexture(64), [])
   const glow = themeConfig.glowIntensity || 1.0
@@ -54,6 +57,7 @@ export const NetworkParticles = memo(function NetworkParticles({
       uniforms: {
         uTexture: { value: glowTexture },
         uGlowIntensity: { value: glow },
+        uTime: timeUniform,
       },
       vertexShader: StardustShader.vertexShader,
       fragmentShader: StardustShader.fragmentShader,
@@ -61,7 +65,7 @@ export const NetworkParticles = memo(function NetworkParticles({
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
-  }, [glow, glowTexture])
+  }, [glow, glowTexture, timeUniform])
 
   // 2. 25 Soft Background Bokeh Circles (opacity: 0.08 to 0.18, Royal-Blue #0048ff)
   const bokehMat = useMemo(() => {
@@ -124,6 +128,7 @@ export const NetworkParticles = memo(function NetworkParticles({
           geometry={sGeo}
           material={stardustMat}
           matrixAutoUpdate={false}
+          frustumCulled={false}
           onUpdate={(self) => self.updateMatrix()}
         />
       )}

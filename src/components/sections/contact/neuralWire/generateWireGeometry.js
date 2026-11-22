@@ -246,6 +246,56 @@ export function heroZ(i, u, H, config) { return computeHeroWaveZ(i, u, H, config
 
 export const HERO_FUNCS = [heroY0, heroY1, heroY2, heroY3]
 
+/** The dominant harmonic of each existing hero ribbon, evaluated at build time. */
+export function getTravelProfile(index, u, H, config, out) {
+  const amplitude = (config.amplitude ?? 1.0) * env(u, H)
+  const frequency = config.frequency ?? 1.0
+  if (index === 0) {
+    out[0] = 0.48 * amplitude * (config.ribbon1Amp ?? 1.0)
+    out[1] = u * Math.PI * 1.62 * frequency * (config.ribbon1Freq ?? 1.0) + 0.08
+  } else if (index === 1) {
+    out[0] = -0.50 * amplitude * (config.ribbon2Amp ?? 1.0)
+    out[1] = u * Math.PI * 1.68 * frequency * (config.ribbon2Freq ?? 1.0) + 0.08
+  } else if (index === 2) {
+    out[0] = -0.42 * Math.pow(u, 1.4) * amplitude * (config.ribbon3Amp ?? 1.0)
+    out[1] = u * Math.PI * 1.35 * frequency * (config.ribbon3Freq ?? 1.0)
+  } else {
+    out[0] = -0.24 * amplitude * (config.ribbon4Amp ?? 1.0)
+    out[1] = u * Math.PI * 2.6 * frequency * (config.ribbon4Freq ?? 1.0) + 0.9
+  }
+  return out
+}
+
+/** Bake the wave phase for cores, auras, silk, beads, and stardust. */
+export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
+  if (!geometry?.getAttribute('position')) return
+  const uArray = geometry.getAttribute('aU')?.array
+  if (!uArray) return
+  const wireIds = geometry.getAttribute('aWireId')?.array
+  const count = uArray.length
+  const profile = new Float32Array(count * 4)
+  const meta = new Float32Array(count * 2)
+  const axis = new Float32Array(count * 3)
+  const scratch = new Float64Array(2)
+  const stringCount = Math.max(2, Math.min(32, Math.round(config.stringCount ?? 11)))
+  const silkVerticesPerHero = stringCount * 2 * 179
+  for (let i = 0; i < count; i++) {
+    const u = uArray[i]
+    let owner = wireIds?.[i] ?? 0
+    if (kind === 'silk') owner = Math.min(3, Math.floor(i / silkVerticesPerHero))
+    else if (kind === 'bead') owner = owner === 82 || owner === 83 || (owner === 84 && u >= 0.58) ? 1 : 0
+    getTravelProfile(owner, u, H, config, scratch)
+    profile[4 * i] = scratch[0]
+    profile[4 * i + 1] = scratch[1]
+    profile[4 * i + 2] = scratch[0]
+    profile[4 * i + 3] = scratch[1]
+    axis[3 * i + 1] = 1.0
+  }
+  geometry.setAttribute('aFlowPair', new THREE.BufferAttribute(profile, 4))
+  geometry.setAttribute('aFlowMeta', new THREE.BufferAttribute(meta, 2))
+  geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
+}
+
 /**
  * 6-pass micro-offset additive glow bundle for each Hero Wave.
  * Renders smooth optical fiber aura rather than a jagged 1px wire.
@@ -1389,6 +1439,12 @@ export function generateSideWireData(side, config = {}) {
 
   // 8. 900 Tiny Pinpoint Stardust Specks
   const stardustGeo = generate900PinpointStardust(side, H, prng, config)
+
+  for (const geometry of [primaryCoreGeo, primaryHaloGeo, secondaryGeo, depthGeo, stardustGeo]) {
+    addTravelFlowAttributes(geometry, H, config)
+  }
+  addTravelFlowAttributes(subFilamentsGeo, H, config, 'silk')
+  addTravelFlowAttributes(beadedStreamsGeo, H, config, 'bead')
 
   // Canonical graph exports
   const canonicalModel = graph.exportCanonicalModel()

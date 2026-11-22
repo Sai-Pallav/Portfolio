@@ -1,5 +1,6 @@
-import { memo, useMemo, useEffect, useRef } from 'react'
+import { memo, useMemo, useEffect, useRef, useContext } from 'react'
 import * as THREE from 'three'
+import { FlowTimeContext, TRAVEL_DEFORMATION_GLSL } from './animationContract'
 
 const LineFeatherShader = {
   vertexShader: `
@@ -10,6 +11,7 @@ const LineFeatherShader = {
     uniform float uInnerFade;
     varying float vAlpha;
     varying vec3 vColor;
+    ${TRAVEL_DEFORMATION_GLSL}
 
     void main() {
       // Dynamic inner tip fade near the globe: smoothstep(0.0, max(0.005, uInnerFade), aU)
@@ -17,7 +19,7 @@ const LineFeatherShader = {
       float feather = smoothstep(0.0, fadeDist, aU);
       vAlpha = aAlpha * feather * uOpacity;
       vColor = color;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      gl_Position = flowClipPosition(position);
     }
   `,
   fragmentShader: `
@@ -57,6 +59,9 @@ function mergeWirePathLayers(layers) {
   const alphaArr = new Float32Array(totalVerts)
   const layerArr = new Float32Array(totalVerts)
   const relArr = new Float32Array(totalVerts * 4)
+  const flowArr = new Float32Array(totalVerts * 4)
+  const flowMetaArr = new Float32Array(totalVerts * 2)
+  const flowAxisArr = new Float32Array(totalVerts * 3)
   const colArr = new Float32Array(totalVerts * 3)
 
   let offset = 0
@@ -73,6 +78,7 @@ function mergeWirePathLayers(layers) {
     const alpha = geo.attributes.aAlpha ? geo.attributes.aAlpha.array : null
     const layer = geo.attributes.aLayer ? geo.attributes.aLayer.array : null
     const rel = geo.attributes.aRelativeCoord ? geo.attributes.aRelativeCoord.array : null
+    const flow = geo.attributes.aFlowPair?.array
     const col = geo.attributes.color ? geo.attributes.color.array : null
 
     const cr = defaultColor.r, cg = defaultColor.g, cb = defaultColor.b
@@ -104,6 +110,15 @@ function mergeWirePathLayers(layers) {
         relArr[idx4 + 2] = rel[i4 + 2]
         relArr[idx4 + 3] = rel[i4 + 3]
       }
+      if (flow) {
+        const source = 4 * i
+        const target = 4 * idx
+        flowArr[target] = flow[source]
+        flowArr[target + 1] = flow[source + 1]
+        flowArr[target + 2] = flow[source + 2]
+        flowArr[target + 3] = flow[source + 3]
+      }
+      flowAxisArr[idx3 + 1] = 1
 
       if (col) {
         colArr[idx3] = col[i3]
@@ -128,6 +143,9 @@ function mergeWirePathLayers(layers) {
   merged.setAttribute('aAlpha', new THREE.BufferAttribute(alphaArr, 1))
   merged.setAttribute('aLayer', new THREE.BufferAttribute(layerArr, 1))
   merged.setAttribute('aRelativeCoord', new THREE.BufferAttribute(relArr, 4))
+  merged.setAttribute('aFlowPair', new THREE.BufferAttribute(flowArr, 4))
+  merged.setAttribute('aFlowMeta', new THREE.BufferAttribute(flowMetaArr, 2))
+  merged.setAttribute('aFlowAxis', new THREE.BufferAttribute(flowAxisArr, 3))
   merged.setAttribute('color', new THREE.BufferAttribute(colArr, 3))
   merged.computeBoundingSphere()
   return merged
@@ -154,6 +172,7 @@ export const WirePaths = memo(function WirePaths({
   themeConfig = {},
   innerFade = 0.04,
 }) {
+  const timeUniform = useContext(FlowTimeContext)
   const glow = themeConfig.glowIntensity || 1.0
   const opacity = themeConfig.wireOpacity || 0.94
 
@@ -193,6 +212,7 @@ export const WirePaths = memo(function WirePaths({
         uColor: { value: new THREE.Color('#0048ff') },
         uOpacity: { value: Math.min(1.0, opacity) },
         uInnerFade: { value: innerFade },
+        uTime: timeUniform,
       },
       vertexShader: LineFeatherShader.vertexShader,
       fragmentShader: LineFeatherShader.fragmentShader,
@@ -200,7 +220,7 @@ export const WirePaths = memo(function WirePaths({
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
-  }, [opacity, innerFade])
+  }, [opacity, innerFade, timeUniform])
 
   const prevGeoRef = useRef(mergedLineGeo)
   useEffect(() => {
@@ -241,6 +261,7 @@ export const WirePaths = memo(function WirePaths({
       geometry={mergedLineGeo}
       material={mergedMat}
       matrixAutoUpdate={false}
+      frustumCulled={false}
       onUpdate={(self) => self.updateMatrix()}
     />
   )

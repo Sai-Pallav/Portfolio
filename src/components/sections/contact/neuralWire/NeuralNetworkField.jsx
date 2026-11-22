@@ -1,9 +1,10 @@
-import { memo, useMemo, useEffect } from 'react'
+import { memo, useMemo, useEffect, useContext } from 'react'
 import * as THREE from 'three'
 import { useThree, createPortal } from '@react-three/fiber'
 import { H_VAL } from './generateWireGeometry'
 import { generateRefinedNeuralField } from './neuralPocketBounds'
 import { useWireframeConfig } from './WireframeConfigContext'
+import { FlowTimeContext, TRAVEL_DEFORMATION_GLSL } from './animationContract'
 
 // Helper to compute responsive ribbon layout matching SideWireNetwork
 function calculateRibbonLayout(viewportWidth, ribbonConfig) {
@@ -103,21 +104,22 @@ function mergeTransformedGeometries(geoA, matA, geoB, matB) {
     const itemSize = attrA.itemSize
     const arr = new attrA.array.constructor(total * itemSize)
 
-    if (attrName === 'position' || attrName === 'aBasePos') {
+    if (attrName === 'position' || attrName === 'aBasePos' || attrName === 'aFlowAxis') {
+      const isDirection = attrName === 'aFlowAxis'
       const srcA = attrA.array
       for (let i = 0, j = 0; i < vA; i++, j += 3) {
         const x = srcA[j], y = srcA[j + 1], z = srcA[j + 2]
-        arr[j] = a0 * x + a4 * y + a8 * z + a12
-        arr[j + 1] = a1 * x + a5 * y + a9 * z + a13
-        arr[j + 2] = a2 * x + a6 * y + a10 * z + a14
+        arr[j] = a0 * x + a4 * y + a8 * z + (isDirection ? 0 : a12)
+        arr[j + 1] = a1 * x + a5 * y + a9 * z + (isDirection ? 0 : a13)
+        arr[j + 2] = a2 * x + a6 * y + a10 * z + (isDirection ? 0 : a14)
       }
       const srcB = attrB.array
       const offset = vA * 3
       for (let i = 0, j = 0; i < vB; i++, j += 3) {
         const x = srcB[j], y = srcB[j + 1], z = srcB[j + 2]
-        arr[offset + j] = b0 * x + b4 * y + b8 * z + b12
-        arr[offset + j + 1] = b1 * x + b5 * y + b9 * z + b13
-        arr[offset + j + 2] = b2 * x + b6 * y + b10 * z + b14
+        arr[offset + j] = b0 * x + b4 * y + b8 * z + (isDirection ? 0 : b12)
+        arr[offset + j + 1] = b1 * x + b5 * y + b9 * z + (isDirection ? 0 : b13)
+        arr[offset + j + 2] = b2 * x + b6 * y + b10 * z + (isDirection ? 0 : b14)
       }
     } else {
       arr.set(attrA.array, 0)
@@ -150,7 +152,8 @@ const NeuralLineShader = {
     attribute float aWeight;
     attribute float aLayer;
     attribute float aAlpha;
-    attribute vec4 aRelativeCoord;
+    attribute vec3 aFlowOther0;
+    attribute vec3 aFlowOther1;
     attribute vec3 color;
 
     uniform float uOpacity;
@@ -158,6 +161,7 @@ const NeuralLineShader = {
 
     varying float vAlpha;
     varying vec3 vColor;
+    ${TRAVEL_DEFORMATION_GLSL}
 
     void main() {
       vec3 pos = position;
@@ -167,9 +171,15 @@ const NeuralLineShader = {
 
       // Whispering gossamer connective tissue: line alpha pre-calibrated to depth tiers
       vAlpha = aAlpha * innerFeather * outerFeather * uOpacity;
+      if (uTime > 0.0) vAlpha *= flowPocketVisibility(aFlowOther0, aFlowOther1);
+      if (uTime > 0.0) {
+        float phase = 6.28318530718 * aU;
+        vAlpha *= 1.0 + 0.018 *
+          (sin(phase - 0.44 * uTime) - sin(phase));
+      }
       vColor = color;
 
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      gl_Position = flowClipPosition(pos);
     }
   `,
   fragmentShader: `
@@ -189,11 +199,12 @@ const NeuralPointShader = {
     attribute float aU;
     attribute float aWeight;
     attribute float aLayer;
-    attribute vec4 aRelativeCoord;
     attribute float size;
     attribute float alpha;
     attribute vec3 color;
     attribute float aIsHighlight;
+    attribute vec3 aFlowOther0;
+    attribute vec3 aFlowOther1;
 
     uniform float uGlowIntensity;
     uniform float uNodeScale;
@@ -203,6 +214,7 @@ const NeuralPointShader = {
     varying vec3 vColor;
     varying vec3 vHaloCol;
     varying float vIsHighlight;
+    ${TRAVEL_DEFORMATION_GLSL}
 
     void main() {
       vec3 pos = position;
@@ -213,8 +225,14 @@ const NeuralPointShader = {
       // 3-layer Z-depth contrast cue
       float depthCue = aLayer > 0.5 ? 1.15 : (aLayer < -0.5 ? 0.48 : 0.88);
 
-      // Stable starlight: no frame-time uniform uploads or blinking isolated dots.
+      // Stable tiers with a small periodic breath on foreground hubs.
       vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity * depthCue;
+      if (uTime > 0.0) vAlpha *= flowPocketVisibility(aFlowOther0, aFlowOther1);
+      if (uTime > 0.0 && aIsHighlight > 0.5) {
+        float phase = 13.0 * aU;
+        vAlpha *= 1.0 + 0.025 *
+          (sin(phase - 0.66 * uTime) - sin(phase));
+      }
       vIsHighlight = aIsHighlight;
 
       // Hoisted static color, tier, and rim-tint calculations out of fragment shader (Requirement 3)
@@ -239,7 +257,10 @@ const NeuralPointShader = {
         vHaloCol = vec3(coreMix);
       }
 
-      vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+      vec4 mvPosition = flowViewPosition(pos);
+      if (uTime > 0.0) {
+        vAlpha *= clamp(1.0 + 0.035 * (8.0 + mvPosition.z), 0.92, 1.07);
+      }
 
       // Multi-scale starlight field point sizing:
       // Tightened around actual visible falloff radius to crush GPU overdraw (Requirement 3)
@@ -297,9 +318,10 @@ const NeuralHazeShader = {
     attribute vec3 aBasePos;
     attribute float aU;
     attribute float aWeight;
-    attribute vec4 aRelativeCoord;
     attribute float size;
     attribute float alpha;
+    attribute vec3 aFlowOther0;
+    attribute vec3 aFlowOther1;
     attribute vec3 color;
 
     uniform float uGlowIntensity;
@@ -308,6 +330,7 @@ const NeuralHazeShader = {
 
     varying float vAlpha;
     varying vec3 vColor;
+    ${TRAVEL_DEFORMATION_GLSL}
 
     void main() {
       vec3 pos = position;
@@ -316,9 +339,13 @@ const NeuralHazeShader = {
       float outerFeather = 1.0 - smoothstep(0.98, 1.01, aU);
 
       vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity;
+      if (uTime > 0.0) vAlpha *= flowPocketVisibility(aFlowOther0, aFlowOther1);
       vColor = color;
 
-      vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+      vec4 mvPosition = flowViewPosition(pos);
+      if (uTime > 0.0) {
+        vAlpha *= clamp(1.0 + 0.025 * (8.0 + mvPosition.z), 0.94, 1.0);
+      }
       // Small rear-core sprites keep additive haze localized and limit overdraw.
       float pointSize = clamp(
         size * uNodeScale * (65.0 / -mvPosition.z) * min(1.15, uGlowIntensity),
@@ -382,6 +409,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
   innerFade = 0.04,
 }) {
   const { viewport, scene, gl } = useThree()
+  const timeUniform = useContext(FlowTimeContext)
   const glow = themeConfig.glowIntensity || 1.0
   const primaryWire = themeConfig.primaryWire || ''
 
@@ -474,6 +502,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       uniforms: {
         uOpacity: { value: 1.0 * Math.min(1.0, glow) },
         uInnerFade: { value: innerFade },
+        uTime: timeUniform,
       },
       vertexShader: NeuralLineShader.vertexShader,
       fragmentShader: NeuralLineShader.fragmentShader,
@@ -481,7 +510,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
-  }, [glow, innerFade])
+  }, [glow, innerFade, timeUniform])
 
   const pointMat = useMemo(() => {
     const mat = new THREE.ShaderMaterial({
@@ -489,6 +518,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
         uGlowIntensity: { value: glow },
         uNodeScale: { value: nodeScale },
         uInnerFade: { value: innerFade },
+        uTime: timeUniform,
       },
       vertexShader: NeuralPointShader.vertexShader,
       fragmentShader: NeuralPointShader.fragmentShader,
@@ -497,7 +527,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       depthWrite: false,
     })
     return mat
-  }, [glow, nodeScale, innerFade])
+  }, [glow, nodeScale, innerFade, timeUniform])
 
   const hazeMat = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -505,6 +535,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
         uGlowIntensity: { value: glow },
         uNodeScale: { value: nodeScale },
         uInnerFade: { value: innerFade },
+        uTime: timeUniform,
       },
       vertexShader: NeuralHazeShader.vertexShader,
       fragmentShader: NeuralHazeShader.fragmentShader,
@@ -512,7 +543,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
-  }, [glow, nodeScale, innerFade])
+  }, [glow, nodeScale, innerFade, timeUniform])
 
   // Separate lifetimes: a point-only material change must not dispose a live line material.
   useEffect(() => () => lineMat.dispose(), [lineMat])
@@ -528,6 +559,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
           geometry={mergedGeometries.hazeGeo}
           material={hazeMat}
           matrixAutoUpdate={false}
+          frustumCulled={false}
         />
       )}
 
@@ -537,6 +569,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
           geometry={mergedGeometries.linesGeo}
           material={lineMat}
           matrixAutoUpdate={false}
+          frustumCulled={false}
         />
       )}
 
@@ -546,6 +579,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
           geometry={mergedGeometries.pointsGeo}
           material={pointMat}
           matrixAutoUpdate={false}
+          frustumCulled={false}
         />
       )}
     </group>,

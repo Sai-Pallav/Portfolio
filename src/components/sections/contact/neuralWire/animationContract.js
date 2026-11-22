@@ -1,22 +1,79 @@
 /**
  * @file animationContract.js
- * Architecture Contract & Deformation Specification for Phase 3 GPU-Based Neural Network Animation.
- * Version 4.0.0 — Outward Traveling 3D Corkscrew Neural Graph Contract.
+ * Architecture Contract & Deformation Specification for side-wave GPU animation.
+ * Version 4.1.0 — Outward Traveling Transverse Wave Contract.
  *
  * This contract establishes the mathematical, topological, and attribute guarantees baked into
  * the static BufferGeometries and canonical NeuralWireGraph, ensuring:
  * 1. The neural network lives exclusively in the negative-space gaps between the primary wave strands.
- * 2. Primary wave strands (Hero 0..3) and central globe are strictly protected and un-rotated.
- * 3. Subtle 3D corkscrew rotation propagates strictly OUTWARD: inner tip (u=0) -> outer edge (u=1).
- * 4. Progressive development: minimal rotation near the central globe (u < 0.10), developing outward.
- * 5. Coherent 3D volumetric depth exchange (Z-depth oscillation) with restrained vertical travel (Y).
- * 6. Left and right networks animate simultaneously with organic subtle asymmetry (seeds, timing, phases).
+ * 2. Wave crests propagate outward while every vertex keeps its original world X coordinate.
+ * 3. The globe stays static and the inner tip is fixed by the original envelope.
+ * 4. Neural vertices interpolate their adjacent wave-boundary displacements.
+ * 5. The original static render is exact at t=0.
+ * 6. Both wings advance from their own inner tips to their outer edges.
  * 7. 100% synchronized deformation between node points and connection edges.
  */
 
 import * as THREE from 'three'
+import { createContext } from 'react'
 
-export const ANIMATION_CONTRACT_VERSION = '4.0.0'
+// One uniform object is shared by every animated material in the side scene.
+export const FlowTimeContext = createContext({ value: 0 })
+export const FLOW_SPEED = 0.22
+export const FLOW_PERIOD = 2 * Math.PI / FLOW_SPEED
+
+// aFlowPair stores lower/upper harmonics as (amplitude, phase) pairs.
+// The phase difference replaces that harmonic with its outward-traveling form.
+// aFlowAxis is transformed once by the existing wing matrix; no vertex moves in X.
+export const TRAVEL_DEFORMATION_GLSL = `
+  attribute vec4 aFlowPair;
+  attribute vec2 aFlowMeta;
+  attribute vec3 aFlowAxis;
+  attribute vec4 aRelativeCoord;
+  uniform float uTime;
+
+  float flowDelta(vec2 harmonic) {
+    float phase = harmonic.y;
+    return harmonic.x * (sin(phase - ${FLOW_SPEED.toFixed(2)} * uTime) - sin(phase));
+  }
+
+  float flowPocketVisibility(vec3 other0, vec3 other1) {
+    float lowerDelta = flowDelta(aFlowPair.xy);
+    float upperDelta = flowDelta(aFlowPair.zw);
+    float nodeDelta = mix(lowerDelta, upperDelta, aFlowMeta.x);
+    float movingGap = aFlowMeta.y + upperDelta - lowerDelta;
+    float boundaryDistance = abs(movingGap) * min(aFlowMeta.x, 1.0 - aFlowMeta.x);
+    float otherDistance0 = abs(other0.z + flowDelta(other0.xy) - nodeDelta);
+    float otherDistance1 = abs(other1.z + flowDelta(other1.xy) - nodeDelta);
+    return smoothstep(0.006, 0.035, movingGap) *
+      smoothstep(0.002, 0.012, boundaryDistance) *
+      smoothstep(0.002, 0.016, otherDistance0) *
+      smoothstep(0.002, 0.016, otherDistance1);
+  }
+
+  vec3 flowPosition(vec3 rest) {
+    vec3 worldRest = (modelMatrix * vec4(rest, 1.0)).xyz;
+    float displacement = mix(flowDelta(aFlowPair.xy), flowDelta(aFlowPair.zw), aFlowMeta.x);
+    vec3 worldAxis = (modelMatrix * vec4(aFlowAxis, 0.0)).xyz;
+    return vec3(worldRest.x,
+      worldRest.y + worldAxis.y * displacement,
+      worldRest.z + worldAxis.z * displacement);
+  }
+
+  vec4 flowClipPosition(vec3 rest) {
+    if (uTime == 0.0) {
+      return projectionMatrix * modelViewMatrix * vec4(rest, 1.0);
+    }
+    return projectionMatrix * viewMatrix * vec4(flowPosition(rest), 1.0);
+  }
+
+  vec4 flowViewPosition(vec3 rest) {
+    if (uTime == 0.0) return modelViewMatrix * vec4(rest, 1.0);
+    return viewMatrix * vec4(flowPosition(rest), 1.0);
+  }
+`
+
+export const ANIMATION_CONTRACT_VERSION = '4.1.0'
 
 export const SIDE_ANIMATION_CONFIG = {
   left: {

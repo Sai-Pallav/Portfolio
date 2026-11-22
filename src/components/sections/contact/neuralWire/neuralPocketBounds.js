@@ -16,6 +16,7 @@ import {
   heroZ,
   H_VAL,
   computeConstraintWeight,
+  getTravelProfile,
 } from './generateWireGeometry.js'
 import { segmentsIntersect2D } from './neuralGraphModel.js'
 
@@ -209,6 +210,67 @@ export function computeRelativeCoordArray(pos, u, H = H_VAL, config = {}) {
   const r_norm = Math.min(1.0, Math.sqrt(v_rel * v_rel + w_depth * w_depth))
 
   return [u, v_rel, w_depth, r_norm]
+}
+
+/** Bind each neural vertex to its two neighboring static hero ribbons. */
+function addPocketTravelAttributes(geometry, H, config) {
+  const positions = geometry.getAttribute('position').array
+  const us = geometry.getAttribute('aU').array
+  const count = us.length
+  const flowPair = new Float32Array(count * 4)
+  const flowMeta = new Float32Array(count * 2)
+  const axis = new Float32Array(count * 3)
+  const other0 = new Float32Array(count * 3)
+  const other1 = new Float32Array(count * 3)
+  const ys = new Float64Array(4)
+  const ids = new Int8Array(4)
+  const profile = new Float64Array(2)
+  for (let i = 0; i < count; i++) {
+    const u = us[i]
+    const y = positions[3 * i + 1]
+    ys[0] = heroY0(u, H, config)
+    ys[1] = heroY1(u, H, config)
+    ys[2] = heroY2(u, H, config)
+    ys[3] = heroY3(u, H, config)
+    for (let k = 0; k < 4; k++) ids[k] = k
+    for (let k = 1; k < 4; k++) {
+      const id = ids[k]
+      let j = k - 1
+      while (j >= 0 && ys[ids[j]] > ys[id]) {
+        ids[j + 1] = ids[j]
+        j--
+      }
+      ids[j + 1] = id
+    }
+    let pair = 0
+    while (pair < 2 && y > ys[ids[pair + 1]]) pair++
+    const low = ids[pair], high = ids[pair + 1]
+    const height = Math.max(0.0001, ys[high] - ys[low])
+    flowMeta[2 * i] = Math.max(0, Math.min(1, (y - ys[low]) / height))
+    flowMeta[2 * i + 1] = height
+    axis[3 * i + 1] = 1
+    getTravelProfile(low, u, H, config, profile)
+    flowPair[4 * i] = profile[0]
+    flowPair[4 * i + 1] = profile[1]
+    getTravelProfile(high, u, H, config, profile)
+    flowPair[4 * i + 2] = profile[0]
+    flowPair[4 * i + 3] = profile[1]
+    let otherSlot = 0
+    for (let k = 0; k < 4; k++) {
+      const id = ids[k]
+      if (id === low || id === high) continue
+      const other = otherSlot++ === 0 ? other0 : other1
+      getTravelProfile(id, u, H, config, profile)
+      other[3 * i] = profile[0]
+      other[3 * i + 1] = profile[1]
+      other[3 * i + 2] = ys[id] - y
+    }
+  }
+  geometry.setAttribute('aFlowPair', new THREE.BufferAttribute(flowPair, 4))
+  geometry.setAttribute('aFlowMeta', new THREE.BufferAttribute(flowMeta, 2))
+  geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
+  geometry.setAttribute('aFlowOther0', new THREE.BufferAttribute(other0, 3))
+  geometry.setAttribute('aFlowOther1', new THREE.BufferAttribute(other1, 3))
 }
 
 /**
@@ -1646,6 +1708,10 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
   hazeGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(hazeRelativeCoords.slice(0, hazeCount * 4), 4))
   hazeGeo.computeBoundingBox()
   hazeGeo.computeBoundingSphere()
+
+  addPocketTravelAttributes(linesGeo, H, config)
+  addPocketTravelAttributes(pointsGeo, H, config)
+  addPocketTravelAttributes(hazeGeo, H, config)
 
   return {
     linesGeo,
