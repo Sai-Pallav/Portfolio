@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState, useCallback, memo } from 'react'
+import { useMemo, useEffect, useState, useCallback, memo, Component } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import { useThemeContext } from '@/context/ThemeContext'
 import { getWireThemeConfig } from './wireThemeConfig'
@@ -6,9 +6,33 @@ import { getSideWireData } from './generateWireGeometry'
 import { useWireframeConfig } from './WireframeConfigContext'
 import { WirePaths } from './WirePaths'
 import { BeadedStreams } from './BeadedStreams'
-import { NetworkConnections } from './NetworkConnections'
-import { NetworkNodes } from './NetworkNodes'
+import { NeuralNetworkField } from './NeuralNetworkField'
 import { NetworkParticles } from './NetworkParticles'
+
+/**
+ * Resilient error boundary for 3D canvas rendering
+ */
+class CanvasErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('SideWireNetwork Canvas error caught:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null
+    }
+    return this.props.children
+  }
+}
 
 /**
  * A single ribbon group with responsive layout, transform & positioning.
@@ -131,18 +155,17 @@ function NeuralScene({ themeKey, isInView }) {
             themeConfig={themeConfig}
             nodeScale={layout.nodeScale}
           />
-          <NetworkConnections
-            constellationGeo={wireData.constellationGeo}
-            themeConfig={themeConfig}
-            innerFade={ribbon.innerFade ?? 0.04}
-          />
-          <NetworkNodes
+                    <NeuralNetworkField
+            linesGeo={wireData.neuralLinesGeo}
+            pointsGeo={wireData.neuralPointsGeo}
+            hazeGeo={wireData.neuralHazeGeo}
             focalFlaresGeo={wireData.focalFlaresGeo}
-            intersectionNodesGeo={wireData.intersectionNodesGeo}
             themeConfig={themeConfig}
             nodeScale={layout.nodeScale}
+            innerFade={ribbon.innerFade ?? 0.04}
+            side={ribbon.side}
           />
-          <NetworkParticles
+<NetworkParticles
             stardustGeo={wireData.stardustGeo}
             bokehGeo={wireData.bokehGeo}
             themeConfig={themeConfig}
@@ -190,30 +213,32 @@ export default memo(function SideWireNetwork({ isInView = true }) {
 
   return (
     <div className="w-full h-full pointer-events-none relative flex items-center justify-center">
-      <Canvas
-        frameloop={isInView ? 'always' : 'never'}
-        dpr={[1, 1.5]}
-        gl={{
-          powerPreference: 'high-performance',
-          antialias: true,
-          alpha: true,
-        }}
-        camera={{ position: [0, 0, 8], fov: 45 }}
-        onCreated={({ gl }) => {
-          const canvasEl = gl.domElement
-          const handleContextLost = (e) => {
-            e.preventDefault()
-            setWebglSupported(false)
-          }
-          canvasEl.addEventListener('webglcontextlost', handleContextLost)
-          return () => {
-            canvasEl.removeEventListener('webglcontextlost', handleContextLost)
-          }
-        }}
-        style={{ pointerEvents: 'none', width: '100%', height: '100%' }}
-      >
-        <NeuralScene themeKey={activeTheme} isInView={isInView} />
-      </Canvas>
+      <CanvasErrorBoundary>
+        <Canvas
+          frameloop={isInView ? 'always' : 'never'}
+          dpr={[1, 1.5]}
+          gl={{
+            powerPreference: 'high-performance',
+            antialias: true,
+            alpha: true,
+          }}
+          camera={{ position: [0, 0, 8], fov: 45 }}
+          onCreated={({ gl }) => {
+            const canvasEl = gl.domElement
+            const handleContextLost = (e) => {
+              e.preventDefault()
+              setWebglSupported(false)
+            }
+            canvasEl.addEventListener('webglcontextlost', handleContextLost)
+            return () => {
+              canvasEl.removeEventListener('webglcontextlost', handleContextLost)
+            }
+          }}
+          style={{ pointerEvents: 'none', width: '100%', height: '100%' }}
+        >
+          <NeuralScene themeKey={activeTheme} isInView={isInView} />
+        </Canvas>
+      </CanvasErrorBoundary>
     </div>
   )
 })

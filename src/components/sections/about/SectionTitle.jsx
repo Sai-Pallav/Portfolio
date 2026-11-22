@@ -3,12 +3,13 @@ import { personal } from '@/data/personal'
 import { drawLineX, fadeUp, fadeUpSoft, staggerFast } from './aboutVariants'
 
 export default function SectionTitle() {
+
   return (
-    <motion.header variants={staggerFast} className="max-w-3xl relative mb-4 lg:mb-5">
+    <motion.header variants={staggerFast} className="max-w-3xl relative mb-8 sm:mb-10">
       {/* Section Tag */}
       <motion.div
         variants={fadeUpSoft}
-        className="inline-flex items-center gap-3 font-mono text-xs sm:text-[13px] font-medium tracking-[0.2em] uppercase text-accent mb-2"
+        className="inline-flex items-center gap-3 font-mono text-xs sm:text-[13px] font-medium tracking-[0.2em] uppercase text-accent mb-4"
       >
         <motion.span
           variants={drawLineX}
@@ -21,7 +22,7 @@ export default function SectionTitle() {
       {/* Main Name Heading */}
       <motion.h2
         variants={fadeUp}
-        className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight text-white/95"
+        className="font-heading text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.08] tracking-tight text-white/95"
       >
         {personal.name}
       </motion.h2>
@@ -29,7 +30,7 @@ export default function SectionTitle() {
       {/* Role / Subtitle */}
       <motion.p
         variants={fadeUpSoft}
-        className="mt-1 font-mono text-xs sm:text-sm tracking-wider uppercase font-semibold text-accent/90"
+        className="mt-3 font-mono text-sm sm:text-base tracking-wider uppercase font-semibold text-accent/90"
       >
         FULL-STACK & SYSTEMS ENGINEER
       </motion.p>

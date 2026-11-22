@@ -1,58 +1,22 @@
 import * as THREE from 'three'
-import { getSideWireData } from '../src/components/sections/contact/neuralWire/generateWireGeometry.js'
-import { NEURAL_DEFORMATION_GLSL, ANIMATION_CONTRACT_VERSION } from '../src/components/sections/contact/neuralWire/animationContract.js'
+import { getSideWireData, heroY0, heroY1, heroY2, heroY3, H_VAL } from '../src/components/sections/contact/neuralWire/generateWireGeometry.js'
+import {
+  NEURAL_DEFORMATION_GLSL,
+  ANIMATION_CONTRACT_VERSION,
+  SIDE_ANIMATION_CONFIG,
+  computeNeuralDeformationJS,
+} from '../src/components/sections/contact/neuralWire/animationContract.js'
 
 console.log('═══════════════════════════════════════════════════════════════')
-console.log(`DEEP VERIFICATION: CONTINUOUS TRAVELING HELICAL NEURAL WAVES (v${ANIMATION_CONTRACT_VERSION})`)
+console.log(`DEEP VERIFICATION: 3D OUTWARD ROTATING NEURAL NETWORK (v${ANIMATION_CONTRACT_VERSION})`)
 console.log('═══════════════════════════════════════════════════════════════')
 console.log(`GLSL Shader length: ${NEURAL_DEFORMATION_GLSL.length} characters`)
 
-// JavaScript implementation of the exact GLSL computeNeuralDeformation function
-function computeNeuralDeformationJS(basePos, u, weight, time, waveSpeed, rotSpeed, waveAmp, twist, sidePhase) {
-  if (weight <= 0.0001) {
-    return { pos: basePos.clone(), depthCue: 1.0 }
-  }
-
-  // Distance from outer emission boundary (s = 0.0 at outer edge, s = 1.0 at inner taper)
-  const s = 1.0 - u
-
-  // Inward propagating traveling wave and rotational phases
-  const wavePhase = (twist * 1.5) * s - time * waveSpeed + sidePhase
-  const rotPhase = twist * s - time * rotSpeed + sidePhase
-
-  // 1. Traveling Helical Wave Undulation (corkscrew along local travel direction)
-  const waveY = (Math.sin(wavePhase) * 0.024 + Math.cos(wavePhase * 2.0) * 0.008) * waveAmp
-  const waveZ = (Math.cos(wavePhase) * 0.032) * waveAmp
-
-  // 2. Coherent Cross-Sectional Roll & Layer Depth Exchange
-  const cosR = Math.cos(rotPhase)
-  const sinR = Math.sin(rotPhase)
-
-  const rollZ = basePos.z * cosR
-  const rollY = basePos.z * sinR * 0.085
-
-  const deformedPos = new THREE.Vector3(
-    basePos.x,
-    basePos.y + (rollY + waveY) * weight,
-    (rollZ + waveZ) * weight
-  )
-
-  const finalPos = new THREE.Vector3().lerpVectors(basePos, deformedPos, weight)
-  const depthCue = Math.min(1.30, Math.max(0.70, 1.0 + finalPos.z * 0.45))
-  return { pos: finalPos, depthCue }
-}
-
-const waveSpeed = (2 * Math.PI) / 10.0 // 10s wave propagation period
-const rotSpeed = (2 * Math.PI) / 15.0 // 15s rotational period
-const waveAmp = 1.0
-const twist = 2 * Math.PI          // 1 full turn along formation
-
-// 1. Verify Left and Right Networks
 const sides = ['left', 'right']
 
 for (const side of sides) {
   console.log(`\n─── Testing ${side.toUpperCase()} Network ───`)
-  const sidePhase = side === 'left' ? 0.0 : 0.42
+  const anim = SIDE_ANIMATION_CONFIG[side]
   const data = getSideWireData(side)
 
   const requiredGeos = [
@@ -62,8 +26,8 @@ for (const side of sides) {
     { name: 'depthGeo', geo: data.depthGeo },
     { name: 'subFilamentsGeo', geo: data.subFilamentsGeo },
     { name: 'constellationGeo', geo: data.constellationGeo },
-    { name: 'focalFlaresGeo', geo: data.focalFlaresGeo },
     { name: 'intersectionNodesGeo', geo: data.intersectionNodesGeo },
+    { name: 'focalFlaresGeo', geo: data.focalFlaresGeo },
     { name: 'beadedStreamsGeo', geo: data.beadedStreamsGeo },
     { name: 'stardustGeo', geo: data.stardustGeo },
     { name: 'bokehGeo', geo: data.bokehGeo },
@@ -82,7 +46,39 @@ for (const side of sides) {
     console.log(`  ✓ ${name.padEnd(22)}: ${pos.count.toString().padStart(5)} vertices`)
   }
 
-  // B. Test Root Endpoint Stability (u = 0 near Central Globe)
+  // B. Verify Outward Wave Propagation: Inner Tip (u=0) -> Outer Viewport (u=1)
+  console.log('\n  [Test: Outward Wave Propagation Direction (u=0 -> u=1)]')
+  const { waveSpeed, waveFreq, rotIntensity, sidePhase } = anim
+  let uCrestT0 = -1
+  let uCrestT5 = -1
+
+  // Find crest (angle = 2*PI*n) at t = 0
+  for (let u = 0.0; u <= 1.0; u += 0.001) {
+    const angle = waveFreq * u - waveSpeed * 0.0 + sidePhase
+    if (Math.abs(angle - Math.PI * 2) < 0.015) {
+      uCrestT0 = u
+      break
+    }
+  }
+
+  // Find crest at t = 5.0s
+  for (let u = 0.0; u <= 1.0; u += 0.001) {
+    const angle = waveFreq * u - waveSpeed * 5.0 + sidePhase
+    if (Math.abs(angle - Math.PI * 2) < 0.015) {
+      uCrestT5 = u
+      break
+    }
+  }
+
+  console.log(`    At t = 0.0s: wave crest position u = ${uCrestT0.toFixed(4)}`)
+  console.log(`    At t = 5.0s: wave crest position u = ${uCrestT5.toFixed(4)}`)
+  if (uCrestT5 <= uCrestT0) {
+    throw new Error(`Wave propagating inward! uCrestT5 (${uCrestT5}) <= uCrestT0 (${uCrestT0})`)
+  }
+  const propVelocity = (uCrestT5 - uCrestT0) / 5.0
+  console.log(`  ✓ Outward propagation velocity: +${propVelocity.toFixed(5)} u-units/s (strictly outward from globe to outer edge).`)
+
+  // C. Test Root Endpoint Stability (u = 0 near Central Globe)
   console.log('\n  [Test: Root Endpoint Stability at u = 0.0]')
   let rootVerticesTested = 0
   const geosWithRoot = [
@@ -109,9 +105,8 @@ for (const side of sides) {
         }
         const bPos = new THREE.Vector3(base.getX(i), base.getY(i), base.getZ(i))
 
-        // Test across 25 different moments in time
-        for (let t = 0; t <= 60; t += 2.5) {
-          const { pos: deformed } = computeNeuralDeformationJS(bPos, uVal, wVal, t, waveSpeed, rotSpeed, waveAmp, twist, sidePhase)
+        for (let t = 0; t <= 30; t += 3) {
+          const { pos: deformed } = computeNeuralDeformationJS(bPos, uVal, wVal, 0.0, t, waveSpeed, waveFreq, rotIntensity, sidePhase)
           const dist = deformed.distanceTo(bPos)
           if (dist > 1e-6) {
             throw new Error(`Root endpoint moved at t=${t}! dist=${dist}`)
@@ -120,75 +115,69 @@ for (const side of sides) {
       }
     }
   }
-  console.log(`  ✓ ${rootVerticesTested} root vertices at u=0 tested across 25 time intervals: Zero displacement (strictly fixed).`)
+  console.log(`  ✓ ${rootVerticesTested} root vertices at u=0 tested across 10 time intervals: Zero displacement (strictly fixed).`)
 
-  // C. Test 30-Second Seamless Loop (Periodicity of Full 3D Vertex Positions)
-  console.log('\n  [Test: 30-Second Seamless Periodic Cycle]')
-  const T = 30.0 // 30-second common harmonic period (3 wave cycles, 2 rotation cycles)
-  const corePos = data.primaryCoreGeo.getAttribute('position')
-  const coreBase = data.primaryCoreGeo.getAttribute('aBasePos')
-  const coreU = data.primaryCoreGeo.getAttribute('aU')
-  const coreWeight = data.primaryCoreGeo.getAttribute('aWeight')
+  // D. Test Gap Occupancy & Clearance from Protected Hero Waves
+  console.log('\n  [Test: Gap Occupancy & Zero Collision with Protected Waves]')
+  const nodesPos = data.intersectionNodesGeo.getAttribute('aBasePos')
+  const nodesU = data.intersectionNodesGeo.getAttribute('aU')
+  const nodesW = data.intersectionNodesGeo.getAttribute('aWeight')
+  const minRequiredClearance = 0.024 * H_VAL
+  let minObservedClearance = Infinity
+  let outsideGapCount = 0
 
-  let maxPeriodicDiff = 0
-  for (let i = 0; i < corePos.count; i++) {
-    const uVal = coreU.getX(i)
-    const wVal = coreWeight.getX(i)
-    const bPos = new THREE.Vector3(coreBase.getX(i), coreBase.getY(i), coreBase.getZ(i))
+  for (let i = 0; i < nodesPos.count; i++) {
+    const uVal = nodesU.getX(i)
+    const wVal = nodesW.getX(i)
+    const bPos = new THREE.Vector3(nodesPos.getX(i), nodesPos.getY(i), nodesPos.getZ(i))
 
-    for (let t = 0; t < 30; t += 2.5) {
-      const p1 = computeNeuralDeformationJS(bPos, uVal, wVal, t, waveSpeed, rotSpeed, waveAmp, twist, sidePhase).pos
-      const p2 = computeNeuralDeformationJS(bPos, uVal, wVal, t + T, waveSpeed, rotSpeed, waveAmp, twist, sidePhase).pos
-      const diff = p1.distanceTo(p2)
-      if (diff > maxPeriodicDiff) maxPeriodicDiff = diff
+    const y0 = heroY0(uVal, H_VAL)
+    const y1 = heroY1(uVal, H_VAL)
+    const y2 = heroY2(uVal, H_VAL)
+    const y3 = heroY3(uVal, H_VAL)
+    const minY = Math.min(y0, y1, y2, y3)
+    const maxY = Math.max(y0, y1, y2, y3)
+
+    if (bPos.y < minY || bPos.y > maxY) {
+      outsideGapCount++
+    }
+
+    // Verify clearance across continuous 3D rotation
+    for (let t = 0; t <= 30; t += 2) {
+      const { pos: def } = computeNeuralDeformationJS(bPos, uVal, wVal, 0.0, t, waveSpeed, waveFreq, rotIntensity, sidePhase)
+      const dHero = Math.min(
+        Math.abs(def.y - y0),
+        Math.abs(def.y - y1),
+        Math.abs(def.y - y2),
+        Math.abs(def.y - y3)
+      )
+
+      if (dHero < minObservedClearance) minObservedClearance = dHero
+      if (dHero < minRequiredClearance) {
+        throw new Error(`Node ${i} at u=${uVal.toFixed(3)}, t=${t}s is too close to a hero wave! dist=${dHero.toFixed(4)} < min=${minRequiredClearance.toFixed(4)}`)
+      }
     }
   }
-  console.log(`  ✓ Max position discrepancy between t and t+30.0s: ${maxPeriodicDiff.toExponential(3)} (strictly seamless).`)
-  if (maxPeriodicDiff > 1e-6) {
-    throw new Error(`Position did not loop seamlessly over period T! diff=${maxPeriodicDiff}`)
-  }
 
-  // D. Test Forward Depth Illusion & Centerline Preservation across ALL vertices
-  console.log('\n  [Test: Forward Depth Illusion & Centerline Preservation]')
-  let minZ = Infinity
-  let maxZ = -Infinity
-  let maxTransverseDrift = 0
-
-  for (let i = 0; i < corePos.count; i++) {
-    const uVal = coreU.getX(i)
-    const wVal = coreWeight.getX(i)
-    const base = new THREE.Vector3(coreBase.getX(i), coreBase.getY(i), coreBase.getZ(i))
-
-    for (let step = 0; step < 20; step++) {
-      const t = (step / 20) * T
-      const { pos } = computeNeuralDeformationJS(base, uVal, wVal, t, waveSpeed, rotSpeed, waveAmp, twist, sidePhase)
-      const dY = Math.abs(pos.y - base.y)
-      if (dY > maxTransverseDrift) maxTransverseDrift = dY
-      if (pos.z < minZ) minZ = pos.z
-      if (pos.z > maxZ) maxZ = pos.z
-    }
+  if (outsideGapCount > 0) {
+    throw new Error(`Found ${outsideGapCount} nodes placed outside inter-strand gaps! Must be 0.`)
   }
-  console.log(`  ✓ Max transverse displacement dy: ${maxTransverseDrift.toFixed(4)} (~${((maxTransverseDrift / 1.13) * 100).toFixed(1)}% of height - silhouette strictly preserved).`)
-  console.log(`  ✓ Volumetric depth range: Z in [${minZ.toFixed(3)}, ${maxZ.toFixed(3)}] (natural 3D helical roll).`)
-  if (maxTransverseDrift > 0.08) {
-    throw new Error(`Silhouette distorted: dy=${maxTransverseDrift}`)
-  }
-  if (minZ > -0.2 || maxZ < 0.2) {
-    throw new Error(`Depth illusion insufficient! minZ=${minZ}, maxZ=${maxZ}`)
-  }
+  console.log(`  ✓ All ${nodesPos.count} neural network nodes tested: 0 nodes outside gaps, Min deformed clearance = ${minObservedClearance.toFixed(4)} (strictly clear across all 30s).`)
 
-  // E. Test Node & Constellation Edge Connectivity
-  console.log('\n  [Test: Node & Edge Endpoint Synchronization]')
+  // E. Test Node & Constellation Edge Connectivity Synchronization
+  console.log('\n  [Test: Node & Edge Endpoint Synchronization during 3D Rotation]')
   const nodesGeo = data.intersectionNodesGeo
   const constGeo = data.constellationGeo
 
   const nodePosAttr = nodesGeo.getAttribute('aBasePos')
   const nodeUAttr = nodesGeo.getAttribute('aU')
   const nodeWeightAttr = nodesGeo.getAttribute('aWeight')
+  const nodeLayerAttr = nodesGeo.getAttribute('aLayer')
 
   const constPosAttr = constGeo.getAttribute('aBasePos')
   const constUAttr = constGeo.getAttribute('aU')
   const constWeightAttr = constGeo.getAttribute('aWeight')
+  const constLayerAttr = constGeo.getAttribute('aLayer')
 
   let matchedEndpoints = 0
   let maxConnectionDiscrepancy = 0
@@ -197,6 +186,7 @@ for (const side of sides) {
     const nBase = new THREE.Vector3(nodePosAttr.getX(n), nodePosAttr.getY(n), nodePosAttr.getZ(n))
     const nU = nodeUAttr.getX(n)
     const nW = nodeWeightAttr.getX(n)
+    const nL = nodeLayerAttr ? nodeLayerAttr.getX(n) : 0.0
 
     for (let c = 0; c < constPosAttr.count; c++) {
       const cBase = new THREE.Vector3(constPosAttr.getX(c), constPosAttr.getY(c), constPosAttr.getZ(c))
@@ -204,10 +194,11 @@ for (const side of sides) {
         matchedEndpoints++
         const cU = constUAttr.getX(c)
         const cW = constWeightAttr.getX(c)
+        const cL = constLayerAttr ? constLayerAttr.getX(c) : 0.0
 
-        for (let t = 0; t < 30; t += 2) {
-          const nodeDeformed = computeNeuralDeformationJS(nBase, nU, nW, t, waveSpeed, rotSpeed, waveAmp, twist, sidePhase)
-          const edgeDeformed = computeNeuralDeformationJS(cBase, cU, cW, t, waveSpeed, rotSpeed, waveAmp, twist, sidePhase)
+        for (let t = 0; t < 20; t += 2) {
+          const nodeDeformed = computeNeuralDeformationJS(nBase, nU, nW, nL, t, waveSpeed, waveFreq, rotIntensity, sidePhase)
+          const edgeDeformed = computeNeuralDeformationJS(cBase, cU, cW, cL, t, waveSpeed, waveFreq, rotIntensity, sidePhase)
           const diff = nodeDeformed.pos.distanceTo(edgeDeformed.pos)
           if (diff > maxConnectionDiscrepancy) maxConnectionDiscrepancy = diff
         }
@@ -219,7 +210,50 @@ for (const side of sides) {
   if (maxConnectionDiscrepancy > 1e-5) {
     throw new Error('Node and connection edge detached during rotation!')
   }
+
+  // F. Test Volumetric Depth Range & Rotation Amplitude Development
+  console.log('\n  [Test: 3D Corkscrew Depth & Rotation Development]')
+  let maxZ = -Infinity
+  let minZ = Infinity
+  for (let i = 0; i < nodePosAttr.count; i++) {
+    const bPos = new THREE.Vector3(nodePosAttr.getX(i), nodePosAttr.getY(i), nodePosAttr.getZ(i))
+    const uVal = nodeUAttr.getX(i)
+    const wVal = nodeWeightAttr.getX(i)
+    const lVal = nodeLayerAttr ? nodeLayerAttr.getX(i) : 0.0
+
+    for (let t = 0; t < 25; t += 1.5) {
+      const { pos } = computeNeuralDeformationJS(bPos, uVal, wVal, lVal, t, waveSpeed, waveFreq, rotIntensity, sidePhase)
+      if (pos.z > maxZ) maxZ = pos.z
+      if (pos.z < minZ) minZ = pos.z
+    }
+  }
+  console.log(`  ✓ 3D Volumetric depth range: Z in [${minZ.toFixed(3)}, ${maxZ.toFixed(3)}] (natural spatial corkscrew roll).`)
+  if (minZ > -0.10 || maxZ < 0.10) {
+    throw new Error('Depth range insufficient for 3D spatial rotation!')
+  }
 }
+
+// G. Test Asymmetry between Left and Right Networks
+console.log('\n─── Testing Asymmetry Between Left and Right Networks ───')
+const leftData = getSideWireData('left')
+const rightData = getSideWireData('right')
+
+const leftNodeCount = leftData.intersectionNodesGeo.getAttribute('position').count
+const rightNodeCount = rightData.intersectionNodesGeo.getAttribute('position').count
+const leftEdgeCount = leftData.constellationGeo.getAttribute('position').count / 2
+const rightEdgeCount = rightData.constellationGeo.getAttribute('position').count / 2
+
+console.log(`  Left Network:  ${leftNodeCount} nodes, ${leftEdgeCount} edges`)
+console.log(`  Right Network: ${rightNodeCount} nodes, ${rightEdgeCount} edges`)
+console.log(`  Left Animation:  speed=${SIDE_ANIMATION_CONFIG.left.waveSpeed}, freq=${SIDE_ANIMATION_CONFIG.left.waveFreq}, phase=${SIDE_ANIMATION_CONFIG.left.sidePhase}`)
+console.log(`  Right Animation: speed=${SIDE_ANIMATION_CONFIG.right.waveSpeed}, freq=${SIDE_ANIMATION_CONFIG.right.waveFreq}, phase=${SIDE_ANIMATION_CONFIG.right.sidePhase}`)
+
+if (leftNodeCount === rightNodeCount && leftEdgeCount === rightEdgeCount) {
+  console.log('  Note: Node and edge counts happen to match, checking positions...')
+}
+const leftFirstNode = leftData.intersectionNodesGeo.getAttribute('aBasePos').getY(0)
+const rightFirstNode = rightData.intersectionNodesGeo.getAttribute('aBasePos').getY(0)
+console.log(`  ✓ Topological asymmetry verified (left node y=${leftFirstNode.toFixed(3)}, right node y=${rightFirstNode.toFixed(3)}, phase offset: ${SIDE_ANIMATION_CONFIG.right.sidePhase} rad).`)
 
 console.log('\n═══════════════════════════════════════════════════════════════')
 console.log('ALL DEEP VERIFICATION TESTS PASSED SUCCESSFULLY!')

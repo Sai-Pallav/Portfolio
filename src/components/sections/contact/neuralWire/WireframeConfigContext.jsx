@@ -3,25 +3,25 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 // eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_SIDE_CONFIG = {
   // ── Dimensions ──
-  lengthMultiplier: 1.0,     // Total wireframe length multiplier
-  breadthMultiplier: 1.75,   // Vertical ribbon breadth / height multiplier
+  lengthMultiplier: 1,       // Total wireframe length multiplier
+  breadthMultiplier: 1.35,   // Vertical ribbon breadth / height multiplier
   depthMultiplier: 0.3,      // Depth thickness multiplier
-  strandSpread: 0.75,        // Companion silk strands width/spread multiplier
-  stringCount: 11,           // Number of strings/strands per hero wave
-  stringWidth: 1.1,          // Width and thickness of individual strings
+  strandSpread: 1,           // Companion silk strands width/spread multiplier
+  stringCount: 13,           // Number of strings/strands per hero wave
+  stringWidth: 0.95,         // Width and thickness of individual strings
 
   // ── Independent End Lengths & Outer Flexibility ──
   innerExtension: 1.3,       // Lengthens inner end inward towards globe (positive = closer / into globe)
-  outerExtension: -2.0,      // Lengthens outer end outward past screen edge
-  outerFlexibility: 0.0,     // Wave flexibility & harmonic whip at outer ends (0.0 = rigid, 1.0 = natural silk)
-  outerFlare: 0.0,           // Vertical fan-out & separation of ribbon streams at outer tips
+  outerExtension: -2,        // Lengthens outer end outward past screen edge
+  outerFlexibility: 0,       // Wave flexibility & harmonic whip at outer ends (0.0 = rigid, 1.0 = natural silk)
+  outerFlare: 0,             // Vertical fan-out & separation of ribbon streams at outer tips
   outerFade: 0.07,           // Soft feather fade distance at outer tips
 
   // ── Waves & Amplitude ──
-  amplitude: 1.25,           // Wave oscillation amplitude multiplier
+  amplitude: 1.65,           // Wave oscillation amplitude multiplier
   frequency: 0.85,           // Wave frequency / cycles multiplier
-  zAmplitude: 1.0,           // Z-depth wave oscillation multiplier
-  wingSweep: 0.28,           // Wing sweep curvature (outer parabolic lift)
+  zAmplitude: 1.5,           // Z-depth wave oscillation multiplier
+  wingSweep: 0.34,           // Wing sweep curvature (outer parabolic lift)
 
   // ── 4 Hero Waves (Individual Ribbon Controls - Mirrored Symmetrically) ──
   ribbon1Amp: 0.65,          // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
@@ -34,7 +34,7 @@ export const DEFAULT_SIDE_CONFIG = {
   ribbon3YOffset: -0.1,      // Vertical shift for Ribbon 3
   ribbon4YOffset: 0.04,      // Vertical shift for Ribbon 4
 
-  ribbon1Freq: 1.0,          // Frequency/cycle density for Ribbon 1
+  ribbon1Freq: 1,            // Frequency/cycle density for Ribbon 1
   ribbon2Freq: 1.05,         // Frequency/cycle density for Ribbon 2
   ribbon3Freq: 1.1,          // Frequency/cycle density for Ribbon 3
   ribbon4Freq: 0.9,          // Frequency/cycle density for Ribbon 4
@@ -42,30 +42,30 @@ export const DEFAULT_SIDE_CONFIG = {
   // ── Inter-Ribbon Spacing & Distances (Pairwise & Outer/Inner Taper) ──
   distRibbon01: -0.04,       // Distance offset between Ribbon 0 (Upper Arch) and Ribbon 1 (Lower Arch)
   distRibbon12: 0.02,        // Distance offset between Ribbon 1 (Lower Arch) and Ribbon 2 (Violet Accent)
-  distRibbon23: 0.0,         // Distance offset between Ribbon 2 (Violet Accent) and Ribbon 3 (Counter-Braid)
+  distRibbon23: 0,           // Distance offset between Ribbon 2 (Violet Accent) and Ribbon 3 (Counter-Braid)
   ribbonSpacingOuter: 0.4,   // Distance multiplier between all ribbons at outer wingtips (fanning out)
   ribbonSpacingInner: 0.85,  // Distance multiplier between all ribbons at inner globe connection (converging)
 
   // ── Two Ends Placement ──
   innerGap: 0.7,             // Fine inner gap offset from globe center
-  innerYOffset: 0.0,         // Inner end height offset
+  innerYOffset: 0,           // Inner end height offset
   innerFade: 0.41,           // Inner tip feather distance (smoothstep cutoff)
-  outerXOffset: 0.0,         // Fine outer X offset
+  outerXOffset: 0,           // Fine outer X offset
   outerYOffset: -0.3,        // Outer end lift/drop
   outerZOffset: -0.7,        // Outer end depth offset
 
   // ── Overall Placement & Tilt ──
-  yOffset: 0.0,              // Global Y offset
-  xOffset: 0.0,              // Global X offset
+  yOffset: 0,                // Global Y offset
+  xOffset: 0,                // Global X offset
   zOffset: 0.2,              // Global Z depth offset
-  tiltZ: 0.0,                // 2D tilt angle (degrees)
-  pitchX: 2.0,               // 3D pitch tilt (degrees)
-  yawY: 16.0,                // 3D yaw tilt (degrees)
+  tiltZ: 0,                  // 2D tilt angle (degrees)
+  pitchX: 2,                 // 3D pitch tilt (degrees)
+  yawY: 16,                  // 3D yaw tilt (degrees)
 
   // ── Styling & Appearance ──
-  wireOpacity: 1.0,          // Wire opacity multiplier
-  glowIntensity: 1.0,        // Halo glow intensity multiplier
-  nodeScale: 1.0,            // Nodes & flares scale multiplier
+  wireOpacity: 1,            // Wire opacity multiplier
+  glowIntensity: 1.25,       // Halo glow intensity multiplier
+  nodeScale: 1,              // Nodes & flares scale multiplier
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -142,7 +142,7 @@ export const PRESETS = {
   },
 }
 
-const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v18'
+const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v20'
 
 const WireframeConfigContext = createContext(null)
 

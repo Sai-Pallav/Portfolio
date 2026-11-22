@@ -743,7 +743,7 @@ export default memo(function WireframeController() {
               description="Number of bundled silk strings running through each wave (2 to 30 strands)"
               paramKey="stringCount"
               min={2} max={30} step={1} unit=" strings"
-              value={currentConfig.stringCount ?? 11}
+              value={currentConfig.stringCount ?? DEFAULT_SIDE_CONFIG.stringCount}
               defaultValue={DEFAULT_SIDE_CONFIG.stringCount}
               onChange={handleSliderChange} onReset={handleSliderReset}
             />
@@ -752,7 +752,7 @@ export default memo(function WireframeController() {
               description="Width and thickness of individual strings in the ribbon bundle"
               paramKey="stringWidth"
               min={0.2} max={4.0} step={0.05} unit="x"
-              value={currentConfig.stringWidth ?? 1.0}
+              value={currentConfig.stringWidth ?? DEFAULT_SIDE_CONFIG.stringWidth}
               defaultValue={DEFAULT_SIDE_CONFIG.stringWidth}
               onChange={handleSliderChange} onReset={handleSliderReset}
             />

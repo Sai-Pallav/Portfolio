@@ -2,7 +2,14 @@ import * as THREE from 'three'
 import {
   NeuralWireGraph,
   GraphNode,
+  segmentsIntersect2D,
 } from './neuralGraphModel.js'
+import { computeNeuralDeformationJS, SIDE_ANIMATION_CONFIG } from './animationContract.js'
+import {
+  getAlmondPocketBounds,
+  computeRelativeCoordArray,
+  generateMarginAnchors,
+} from './neuralPocketBounds.js'
 
 /**
  * Deterministic PRNG to ensure reproducible, non-flickering static geometry.
@@ -94,7 +101,7 @@ export function computeRibbonSpacingOffset(index, u, H, config = {}) {
 
   // Exact linear decomposition for pairwise distance adjustments
   const pairwiseOffsets = [
-     0.75 * dist01 + 0.50 * dist12 + 0.25 * dist23,
+    0.75 * dist01 + 0.50 * dist12 + 0.25 * dist23,
     -0.25 * dist01 + 0.50 * dist12 + 0.25 * dist23,
     -0.25 * dist01 - 0.50 * dist12 + 0.25 * dist23,
     -0.25 * dist01 - 0.50 * dist12 - 0.75 * dist23,
@@ -266,9 +273,11 @@ export const WIRE_ANIMATION_PARAMS = {
  * Parameterized line geometry builder for animation-ready BufferGeometries.
  */
 class ParameterizedLineBuilder {
-  constructor(innerFade = 0.04, outerFade = 0.15) {
+  constructor(innerFade = 0.04, outerFade = 0.15, H = H_VAL, config = {}) {
     this.innerFade = innerFade
     this.outerFade = outerFade
+    this.H = H
+    this.config = config
     this.positions = []
     this.basePositions = []
     this.uParams = []
@@ -276,9 +285,19 @@ class ParameterizedLineBuilder {
     this.weights = []
     this.alphas = []
     this.colors = []
+    this.layers = []
+    this.relativeCoords = []
   }
 
-  addSegment(p1, u1, wireId1, w1, p2, u2, wireId2, w2, a1 = null, a2 = null, c1 = null, c2 = null, maxU = 1.0) {
+  addSegment(
+    p1, u1, wireId1, w1,
+    p2, u2, wireId2, w2,
+    a1 = null, a2 = null,
+    c1 = null, c2 = null,
+    maxU = 1.0,
+    l1 = 0.0, l2 = 0.0,
+    rel1 = null, rel2 = null
+  ) {
     const alpha1 = a1 !== null ? a1 : computeVertexAlpha(u1, this.innerFade, this.outerFade, maxU)
     const alpha2 = a2 !== null ? a2 : computeVertexAlpha(u2, this.innerFade, this.outerFade, maxU)
 
@@ -288,6 +307,10 @@ class ParameterizedLineBuilder {
     this.wireIds.push(wireId1)
     this.weights.push(w1)
     this.alphas.push(alpha1)
+    this.layers.push(l1)
+
+    const r1 = rel1 || computeRelativeCoordArray(p1, u1, this.H, this.config)
+    this.relativeCoords.push(r1[0], r1[1], r1[2], r1[3])
 
     this.positions.push(p2.x, p2.y, p2.z)
     this.basePositions.push(p2.x, p2.y, p2.z)
@@ -295,6 +318,10 @@ class ParameterizedLineBuilder {
     this.wireIds.push(wireId2)
     this.weights.push(w2)
     this.alphas.push(alpha2)
+    this.layers.push(l2)
+
+    const r2 = rel2 || computeRelativeCoordArray(p2, u2, this.H, this.config)
+    this.relativeCoords.push(r2[0], r2[1], r2[2], r2[3])
 
     if (c1 && c2) {
       this.colors.push(c1.r, c1.g, c1.b)
@@ -310,6 +337,8 @@ class ParameterizedLineBuilder {
     geo.setAttribute('aWireId', new THREE.Float32BufferAttribute(this.wireIds, 1))
     geo.setAttribute('aWeight', new THREE.Float32BufferAttribute(this.weights, 1))
     geo.setAttribute('aAlpha', new THREE.Float32BufferAttribute(this.alphas, 1))
+    geo.setAttribute('aLayer', new THREE.Float32BufferAttribute(this.layers.length > 0 ? this.layers : new Array(this.positions.length / 3).fill(0), 1))
+    geo.setAttribute('aRelativeCoord', new THREE.Float32BufferAttribute(this.relativeCoords, 4))
     if (this.colors.length > 0) {
       geo.setAttribute('color', new THREE.Float32BufferAttribute(this.colors, 3))
     }
@@ -322,7 +351,9 @@ class ParameterizedLineBuilder {
  * Parameterized points geometry builder for animation-ready Nodes & Particles.
  */
 class ParameterizedPointsBuilder {
-  constructor() {
+  constructor(H = H_VAL, config = {}) {
+    this.H = H
+    this.config = config
     this.positions = []
     this.basePositions = []
     this.uParams = []
@@ -331,9 +362,12 @@ class ParameterizedPointsBuilder {
     this.sizes = []
     this.alphas = []
     this.colors = []
+    this.layers = []
+    this.highlights = []
+    this.relativeCoords = []
   }
 
-  addPoint(p, u, wireId, w, size = 1.0, alpha = 1.0, color = null) {
+  addPoint(p, u, wireId, w, size = 1.0, alpha = 1.0, color = null, layer = 0.0, isHighlight = 0.0, relCoord = null) {
     this.positions.push(p.x, p.y, p.z)
     this.basePositions.push(p.x, p.y, p.z)
     this.uParams.push(u)
@@ -341,6 +375,12 @@ class ParameterizedPointsBuilder {
     this.weights.push(w)
     this.sizes.push(size)
     this.alphas.push(alpha)
+    this.layers.push(layer)
+    this.highlights.push(isHighlight)
+
+    const r = relCoord || computeRelativeCoordArray(p, u, this.H, this.config)
+    this.relativeCoords.push(r[0], r[1], r[2], r[3])
+
     if (color) {
       this.colors.push(color.r, color.g, color.b)
     }
@@ -353,6 +393,9 @@ class ParameterizedPointsBuilder {
     geo.setAttribute('aU', new THREE.Float32BufferAttribute(this.uParams, 1))
     geo.setAttribute('aWireId', new THREE.Float32BufferAttribute(this.wireIds, 1))
     geo.setAttribute('aWeight', new THREE.Float32BufferAttribute(this.weights, 1))
+    geo.setAttribute('aLayer', new THREE.Float32BufferAttribute(this.layers.length > 0 ? this.layers : new Array(this.positions.length / 3).fill(0), 1))
+    geo.setAttribute('aIsHighlight', new THREE.Float32BufferAttribute(this.highlights.length > 0 ? this.highlights : new Array(this.positions.length / 3).fill(0), 1))
+    geo.setAttribute('aRelativeCoord', new THREE.Float32BufferAttribute(this.relativeCoords, 4))
     if (includeSizeAndAlpha) {
       geo.setAttribute('size', new THREE.Float32BufferAttribute(this.sizes, 1))
       geo.setAttribute('alpha', new THREE.Float32BufferAttribute(this.alphas, 1))
@@ -382,7 +425,7 @@ function generateCompanionSilkStrands(side, H, config = {}) {
   const strandSpread = config.strandSpread !== undefined ? config.strandSpread : 1.0
   const stringCount = config.stringCount !== undefined ? Math.max(2, Math.min(32, Math.round(config.stringCount))) : 11
   const stringWidth = config.stringWidth !== undefined ? Math.max(0.1, config.stringWidth) : 1.0
-  const builder = new ParameterizedLineBuilder(innerFade, outerFade)
+  const builder = new ParameterizedLineBuilder(innerFade, outerFade, H, config)
 
   for (let i = 0; i < 4; i++) {
     for (let k = 0; k < stringCount; k++) {
@@ -412,6 +455,7 @@ function generateCompanionSilkStrands(side, H, config = {}) {
 
       let prevPt = null
       let prevU = null
+      let prevW = null
 
       for (let s = 0; s < N_SILK; s++) {
         const u = (s / (N_SILK - 1)) * strandMaxU
@@ -431,7 +475,7 @@ function generateCompanionSilkStrands(side, H, config = {}) {
             prevPt,
             prevU,
             10 + i * 11 + k,
-            w,
+            prevW,
             pt,
             u,
             10 + i * 11 + k,
@@ -445,6 +489,7 @@ function generateCompanionSilkStrands(side, H, config = {}) {
         }
         prevPt = pt
         prevU = u
+        prevW = w
       }
     }
   }
@@ -453,54 +498,312 @@ function generateCompanionSilkStrands(side, H, config = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. 3D NEURAL TRIANGULATION MESH & 65 GRAPH NODES (DARK ALMOND LOBE INTERIOR)
-// 65 Nodes distributed in almond chamber & outer halo.
-// Connected to 2-3 nearest neighbors strictly within d < 0.28 * H.
+// 3. VOLUMETRIC 3-LAYER NEURAL NETWORK FIELD (STRICTLY IN ALMOND CHAMBERS)
+// Nested strictly inside the negative-space almond chambers between Hero Waves.
+// Elliptical volumetric 3-layer cross-section (bg, mid, fg + ice-white hubs).
+// Tucks invisible anchor points along yUpper - safeMargin and yLower + safeMargin.
+// Density ramps smoothly from u = 0.08 to 0.96 with distinct PRNG seeds (314159 / 271828).
+// Zero floating disconnected nodes guaranteed with k-NN (k = 3–5, max edge <= 1.15 * h(u)).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function generate3DNeuralTriangulation(side, H, prng, config = {}) {
+/**
+ * Generates pocket-confined volumetric blue haze micro-cloud strictly inside the almond chamber.
+ * Strictly within elliptical core (r_norm < 0.75, w_depth < -0.15) with soft Gaussian drop-off,
+ * boundary fading, globe tapering, and pinch-gate clearance.
+ */
+function generateVolumetricBlueHaze(side, H, prng, config = {}) {
+  const isLeft = side === 'left'
+  const sign = isLeft ? -1 : 1
+  const HAZE_POINTS = 520
+  const pointsBuilder = new ParameterizedPointsBuilder(H, config)
+
+  const baseNavy = new THREE.Color('#082878')
+  const royalSapphire = new THREE.Color('#0048d0')
+
+  for (let p = 0; p < HAZE_POINTS; p++) {
+    const t = p / (HAZE_POINTS - 1)
+    const u = 0.16 + t * (0.94 - 0.16) + (prng() - 0.5) * 0.02
+    const safeU = Math.max(0.16, Math.min(0.94, u))
+    const bounds = getAlmondPocketBounds(safeU, H, config)
+    if (bounds.gapHeight < bounds.minGapHeight * 1.15 || bounds.Ry < 0.035) continue
+
+    // Elliptical core sampling: r_norm < 0.70, w_depth < -0.15
+    const rCore = Math.sqrt(prng()) * 0.65
+    const theta = prng() * Math.PI * 2.0
+    const v_rel = rCore * Math.sin(theta)
+    // Background depth: strictly between -0.85 and -0.16
+    const w_depth = -0.16 - prng() * 0.68
+
+    const r_norm = Math.sqrt(v_rel * v_rel + w_depth * w_depth)
+    if (r_norm >= 0.72 || w_depth >= -0.15) continue
+
+    const y = bounds.gapCenterY + v_rel * bounds.Ry
+    const z = bounds.gapCenterZ + w_depth * bounds.Rz
+    const x = sign * 10.0 * safeU
+
+    // Clearance check to ensure no ribbon collision
+    const dHero = Math.min(
+      Math.abs(y - bounds.y0),
+      Math.abs(y - bounds.y1),
+      Math.abs(y - bounds.y2),
+      Math.abs(y - bounds.y3)
+    )
+    if (dHero < bounds.safeMargin * 0.50) continue
+
+    // Boundary taper: smooth falloff at outer pocket envelope
+    const boundaryFade = Math.max(0.0, Math.pow(1.0 - r_norm * r_norm, 1.8))
+    // Globe taper: smoothly ramps from u = 0.16 to 0.30
+    const globeTaper = THREE.MathUtils.smoothstep(safeU, 0.16, 0.30)
+    // Pinch gate taper: smoothly extinguishes before reaching pinch threshold
+    const pinchTaper = THREE.MathUtils.smoothstep(bounds.gapHeight, bounds.minGapHeight * 1.15, bounds.minGapHeight * 1.8)
+
+    const weight = computeConstraintWeight(safeU)
+    // Opacity strictly in calibrated 0.05 - 0.12 range
+    const alpha = (0.055 + prng() * 0.055) * boundaryFade * globeTaper * pinchTaper * weight
+    // Point size dynamically scales with local pocket height to prevent haze bleed
+    const size = Math.max(12.0, Math.min(40.0, bounds.Ry * 135.0 + prng() * 5.0))
+    const color = baseNavy.clone().lerp(royalSapphire, prng())
+
+    // 12% Theme modulation if themeConfig provides an accent
+    if (config.themeConfig && config.themeConfig.primaryWire) {
+      color.lerp(new THREE.Color(config.themeConfig.primaryWire), 0.12)
+    }
+
+    const relCoord = [safeU, v_rel, w_depth, r_norm]
+    pointsBuilder.addPoint(
+      new THREE.Vector3(x, y, z),
+      safeU,
+      76,
+      weight,
+      size,
+      alpha,
+      color,
+      -1.0,
+      0.0,
+      relCoord
+    )
+  }
+
+  return pointsBuilder.buildGeometry(true, true)
+}
+
+export function generateVolumetricNeuralField(side, H = H_VAL, prngOrConfig = {}, configOrGraph = {}, maybeGraph = null) {
+  let prng = null
+  let config = {}
+  let graph = null
+
+  if (typeof prngOrConfig === 'function') {
+    prng = prngOrConfig
+    config = configOrGraph || {}
+    graph = (maybeGraph && typeof maybeGraph.addNode === 'function') ? maybeGraph : null
+  } else {
+    config = prngOrConfig || {}
+    graph = (configOrGraph && typeof configOrGraph.addNode === 'function') ? configOrGraph : null
+  }
+
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
   const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
+  const outerFade = config.outerFade !== undefined ? config.outerFade : 0.15
+  const safeMargin = 0.052 * H // Minimum clearance from any primary wave strand (~0.059 units)
+
+  // Distinct left/right PRNG seeds: 314159 (left) / 271828 (right)
+  const localPrng = prng || createPrng(isLeft ? 314159 : 271828)
+
+  // 1. Invisible Anchor Points along inner ribbon margins (alpha = 0, size = 0)
+  const anchors = generateMarginAnchors(side, H, config, 28)
+
+  // 2. Volumetric Nodes with smooth density ramping from u = 0.08 to 0.96 across S = 24 bands
   const nodes = []
+  const S = 24 // 24 stratified longitudinal bands
+  let nodeId = 0
 
-  // Generate 65 Graph Nodes inside u in [0.18, 0.95]
-  for (let i = 0; i < 65; i++) {
-    const uNorm = i / 64.0
-    // Stratified distribution along u
-    const u = 0.20 + uNorm * (0.92 - 0.20) + (prng() - 0.5) * 0.03
-    const clampedU = Math.min(0.95, Math.max(0.18, u))
-    const yA = heroY0(clampedU, H, config)
-    const yB = heroY1(clampedU, H, config)
-    const yMin = Math.min(yA, yB)
-    const yMax = Math.max(yA, yB)
-    const gap = Math.max(0.04, yMax - yMin)
+  for (let s = 0; s < S; s++) {
+    const t = (s + 0.5) / S
+    const uStart = 0.08 + (s / S) * (0.96 - 0.08)
+    const uEnd = 0.08 + ((s + 1) / S) * (0.96 - 0.08)
+    // Smooth density ramping: fewer near globe (~3), richer toward outer wings (~10)
+    const countInBand = Math.round(3 + 6.8 * t)
 
-    let y
-    if (i < 48) {
-      // 48 Interior nodes inside the open almond eye & lobe volume
-      const t = 0.12 + 0.76 * prng()
-      y = yMin + t * gap
-    } else {
-      // 17 Peripheral nodes in the outer halo
-      const pickTop = prng() > 0.5
-      y = (pickTop ? yMax : yMin) + (prng() - 0.5) * 0.12 * H
+    for (let c = 0; c < countInBand; c++) {
+      let nodeCreated = false
+      for (let attempt = 0; attempt < 20 && !nodeCreated; attempt++) {
+        const u = uStart + localPrng() * (uEnd - uStart)
+        const bounds = getAlmondPocketBounds(u, H, config)
+
+        // Skip tight crossover pinch points
+        if (bounds.isPinch) continue
+
+        // Polar coordinate sampling strictly inside the elliptical cross-section
+        const rNorm = Math.sqrt(localPrng()) * 0.74
+        const theta = 2.0 * Math.PI * localPrng()
+        const v_rel = rNorm * Math.sin(theta)
+        const w_depth = rNorm * Math.cos(theta)
+
+        const y = bounds.gapCenterY + v_rel * bounds.Ry
+        const z = bounds.gapCenterZ + w_depth * bounds.Rz
+        const x = sign * 10.0 * u
+
+        // Poisson-like spatial clearance to prevent clustering
+        const posCandidate = new THREE.Vector3(x, y, z)
+        const minDist = 0.14 * bounds.Ry
+        let tooClose = false
+        for (let ex = Math.max(0, nodes.length - 18); ex < nodes.length; ex++) {
+          if (posCandidate.distanceTo(nodes[ex].pos) < minDist) {
+            tooClose = true
+            break
+          }
+        }
+        if (tooClose) continue
+
+        // Check clearance to all 4 hero ribbons
+        const dYHero = Math.min(
+          Math.abs(y - bounds.y0),
+          Math.abs(y - bounds.y1),
+          Math.abs(y - bounds.y2),
+          Math.abs(y - bounds.y3)
+        )
+        if (dYHero < safeMargin * 0.70) continue
+        if (Math.hypot(y - bounds.y2, z - bounds.z2) < safeMargin * 0.85) continue
+        if (Math.hypot(y - bounds.y3, z - bounds.z3) < safeMargin * 0.85) continue
+
+        // Verify dynamic deformation clearance across continuous 3D rotation
+        const animParams = SIDE_ANIMATION_CONFIG[side] || SIDE_ANIMATION_CONFIG.left
+        const { waveSpeed, waveFreq, rotIntensity, sidePhase } = animParams
+        const weightVal = computeConstraintWeight(u)
+        let dynamicClear = true
+        for (let dt = 0; dt <= 30; dt += 2) {
+          const { pos: defPt } = computeNeuralDeformationJS(
+            posCandidate,
+            u,
+            weightVal,
+            0.0,
+            dt,
+            waveSpeed,
+            waveFreq,
+            rotIntensity,
+            sidePhase
+          )
+          const dDef = Math.min(
+            Math.abs(defPt.y - bounds.y0),
+            Math.abs(defPt.y - bounds.y1),
+            Math.abs(defPt.y - bounds.y2),
+            Math.abs(defPt.y - bounds.y3)
+          )
+          if (dDef < 0.0285 * H) {
+            dynamicClear = false
+            break
+          }
+        }
+        if (!dynamicClear) continue
+
+        // 3-layer volumetric classification based on w_depth
+        let layer, depthTier, color, lineColor, alpha, size, isHighlight
+
+        if (w_depth < -0.25) {
+          // Background: deep sapphire/navy blue ~0.22 opacity
+          depthTier = 'bg'
+          layer = -1.0
+          color = new THREE.Color('#0a1e4a').lerp(new THREE.Color('#0038b8'), localPrng())
+          lineColor = color
+          alpha = 0.22 + localPrng() * 0.04
+          size = 1.5 + localPrng() * 0.3
+          isHighlight = 0.0
+        } else if (w_depth <= 0.25) {
+          // Midground: electric royal-blue ~0.58 opacity
+          depthTier = 'mid'
+          layer = 0.0
+          color = new THREE.Color('#0077ff').lerp(new THREE.Color('#00a8ff'), localPrng())
+          lineColor = color
+          alpha = 0.58 + localPrng() * 0.08
+          size = 2.6 + localPrng() * 0.4
+          isHighlight = 0.0
+        } else {
+          // Foreground: crisp cyan + prominent ice-white hubs ~0.90 opacity
+          depthTier = 'fg'
+          layer = 1.0
+          if (localPrng() < 0.26) {
+            // Radiant ice-white pinpoint hub
+            color = new THREE.Color('#ffffff')
+            lineColor = new THREE.Color('#00f0ff')
+            alpha = 0.98
+            size = 5.6 + localPrng() * 0.8
+            isHighlight = 1.0
+          } else {
+            // Crisp cyan
+            color = new THREE.Color('#00f0ff').lerp(new THREE.Color('#38d8ff'), localPrng() * 0.3)
+            lineColor = color
+            alpha = 0.90
+            size = 4.0 + localPrng() * 0.5
+            isHighlight = 0.0
+          }
+        }
+
+        // Soft 12% chromatic blend with active portfolio theme accent
+        if (config.themeConfig && config.themeConfig.primaryWire) {
+          color.lerp(new THREE.Color(config.themeConfig.primaryWire), 0.12)
+          lineColor.lerp(new THREE.Color(config.themeConfig.primaryWire), 0.12)
+        }
+
+        const relCoord = [u, v_rel, w_depth, rNorm]
+        const weight = computeConstraintWeight(u)
+        const targetK = 3 + Math.floor(localPrng() * 3) // k in [3, 5]
+
+        nodes.push({
+          id: `vol_node_${nodeId++}`,
+          pos: posCandidate,
+          u,
+          hu: bounds.gapHeight,
+          weight,
+          isAnchor: false,
+          connectedCount: 0,
+          targetK,
+          layer,
+          depthTier,
+          color,
+          lineColor,
+          alpha,
+          size,
+          isHighlight,
+          relativeCoord: relCoord,
+          v_rel,
+          w_depth,
+          r_norm: rNorm,
+        })
+        nodeCreated = true
+      }
     }
-    const x = sign * 10.0 * clampedU
-    const z = (prng() - 0.5) * 0.35 * H
-
-    nodes.push({
-      id: i,
-      pos: new THREE.Vector3(x, y, z),
-      u: clampedU,
-      weight: computeConstraintWeight(clampedU),
-    })
   }
 
-  // Connect each node to 2-3 nearest neighbors within d < 0.28 * H
-  const maxRadius = 0.28 * H
-  const edgeSet = new Set()
+  // 3. Ribbon Non-Intersection Check for Candidate Segments
+  function doesSegmentIntersectRibbons(pA, uA, pB, uB, isTether = false) {
+    const samples = 6
+    for (let s = 1; s < samples; s++) {
+      const frac = s / samples
+      const ut = uA + frac * (uB - uA)
+      const yt = pA.y + frac * (pB.y - pA.y)
+      const zt = pA.z + frac * (pB.z - pA.z)
+
+      const bounds = getAlmondPocketBounds(ut, H, config)
+      const marginTol = isTether ? 0.002 : 0.20 * safeMargin
+      if (yt > bounds.yUpper + marginTol || yt < bounds.yLower - marginTol) {
+        return true
+      }
+
+      const y2 = heroY2(ut, H, config)
+      const z2 = heroZ(2, ut, H, config)
+      const y3 = heroY3(ut, H, config)
+      const z3 = heroZ(3, ut, H, config)
+      if (Math.hypot(yt - y2, zt - z2) < 0.45 * safeMargin) return true
+      if (Math.hypot(yt - y3, zt - z3) < 0.45 * safeMargin) return true
+    }
+    return false
+  }
+
+  // 4. Proximity-Constrained k-NN Edge Construction (k = 3-5)
+  // Length clamping strictly bounded: 0.08 * h(u) <= length(e) <= 0.85 * h(u)
   const edges = []
+  const edgeSet = new Set()
 
   for (let i = 0; i < nodes.length; i++) {
     const nA = nodes[i]
@@ -509,59 +812,276 @@ function generate3DNeuralTriangulation(side, H, prng, config = {}) {
     for (let j = 0; j < nodes.length; j++) {
       if (i === j) continue
       const nB = nodes[j]
+      if (nB.connectedCount >= 5) continue
+
+      const du = Math.abs(nA.u - nB.u)
+      if (du > 0.12) continue
+
+      const avgHu = 0.5 * (nA.hu + nB.hu)
       const dist = nA.pos.distanceTo(nB.pos)
-      if (dist < maxRadius && dist > 0.01) {
-        candidates.push({ j, dist })
-      }
+      // Strict length clamping: no long diagonal struts spanning the chamber
+      if (dist < 0.08 * avgHu || dist > 0.85 * avgHu) continue
+
+      if (doesSegmentIntersectRibbons(nA.pos, nA.u, nB.pos, nB.u)) continue
+
+      candidates.push({ j, dist })
     }
 
     candidates.sort((a, b) => a.dist - b.dist)
-    const connectCount = Math.min(3, candidates.length)
-    for (let c = 0; c < connectCount; c++) {
-      const j = candidates[c].j
-      const key = Math.min(i, j) + '-' + Math.max(i, j)
-      if (!edgeSet.has(key)) {
-        edgeSet.add(key)
-        edges.push({ i, j, dist: candidates[c].dist })
+
+    for (const cand of candidates) {
+      if (nA.connectedCount >= nA.targetK) break
+      const nB = nodes[cand.j]
+      if (nB.connectedCount >= 5) continue
+
+      const key = Math.min(i, cand.j) + '-' + Math.max(i, cand.j)
+      if (edgeSet.has(key)) continue
+
+      // Same-layer cross-intersection prevention
+      const avgZ1 = (nA.pos.z + nB.pos.z) * 0.5
+      let crosses = false
+      for (const e of edges) {
+        if (e.i === i || e.j === i || e.i === cand.j || e.j === cand.j) continue
+        const eA = nodes[e.i]
+        const eB = nodes[e.j]
+        const avgZ2 = (eA.pos.z + eB.pos.z) * 0.5
+        if (Math.abs(avgZ1 - avgZ2) < 0.06) {
+          if (segmentsIntersect2D(nA.pos, nB.pos, eA.pos, eB.pos)) {
+            crosses = true
+            break
+          }
+        }
+      }
+      if (crosses) continue
+
+      edgeSet.add(key)
+      edges.push({ i, j: cand.j, dist: cand.dist })
+      nA.connectedCount++
+      nB.connectedCount++
+    }
+  }
+
+  // 5. Guaranteed Connectivity: zero floating disconnected nodes, every non-anchor node degree >= 1
+  for (let i = 0; i < nodes.length; i++) {
+    const nA = nodes[i]
+    if (nA.connectedCount === 0) {
+      let bestJ = -1
+      let bestDist = Infinity
+      // First pass: strictly require no ribbon intersection AND no same-layer crossing
+      for (let j = 0; j < nodes.length; j++) {
+        if (i === j) continue
+        const nB = nodes[j]
+        const du = Math.abs(nA.u - nB.u)
+        if (du > 0.18) continue
+        const dist = nA.pos.distanceTo(nB.pos)
+        if (dist < bestDist && !doesSegmentIntersectRibbons(nA.pos, nA.u, nB.pos, nB.u)) {
+          const avgZ1 = (nA.pos.z + nB.pos.z) * 0.5
+          let crosses = false
+          for (const e of edges) {
+            if (e.i === i || e.j === i || e.i === j || e.j === j) continue
+            const eA = nodes[e.i]
+            const eB = nodes[e.j]
+            const avgZ2 = (eA.pos.z + eB.pos.z) * 0.5
+            if (Math.abs(avgZ1 - avgZ2) < 0.06) {
+              if (segmentsIntersect2D(nA.pos, nB.pos, eA.pos, eB.pos)) {
+                crosses = true
+                break
+              }
+            }
+          }
+          if (!crosses) {
+            bestDist = dist
+            bestJ = j
+          }
+        }
+      }
+      // Fallback pass if no candidate found without same-layer crossing: find closest non-intersecting candidate
+      if (bestJ === -1) {
+        for (let j = 0; j < nodes.length; j++) {
+          if (i === j) continue
+          const nB = nodes[j]
+          const du = Math.abs(nA.u - nB.u)
+          if (du > 0.22) continue
+          const dist = nA.pos.distanceTo(nB.pos)
+          if (dist < bestDist && !doesSegmentIntersectRibbons(nA.pos, nA.u, nB.pos, nB.u)) {
+            bestDist = dist
+            bestJ = j
+          }
+        }
+      }
+      if (bestJ !== -1) {
+        const key = Math.min(i, bestJ) + '-' + Math.max(i, bestJ)
+        if (!edgeSet.has(key)) {
+          edgeSet.add(key)
+          edges.push({ i, j: bestJ, dist: bestDist })
+          nA.connectedCount++
+          nodes[bestJ].connectedCount++
+        }
       }
     }
   }
 
-  // Build LineSegments geometry for delicate geometric neural triangles (opacity: 0.18)
-  const lineBuilder = new ParameterizedLineBuilder(innerFade)
-  const lineColor = new THREE.Color('#0a52ff').lerp(new THREE.Color('#30d5ff'), 0.45)
+  // Filter visible nodes to guarantee degree >= 1
+  const visibleNodes = nodes.filter((n) => n.connectedCount > 0)
 
+  // 6. Wave Margin Tethering:
+  // Outer boundary nodes (r_norm > 0.62) establish clean tethering edges to nearest invisible margin anchors
+  const tetherEdges = []
+  for (const node of visibleNodes) {
+    if (node.r_norm > 0.62) {
+      let bestAnchor = null
+      let bestAnchorDist = Infinity
+
+      for (const anc of anchors) {
+        const du = Math.abs(node.u - anc.u)
+        if (du > 0.08) continue
+
+        // Check if anchor is on the same vertical side (upper or lower)
+        const isUpperAnchor = anc.id.includes('upper')
+        if (node.v_rel > 0 && !isUpperAnchor) continue
+        if (node.v_rel < 0 && isUpperAnchor) continue
+
+        const dist = node.pos.distanceTo(anc.pos)
+        if (dist <= 0.85 * node.hu && dist < bestAnchorDist) {
+          if (!doesSegmentIntersectRibbons(node.pos, node.u, anc.pos, anc.u, true)) {
+            bestAnchorDist = dist
+            bestAnchor = anc
+          }
+        }
+      }
+
+      if (bestAnchor) {
+        tetherEdges.push({
+          node,
+          anchor: bestAnchor,
+          dist: bestAnchorDist,
+        })
+      }
+    }
+  }
+
+  // 7. Build Line BufferGeometry (Internal Edges + Margin Tethers)
+  const lineBuilder = new ParameterizedLineBuilder(innerFade, outerFade, H, config)
+
+  // Add internal structural edges
   edges.forEach(({ i, j }) => {
     const nA = nodes[i]
     const nB = nodes[j]
+
+    const aA = nA.layer > 0.5 ? 0.88 : (nA.layer < -0.5 ? 0.22 : 0.58)
+    const aB = nB.layer > 0.5 ? 0.88 : (nB.layer < -0.5 ? 0.22 : 0.58)
+
+    const cA = nA.lineColor || nA.color
+    const cB = nB.lineColor || nB.color
+
     lineBuilder.addSegment(
       nA.pos,
       nA.u,
-      70,
+      75,
       nA.weight,
       nB.pos,
       nB.u,
-      70,
+      75,
       nB.weight,
-      0.18,
-      0.18,
-      lineColor,
-      lineColor
+      aA,
+      aB,
+      cA,
+      cB,
+      1.0,
+      nA.layer,
+      nB.layer,
+      nA.relativeCoord,
+      nB.relativeCoord
     )
   })
-  const triangulationGeo = lineBuilder.buildGeometry()
 
-  // Build Points geometry for the 65 crisp glowing neural nodes
-  const pointsBuilder = new ParameterizedPointsBuilder()
-  const nodeColor = new THREE.Color('#30d5ff')
+  // Add margin tether edges (alpha smoothly fades to 0.40 at the margin anchor)
+  const tetherColor = new THREE.Color('#00c8ff')
+  tetherEdges.forEach(({ node, anchor }) => {
+    const aNode = node.layer > 0.5 ? 0.80 : (node.layer < -0.5 ? 0.20 : 0.50)
+    const aAnchor = 0.40 // Smooth fade toward the wave margin (SPEC.md Section 5.3)
 
-  nodes.forEach((n) => {
-    pointsBuilder.addPoint(n.pos, n.u, 75, n.weight, 0.22, 0.85, nodeColor)
+    lineBuilder.addSegment(
+      node.pos,
+      node.u,
+      75,
+      node.weight,
+      anchor.pos,
+      anchor.u,
+      75,
+      anchor.weight,
+      aNode,
+      aAnchor,
+      node.color,
+      tetherColor,
+      1.0,
+      node.layer,
+      0.0,
+      node.relativeCoord,
+      anchor.relativeCoord
+    )
   })
-  const nodesGeo = pointsBuilder.buildGeometry(true, true)
+  const linesGeo = lineBuilder.buildGeometry()
 
-  return { triangulationGeo, nodesGeo, rawNodes: nodes }
+  // 8. Build Points BufferGeometry (Zero anchor nodes included -> zero dots on wave filaments!)
+  const pointsBuilder = new ParameterizedPointsBuilder(H, config)
+  visibleNodes.forEach((n) => {
+    pointsBuilder.addPoint(
+      n.pos,
+      n.u,
+      75,
+      n.weight,
+      n.size,
+      n.alpha,
+      n.color,
+      n.layer,
+      n.isHighlight,
+      n.relativeCoord
+    )
+  })
+  const pointsGeo = pointsBuilder.buildGeometry(true, true)
+
+  // 9. Generate Pocket-Confined Volumetric Blue Haze
+  const hazeGeo = generateVolumetricBlueHaze(side, H, localPrng, config)
+
+  // Register in canonical graph if provided
+  if (graph && typeof graph.addNode === 'function') {
+    visibleNodes.forEach((n) => {
+      graph.addNode(
+        new GraphNode({
+          id: `${side}_node_${n.id}`,
+          position: n.pos,
+          u: n.u,
+          wireId: 75,
+          weight: n.weight,
+          tier: n.isHighlight ? 'hero' : 'intersection',
+          depthLayer: n.depthTier,
+          relativeCoord: n.relativeCoord,
+          meta: { isHighlight: n.isHighlight, layer: n.layer, relativeCoord: n.relativeCoord },
+        })
+      )
+    })
+
+    edges.forEach(({ i, j }) => {
+      const nA = nodes[i]
+      const nB = nodes[j]
+      graph.addEdge(`${side}_node_${nA.id}`, `${side}_node_${nB.id}`, 'secondary', 75)
+    })
+  }
+
+  return {
+    linesGeo,
+    pointsGeo,
+    hazeGeo,
+    triangulationGeo: linesGeo,
+    nodesGeo: pointsGeo,
+    rawNodes: visibleNodes,
+    edges,
+  }
 }
+// Backward-compatible aliases
+export const generate3DNeuralNetwork = generateVolumetricNeuralField
+export const generate3DNeuralTriangulation = generateVolumetricNeuralField
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. SWEEPING OUTER BEADED DOT-ARCS & SOFT BOKEH CIRCLES
@@ -576,7 +1096,7 @@ function generate5SweepingOuterBeadedStreams(side, H, config = {}) {
   const sign = isLeft ? -1 : 1
   const N_DOTS = 75
   const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
-  const pointsBuilder = new ParameterizedPointsBuilder()
+  const pointsBuilder = new ParameterizedPointsBuilder(H, config)
   const beadColor = new THREE.Color('#30d5ff').lerp(new THREE.Color('#0055ff'), 0.35)
 
   // 5 outer arc definitions
@@ -643,10 +1163,12 @@ function generate5SweepingOuterBeadedStreams(side, H, config = {}) {
   return pointsBuilder.buildGeometry(true, true)
 }
 
+
+
 function generate25BackgroundBokehCircles(side, H, prng) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
-  const pointsBuilder = new ParameterizedPointsBuilder()
+  const pointsBuilder = new ParameterizedPointsBuilder(H)
   const bokehColor = new THREE.Color('#0048ff')
 
   for (let b = 0; b < 25; b++) {
@@ -690,7 +1212,7 @@ function get6ExactCurveCrossingFlares(side, H, config = {}) {
     { u: 0.842, y: heroY2(0.842, H, config), z: heroZ(2, 0.842, H, config) }, // Hero 2 & Hero 3
   ]
 
-  const pointsBuilder = new ParameterizedPointsBuilder()
+  const pointsBuilder = new ParameterizedPointsBuilder(H, config)
 
   crossings.forEach(({ u, y, z }, idx) => {
     const x = sign * 10.0 * u
@@ -714,7 +1236,7 @@ function generate900PinpointStardust(side, H, prng, config = {}) {
   const sign = isLeft ? -1 : 1
   const STARDUST_COUNT = 900
   const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
-  const pointsBuilder = new ParameterizedPointsBuilder()
+  const pointsBuilder = new ParameterizedPointsBuilder(H, config)
 
   const colorPalette = [
     new THREE.Color('#1068ff'), // Electric Royal-Blue
@@ -771,7 +1293,8 @@ function generate900PinpointStardust(side, H, prng, config = {}) {
  * @param {object} [config]
  */
 export function generateSideWireData(side, config = {}) {
-  const prng = createPrng(7771)
+  const seed = side === 'left' ? 104729 : 1299709
+  const prng = createPrng(seed)
   const graph = new NeuralWireGraph(side)
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
@@ -799,7 +1322,7 @@ export function generateSideWireData(side, config = {}) {
 
   // 2. 6-pass micro-offset additive glow bundle builder for Hero Waves
   function buildCoreLineGeo(strandList) {
-    const builder = new ParameterizedLineBuilder(innerFade, outerFade)
+    const builder = new ParameterizedLineBuilder(innerFade, outerFade, H, config)
     strandList.forEach(({ wireId, pts, maxU = 1.0 }) => {
       const count = pts.length
       for (let i = 0; i < count - 1; i++) {
@@ -814,7 +1337,7 @@ export function generateSideWireData(side, config = {}) {
   }
 
   function buildOffsetAuraLineGeo(strandList, offsets) {
-    const builder = new ParameterizedLineBuilder(innerFade, outerFade)
+    const builder = new ParameterizedLineBuilder(innerFade, outerFade, H, config)
     strandList.forEach(({ wireId, pts, maxU = 1.0 }) => {
       const count = pts.length
       offsets.forEach(({ dy, dz }) => {
@@ -850,30 +1373,18 @@ export function generateSideWireData(side, config = {}) {
   // 3. Companion Silk Strands bundled tightly along Hero Waves (ZERO HAMMOCK NET!)
   const subFilamentsGeo = generateCompanionSilkStrands(side, H, config)
 
-  // 4. 3D Neural Triangulation Mesh & 65 Graph Nodes inside the dark almond chamber
-  const { triangulationGeo: constellationGeo, nodesGeo: intersectionNodesGeo, rawNodes } =
-    generate3DNeuralTriangulation(side, H, prng, config)
-
-  rawNodes.forEach((n) => {
-    graph.addNode(new GraphNode({
-      id: `${side}_node_${n.id}`,
-      position: n.pos,
-      u: n.u,
-      wireId: 75,
-      weight: n.weight,
-      tier: 'intersection',
-      depthLayer: n.pos.z >= 0.05 ? 'fg' : 'mid',
-    }))
-  })
+  // 4. Volumetric 3-Layer Neural Network Field in almond chambers
+  const { linesGeo: neuralLinesGeo, pointsGeo: neuralPointsGeo, hazeGeo: neuralHazeGeo } =
+    generateVolumetricNeuralField(side, H, config, graph)
 
   // 5. 5 Sweeping Outer Beaded Dot-Streams floating well outside the main waves
   const beadedStreamsGeo = generate5SweepingOuterBeadedStreams(side, H, config)
 
-  // 6. 25 Soft Out-of-Focus Background Bokeh Discs
-  const bokehGeo = generate25BackgroundBokehCircles(side, H, prng)
-
-  // 7. 6 Exact Curve-Crossing Flares strictly on Hero wave intersections
+  // 6. 6 Exact Curve-Crossing Flares strictly on Hero wave intersections
   const focalFlaresGeo = get6ExactCurveCrossingFlares(side, H, config)
+
+  // 7. 25 Soft Out-of-Focus Background Bokeh Discs
+  const bokehGeo = generate25BackgroundBokehCircles(side, H, prng)
 
   // 8. 900 Tiny Pinpoint Stardust Specks
   const stardustGeo = generate900PinpointStardust(side, H, prng, config)
@@ -881,7 +1392,7 @@ export function generateSideWireData(side, config = {}) {
   // Canonical graph exports
   const canonicalModel = graph.exportCanonicalModel()
   primaryCoreGeo.userData.graphModel = canonicalModel
-  constellationGeo.userData.graphModel = canonicalModel
+  neuralLinesGeo.userData.graphModel = canonicalModel
 
   return {
     primaryCoreGeo,
@@ -895,13 +1406,19 @@ export function generateSideWireData(side, config = {}) {
     subFilamentsGeo,
     tertiaryGeo: subFilamentsGeo,
     beadedStreamsGeo,
-    constellationGeo,
-    primaryConnectionsGeo: constellationGeo,
-    backgroundConnectionsGeo: constellationGeo,
+    neuralLinesGeo,
+    neuralPointsGeo,
+    neuralHazeGeo,
+    constellationGeo: neuralLinesGeo,
+    primaryConnectionsGeo: neuralLinesGeo,
+    backgroundConnectionsGeo: neuralLinesGeo,
     focalFlaresGeo,
     heroNodesGeo: focalFlaresGeo,
-    intersectionNodesGeo,
-    connectionNodesGeo: intersectionNodesGeo,
+    intersectionNodesGeo: neuralPointsGeo,
+    connectionNodesGeo: neuralPointsGeo,
+    minorNodesGeo: neuralPointsGeo,
+    neuralNodesGeo: neuralPointsGeo,
+    neuralEdgesGeo: neuralLinesGeo,
     stardustGeo,
     particlesGeo: stardustGeo,
     bokehGeo,

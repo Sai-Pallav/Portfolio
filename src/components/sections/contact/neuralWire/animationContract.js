@@ -1,82 +1,134 @@
 /**
  * @file animationContract.js
- * Architecture Contract & Deformation Specification for Phase 2 GPU-Based Neural Animation.
- * Version 3.0.0 — Braided Luminous Neural Wave Stream Contract.
+ * Architecture Contract & Deformation Specification for Phase 3 GPU-Based Neural Network Animation.
+ * Version 4.0.0 — Outward Traveling 3D Corkscrew Neural Graph Contract.
  *
  * This contract establishes the mathematical, topological, and attribute guarantees baked into
- * the static BufferGeometries and canonical NeuralWireGraph during the structural redesign,
- * ensuring that Phase 2 can introduce organic, synchronized wave undulation without rebuilding
- * geometry or breaking network connectivity.
+ * the static BufferGeometries and canonical NeuralWireGraph, ensuring:
+ * 1. The neural network lives exclusively in the negative-space gaps between the primary wave strands.
+ * 2. Primary wave strands (Hero 0..3) and central globe are strictly protected and un-rotated.
+ * 3. Subtle 3D corkscrew rotation propagates strictly OUTWARD: inner tip (u=0) -> outer edge (u=1).
+ * 4. Progressive development: minimal rotation near the central globe (u < 0.10), developing outward.
+ * 5. Coherent 3D volumetric depth exchange (Z-depth oscillation) with restrained vertical travel (Y).
+ * 6. Left and right networks animate simultaneously with organic subtle asymmetry (seeds, timing, phases).
+ * 7. 100% synchronized deformation between node points and connection edges.
  */
+
+import * as THREE from 'three'
+
+export const ANIMATION_CONTRACT_VERSION = '4.0.0'
+
+export const SIDE_ANIMATION_CONFIG = {
+  left: {
+    waveSpeed: 0.55,       // rad/s (approx 11.4s period)
+    waveFreq: 11.62,       // k (approx 1.85 cycles along formation)
+    rotIntensity: 1.0,     // amplitude multiplier
+    sidePhase: 0.0,        // starting phase
+    seed: 104729,          // deterministic PRNG seed for topology
+  },
+  right: {
+    waveSpeed: 0.48,       // slightly slower, organic difference
+    waveFreq: 12.25,       // slightly higher cycle density
+    rotIntensity: 1.0,
+    sidePhase: 0.65,       // phase offset for organic asymmetry
+    seed: 1299709,         // distinct PRNG seed
+  },
+}
 
 /**
- * ═══════════════════════════════════════════════════════════════════════════════
- * BUFFER ATTRIBUTE & GRAPH SPECIFICATION (Baked into BufferGeometries & Graph)
- * ═══════════════════════════════════════════════════════════════════════════════
- *
- * 1. Canonical Graph Model:
- *    - Maintained via `NeuralWireGraph`, `GraphNode`, and `GraphEdge`.
- *    - 4 Hero Primary Filaments per side (wireId 0..3).
- *    - Layer A: Curved Hairline Sub-Filaments (wireId 10..29) peeling off and merging back.
- *    - Layer B: Beaded Dot-Stream Curves (wireId 30..35) evenly sampled along sweeping splines.
- *    - Layer C: Whisper-Faint Micro-Constellation Web (strictly local edges).
- *    - Focal Pinch-Point Flares anchored at exact curve crossings and pinch points.
- *
- * 2. Vertex Buffer Attributes:
- *    Every vertex across all geometric layers contains synchronized Float32BufferAttributes:
- *
- *    - `position`   (vec3)  : Base undeformed 3D coordinates [x, y, z] in Three.js space.
- *    - `aBasePos`   (vec3)  : Permanent clone of undeformed base position [x, y, z].
- *    - `aU`         (float) : Normalized curve parameter along stream, u in [0.0, 1.0].
- *                             u = 0.0 is the inner anchor near the central globe.
- *                             u = 1.0 is the outer boundary toward viewport edge.
- *    - `aWireId`    (float) : Integer ID identifying parent strand:
- *                             0..3: Primary Hero Curves (0: Upper Crest, 1: Lower Counter-Crest, 2: Weaver, 3: Depth)
- *                             10..29: Curved Hairline Sub-Filaments
- *                             30..35: Beaded Dot-Stream Splines
- *    - `aWeight`    (float) : Boundary constraint weight in [0.0, 1.0].
- *                             Weight is strictly 0.0 at u = 0.0 (near central globe),
- *                             smoothly easing to 1.0 by u = 0.14.
- *                             This guarantees wire endpoints near the globe NEVER displace,
- *                             preventing any collision or clipping with orbital rings.
- *                             At outer boundaries (u > 0.88), weight gently eases to 0.80
- *                             to maintain spatial stability.
- *
- * 3. Point Attributes (for Beaded Streams, Flares, Stardust, Bokeh):
- *    - `size`       (float) : Calibrated particle/node base size.
- *    - `alpha`      (float) : Opacity weighting factor.
- *
- * ═══════════════════════════════════════════════════════════════════════════════
- * PHASE 2 VERTEX SHADER DEFORMATION SPECIFICATION (GLSL)
- * ═══════════════════════════════════════════════════════════════════════════════
- *
- * When Phase 2 introduces animation, all elements will evaluate this EXACT shared deformation:
- *
- * ```glsl
- * uniform float uTime;
- * uniform float uWaveSpeed;
- * uniform float uWaveAmplitude;
- *
- * attribute vec3 aBasePos;
- * attribute float aU;
- * attribute float aWireId;
- * attribute float aWeight;
- *
- * vec3 computeNeuralDisplacement(vec3 basePos, float u, float wireId, float weight, float time) {
- *   if (weight <= 0.001) return basePos;
- *
- *   float phase = wireId * 1.570796;
- *   float freq1 = 2.4;
- *   float freq2 = 1.6;
- *   float speed = uWaveSpeed;
- *
- *   float waveY = sin(u * 6.283185 * freq1 - time * speed + phase) * 0.14
- *               + cos(u * 6.283185 * freq2 - time * speed * 0.68 + phase * 1.35) * 0.08;
- *   float waveZ = cos(u * 6.283185 * freq1 * 0.85 - time * speed * 0.55 + phase * 0.9) * 0.10;
- *
- *   return basePos + vec3(0.0, waveY * weight * uWaveAmplitude, waveZ * weight * uWaveAmplitude);
- * }
- * ```
+ * GLSL Vertex Shader Deformation Function.
+ * Evaluates the exact outward propagation corkscrew roll.
  */
+export const NEURAL_DEFORMATION_GLSL = `
+uniform float uTime;
+uniform float uWaveSpeed;
+uniform float uWaveFreq;
+uniform float uRotIntensity;
+uniform float uSidePhase;
 
-export const ANIMATION_CONTRACT_VERSION = '3.0.0'
+vec3 computeNeuralDeformation(vec3 basePos, float u, float weight, float layer) {
+  if (weight <= 0.0001) return basePos;
+
+  // Outward traveling wave phase:
+  // u = 0.0 (inner tip near globe) -> u = 1.0 (outer viewport edge)
+  // Continuous travelling phase: angle = k * u - omega * time + sidePhase
+  float angle = uWaveFreq * u - uWaveSpeed * uTime + uSidePhase;
+
+  // Progressive rotational intensity envelope:
+  // Strictly 0 near globe (u < 0.08), smoothly developing outward
+  float innerEnv = smoothstep(0.06, 0.32, u);
+  float outerRamp = mix(0.40, 1.0, smoothstep(0.32, 0.95, u));
+  float amp = innerEnv * outerRamp * weight * uRotIntensity;
+
+  // Formation center parabolic sweep
+  float yCenter = 0.3164 * u * u;
+  float deltaY = basePos.y - yCenter;
+  float deltaZ = basePos.z;
+
+  // 3D Corkscrew deformation:
+  // 1. Helical wave displacement along local propagation
+  float sinA = sin(angle);
+  float cosA = cos(angle);
+  float waveY = sinA * (0.020 * 1.13) * amp;
+  float waveZ = cosA * (0.120 * 1.13) * amp;
+
+  // 2. Coherent cross-sectional roll & layer depth exchange
+  float rollY = (-deltaZ * sinA * 0.075 + deltaY * (cosA - 1.0) * 0.030) * amp;
+  float rollZ = (deltaZ * (cosA - 1.0) + deltaY * sinA * 0.120) * amp;
+
+  return vec3(
+    basePos.x,
+    basePos.y + waveY + rollY,
+    basePos.z + waveZ + rollZ
+  );
+}
+`
+
+/**
+ * Pure JavaScript equivalent of computeNeuralDeformation for testing and verification.
+ */
+export function computeNeuralDeformationJS(
+  basePos,
+  u,
+  weight,
+  layer = 0.0,
+  time = 0.0,
+  waveSpeed = 0.55,
+  waveFreq = 11.62,
+  rotIntensity = 1.0,
+  sidePhase = 0.0
+) {
+  if (weight <= 0.0001) {
+    return { pos: basePos.clone(), depthCue: 1.0 }
+  }
+
+  // Outward traveling wave phase: angle = k * u - omega * time + sidePhase
+  const angle = waveFreq * u - waveSpeed * time + sidePhase
+
+  // Progressive envelope: strictly 0 near globe
+  const innerEnv = THREE.MathUtils.smoothstep(u, 0.06, 0.32)
+  const outerRamp = THREE.MathUtils.lerp(0.40, 1.0, THREE.MathUtils.smoothstep(u, 0.32, 0.95))
+  const amp = innerEnv * outerRamp * weight * rotIntensity
+
+  const yCenter = 0.3164 * u * u
+  const deltaY = basePos.y - yCenter
+  const deltaZ = basePos.z
+
+  // 3D Corkscrew deformation
+  const sinA = Math.sin(angle)
+  const cosA = Math.cos(angle)
+  const waveY = sinA * (0.020 * 1.13) * amp
+  const waveZ = cosA * (0.120 * 1.13) * amp
+
+  const rollY = (-deltaZ * sinA * 0.075 + deltaY * (cosA - 1.0) * 0.030) * amp
+  const rollZ = (deltaZ * (cosA - 1.0) + deltaY * sinA * 0.120) * amp
+
+  const deformedPos = new THREE.Vector3(
+    basePos.x,
+    basePos.y + waveY + rollY,
+    basePos.z + waveZ + rollZ
+  )
+
+  const depthCue = Math.min(1.40, Math.max(0.65, 1.0 + (deformedPos.z + layer * 0.02) * 0.50))
+  return { pos: deformedPos, depthCue }
+}

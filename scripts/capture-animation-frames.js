@@ -5,7 +5,7 @@ import { spawn } from 'child_process'
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 const PORT = 9223
-const TARGET_URL = 'http://localhost:4173/#contact'
+const TARGET_URL = 'http://localhost:5173/#contact'
 
 async function launchChrome() {
   const tmpDir = path.join(process.env.TEMP || 'C:\\Windows\\Temp', 'chrome-profile-' + Date.now())
@@ -21,9 +21,6 @@ async function launchChrome() {
     '--enable-webgl',
     '--ignore-gpu-blocklist',
   ])
-
-  chrome.stdout.on('data', d => console.log('CHROME OUT:', d.toString()))
-  chrome.stderr.on('data', d => console.log('CHROME ERR:', d.toString()))
 
   // Wait for remote debugging to be ready
   for (let i = 0; i < 30; i++) {
@@ -78,48 +75,55 @@ async function capture() {
     await sendCDP(ws, 'Runtime.enable')
     await sendCDP(ws, 'Console.enable')
 
-    const consoleLogs = []
-    ws.addEventListener('message', (event) => {
-      const msg = JSON.parse(event.data)
-      if (msg.method === 'Runtime.consoleAPICalled') {
-        const text = msg.params.args.map(a => a.value || a.description).join(' ')
-        consoleLogs.push(`[Console ${msg.params.type}] ${text}`)
-      }
-    })
-
     console.log(`Navigating to ${TARGET_URL}...`)
     await sendCDP(ws, 'Page.navigate', { url: TARGET_URL })
 
     // Wait 3.5s for initial load and Three.js canvas initialization
     await new Promise(r => setTimeout(r, 3500))
 
-    // Scroll directly into the #contact section
+    // Scroll directly into the contact globe and hide debug panel
     await sendCDP(ws, 'Runtime.evaluate', {
       expression: `
-        const el = document.getElementById('contact');
-        if (el) {
-          el.scrollIntoView({ behavior: 'instant', block: 'center' });
-        }
+        (() => {
+          const globe = document.getElementById('contact-globe-inner') || document.getElementById('contact');
+          if (globe) {
+            globe.scrollIntoView({ behavior: 'instant', block: 'center' });
+          }
+          document.querySelectorAll('div.fixed.z-50').forEach(el => {
+            el.style.display = 'none';
+          });
+        })()
       `,
     })
 
-    // Wait 2 seconds for IntersectionObserver and in-view rendering to settle
-    await new Promise(r => setTimeout(r, 2000))
+    // Wait 2.5 seconds for Lenis and Three.js canvas to settle
+    await new Promise(r => setTimeout(r, 2500))
 
-    // Capture screenshots at multiple animation moments across cycles
-    const moments = [
-      { name: 'moment-00-initial', delayMs: 500, label: 'Initial State' },
-      { name: 'moment-01-early-wave', delayMs: 2500, label: 'Early Wave Propagation (t ~ 2.5s)' },
-      { name: 'moment-02-mid-prop', delayMs: 3000, label: 'Mid-Propagation (t ~ 5.5s)' },
-      { name: 'moment-03-rot-transition', delayMs: 4000, label: 'Rotational Transition / Depth Roll (t ~ 9.5s)' },
-      { name: 'moment-04-late-prop', delayMs: 4500, label: 'Late Propagation / Wave Crest (t ~ 14.0s)' },
-      { name: 'moment-05-full-cycle', delayMs: 4000, label: 'Full Rotation Cycle Complete (t ~ 18.0s)' },
-    ]
+    // Re-verify scroll position right before capturing
+    await sendCDP(ws, 'Runtime.evaluate', {
+      expression: `
+        (() => {
+          const globe = document.getElementById('contact-globe-inner') || document.getElementById('contact');
+          if (globe) {
+            globe.scrollIntoView({ behavior: 'instant', block: 'center' });
+          }
+        })()
+      `,
+    })
+    await new Promise(r => setTimeout(r, 500))
 
     const outDir = path.resolve('scripts/screenshots')
     if (!fs.existsSync(outDir)) {
       fs.mkdirSync(outDir, { recursive: true })
     }
+
+    // 1. Capture Desktop Moments (1920x1080)
+    const moments = [
+      { name: 'moment-00-initial', delayMs: 500, label: 'Desktop Initial (t ~ 0s)' },
+      { name: 'moment-01-early-wave', delayMs: 3000, label: 'Desktop Early Wave Propagation (t ~ 3s)' },
+      { name: 'moment-02-mid-prop', delayMs: 4000, label: 'Desktop Mid Outward Propagation (t ~ 7s)' },
+      { name: 'moment-03-rot-transition', delayMs: 4500, label: 'Desktop 3D Corkscrew Roll (t ~ 11.5s)' },
+    ]
 
     for (const moment of moments) {
       if (moment.delayMs > 0) {
@@ -133,7 +137,51 @@ async function capture() {
       console.log(`  ✓ Saved ${filePath} (${(buf.length / 1024).toFixed(1)} KB)`)
     }
 
-    // Inspect WebGL canvas presence & context
+    // 2. Capture Tablet Viewport (1024x768)
+    console.log('Switching to Tablet viewport (1024x768)...')
+    await sendCDP(ws, 'Emulation.setDeviceMetricsOverride', {
+      width: 1024,
+      height: 768,
+      deviceScaleFactor: 1,
+      mobile: false,
+    })
+    await new Promise(r => setTimeout(r, 1500))
+    await sendCDP(ws, 'Runtime.evaluate', {
+      expression: `
+        const el = document.getElementById('contact');
+        if (el) el.scrollIntoView({ behavior: 'instant', block: 'center' });
+      `,
+    })
+    await new Promise(r => setTimeout(r, 1000))
+    const tabletRes = await sendCDP(ws, 'Page.captureScreenshot', { format: 'png' })
+    const tabletBuf = Buffer.from(tabletRes.data, 'base64')
+    const tabletPath = path.join(outDir, 'tablet-1024.png')
+    fs.writeFileSync(tabletPath, tabletBuf)
+    console.log(`  ✓ Saved ${tabletPath} (${(tabletBuf.length / 1024).toFixed(1)} KB)`)
+
+    // 3. Capture Mobile Viewport (390x844)
+    console.log('Switching to Mobile viewport (390x844)...')
+    await sendCDP(ws, 'Emulation.setDeviceMetricsOverride', {
+      width: 390,
+      height: 844,
+      deviceScaleFactor: 2,
+      mobile: true,
+    })
+    await new Promise(r => setTimeout(r, 1500))
+    await sendCDP(ws, 'Runtime.evaluate', {
+      expression: `
+        const el = document.getElementById('contact');
+        if (el) el.scrollIntoView({ behavior: 'instant', block: 'center' });
+      `,
+    })
+    await new Promise(r => setTimeout(r, 1000))
+    const mobileRes = await sendCDP(ws, 'Page.captureScreenshot', { format: 'png' })
+    const mobileBuf = Buffer.from(mobileRes.data, 'base64')
+    const mobilePath = path.join(outDir, 'mobile-390.png')
+    fs.writeFileSync(mobilePath, mobileBuf)
+    console.log(`  ✓ Saved ${mobilePath} (${(mobileBuf.length / 1024).toFixed(1)} KB)`)
+
+    // Validation
     const evalResult = await sendCDP(ws, 'Runtime.evaluate', {
       expression: `
         (() => {
@@ -144,7 +192,6 @@ async function capture() {
             totalCanvases: canvases.length,
             hasContactSection: !!contactSec,
             hasWireCanvas: !!wireCanvas,
-            contactRect: contactSec ? { width: contactSec.offsetWidth, height: contactSec.offsetHeight } : null,
           };
         })()
       `,
@@ -153,11 +200,6 @@ async function capture() {
 
     console.log('\n─── DOM & WebGL Validation ───')
     console.log('Result:', JSON.stringify(evalResult.result.value, null, 2))
-
-    if (consoleLogs.length > 0) {
-      console.log('\n─── Browser Console Logs ───')
-      consoleLogs.forEach(l => console.log(l))
-    }
 
     ws.close()
   } finally {

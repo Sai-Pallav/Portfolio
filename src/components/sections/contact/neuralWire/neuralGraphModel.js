@@ -54,6 +54,7 @@ export class GraphNode {
     weight,
     tier = 'minor',
     depthLayer = 'mid',
+    relativeCoord = null,
     meta = {},
   }) {
     this.id = id
@@ -63,6 +64,7 @@ export class GraphNode {
     this.weight = weight
     this.tier = tier // 'hero' | 'intersection' | 'minor' | 'particle'
     this.depthLayer = depthLayer // 'fg' | 'mid' | 'bg'
+    this.relativeCoord = relativeCoord ? (relativeCoord.clone ? relativeCoord.clone() : [...relativeCoord]) : null
     this.connectedEdgeIds = []
     this.degree = 0
     this.meta = meta
@@ -234,6 +236,12 @@ export class NeuralWireGraph {
         weight: Number(n.weight.toFixed(4)),
         tier: n.tier,
         depthLayer: n.depthLayer,
+        relativeCoord: n.relativeCoord ? (Array.isArray(n.relativeCoord) ? n.relativeCoord.map(v => Number(v.toFixed(4))) : [
+          Number(n.relativeCoord.x.toFixed(4)),
+          Number(n.relativeCoord.y.toFixed(4)),
+          Number(n.relativeCoord.z.toFixed(4)),
+          Number(n.relativeCoord.w.toFixed(4)),
+        ]) : null,
         degree: n.degree,
       })
     })
