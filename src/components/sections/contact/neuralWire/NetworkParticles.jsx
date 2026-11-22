@@ -90,13 +90,43 @@ export const NetworkParticles = memo(function NetworkParticles({
     prevMatsRef.current = current
   }, [stardustMat, bokehMat])
 
+  const bokehMeshRef = useRef(null)
+  const stardustMeshRef = useRef(null)
+
+  useEffect(() => {
+    if (bokehMeshRef.current) {
+      bokehMeshRef.current.matrixAutoUpdate = false
+      bokehMeshRef.current.updateMatrix()
+    }
+    if (stardustMeshRef.current) {
+      stardustMeshRef.current.matrixAutoUpdate = false
+      stardustMeshRef.current.updateMatrix()
+    }
+  }, [])
+
   return (
-    <group>
+    <group matrixAutoUpdate={false}>
       {/* 25 Background Soft Bokeh Circles */}
-      {bokehGeo && <points geometry={bokehGeo} material={bokehMat} />}
+      {bokehGeo && (
+        <points
+          ref={bokehMeshRef}
+          geometry={bokehGeo}
+          material={bokehMat}
+          matrixAutoUpdate={false}
+          onUpdate={(self) => self.updateMatrix()}
+        />
+      )}
 
       {/* 900 Tiny Pinpoint Stardust Specks */}
-      {sGeo && <points geometry={sGeo} material={stardustMat} />}
+      {sGeo && (
+        <points
+          ref={stardustMeshRef}
+          geometry={sGeo}
+          material={stardustMat}
+          matrixAutoUpdate={false}
+          onUpdate={(self) => self.updateMatrix()}
+        />
+      )}
     </group>
   )
 })

@@ -28,7 +28,7 @@ const BeadedShader = {
 
     void main() {
       vec4 tex = texture2D(uTexture, gl_PointCoord);
-      vec3 col = length(vColor) > 0.01 ? vColor : uColor;
+      vec3 col = dot(vColor, vColor) > 0.0001 ? vColor : uColor;
       gl_FragColor = vec4(col, tex.a * clamp(vAlpha, 0.0, 1.0));
     }
   `,
@@ -72,7 +72,23 @@ export const BeadedStreams = memo(function BeadedStreams({
     prevMatRef.current = beadedMat
   }, [beadedMat])
 
+  const meshRef = useRef(null)
+  useEffect(() => {
+    if (meshRef.current) {
+      meshRef.current.matrixAutoUpdate = false
+      meshRef.current.updateMatrix()
+    }
+  }, [])
+
   if (!beadedStreamsGeo) return null
 
-  return <points geometry={beadedStreamsGeo} material={beadedMat} />
+  return (
+    <points
+      ref={meshRef}
+      geometry={beadedStreamsGeo}
+      material={beadedMat}
+      matrixAutoUpdate={false}
+      onUpdate={(self) => self.updateMatrix()}
+    />
+  )
 })

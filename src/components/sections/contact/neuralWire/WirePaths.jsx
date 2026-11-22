@@ -26,15 +26,116 @@ const LineFeatherShader = {
     varying vec3 vColor;
 
     void main() {
-      vec3 col = length(vColor) > 0.01 ? vColor : uColor;
+      // Optimized: dot product check eliminates hardware square root (length)
+      vec3 col = dot(vColor, vColor) > 0.0001 ? vColor : uColor;
       gl_FragColor = vec4(col, clamp(vAlpha, 0.0, 1.0));
     }
   `,
 }
 
 /**
- * 3-Layer Additive Ribbon Rendering for the 4 Primary Hero Waves
- * + 44 Companion Silk Strands bundled tightly along the hero paths:
+ * Merges multiple line buffer geometries into a single LineSegments BufferGeometry
+ * with baked per-vertex color and alpha multiplier attributes.
+ * Under AdditiveBlending and depthWrite: false, rendering in a single draw call
+ * is mathematically identical to rendering separate LineSegments draw calls.
+ */
+function mergeWirePathLayers(layers) {
+  let totalVerts = 0
+  for (let i = 0; i < layers.length; i++) {
+    const g = layers[i].geo
+    if (g && g.attributes.position) {
+      totalVerts += g.attributes.position.count
+    }
+  }
+  if (totalVerts === 0) return null
+
+  const posArr = new Float32Array(totalVerts * 3)
+  const basePosArr = new Float32Array(totalVerts * 3)
+  const uArr = new Float32Array(totalVerts)
+  const wireIdArr = new Float32Array(totalVerts)
+  const weightArr = new Float32Array(totalVerts)
+  const alphaArr = new Float32Array(totalVerts)
+  const layerArr = new Float32Array(totalVerts)
+  const relArr = new Float32Array(totalVerts * 4)
+  const colArr = new Float32Array(totalVerts * 3)
+
+  let offset = 0
+  for (let l = 0; l < layers.length; l++) {
+    const { geo, defaultColor, alphaMultiplier } = layers[l]
+    if (!geo || !geo.attributes.position) continue
+
+    const count = geo.attributes.position.count
+    const pos = geo.attributes.position.array
+    const basePos = geo.attributes.aBasePos ? geo.attributes.aBasePos.array : pos
+    const u = geo.attributes.aU ? geo.attributes.aU.array : null
+    const wireId = geo.attributes.aWireId ? geo.attributes.aWireId.array : null
+    const weight = geo.attributes.aWeight ? geo.attributes.aWeight.array : null
+    const alpha = geo.attributes.aAlpha ? geo.attributes.aAlpha.array : null
+    const layer = geo.attributes.aLayer ? geo.attributes.aLayer.array : null
+    const rel = geo.attributes.aRelativeCoord ? geo.attributes.aRelativeCoord.array : null
+    const col = geo.attributes.color ? geo.attributes.color.array : null
+
+    const cr = defaultColor.r, cg = defaultColor.g, cb = defaultColor.b
+
+    for (let i = 0; i < count; i++) {
+      const idx = offset + i
+      const i3 = i * 3
+      const idx3 = idx * 3
+
+      posArr[idx3] = pos[i3]
+      posArr[idx3 + 1] = pos[i3 + 1]
+      posArr[idx3 + 2] = pos[i3 + 2]
+
+      basePosArr[idx3] = basePos[i3]
+      basePosArr[idx3 + 1] = basePos[i3 + 1]
+      basePosArr[idx3 + 2] = basePos[i3 + 2]
+
+      uArr[idx] = u ? u[i] : 0
+      wireIdArr[idx] = wireId ? wireId[i] : 0
+      weightArr[idx] = weight ? weight[i] : 1
+      alphaArr[idx] = (alpha ? alpha[i] : 1) * alphaMultiplier
+      layerArr[idx] = layer ? layer[i] : 0
+
+      if (rel) {
+        const i4 = i * 4
+        const idx4 = idx * 4
+        relArr[idx4] = rel[i4]
+        relArr[idx4 + 1] = rel[i4 + 1]
+        relArr[idx4 + 2] = rel[i4 + 2]
+        relArr[idx4 + 3] = rel[i4 + 3]
+      }
+
+      if (col) {
+        colArr[idx3] = col[i3]
+        colArr[idx3 + 1] = col[i3 + 1]
+        colArr[idx3 + 2] = col[i3 + 2]
+      } else {
+        colArr[idx3] = cr
+        colArr[idx3 + 1] = cg
+        colArr[idx3 + 2] = cb
+      }
+    }
+
+    offset += count
+  }
+
+  const merged = new THREE.BufferGeometry()
+  merged.setAttribute('position', new THREE.BufferAttribute(posArr, 3))
+  merged.setAttribute('aBasePos', new THREE.BufferAttribute(basePosArr, 3))
+  merged.setAttribute('aU', new THREE.BufferAttribute(uArr, 1))
+  merged.setAttribute('aWireId', new THREE.BufferAttribute(wireIdArr, 1))
+  merged.setAttribute('aWeight', new THREE.BufferAttribute(weightArr, 1))
+  merged.setAttribute('aAlpha', new THREE.BufferAttribute(alphaArr, 1))
+  merged.setAttribute('aLayer', new THREE.BufferAttribute(layerArr, 1))
+  merged.setAttribute('aRelativeCoord', new THREE.BufferAttribute(relArr, 4))
+  merged.setAttribute('color', new THREE.BufferAttribute(colArr, 3))
+  merged.computeBoundingSphere()
+  return merged
+}
+
+/**
+ * Merged 1-Draw-Call Additive Ribbon Rendering for all Hero Waves
+ * + 44 Companion Silk Strands:
  * 1. 6-pass micro-offset Royal-Blue (#0048ff) aura bundle for Hero Waves 0, 1, 3
  * 2. Crisp White-Cyan (#e0ffff) core filaments
  * 3. Violet/Magenta (#b83dff) Hero 2 core & aura
@@ -50,7 +151,7 @@ export const WirePaths = memo(function WirePaths({
   primaryBgGeo,
   subFilamentsGeo,
   tertiaryGeo,
-  themeConfig,
+  themeConfig = {},
   innerFade = 0.04,
 }) {
   const glow = themeConfig.glowIntensity || 1.0
@@ -62,13 +163,35 @@ export const WirePaths = memo(function WirePaths({
   const dGeo = depthGeo || primaryBgGeo
   const sfGeo = subFilamentsGeo || tertiaryGeo
 
-  // 1. Hero 0, 1, 3: Crisp White-Cyan Energy Core (opacity: 0.95)
-  const coreMat = useMemo(() => {
-    const col = new THREE.Color('#e0ffff')
+  // Palette colors matching the original 5 materials
+  const sfColor = useMemo(() => new THREE.Color('#0a52ff'), [])
+  const haloColor = useMemo(() => new THREE.Color('#0048ff'), [])
+  const violetHaloColor = useMemo(() => new THREE.Color('#b83dff'), [])
+  const violetCoreColor = useMemo(() => new THREE.Color('#f0abfc'), [])
+  const coreColor = useMemo(() => new THREE.Color('#e0ffff'), [])
+
+  // Merge the 5 static additive line layers into 1 single LineSegments BufferGeometry per wing
+  const mergedLineGeo = useMemo(() => {
+    return mergeWirePathLayers([
+      // 1. 44 Companion Silk Strands (alpha mult: 1.0 * glow)
+      { geo: sfGeo, defaultColor: sfColor, alphaMultiplier: 1.0 * glow },
+      // 2. Hero 0, 1, 3: 6-Pass Royal-Blue Aura (alpha mult: 0.32 * glow)
+      { geo: pHaloGeo, defaultColor: haloColor, alphaMultiplier: 0.32 * glow },
+      // 3. Hero 2: 6-Pass Neon Violet Aura (alpha mult: 0.42 * glow)
+      { geo: dGeo, defaultColor: violetHaloColor, alphaMultiplier: 0.42 * glow },
+      // 4. Hero 2: Violet/Magenta Core Wave (alpha mult: 0.95)
+      { geo: sGeo, defaultColor: violetCoreColor, alphaMultiplier: 0.95 },
+      // 5. Hero 0, 1, 3: Crisp White-Cyan Energy Core (alpha mult: 0.95)
+      { geo: pCoreGeo, defaultColor: coreColor, alphaMultiplier: 0.95 },
+    ])
+  }, [sfGeo, pHaloGeo, dGeo, sGeo, pCoreGeo, glow, sfColor, haloColor, violetHaloColor, violetCoreColor, coreColor])
+
+  // Single unified ShaderMaterial for all 5 line layers
+  const mergedMat = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
-        uColor: { value: col },
-        uOpacity: { value: Math.min(1.0, 0.95 * opacity) },
+        uColor: { value: new THREE.Color('#0048ff') },
+        uOpacity: { value: Math.min(1.0, opacity) },
         uInnerFade: { value: innerFade },
       },
       vertexShader: LineFeatherShader.vertexShader,
@@ -79,114 +202,46 @@ export const WirePaths = memo(function WirePaths({
     })
   }, [opacity, innerFade])
 
-  // 2. Hero 0, 1, 3: 6-Pass Micro-Offset Royal-Blue Aura (#0048ff, opacity: 0.32)
-  const haloMat = useMemo(() => {
-    const col = new THREE.Color('#0048ff')
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        uColor: { value: col },
-        uOpacity: { value: Math.min(1.0, 0.32 * glow * opacity) },
-        uInnerFade: { value: innerFade },
-      },
-      vertexShader: LineFeatherShader.vertexShader,
-      fragmentShader: LineFeatherShader.fragmentShader,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  }, [opacity, glow, innerFade])
-
-  // 3. Hero 2: Violet/Magenta Core Wave (#f0abfc, opacity: 0.95)
-  const violetCoreMat = useMemo(() => {
-    const col = new THREE.Color('#f0abfc')
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        uColor: { value: col },
-        uOpacity: { value: Math.min(1.0, 0.95 * opacity) },
-        uInnerFade: { value: innerFade },
-      },
-      vertexShader: LineFeatherShader.vertexShader,
-      fragmentShader: LineFeatherShader.fragmentShader,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  }, [opacity, innerFade])
-
-  // 4. Hero 2: 6-Pass Micro-Offset Neon Violet Aura (#b83dff, opacity: 0.42)
-  const violetHaloMat = useMemo(() => {
-    const col = new THREE.Color('#b83dff')
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        uColor: { value: col },
-        uOpacity: { value: Math.min(1.0, 0.42 * glow * opacity) },
-        uInnerFade: { value: innerFade },
-      },
-      vertexShader: LineFeatherShader.vertexShader,
-      fragmentShader: LineFeatherShader.fragmentShader,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  }, [opacity, glow, innerFade])
-
-  // 5. 44 Companion Silk Strands: Bundled silk fibers hugging hero waves (opacity: 0.16 to 0.34 per vertex)
-  const subFilamentsMat = useMemo(() => {
-    const defaultCol = new THREE.Color('#0a52ff')
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        uColor: { value: defaultCol },
-        uOpacity: { value: Math.min(1.0, 1.0 * glow * opacity) },
-        uInnerFade: { value: innerFade },
-      },
-      vertexShader: LineFeatherShader.vertexShader,
-      fragmentShader: LineFeatherShader.fragmentShader,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-  }, [opacity, glow, innerFade])
-
-  const prevMatsRef = useRef({})
+  const prevGeoRef = useRef(mergedLineGeo)
   useEffect(() => {
-    const current = {
-      coreMat,
-      haloMat,
-      violetCoreMat,
-      violetHaloMat,
-      subFilamentsMat,
+    if (prevGeoRef.current && prevGeoRef.current !== mergedLineGeo) {
+      prevGeoRef.current.dispose()
     }
-    Object.keys(prevMatsRef.current).forEach((k) => {
-      const oldMat = prevMatsRef.current[k]
-      if (oldMat && oldMat !== current[k]) {
-        oldMat.dispose()
-      }
-    })
-    prevMatsRef.current = current
-  }, [
-    coreMat,
-    haloMat,
-    violetCoreMat,
-    violetHaloMat,
-    subFilamentsMat,
-  ])
+    prevGeoRef.current = mergedLineGeo
+  }, [mergedLineGeo])
+
+  const prevMatRef = useRef(mergedMat)
+  useEffect(() => {
+    if (prevMatRef.current && prevMatRef.current !== mergedMat) {
+      prevMatRef.current.dispose()
+    }
+    prevMatRef.current = mergedMat
+  }, [mergedMat])
+
+  useEffect(() => {
+    return () => {
+      if (prevGeoRef.current) prevGeoRef.current.dispose()
+      if (prevMatRef.current) prevMatRef.current.dispose()
+    }
+  }, [])
+
+  const lineMeshRef = useRef(null)
+  useEffect(() => {
+    if (lineMeshRef.current) {
+      lineMeshRef.current.matrixAutoUpdate = false
+      lineMeshRef.current.updateMatrix()
+    }
+  }, [])
+
+  if (!mergedLineGeo) return null
 
   return (
-    <group>
-      {/* 44 Companion Silk Strands (bundled locks of silk hugging hero waves, leaving eye center dark) */}
-      {sfGeo && <lineSegments geometry={sfGeo} material={subFilamentsMat} />}
-
-      {/* Hero 0, 1, 3: 6-Pass Micro-Offset Royal-Blue Aura (#0048ff) */}
-      {pHaloGeo && <lineSegments geometry={pHaloGeo} material={haloMat} />}
-
-      {/* Hero 2: 6-Pass Micro-Offset Neon Violet Aura (#b83dff) */}
-      {dGeo && <lineSegments geometry={dGeo} material={violetHaloMat} />}
-
-      {/* Hero 2: Vibrant Violet/Magenta Core Wave */}
-      {sGeo && <lineSegments geometry={sGeo} material={violetCoreMat} />}
-
-      {/* Hero 0, 1, 3: Crisp White-Cyan Core Filaments */}
-      {pCoreGeo && <lineSegments geometry={pCoreGeo} material={coreMat} />}
-    </group>
+    <lineSegments
+      ref={lineMeshRef}
+      geometry={mergedLineGeo}
+      material={mergedMat}
+      matrixAutoUpdate={false}
+      onUpdate={(self) => self.updateMatrix()}
+    />
   )
 })

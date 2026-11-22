@@ -1,9 +1,128 @@
 import { memo, useMemo, useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { useFrame } from '@react-three/fiber'
-import { getGlowTexture, H_VAL } from './generateWireGeometry'
+import { useFrame, useThree, createPortal } from '@react-three/fiber'
+import { H_VAL } from './generateWireGeometry'
 import { generateRefinedNeuralField } from './neuralPocketBounds'
 import { useWireframeConfig } from './WireframeConfigContext'
+
+// Helper to compute responsive ribbon layout matching SideWireNetwork
+function calculateRibbonLayout(viewportWidth, ribbonConfig) {
+  const halfWidth = viewportWidth / 2
+
+  let baseStart
+  if (viewportWidth >= 8.5) {
+    baseStart = 2.30
+  } else if (viewportWidth <= 5.5) {
+    baseStart = 1.65
+  } else {
+    baseStart = 1.65 + ((viewportWidth - 5.5) / 3.0) * 0.65
+  }
+
+  const innerExt = (ribbonConfig.innerExtension ?? 0.0) - (ribbonConfig.innerGap ?? 0.0)
+  const xInner = Math.max(0.05, baseStart - innerExt)
+
+  const baseEnd = Math.max(halfWidth * 1.28, 7.2)
+  const outerExt = (ribbonConfig.outerExtension ?? 1.5) * 1.2 + (ribbonConfig.outerXOffset ?? 0.0)
+  const xOuter = Math.max(xInner + 2.0, baseEnd + outerExt)
+
+  const span = (xOuter - xInner) * (ribbonConfig.lengthMultiplier ?? 1.0)
+  const scaleX = span / 10.0
+  const scaleY = Math.max(0.60, Math.min(1.35, span * 0.18)) * (ribbonConfig.breadthMultiplier ?? 1.0)
+  const scaleZ = ribbonConfig.depthMultiplier ?? 1.0
+  const nodeScale = Math.max(0.65, Math.min(1.35, scaleY)) * (ribbonConfig.nodeScale ?? 1.0)
+
+  return { xStart: xInner, xEnd: xOuter, span, scaleX, scaleY, scaleZ, nodeScale }
+}
+
+// Helper to compute ribbon transformation matrix matching RibbonGroup
+function getRibbonMatrix(ribbon, layout) {
+  const isLeft = ribbon.side === 'left'
+
+  const posX = isLeft
+    ? -layout.xStart - (ribbon.xOffset ?? 0)
+    : layout.xStart + (ribbon.xOffset ?? 0)
+
+  const pos = new THREE.Vector3(
+    posX,
+    ribbon.yOffset ?? 0,
+    ribbon.zOffset ?? 0
+  )
+
+  const rot = new THREE.Euler(
+    ((ribbon.pitchX ?? 0) * Math.PI) / 180,
+    isLeft
+      ? ((ribbon.yawY ?? 0) * Math.PI) / 180
+      : -((ribbon.yawY ?? 0) * Math.PI) / 180,
+    isLeft
+      ? -((ribbon.tiltZ ?? 0) * Math.PI) / 180
+      : ((ribbon.tiltZ ?? 0) * Math.PI) / 180
+  )
+
+  const scale = new THREE.Vector3(layout.scaleX, layout.scaleY, layout.scaleZ)
+
+  const mat = new THREE.Matrix4()
+  mat.compose(pos, new THREE.Quaternion().setFromEuler(rot), scale)
+  return mat
+}
+
+// Helper to merge two BufferGeometries with rigid transforms on position and aBasePos
+function mergeTransformedGeometries(geoA, matA, geoB, matB) {
+  if (!geoA && !geoB) return null
+  if (!geoA) return geoB
+  if (!geoB) return geoA
+
+  const merged = new THREE.BufferGeometry()
+  const vA = geoA.attributes.position ? geoA.attributes.position.count : 0
+  const vB = geoB.attributes.position ? geoB.attributes.position.count : 0
+  const total = vA + vB
+
+  const mA = matA.elements
+  const a0 = mA[0], a1 = mA[1], a2 = mA[2]
+  const a4 = mA[4], a5 = mA[5], a6 = mA[6]
+  const a8 = mA[8], a9 = mA[9], a10 = mA[10]
+  const a12 = mA[12], a13 = mA[13], a14 = mA[14]
+
+  const mB = matB.elements
+  const b0 = mB[0], b1 = mB[1], b2 = mB[2]
+  const b4 = mB[4], b5 = mB[5], b6 = mB[6]
+  const b8 = mB[8], b9 = mB[9], b10 = mB[10]
+  const b12 = mB[12], b13 = mB[13], b14 = mB[14]
+
+  for (const attrName in geoA.attributes) {
+    const attrA = geoA.attributes[attrName]
+    const attrB = geoB.attributes[attrName]
+    if (!attrB) continue
+
+    const itemSize = attrA.itemSize
+    const arr = new Float32Array(total * itemSize)
+
+    if (attrName === 'position' || attrName === 'aBasePos') {
+      const srcA = attrA.array
+      for (let i = 0, j = 0; i < vA; i++, j += 3) {
+        const x = srcA[j], y = srcA[j + 1], z = srcA[j + 2]
+        arr[j] = a0 * x + a4 * y + a8 * z + a12
+        arr[j + 1] = a1 * x + a5 * y + a9 * z + a13
+        arr[j + 2] = a2 * x + a6 * y + a10 * z + a14
+      }
+      const srcB = attrB.array
+      const offset = vA * 3
+      for (let i = 0, j = 0; i < vB; i++, j += 3) {
+        const x = srcB[j], y = srcB[j + 1], z = srcB[j + 2]
+        arr[offset + j] = b0 * x + b4 * y + b8 * z + b12
+        arr[offset + j + 1] = b1 * x + b5 * y + b9 * z + b13
+        arr[offset + j + 2] = b2 * x + b6 * y + b10 * z + b14
+      }
+    } else {
+      arr.set(attrA.array, 0)
+      arr.set(attrB.array, vA * itemSize)
+    }
+
+    merged.setAttribute(attrName, new THREE.BufferAttribute(arr, itemSize))
+  }
+
+  merged.computeBoundingSphere()
+  return merged
+}
 
 const NeuralLineShader = {
   vertexShader: `
@@ -20,19 +139,16 @@ const NeuralLineShader = {
 
     varying float vAlpha;
     varying vec3 vColor;
-    varying float vLayer;
 
     void main() {
-      // Stage 1: Static almond chamber position (aRelativeCoord stored for Stage 2 helical sync)
       vec3 pos = position;
 
       float innerFeather = smoothstep(0.06, 0.20, aU);
       float outerFeather = 1.0 - smoothstep(0.995, 1.02, aU);
 
-      // Whispering gossamer connective tissue: line alpha pre-calibrated to BG 0.05–0.09, MID 0.16–0.24, FG 0.28–0.38
+      // Whispering gossamer connective tissue: line alpha pre-calibrated to depth tiers
       vAlpha = aAlpha * innerFeather * outerFeather * uOpacity;
       vColor = color;
-      vLayer = aLayer;
 
       gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
     }
@@ -42,6 +158,7 @@ const NeuralLineShader = {
     varying vec3 vColor;
 
     void main() {
+      if (vAlpha < 0.003) discard;
       gl_FragColor = vec4(vColor, clamp(vAlpha, 0.0, 1.0));
     }
   `,
@@ -66,12 +183,10 @@ const NeuralPointShader = {
 
     varying float vAlpha;
     varying vec3 vColor;
+    varying vec3 vHaloCol;
     varying float vIsHighlight;
-    varying float vLayer;
-    varying vec4 vRelativeCoord;
 
     void main() {
-      // Stage 1: Static almond chamber position (aRelativeCoord stored for Stage 2 helical sync)
       vec3 pos = position;
 
       float innerFeather = smoothstep(0.06, 0.20, aU);
@@ -87,23 +202,40 @@ const NeuralPointShader = {
       }
 
       vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity * depthCue * twinkle;
-      vColor = color;
       vIsHighlight = aIsHighlight;
-      vLayer = aLayer;
-      vRelativeCoord = aRelativeCoord;
+
+      // Hoisted static color, tier, and rim-tint calculations out of fragment shader (Requirement 3)
+      vec3 electricCyan = vec3(0.157, 0.847, 1.0); // #28d8ff
+      vec3 iceWhite = vec3(1.0, 1.0, 1.0);
+      vec3 cobaltCyan = vec3(0.055, 0.380, 0.920);
+      vec3 indigoViolet = vec3(0.369, 0.282, 1.0); // #5e48ff
+
+      float rimProx = smoothstep(0.65, 0.90, abs(aRelativeCoord.y));
+      float colorViolet = clamp((color.r - 0.10) * 3.2, 0.0, 1.0);
+      float rimTint = max(rimProx * 0.70, colorViolet * 0.80);
+
+      if (aIsHighlight > 0.5) {
+        vec3 halo = mix(cobaltCyan, electricCyan, 0.65);
+        halo = mix(halo, indigoViolet, rimTint * 0.35);
+        vHaloCol = halo;
+        vColor = iceWhite;
+      } else {
+        vec3 nodeCol = color;
+        float coreMix = aLayer > 0.5 ? 0.45 : (aLayer < -0.5 ? 0.0 : 0.25);
+        nodeCol = mix(nodeCol, indigoViolet, rimTint * 0.45);
+        vColor = nodeCol;
+        vHaloCol = vec3(coreMix);
+      }
 
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
 
-      // Multi-scale starlight field point sizing matching Answer 4:
-      // FG ice-white pinpoint hubs: 14–22px quad
-      // FG cyan stars: 6–10px quad
-      // MID cobalt/royal-blue nodes: 4–7px quad
-      // BG sapphire micro-dots: 1.5–3px quad
+      // Multi-scale starlight field point sizing:
+      // Tightened around actual visible falloff radius to crush GPU overdraw (Requirement 3)
       float feather = innerFeather * outerFeather;
       float scaleFeather = 0.25 + 0.75 * innerFeather;
-      float baseSize = size * uNodeScale * depthCue * (32.0 / -mvPosition.z) * min(1.15, uGlowIntensity) * max(0.20, feather);
-      float maxPointSize = aIsHighlight > 0.5 ? 22.0 : (aLayer > 0.5 ? 10.0 : (aLayer < -0.5 ? 3.0 : 7.0));
-      float minPointSize = aIsHighlight > 0.5 ? 14.0 : (aLayer > 0.5 ? 6.0 : (aLayer < -0.5 ? 1.5 : 4.0));
+      float baseSize = size * uNodeScale * depthCue * (30.0 / -mvPosition.z) * min(1.15, uGlowIntensity) * max(0.20, feather);
+      float maxPointSize = aIsHighlight > 0.5 ? 20.0 : (aLayer > 0.5 ? 9.5 : (aLayer < -0.5 ? 3.0 : 6.8));
+      float minPointSize = aIsHighlight > 0.5 ? 13.0 : (aLayer > 0.5 ? 5.5 : (aLayer < -0.5 ? 1.4 : 3.8));
       gl_PointSize = clamp(baseSize * scaleFeather, minPointSize * scaleFeather, maxPointSize);
       gl_Position = projectionMatrix * mvPosition;
     }
@@ -111,64 +243,37 @@ const NeuralPointShader = {
   fragmentShader: `
     varying float vAlpha;
     varying vec3 vColor;
+    varying vec3 vHaloCol;
     varying float vIsHighlight;
-    varying float vLayer;
-    varying vec4 vRelativeCoord;
 
     void main() {
-      // Purely circular radial coordinates - zero 4-point cross or star-spike math
-      vec2 coord = gl_PointCoord - vec2(0.5);
-      float dist = length(coord) * 2.0;
-      if (dist > 1.0) discard;
+      // Immediate squared-distance early discard before ANY math (Requirement 3)
+      vec2 p = gl_PointCoord - 0.5;
+      float r2 = dot(p, p);
+      if (r2 > 0.25) discard;
       if (vAlpha < 0.003) discard;
 
-      vec3 electricCyan = vec3(0.157, 0.847, 1.0); // #28d8ff
-      vec3 iceWhite = vec3(1.0, 1.0, 1.0);
-      vec3 cobaltCyan = vec3(0.055, 0.380, 0.920);
-      vec3 indigoViolet = vec3(0.369, 0.282, 1.0); // #5e48ff
-
-      // Subtle indigo-violet rim tinting near purple wave rims
-      float rimProx = smoothstep(0.65, 0.90, abs(vRelativeCoord.y));
-      float colorViolet = clamp((vColor.r - 0.10) * 3.2, 0.0, 1.0);
-      float rimTint = max(rimProx * 0.70, colorViolet * 0.80);
+      // Circle cutoff falloff
+      float circleCutoff = clamp(1.0 - 4.0 * r2, 0.0, 1.0);
 
       if (vIsHighlight > 0.5) {
-        // Sparse 12–15% FG purely circular ice-white pinpoint hubs (Answer 4)
-        // Sharp 15–20% pure white core, tight exponential cyan-blue halo, zero spikes or bokeh blobs
-        float sharpCore = exp(-dist * dist * 65.0);
-        float whiteCore = pow(clamp(1.0 - dist * 2.5, 0.0, 1.0), 4.8);
-        float expHalo = exp(-dist * 6.2) * 0.82;
-        float circleCutoff = pow(clamp(1.0 - dist, 0.0, 1.0), 1.6);
+        // Purely circular ice-white pinpoint hub: sharp core + tight exponential cyan halo
+        float sharpCore = exp(-260.0 * r2);
+        float whiteCore = exp(-400.0 * r2) * clamp(1.0 - 25.0 * r2, 0.0, 1.0);
+        float expHalo = (exp(-60.0 * r2) * 0.55 + exp(-10.0 * r2) * 0.27) * circleCutoff;
 
-        vec3 haloCol = mix(cobaltCyan, electricCyan, clamp(1.0 - dist * 1.3, 0.0, 1.0));
-        haloCol = mix(haloCol, indigoViolet, rimTint * 0.35);
-
-        vec3 col = mix(haloCol, iceWhite, clamp(whiteCore * 1.7 + sharpCore * 0.95, 0.0, 1.0));
-        float hubAlpha = clamp(whiteCore * 0.96 + sharpCore * 0.60 + expHalo * circleCutoff, 0.0, 0.98);
+        vec3 col = mix(vHaloCol, vec3(1.0), clamp(whiteCore * 1.7 + sharpCore * 0.95, 0.0, 1.0));
+        float hubAlpha = clamp(whiteCore * 0.96 + sharpCore * 0.60 + expHalo, 0.0, 0.98);
 
         gl_FragColor = vec4(col, min(vAlpha * hubAlpha, 0.98));
       } else {
-        // Multi-scale starlight hierarchy: 6-10px cyan FG, 4-7px cobalt MID, 1.5-3px sapphire BG
-        float core = exp(-dist * dist * 36.0);
-        float expHalo = exp(-dist * 4.6) * 0.65;
-        float circleCutoff = pow(clamp(1.0 - dist, 0.0, 1.0), 1.4);
+        // Multi-scale starlight nodes: brilliant core + whispering halo
+        float core = exp(-144.0 * r2);
+        float expHalo = (exp(-48.0 * r2) * 0.40 + exp(-12.0 * r2) * 0.25) * circleCutoff;
 
-        vec3 nodeCol = vColor;
-        if (vLayer > 0.5) {
-          // Foreground cyan stars
-          nodeCol = mix(vColor, iceWhite, core * 0.45);
-        } else if (vLayer < -0.5) {
-          // Background micro-dots: dim sapphire
-          nodeCol = vColor;
-        } else {
-          // Midground nodes: cobalt/royal-blue blend
-          nodeCol = mix(vColor, iceWhite, core * 0.25);
-        }
+        vec3 nodeCol = mix(vColor, vec3(1.0), core * vHaloCol.r);
+        float radialAlpha = core * 0.72 + expHalo * 0.58;
 
-        // Subtle indigo-violet rim tinting near purple wave edges
-        nodeCol = mix(nodeCol, indigoViolet, rimTint * 0.45);
-
-        float radialAlpha = (core * 0.72 + expHalo * 0.58) * circleCutoff;
         gl_FragColor = vec4(nodeCol, min(vAlpha * radialAlpha, 0.96));
       }
     }
@@ -198,15 +303,15 @@ const NeuralHazeShader = {
       float innerFeather = smoothstep(0.06, 0.20, aU);
       float outerFeather = 1.0 - smoothstep(0.98, 1.01, aU);
 
-      // Answer 5: peak opacity 0.025–0.032, deep sapphire (#041038 to #061b4d)
       vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity;
       vColor = color;
 
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+      // Tightened gl_PointSize around visible falloff radius to crush overdraw without shrinking physical presence (Requirement 3)
       float pointSize = clamp(
-        size * uNodeScale * (85.0 / -mvPosition.z) * min(1.15, uGlowIntensity),
-        18.0,
-        75.0
+        size * uNodeScale * (65.0 / -mvPosition.z) * min(1.15, uGlowIntensity),
+        14.0,
+        44.0
       );
       gl_PointSize = pointSize;
       gl_Position = projectionMatrix * mvPosition;
@@ -217,13 +322,14 @@ const NeuralHazeShader = {
     varying vec3 vColor;
 
     void main() {
-      vec2 coord = gl_PointCoord - vec2(0.5);
-      float dist = length(coord) * 2.0;
-      if (dist > 1.0) discard;
+      // Immediate squared-distance early discard before ANY math (Requirement 3)
+      vec2 p = gl_PointCoord - 0.5;
+      float r2 = dot(p, p);
+      if (r2 > 0.25) discard;
       if (vAlpha < 0.001) discard;
 
-      // Ultra-silky smooth quadratic Gaussian falloff (Answer 5: exp(-3.5 * dist^2))
-      float falloff = exp(-dist * dist * 3.5) * (1.0 - dist);
+      // Fast r2-based Gaussian falloff calibrated proportionally to 44.0 quad ceiling (8.0 * (44/58)^2 = 4.60)
+      float falloff = exp(-4.60 * r2) * clamp(1.0 - 4.0 * r2, 0.0, 1.0);
 
       gl_FragColor = vec4(vColor, clamp(vAlpha * falloff, 0.0, 0.032));
     }
@@ -232,47 +338,174 @@ const NeuralHazeShader = {
 
 /**
  * NeuralNetworkField:
- * Standalone, high-performance 3D visualization component for Stage 1.
- * Renders the 3-layer volumetric neural web (points + line segments),
- * restrained deep-sapphire volumetric nebula glow (#05164d) across chambers,
- * and delicate curve-crossing flares strictly inside negative-space pocket bounds.
+ * Merges both left/right wings and all BG/MID/FG depth tiers into at most 3 total draw calls
+ * (1 LineSegments for all edges, 1 Points for all nodes, 1 Points for all haze) with
+ * precomputed boundingSpheres, matrixAutoUpdate = false, and locked useMemo geometry/material
+ * creation with stable primitive dependencies (Requirements 1 & 2).
  */
 export const NeuralNetworkField = memo(function NeuralNetworkField({
-  linesGeo,
-  pointsGeo,
-  hazeGeo,
-  focalFlaresGeo,
   themeConfig = {},
   nodeScale = 1.0,
   innerFade = 0.04,
   side = 'left',
 }) {
+  // Only the left instance renders the merged 2-wing field into the scene root via createPortal,
+  // reducing the entire neural field across both wings to at most 3 total draw calls (Requirement 2).
+  if (side === 'right') {
+    return null
+  }
+
+  return (
+    <MergedNeuralNetworkField
+      themeConfig={themeConfig}
+      nodeScale={nodeScale}
+      innerFade={innerFade}
+    />
+  )
+})
+
+const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
+  themeConfig = {},
+  nodeScale = 1.0,
+  innerFade = 0.04,
+}) {
+  const { viewport, scene, gl } = useThree()
   const glow = themeConfig.glowIntensity || 1.0
+  const primaryWire = themeConfig.primaryWire || ''
 
-  const glowTexture = useMemo(() => getGlowTexture(64), [])
+  if (typeof window !== 'undefined') {
+    window.__neuralRenderer = gl
+  }
 
-  // Access current live wireframe config so bounds match rendered ribbon shapes exactly
   const wireframeCtx = useWireframeConfig()
-  const sideConfig = side === 'left' ? wireframeCtx.leftConfig : wireframeCtx.rightConfig
+  const leftConfig = wireframeCtx.leftConfig
+  const rightConfig = wireframeCtx.rightConfig
 
-  const fullConfig = useMemo(() => {
+  // Stable primitive keys for geometry dependencies (Requirement 1)
+  const leftKey = `${leftConfig.lengthMultiplier}_${leftConfig.breadthMultiplier}_${leftConfig.depthMultiplier}_${leftConfig.innerExtension}_${leftConfig.outerExtension}_${leftConfig.amplitude}_${leftConfig.frequency}_${leftConfig.zAmplitude}_${leftConfig.wingSweep}_${leftConfig.ribbon1Amp}_${leftConfig.ribbon2Amp}_${leftConfig.ribbon3Amp}_${leftConfig.ribbon4Amp}_${leftConfig.distRibbon01}_${leftConfig.distRibbon12}_${leftConfig.distRibbon23}_${leftConfig.innerGap}_${leftConfig.xOffset}_${leftConfig.yOffset}_${leftConfig.zOffset}_${leftConfig.pitchX}_${leftConfig.yawY}_${leftConfig.tiltZ}`
+  const rightKey = `${rightConfig.lengthMultiplier}_${rightConfig.breadthMultiplier}_${rightConfig.depthMultiplier}_${rightConfig.innerExtension}_${rightConfig.outerExtension}_${rightConfig.amplitude}_${rightConfig.frequency}_${rightConfig.zAmplitude}_${rightConfig.wingSweep}_${rightConfig.ribbon1Amp}_${rightConfig.ribbon2Amp}_${rightConfig.ribbon3Amp}_${rightConfig.ribbon4Amp}_${rightConfig.distRibbon01}_${rightConfig.distRibbon12}_${rightConfig.distRibbon23}_${rightConfig.innerGap}_${rightConfig.xOffset}_${rightConfig.yOffset}_${rightConfig.zOffset}_${rightConfig.pitchX}_${rightConfig.yawY}_${rightConfig.tiltZ}`
+  const vpWidth = viewport.width
+
+  // 1. Generate refined neural field for left wing independently so tweaking right never rebuilds left
+  const leftFieldData = useMemo(() => {
+    const t0 = performance.now()
+    const leftFullConfig = { ...leftConfig, ...themeConfig, innerFade, nodeScale }
+    const field = generateRefinedNeuralField('left', H_VAL, leftFullConfig)
     return {
-      ...sideConfig,
-      ...themeConfig,
-      innerFade,
-      nodeScale,
+      field,
+      dt: performance.now() - t0,
     }
-  }, [sideConfig, themeConfig, innerFade, nodeScale])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leftKey, innerFade, nodeScale, primaryWire])
 
-  // Generate refined neural field geometries implementing all 6 visual gap polish passes
-  const refinedField = useMemo(() => {
-    return generateRefinedNeuralField(side, H_VAL, fullConfig)
-  }, [side, fullConfig])
+  // 2. Generate refined neural field for right wing independently so tweaking left never rebuilds right
+  const rightFieldData = useMemo(() => {
+    const t0 = performance.now()
+    const rightFullConfig = { ...rightConfig, ...themeConfig, innerFade, nodeScale }
+    const field = generateRefinedNeuralField('right', H_VAL, rightFullConfig)
+    return {
+      field,
+      dt: performance.now() - t0,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rightKey, innerFade, nodeScale, primaryWire])
 
-  const activeLinesGeo = refinedField?.linesGeo || linesGeo
-  const activePointsGeo = refinedField?.pointsGeo || pointsGeo
-  const activeHazeGeo = refinedField?.hazeGeo || hazeGeo
+  // Clean disposal of previous unmerged single-wing fields when they change or unmount
+  const prevLeftRef = useRef(leftFieldData.field)
+  useEffect(() => {
+    if (prevLeftRef.current && prevLeftRef.current !== leftFieldData.field) {
+      const f = prevLeftRef.current
+      if (f.linesGeo) f.linesGeo.dispose()
+      if (f.pointsGeo) f.pointsGeo.dispose()
+      if (f.hazeGeo) f.hazeGeo.dispose()
+    }
+    prevLeftRef.current = leftFieldData.field
+  }, [leftFieldData])
 
+  const prevRightRef = useRef(rightFieldData.field)
+  useEffect(() => {
+    if (prevRightRef.current && prevRightRef.current !== rightFieldData.field) {
+      const f = prevRightRef.current
+      if (f.linesGeo) f.linesGeo.dispose()
+      if (f.pointsGeo) f.pointsGeo.dispose()
+      if (f.hazeGeo) f.hazeGeo.dispose()
+    }
+    prevRightRef.current = rightFieldData.field
+  }, [rightFieldData])
+
+  useEffect(() => {
+    return () => {
+      if (prevLeftRef.current) {
+        const f = prevLeftRef.current
+        if (f.linesGeo) f.linesGeo.dispose()
+        if (f.pointsGeo) f.pointsGeo.dispose()
+        if (f.hazeGeo) f.hazeGeo.dispose()
+      }
+      if (prevRightRef.current) {
+        const f = prevRightRef.current
+        if (f.linesGeo) f.linesGeo.dispose()
+        if (f.pointsGeo) f.pointsGeo.dispose()
+        if (f.hazeGeo) f.hazeGeo.dispose()
+      }
+    }
+  }, [])
+
+  // 3. Fast rigid transform & merge into at most 3 total BufferGeometries
+  const mergedGeometries = useMemo(() => {
+    const leftField = leftFieldData.field
+    const rightField = rightFieldData.field
+
+    if (typeof window !== 'undefined') {
+      window.__neuralBuildTimes = {
+        left: leftFieldData.dt,
+        right: rightFieldData.dt,
+        total: leftFieldData.dt + rightFieldData.dt,
+      }
+    }
+
+    // Compute transforms for each wing
+    const layoutLeft = calculateRibbonLayout(vpWidth, leftConfig)
+    const layoutRight = calculateRibbonLayout(vpWidth, rightConfig)
+
+    const matLeft = getRibbonMatrix({ ...leftConfig, side: 'left' }, layoutLeft)
+    const matRight = getRibbonMatrix({ ...rightConfig, side: 'right' }, layoutRight)
+
+    const mergedLinesGeo = mergeTransformedGeometries(leftField.linesGeo, matLeft, rightField.linesGeo, matRight)
+    const mergedPointsGeo = mergeTransformedGeometries(leftField.pointsGeo, matLeft, rightField.pointsGeo, matRight)
+    const mergedHazeGeo = mergeTransformedGeometries(leftField.hazeGeo, matLeft, rightField.hazeGeo, matRight)
+
+    return {
+      linesGeo: mergedLinesGeo,
+      pointsGeo: mergedPointsGeo,
+      hazeGeo: mergedHazeGeo,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leftFieldData, rightFieldData, vpWidth, leftKey, rightKey])
+
+  // Dispose previous merged geometries when mergedGeometries changes or unmounts
+  const prevMergedRef = useRef(mergedGeometries)
+  useEffect(() => {
+    if (prevMergedRef.current && prevMergedRef.current !== mergedGeometries) {
+      const m = prevMergedRef.current
+      if (m.linesGeo) m.linesGeo.dispose()
+      if (m.pointsGeo) m.pointsGeo.dispose()
+      if (m.hazeGeo) m.hazeGeo.dispose()
+    }
+    prevMergedRef.current = mergedGeometries
+  }, [mergedGeometries])
+
+  useEffect(() => {
+    return () => {
+      if (prevMergedRef.current) {
+        const m = prevMergedRef.current
+        if (m.linesGeo) m.linesGeo.dispose()
+        if (m.pointsGeo) m.pointsGeo.dispose()
+        if (m.hazeGeo) m.hazeGeo.dispose()
+      }
+    }
+  }, [])
+
+  // Strict useMemo for materials with stable primitive dependencies (Requirement 1)
   const lineMat = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
@@ -307,6 +540,7 @@ export const NeuralNetworkField = memo(function NeuralNetworkField({
     return mat
   }, [glow, nodeScale, innerFade])
 
+  // Lightweight per-frame animation: strictly updates uniform value, zero allocations (Requirement 1)
   useFrame((state) => {
     if (pointMatRef.current) {
       pointMatRef.current.uniforms.uTime.value = state.clock.elapsedTime
@@ -328,79 +562,56 @@ export const NeuralNetworkField = memo(function NeuralNetworkField({
     })
   }, [glow, nodeScale, innerFade])
 
-  // Delicate Curve-Crossing Flares (6 exact curve intersections, sized crisp without blurry blobs)
-  const flareCoreMat = useMemo(() => {
-    if (!focalFlaresGeo) return null
-    return new THREE.PointsMaterial({
-      color: new THREE.Color('#ffffff'),
-      size: 0.012 * Math.min(1.15, glow) * nodeScale,
-      map: glowTexture,
-      transparent: true,
-      opacity: 0.22,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true,
-    })
-  }, [focalFlaresGeo, glowTexture, glow, nodeScale])
-
-  const flareHaloMat = useMemo(() => {
-    if (!focalFlaresGeo) return null
-    return new THREE.PointsMaterial({
-      color: new THREE.Color('#0048ff'),
-      size: 0.026 * glow * nodeScale,
-      map: glowTexture,
-      transparent: true,
-      opacity: Math.min(0.08, 0.06 * glow),
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true,
-    })
-  }, [focalFlaresGeo, glowTexture, glow, nodeScale])
-
-  // Comprehensive GPU resource disposal
-  const prevMatsRef = useRef({})
+  // Disposal on unmount or re-creation (Requirement 1)
   useEffect(() => {
-    const current = { lineMat, pointMat, hazeMat, flareCoreMat, flareHaloMat }
-    Object.keys(prevMatsRef.current).forEach((k) => {
-      const oldMat = prevMatsRef.current[k]
-      if (oldMat && oldMat !== current[k]) {
-        oldMat.dispose()
-      }
-    })
-    prevMatsRef.current = current
     return () => {
       lineMat.dispose()
       pointMat.dispose()
       hazeMat.dispose()
-      if (flareCoreMat) flareCoreMat.dispose()
-      if (flareHaloMat) flareHaloMat.dispose()
     }
-  }, [lineMat, pointMat, hazeMat, flareCoreMat, flareHaloMat])
+  }, [lineMat, pointMat, hazeMat])
 
-  // Dispose generated geometries on unmount / regeneration
   useEffect(() => {
     return () => {
-      if (refinedField?.linesGeo) refinedField.linesGeo.dispose()
-      if (refinedField?.pointsGeo) refinedField.pointsGeo.dispose()
-      if (refinedField?.hazeGeo) refinedField.hazeGeo.dispose()
+      if (mergedGeometries) {
+        if (mergedGeometries.linesGeo) mergedGeometries.linesGeo.dispose()
+        if (mergedGeometries.pointsGeo) mergedGeometries.pointsGeo.dispose()
+        if (mergedGeometries.hazeGeo) mergedGeometries.hazeGeo.dispose()
+      }
     }
-  }, [refinedField])
+  }, [mergedGeometries])
 
-  return (
-    <group>
-      {/* 1. Restrained Volumetric Nebula Glow (#05164d) across chambers */}
-      {activeHazeGeo && <points geometry={activeHazeGeo} material={hazeMat} />}
+  // Render merged meshes directly at scene level with matrixAutoUpdate = false (Requirements 1 & 2)
+  return createPortal(
+    <group matrixAutoUpdate={false}>
+      {/* 1. Restrained Volumetric Nebula Glow (Merged Points) */}
+      {mergedGeometries.hazeGeo && (
+        <points
+          geometry={mergedGeometries.hazeGeo}
+          material={hazeMat}
+          matrixAutoUpdate={false}
+        />
+      )}
 
-      {/* 2. Whisper-Thin Gossamer Connective Tissue (max edge <= 0.26 * h(u)) */}
-      {activeLinesGeo && <lineSegments geometry={activeLinesGeo} material={lineMat} />}
+      {/* 2. Gossamer Connective Tissue (Merged LineSegments) */}
+      {mergedGeometries.linesGeo && (
+        <lineSegments
+          geometry={mergedGeometries.linesGeo}
+          material={lineMat}
+          matrixAutoUpdate={false}
+        />
+      )}
 
-      {/* 3. Multi-Scale Starlight Field: Twinkling Micro-Nodes + Radiant Ice-White Hubs */}
-      {activePointsGeo && <points geometry={activePointsGeo} material={pointMat} />}
-
-      {/* 4. Delicate Curve-Crossing Flares */}
-      {focalFlaresGeo && flareHaloMat && <points geometry={focalFlaresGeo} material={flareHaloMat} />}
-      {focalFlaresGeo && flareCoreMat && <points geometry={focalFlaresGeo} material={flareCoreMat} />}
-    </group>
+      {/* 3. Multi-Scale Starlight Field: Micro-Nodes + Ice-White Hubs (Merged Points) */}
+      {mergedGeometries.pointsGeo && (
+        <points
+          geometry={mergedGeometries.pointsGeo}
+          material={pointMat}
+          matrixAutoUpdate={false}
+        />
+      )}
+    </group>,
+    scene
   )
 })
 

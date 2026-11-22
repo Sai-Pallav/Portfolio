@@ -1197,7 +1197,7 @@ function generate25BackgroundBokehCircles(side, H, prng) {
   return pointsBuilder.buildGeometry(true, true)
 }
 
-function get6ExactCurveCrossingFlares(side, H, config = {}) {
+export function get6ExactCurveCrossingFlares(side, H, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
   const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
@@ -1373,15 +1373,16 @@ export function generateSideWireData(side, config = {}) {
   // 3. Companion Silk Strands bundled tightly along Hero Waves (ZERO HAMMOCK NET!)
   const subFilamentsGeo = generateCompanionSilkStrands(side, H, config)
 
-  // 4. Volumetric 3-Layer Neural Network Field in almond chambers
-  const { linesGeo: neuralLinesGeo, pointsGeo: neuralPointsGeo, hazeGeo: neuralHazeGeo } =
-    generateVolumetricNeuralField(side, H, config, graph)
+  // 4. Volumetric 3-Layer Neural Network Field (handled independently by MergedNeuralNetworkField)
+  const neuralLinesGeo = new THREE.BufferGeometry()
+  const neuralPointsGeo = new THREE.BufferGeometry()
+  const neuralHazeGeo = new THREE.BufferGeometry()
 
   // 5. 5 Sweeping Outer Beaded Dot-Streams floating well outside the main waves
   const beadedStreamsGeo = generate5SweepingOuterBeadedStreams(side, H, config)
 
-  // 6. 6 Exact Curve-Crossing Flares strictly on Hero wave intersections
-  const focalFlaresGeo = get6ExactCurveCrossingFlares(side, H, config)
+  // 6. 6 Exact Curve-Crossing Flares (obsolete / unused by active render tree)
+  const focalFlaresGeo = new THREE.BufferGeometry()
 
   // 7. 25 Soft Out-of-Focus Background Bokeh Discs
   const bokehGeo = generate25BackgroundBokehCircles(side, H, prng)
@@ -1475,8 +1476,8 @@ export function getGeometryCacheKey(side, config = {}) {
 export function getSideWireData(side, config = {}) {
   const key = getGeometryCacheKey(side, config)
   if (!cachedGeometryMap.has(key)) {
-    // Keep at most 16 entries in cache to bound GPU memory
-    if (cachedGeometryMap.size > 16) {
+    // Keep at most 4 entries in cache to bound GPU memory
+    if (cachedGeometryMap.size > 4) {
       const oldestKey = cachedGeometryMap.keys().next().value
       const oldData = cachedGeometryMap.get(oldestKey)
       if (oldData) {

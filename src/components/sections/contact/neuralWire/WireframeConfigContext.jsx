@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, startTransition } from 'react'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_SIDE_CONFIG = {
@@ -208,25 +208,29 @@ export function WireframeConfigProvider({ children }) {
   const updateParam = useCallback((key, value, targetSide = null) => {
     const side = targetSide || (linkSides ? 'both' : activeSideTab)
 
-    if (side === 'both') {
-      setLeftConfig((prev) => ({ ...prev, [key]: value }))
-      setRightConfig((prev) => ({ ...prev, [key]: value }))
-    } else if (side === 'left') {
-      setLeftConfig((prev) => ({ ...prev, [key]: value }))
-    } else if (side === 'right') {
-      setRightConfig((prev) => ({ ...prev, [key]: value }))
-    }
+    startTransition(() => {
+      if (side === 'both') {
+        setLeftConfig((prev) => ({ ...prev, [key]: value }))
+        setRightConfig((prev) => ({ ...prev, [key]: value }))
+      } else if (side === 'left') {
+        setLeftConfig((prev) => ({ ...prev, [key]: value }))
+      } else if (side === 'right') {
+        setRightConfig((prev) => ({ ...prev, [key]: value }))
+      }
+    })
   }, [linkSides, activeSideTab])
 
   /**
    * Update a parameter specifically for an individual ribbon (by side or id)
    */
   const updateRibbonParam = useCallback((sideOrId, key, value) => {
-    if (sideOrId === 'left' || sideOrId === 0) {
-      setLeftConfig((prev) => ({ ...prev, [key]: value }))
-    } else if (sideOrId === 'right' || sideOrId === 1) {
-      setRightConfig((prev) => ({ ...prev, [key]: value }))
-    }
+    startTransition(() => {
+      if (sideOrId === 'left' || sideOrId === 0) {
+        setLeftConfig((prev) => ({ ...prev, [key]: value }))
+      } else if (sideOrId === 'right' || sideOrId === 1) {
+        setRightConfig((prev) => ({ ...prev, [key]: value }))
+      }
+    })
   }, [])
 
   const applyPreset = useCallback((presetKey) => {

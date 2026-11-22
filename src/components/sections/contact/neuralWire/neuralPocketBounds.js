@@ -109,7 +109,6 @@ export function getAlmondPocketBounds(u, H = H_VAL, config = {}) {
     Ry,
     Rz,
     isPinch,
-    // Extended envelope covering all four wave ribbons
     envMinY,
     envMaxY,
     envMinZ,
@@ -125,13 +124,6 @@ export function getAlmondPocketBounds(u, H = H_VAL, config = {}) {
 /**
  * Computes all valid open vertical sub-pockets between the sorted Y-coordinates of all active
  * wave ribbons at longitudinal coordinate u.
- * Strictly rejects any narrow slice below minSubGap to eliminate 1D collapsing spines.
- *
- * @param {number} u
- * @param {number} [H=H_VAL]
- * @param {object} [config={}]
- * @param {number} [minSubGap=0.028]
- * @returns {Array<object>}
  */
 export function getAllSubPockets(u, H = H_VAL, config = {}, minSubGap = 0.028) {
   const y0 = heroY0(u, H, config)
@@ -156,7 +148,6 @@ export function getAllSubPockets(u, H = H_VAL, config = {}, minSubGap = 0.028) {
     const rHigh = ribbons[k + 1]
     const height = rHigh.y - rLow.y
 
-    // Strictly reject any narrow slice below minSubGap
     if (height >= minSubGap) {
       const centerY = 0.5 * (rLow.y + rHigh.y)
       const centerZ = 0.5 * (rLow.z + rHigh.z)
@@ -185,8 +176,7 @@ export function getAllSubPockets(u, H = H_VAL, config = {}, minSubGap = 0.028) {
 }
 
 /**
- * Computes the relative coordinate Vector4 (u, v_rel, w_depth, r_norm) for a 3D point
- * relative to the local almond chamber / wave envelope.
+ * Computes the relative coordinate Vector4 (u, v_rel, w_depth, r_norm) for a 3D point.
  */
 export function computeRelativeCoord(pos, u, H = H_VAL, config = {}) {
   const bounds = getAlmondPocketBounds(u, H, config)
@@ -204,8 +194,7 @@ export function computeRelativeCoord(pos, u, H = H_VAL, config = {}) {
 }
 
 /**
- * Computes relative coordinates as a plain 4-element array [u, v_rel, w_depth, r_norm]
- * for high-performance direct buffer insertion.
+ * Computes relative coordinates as a plain 4-element array [u, v_rel, w_depth, r_norm].
  */
 export function computeRelativeCoordArray(pos, u, H = H_VAL, config = {}) {
   const bounds = getAlmondPocketBounds(u, H, config)
@@ -224,7 +213,6 @@ export function computeRelativeCoordArray(pos, u, H = H_VAL, config = {}) {
 
 /**
  * Generates invisible anchor vertices along the inner margins of the upper and lower waves.
- * Extends longitudinal sampling across the full wave span all the way to u = 1.0 (flush with viewport edge).
  */
 export function generateMarginAnchors(side, H = H_VAL, config = {}, count = 64) {
   const isLeft = side === 'left'
@@ -283,22 +271,132 @@ export function generateMarginAnchors(side, H = H_VAL, config = {}, count = 64) 
 }
 
 /**
- * Fast 3D spatial hash grid for accelerated Poisson-disk distance queries.
+ * 1D Lookup Table (LUT) of sorted active ribbon bounds along u once per build (Requirement 4).
  */
-class SpatialGrid3D {
-  constructor(cellSize = 0.035) {
+export class RibbonBoundsLUT {
+  constructor(H = H_VAL, config = {}, samples = 1024) {
+    this.samples = samples
+    this.H = H
+    this.config = config
+    this.data = new Array(samples + 1)
+    for (let i = 0; i <= samples; i++) {
+      const u = i / samples
+      this.data[i] = getAlmondPocketBounds(u, H, config)
+    }
+    this._reusableBounds = {
+      u: 0,
+      y0: 0, y1: 0, z0: 0, z1: 0,
+      y2: 0, z2: 0, y3: 0, z3: 0,
+      yUpper: 0, yLower: 0,
+      envMinY: 0, envMaxY: 0,
+      envHeight: 0,
+      envCenterY: 0, envCenterZ: 0,
+      safeMargin: 0,
+      minGapHeight: 0,
+    }
+  }
+
+  getBounds(u, out = this._reusableBounds) {
+    const su = Math.max(0, Math.min(1, u)) * this.samples
+    const i = Math.floor(su)
+    const f = su - i
+    if (i >= this.samples) {
+      const b = this.data[this.samples]
+      out.u = u
+      out.y0 = b.y0
+      out.y1 = b.y1
+      out.z0 = b.z0
+      out.z1 = b.z1
+      out.y2 = b.y2
+      out.z2 = b.z2
+      out.y3 = b.y3
+      out.z3 = b.z3
+      out.yUpper = b.yUpper
+      out.yLower = b.yLower
+      out.envMinY = b.envMinY
+      out.envMaxY = b.envMaxY
+      out.envHeight = b.envHeight
+      out.envCenterY = b.envCenterY
+      out.envCenterZ = b.envCenterZ
+      out.safeMargin = b.safeMargin
+      out.minGapHeight = b.minGapHeight
+      return out
+    }
+    const b0 = this.data[i]
+    const b1 = this.data[i + 1]
+
+    out.u = u
+    out.y0 = b0.y0 + f * (b1.y0 - b0.y0)
+    out.y1 = b0.y1 + f * (b1.y1 - b0.y1)
+    out.z0 = b0.z0 + f * (b1.z0 - b0.z0)
+    out.z1 = b0.z1 + f * (b1.z1 - b0.z1)
+    out.y2 = b0.y2 + f * (b1.y2 - b0.y2)
+    out.z2 = b0.z2 + f * (b1.z2 - b0.z2)
+    out.y3 = b0.y3 + f * (b1.y3 - b0.y3)
+    out.z3 = b0.z3 + f * (b1.z3 - b0.z3)
+    out.yUpper = b0.yUpper + f * (b1.yUpper - b0.yUpper)
+    out.yLower = b0.yLower + f * (b1.yLower - b0.yLower)
+    out.envMinY = b0.envMinY + f * (b1.envMinY - b0.envMinY)
+    out.envMaxY = b0.envMaxY + f * (b1.envMaxY - b0.envMaxY)
+    out.envHeight = b0.envHeight + f * (b1.envHeight - b0.envHeight)
+    out.envCenterY = b0.envCenterY + f * (b1.envCenterY - b0.envCenterY)
+    out.envCenterZ = b0.envCenterZ + f * (b1.envCenterZ - b0.envCenterZ)
+    out.safeMargin = b0.safeMargin
+    out.minGapHeight = b0.minGapHeight
+    return out
+  }
+
+  getSubPockets(u, minSubGap = 0.028) {
+    const b = this.getBounds(u)
+    const ribbons = [
+      { id: 0, y: b.y0, z: b.z0 },
+      { id: 1, y: b.y1, z: b.z1 },
+      { id: 2, y: b.y2, z: b.z2 },
+      { id: 3, y: b.y3, z: b.z3 },
+    ]
+    ribbons.sort((a, b) => a.y - b.y)
+
+    const pockets = []
+    for (let i = 0; i < ribbons.length - 1; i++) {
+      const lower = ribbons[i]
+      const upper = ribbons[i + 1]
+      const height = upper.y - lower.y
+      if (height >= minSubGap) {
+        pockets.push({
+          lowerId: lower.id,
+          upperId: upper.id,
+          lowerY: lower.y,
+          upperY: upper.y,
+          centerY: 0.5 * (upper.y + lower.y),
+          centerZ: 0.5 * (upper.z + lower.z),
+          height,
+          ry: Math.max(0.0, 0.5 * height - b.safeMargin * 0.4),
+          rz: Math.max(0.005, 0.5 * height * 0.85),
+        })
+      }
+    }
+    return pockets
+  }
+}
+
+/**
+ * 3D Spatial Hash Grid for accelerated Poisson-disk sampling and k-NN edge queries (Requirement 4).
+ */
+export class SpatialGrid3D {
+  constructor(cellSize = 0.10) {
     this.cellSize = cellSize
+    this.invCellSize = 1 / cellSize
     this.cells = new Map()
   }
 
   _key(ix, iy, iz) {
-    return `${ix},${iy},${iz}`
+    return ((ix * 73856093) ^ (iy * 19349663) ^ (iz * 83492791)) | 0
   }
 
   insert(x, y, z, id) {
-    const ix = Math.floor(x / this.cellSize)
-    const iy = Math.floor(y / this.cellSize)
-    const iz = Math.floor(z / this.cellSize)
+    const ix = Math.floor(x * this.invCellSize)
+    const iy = Math.floor(y * this.invCellSize)
+    const iz = Math.floor(z * this.invCellSize)
     const k = this._key(ix, iy, iz)
     let list = this.cells.get(k)
     if (!list) {
@@ -310,12 +408,12 @@ class SpatialGrid3D {
 
   isTooClose(x, y, z, reqRadius, nodes) {
     const r2 = reqRadius * reqRadius
-    const minX = Math.floor((x - reqRadius) / this.cellSize)
-    const maxX = Math.floor((x + reqRadius) / this.cellSize)
-    const minY = Math.floor((y - reqRadius) / this.cellSize)
-    const maxY = Math.floor((y + reqRadius) / this.cellSize)
-    const minZ = Math.floor((z - reqRadius) / this.cellSize)
-    const maxZ = Math.floor((z + reqRadius) / this.cellSize)
+    const minX = Math.floor((x - reqRadius) * this.invCellSize)
+    const maxX = Math.floor((x + reqRadius) * this.invCellSize)
+    const minY = Math.floor((y - reqRadius) * this.invCellSize)
+    const maxY = Math.floor((y + reqRadius) * this.invCellSize)
+    const minZ = Math.floor((z - reqRadius) * this.invCellSize)
+    const maxZ = Math.floor((z + reqRadius) * this.invCellSize)
 
     for (let ix = minX; ix <= maxX; ix++) {
       for (let iy = minY; iy <= maxY; iy++) {
@@ -327,8 +425,111 @@ class SpatialGrid3D {
               const dx = other.pos.x - x
               const dy = other.pos.y - y
               const dz = other.pos.z - z
+              if (dx * dx + dy * dy + dz * dz < r2) return true
+            }
+          }
+        }
+      }
+    }
+    return false
+  }
+
+  queryRadius(x, y, z, radius, nodes, cb) {
+    const r2 = radius * radius
+    const minX = Math.floor((x - radius) * this.invCellSize)
+    const maxX = Math.floor((x + radius) * this.invCellSize)
+    const minY = Math.floor((y - radius) * this.invCellSize)
+    const maxY = Math.floor((y + radius) * this.invCellSize)
+    const minZ = Math.floor((z - radius) * this.invCellSize)
+    const maxZ = Math.floor((z + radius) * this.invCellSize)
+
+    for (let ix = minX; ix <= maxX; ix++) {
+      for (let iy = minY; iy <= maxY; iy++) {
+        for (let iz = minZ; iz <= maxZ; iz++) {
+          const list = this.cells.get(this._key(ix, iy, iz))
+          if (list) {
+            for (let i = 0; i < list.length; i++) {
+              const id = list[i]
+              const other = nodes[id]
+              const dx = other.pos.x - x
+              const dy = other.pos.y - y
+              const dz = other.pos.z - z
               const d2 = dx * dx + dy * dy + dz * dz
-              if (d2 < r2) return true
+              if (d2 <= r2) {
+                cb(id, Math.sqrt(d2), d2)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 2D Spatial Grid for fast edge crossing validation without heap allocations.
+ */
+class EdgeGrid2D {
+  constructor(cellSize = 0.25, maxEdges = 20000) {
+    this.cellSize = cellSize
+    this.invCellSize = 1 / cellSize
+    this.cells = new Map()
+    this.visited = new Int32Array(maxEdges)
+    this.stamp = 1
+  }
+
+  _key(ix, iy) {
+    return ((ix * 73856093) ^ (iy * 19349663)) | 0
+  }
+
+  insert(edgeIdx, pA, pB) {
+    if (edgeIdx >= this.visited.length) {
+      const nextVisited = new Int32Array(Math.max(this.visited.length * 2, edgeIdx + 1024))
+      nextVisited.set(this.visited)
+      this.visited = nextVisited
+    }
+
+    const minX = Math.floor(Math.min(pA.x, pB.x) * this.invCellSize)
+    const maxX = Math.floor(Math.max(pA.x, pB.x) * this.invCellSize)
+    const minY = Math.floor(Math.min(pA.y, pB.y) * this.invCellSize)
+    const maxY = Math.floor(Math.max(pA.y, pB.y) * this.invCellSize)
+
+    for (let ix = minX; ix <= maxX; ix++) {
+      for (let iy = minY; iy <= maxY; iy++) {
+        const k = this._key(ix, iy)
+        let list = this.cells.get(k)
+        if (!list) {
+          list = []
+          this.cells.set(k, list)
+        }
+        list.push(edgeIdx)
+      }
+    }
+  }
+
+  hasCrossing(pA, pB, candI, candJ, edges, rawNodes, targetTier) {
+    const minX = Math.floor(Math.min(pA.x, pB.x) * this.invCellSize)
+    const maxX = Math.floor(Math.max(pA.x, pB.x) * this.invCellSize)
+    const minY = Math.floor(Math.min(pA.y, pB.y) * this.invCellSize)
+    const maxY = Math.floor(Math.max(pA.y, pB.y) * this.invCellSize)
+
+    this.stamp++
+    const stamp = this.stamp
+    for (let ix = minX; ix <= maxX; ix++) {
+      for (let iy = minY; iy <= maxY; iy++) {
+        const list = this.cells.get(this._key(ix, iy))
+        if (!list) continue
+        for (let i = 0; i < list.length; i++) {
+          const eIdx = list[i]
+          if (this.visited[eIdx] === stamp) continue
+          this.visited[eIdx] = stamp
+          const e = edges[eIdx]
+          if (e.i === candI || e.j === candI || e.i === candJ || e.j === candJ) continue
+          const eA = rawNodes[e.i]
+          const eB = rawNodes[e.j]
+          if (eA.depthTier === targetTier && eB.depthTier === targetTier) {
+            if (segmentsIntersect2D(pA, pB, eA.pos, eB.pos)) {
+              return true
             }
           }
         }
@@ -339,59 +540,69 @@ class SpatialGrid3D {
 }
 
 /**
- * Checks if a candidate line segment intersects any wave ribbon filament core or crosses pocket envelopes.
+ * Checks if a candidate line segment intersects any wave ribbon filament core using the 1D LUT.
+ * Uses squared distances to eliminate heavy Math.hypot / Math.sqrt calls across tens of thousands of edge tests.
  */
-function doesSegmentIntersectRibbons(pA, uA, pB, uB, H = H_VAL, config = {}, isTether = false) {
+function doesSegmentIntersectRibbonsLUT(pA, uA, pB, uB, lut, isTether = false) {
   const samples = 7
-  for (let s = 1; s < samples; s++) {
-    const frac = s / samples
-    const ut = uA + frac * (uB - uA)
-    const yt = pA.y + frac * (pB.y - pA.y)
-    const zt = pA.z + frac * (pB.z - pA.z)
+  const marginTol = isTether ? 0.006 : 0.014
+  const filamentTol = isTether ? 0.0060 : 0.0070
+  const filamentTol2 = filamentTol * filamentTol
+  const du = (uB - uA) / samples
+  const dy = (pB.y - pA.y) / samples
+  const dz = (pB.z - pA.z) / samples
 
-    const bounds = getAlmondPocketBounds(ut, H, config)
-    const marginTol = isTether ? 0.006 : 0.014
+  let ut = uA
+  let yt = pA.y
+  let zt = pA.z
+
+  const bounds = lut._reusableBounds
+
+  for (let s = 1; s < samples; s++) {
+    ut += du
+    yt += dy
+    zt += dz
+
+    lut.getBounds(ut, bounds)
     if (yt > bounds.envMaxY + marginTol || yt < bounds.envMinY - marginTol) {
       return true
     }
 
-    const filamentTol = isTether ? 0.0060 : 0.0070
-    if (Math.hypot(yt - bounds.y0, zt - bounds.z0) < filamentTol) return true
-    if (Math.hypot(yt - bounds.y1, zt - bounds.z1) < filamentTol) return true
-    if (Math.hypot(yt - bounds.y2, zt - bounds.z2) < filamentTol) return true
-    if (Math.hypot(yt - bounds.y3, zt - bounds.z3) < filamentTol) return true
+    const d0y = yt - bounds.y0
+    const d0z = zt - bounds.z0
+    if (d0y * d0y + d0z * d0z < filamentTol2) return true
+
+    const d1y = yt - bounds.y1
+    const d1z = zt - bounds.z1
+    if (d1y * d1y + d1z * d1z < filamentTol2) return true
+
+    const d2y = yt - bounds.y2
+    const d2z = zt - bounds.z2
+    if (d2y * d2y + d2z * d2z < filamentTol2) return true
+
+    const d3y = yt - bounds.y3
+    const d3z = zt - bounds.z3
+    if (d3y * d3y + d3z * d3z < filamentTol2) return true
   }
   return false
 }
 
-/**
- * Helper to compute minimum distance from a 3D point (y, z) at u to all 4 ribbon filaments.
- */
 function getMinFilamentClearance(y, z, b) {
-  const d0 = Math.hypot(y - b.y0, z - b.z0)
-  const d1 = Math.hypot(y - b.y1, z - b.z1)
-  const d2 = Math.hypot(y - b.y2, z - b.z2)
-  const d3 = Math.hypot(y - b.y3, z - b.z3)
-  return Math.min(d0, d1, d2, d3)
+  const d0y = y - b.y0, d0z = z - b.z0
+  const d1y = y - b.y1, d1z = z - b.z1
+  const d2y = y - b.y2, d2z = z - b.z2
+  const d3y = y - b.y3, d3z = z - b.z3
+  const d02 = d0y * d0y + d0z * d0z
+  const d12 = d1y * d1y + d1z * d1z
+  const d22 = d2y * d2y + d2z * d2z
+  const d32 = d3y * d3y + d3z * d3z
+  return Math.sqrt(Math.min(d02, d12, d22, d32))
 }
 
 /**
  * Generates the refined volumetric neural field BufferGeometries (linesGeo, pointsGeo, hazeGeo).
- *
- * Implements all 5 finalized blueprint answers:
- * (1) True 3D Poisson-disk volumetric sampling across open sub-pockets with subtle low-frequency clustering noise,
- *     rejecting narrow slices below minSubGap so 1D curve-following trails are impossible.
- * (2) Proximity-constrained 3D Delaunay/k-NN edges clamped to <= 0.38 * h(u) + 0.025 with midpoint ribbon-crossing rejection,
- *     tall vertical-strut gating (dy > 1.8 * dx on long spans), dual-tier FG-to-MID/BG links, and local fallback (degree >= 2).
- * (3) Continuous smoothstep tapering of density, scale, and alpha to zero across u in [0.06, 0.20], dynamic h(u) feathering
- *     inside crossing throats, full-volume sampling flush to u = 1.00, and soft margin alpha feathering past |v_rel| = 0.78.
- * (4) 3-tier Z-depth stratification with narrow smoothstep blends around w_depth = -0.25 and +0.25 — sparse 12–15% FG purely
- *     circular ice-white pinpoint hubs (14–22px quad, sharp 15–20% core, tight exponential cyan-blue halo, zero 4-point star spikes
- *     or bokeh blobs) plus 6–10px cyan FG stars, MID 4–7px cobalt/royal-blue nodes and crisp webbing, BG 1.5–3px dim sapphire micro-dots
- *     and faint deep-navy sub-web, plus subtle electric-indigo/violet rim tinting near purple wave edges.
- * (5) Pocket haze capped at 350–500 deep sapphire (#041038 to #061b4d) particles per side strictly inside r_norm < 0.65 and
- *     w_depth < -0.20 with peak opacity 0.025–0.032, radius scaled to h(u), slight bias behind dense node clusters, smooth Gaussian falloff,
- *     and zero throat bleed.
+ * Highly optimized with 1D LUT and 3D spatial hash grid (Requirement 4).
+ * Precomputes bounding spheres on all BufferGeometries (Requirement 2).
  *
  * @param {'left' | 'right'} side
  * @param {number} [H=H_VAL]
@@ -407,14 +618,16 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
   const themeConfig = config.themeConfig || {}
   const minSubGap = 0.028
 
+  // 0. Precompute 1D LUT of sorted active ribbon bounds along u once per build (Requirement 4)
+  const lut = new RibbonBoundsLUT(H, config, 1024)
+
   // 1. Invisible Anchor Points along inner ribbon margins (alpha = 0, size = 0)
   const anchors = generateMarginAnchors(side, H, config, 64)
 
   // 2. True 3D Poisson-Disk Volumetric Sampling across all open sub-pockets
   const rawNodes = []
-  const grid = new SpatialGrid3D(0.035)
+  const grid = new SpatialGrid3D(0.10)
 
-  // Adaptive longitudinal resolution ensuring delta_x <= maxEdgeDist everywhere
   const uList = []
   for (let u = 0.082; u < 0.12; u += 0.0016) uList.push(u)
   for (let u = 0.12; u < 0.22; u += 0.0022) uList.push(u)
@@ -426,7 +639,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
     const tipTaper = THREE.MathUtils.smoothstep(uBin, 0.06, 0.20)
     if (tipTaper <= 0.001) continue
 
-    const pocketsCheck = getAllSubPockets(uBin, H, config, minSubGap)
+    const pocketsCheck = lut.getSubPockets(uBin, minSubGap)
     if (pocketsCheck.length === 0) continue
 
     for (const basePocket of pocketsCheck) {
@@ -443,8 +656,8 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
           0.999
         )
 
-        const bLocal = getAlmondPocketBounds(u, H, config)
-        const pLocalList = getAllSubPockets(u, H, config, minSubGap)
+        const bLocal = lut.getBounds(u)
+        const pLocalList = lut.getSubPockets(u, minSubGap)
         if (pLocalList.length === 0) continue
 
         let pLocal = pLocalList[0]
@@ -463,7 +676,6 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
         const r_norm = Math.hypot(v_rel, w_depth)
         if (r_norm > 0.86) continue
 
-        // Dynamic cross-section depth scaling at narrow tip
         const localRz = u < 0.20
           ? Math.min(pLocal.rz, 1.1 * pLocal.height + 0.015)
           : pLocal.rz
@@ -481,18 +693,15 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
           : (u > 0.65 ? 0.0070 : (u < 0.20 ? Math.min(0.0060, 0.10 * pLocal.height) : 0.0080))
         if (minFilamentDist < heroClearance) continue
 
-        // Subtle low-frequency galactic clustering noise (gentle modulation, never starving narrow necks)
         const clusterNoise = 0.65 + 0.18 * Math.sin(1.6 * x + 0.4) * Math.cos(4.0 * y) + 0.10 * Math.sin(3.0 * x - 2.0 * z) + 0.07 * Math.cos(5.0 * y + 3.0 * z)
         const noiseAccept = u < 0.22 ? 0.88 : THREE.MathUtils.clamp(clusterNoise, 0.40, 1.0)
         if (prng() > noiseAccept) continue
 
-        // 3-tier Z-depth stratification
         const isFG = w_depth > 0.25
         const isBG = w_depth < -0.25
         const depthTier = isFG ? 'fg' : (isBG ? 'bg' : 'mid')
         const layer = isFG ? 1.0 : (isBG ? -1.0 : 0.0)
 
-        // Multi-scale Poisson clearance: wider for FG hubs and stars, tighter for MID/BG
         const rMin = u < 0.20
           ? (0.025 * pLocal.height + 0.012)
           : (isFG ? (0.062 * pLocal.height + 0.030) : (0.044 * pLocal.height + 0.019))
@@ -527,78 +736,67 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
     }
   }
 
-  // 3. Proximity-Constrained 3D Delaunay/k-NN Graph Topology
+  // 3. Topology Connection using Spatial Hash Grid (Requirement 4)
   const edges = []
   const edgeSet = new Set()
   const adj = Array.from({ length: rawNodes.length }, () => [])
+  const edgeGrid = new EdgeGrid2D(0.20)
 
   function addEdge(i, j, dist, isInterLayer = false, isFallback = false) {
     const key = Math.min(i, j) + '-' + Math.max(i, j)
     if (edgeSet.has(key)) return false
     edgeSet.add(key)
+    const edgeIdx = edges.length
     edges.push({ i, j, dist, isInterLayer, isFallback })
     rawNodes[i].connectedCount++
     rawNodes[j].connectedCount++
     adj[i].push(j)
     adj[j].push(i)
+    edgeGrid.insert(edgeIdx, rawNodes[i].pos, rawNodes[j].pos)
     return true
   }
 
   // 3a. Intra-layer Delaunay/k-NN connections
   const depthLayers = ['fg', 'mid', 'bg']
   for (const lyr of depthLayers) {
-    const layerIndices = rawNodes
-      .map((n, idx) => (n.depthTier === lyr ? idx : -1))
-      .filter(idx => idx >= 0)
+    const layerIndices = []
+    for (let i = 0; i < rawNodes.length; i++) {
+      if (rawNodes[i].depthTier === lyr) layerIndices.push(i)
+    }
 
     const targetK = lyr === 'mid' ? 4 : (lyr === 'fg' ? 4 : 3)
 
     for (let a = 0; a < layerIndices.length; a++) {
       const i = layerIndices[a]
       const nA = rawNodes[i]
+      const localH = nA.hu
+      const maxEdgeDist = 0.38 * localH + 0.025
       const candidates = []
 
-      for (let b = 0; b < layerIndices.length; b++) {
-        if (a === b) continue
-        const j = layerIndices[b]
+      grid.queryRadius(nA.pos.x, nA.pos.y, nA.pos.z, maxEdgeDist, rawNodes, (j, dist3D) => {
+        if (i === j) return
         const nB = rawNodes[j]
-        if (Math.abs(nA.u - nB.u) > 0.090) continue
+        if (nB.depthTier !== lyr) return
+        if (Math.abs(nA.u - nB.u) > 0.090) return
+        if (dist3D < 0.008) return
 
-        const dist3D = nA.pos.distanceTo(nB.pos)
-        const localH = Math.max(nA.hu, nB.hu)
-        const maxEdgeDist = 0.38 * localH + 0.025
-        if (dist3D < 0.008 || dist3D > maxEdgeDist) continue
-
-        // Tall vertical-strut gating: dy over 1.8 * dx on long spans
         const dx = Math.abs(nA.pos.x - nB.pos.x)
         const dy = Math.abs(nA.pos.y - nB.pos.y)
-        if (dist3D > 0.18 * localH && dy > 1.8 * dx) continue
-
-        if (doesSegmentIntersectRibbons(nA.pos, nA.u, nB.pos, nB.u, H, config)) continue
+        if (dist3D > 0.18 * localH && dy > 1.8 * dx) return
 
         candidates.push({ j, dist3D })
-      }
+      })
 
       candidates.sort((c1, c2) => c1.dist3D - c2.dist3D)
 
-      for (const cand of candidates) {
+      for (let c = 0; c < candidates.length; c++) {
         if (nA.connectedCount >= targetK) break
+        const cand = candidates[c]
         const nB = rawNodes[cand.j]
         if (nB.connectedCount >= targetK + 2) continue
 
-        let crosses = false
-        for (const e of edges) {
-          if (e.i === i || e.j === i || e.i === cand.j || e.j === cand.j) continue
-          const eA = rawNodes[e.i]
-          const eB = rawNodes[e.j]
-          if (eA.depthTier === lyr && eB.depthTier === lyr) {
-            if (segmentsIntersect2D(nA.pos, nB.pos, eA.pos, eB.pos)) {
-              crosses = true
-              break
-            }
-          }
-        }
-        if (crosses) continue
+        if (doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, nB.pos, nB.u, lut)) continue
+        if (edgeGrid.hasCrossing(nA.pos, nB.pos, i, cand.j, edges, rawNodes, lyr)) continue
 
         addEdge(i, cand.j, cand.dist3D)
       }
@@ -614,6 +812,8 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
         for (let p2 = p1 + 1; p2 < nbrs.length; p2++) {
           const j = nbrs[p1]
           const k = nbrs[p2]
+          const key = Math.min(j, k) + '-' + Math.max(j, k)
+          if (edgeSet.has(key)) continue
           const nJ = rawNodes[j]
           const nK = rawNodes[k]
           if (nJ.connectedCount >= targetK + 1 || nK.connectedCount >= targetK + 1) continue
@@ -628,21 +828,8 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
           const dy = Math.abs(nJ.pos.y - nK.pos.y)
           if (dist3D > 0.18 * localH && dy > 1.8 * dx) continue
 
-          if (doesSegmentIntersectRibbons(nJ.pos, nJ.u, nK.pos, nK.u, H, config)) continue
-
-          let crosses = false
-          for (const e of edges) {
-            if (e.i === j || e.j === j || e.i === k || e.j === k) continue
-            const eA = rawNodes[e.i]
-            const eB = rawNodes[e.j]
-            if (eA.depthTier === lyr && eB.depthTier === lyr) {
-              if (segmentsIntersect2D(nJ.pos, nK.pos, eA.pos, eB.pos)) {
-                crosses = true
-                break
-              }
-            }
-          }
-          if (crosses) continue
+          if (doesSegmentIntersectRibbonsLUT(nJ.pos, nJ.u, nK.pos, nK.u, lut)) continue
+          if (edgeGrid.hasCrossing(nJ.pos, nK.pos, j, k, edges, rawNodes, lyr)) continue
 
           addEdge(j, k, dist3D)
         }
@@ -654,18 +841,18 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
   for (let i = 0; i < rawNodes.length; i++) {
     const nA = rawNodes[i]
     if (nA.depthTier !== 'fg') continue
+    const maxEdgeDist = 0.38 * nA.hu + 0.025
     const candidates = []
-    for (let j = 0; j < rawNodes.length; j++) {
+
+    grid.queryRadius(nA.pos.x, nA.pos.y, nA.pos.z, maxEdgeDist, rawNodes, (j, dist3D) => {
       const nB = rawNodes[j]
-      if (nB.depthTier !== 'mid') continue
-      if (Math.abs(nA.u - nB.u) > 0.085) continue
-      const dist3D = nA.pos.distanceTo(nB.pos)
-      const localH = Math.max(nA.hu, nB.hu)
-      const maxEdgeDist = 0.38 * localH + 0.025
-      if (dist3D > maxEdgeDist || dist3D < 0.008) continue
-      if (doesSegmentIntersectRibbons(nA.pos, nA.u, nB.pos, nB.u, H, config)) continue
+      if (nB.depthTier !== 'mid') return
+      if (Math.abs(nA.u - nB.u) > 0.085) return
+      if (dist3D < 0.008) return
+      if (doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, nB.pos, nB.u, lut)) return
       candidates.push({ j, dist3D })
-    }
+    })
+
     candidates.sort((a, b) => a.dist3D - b.dist3D)
     for (let m = 0; m < Math.min(2, candidates.length); m++) {
       addEdge(i, candidates[m].j, candidates[m].dist3D, true)
@@ -675,69 +862,69 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
   for (let i = 0; i < rawNodes.length; i++) {
     const nA = rawNodes[i]
     if (nA.depthTier !== 'bg') continue
+    const maxEdgeDist = 0.38 * nA.hu + 0.025
     const candidates = []
-    for (let j = 0; j < rawNodes.length; j++) {
+
+    grid.queryRadius(nA.pos.x, nA.pos.y, nA.pos.z, maxEdgeDist, rawNodes, (j, dist3D) => {
       const nB = rawNodes[j]
-      if (nB.depthTier !== 'mid') continue
-      if (Math.abs(nA.u - nB.u) > 0.085) continue
-      const dist3D = nA.pos.distanceTo(nB.pos)
-      const localH = Math.max(nA.hu, nB.hu)
-      const maxEdgeDist = 0.38 * localH + 0.025
-      if (dist3D > maxEdgeDist || dist3D < 0.008) continue
-      if (doesSegmentIntersectRibbons(nA.pos, nA.u, nB.pos, nB.u, H, config)) continue
+      if (nB.depthTier !== 'mid') return
+      if (Math.abs(nA.u - nB.u) > 0.085) return
+      if (dist3D < 0.008) return
+      if (doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, nB.pos, nB.u, lut)) return
       candidates.push({ j, dist3D })
-    }
+    })
+
     candidates.sort((a, b) => a.dist3D - b.dist3D)
     for (let m = 0; m < Math.min(1, candidates.length); m++) {
       addEdge(i, candidates[m].j, candidates[m].dist3D, true)
     }
   }
 
-  // Cross-layer connections in the narrow tip (u < 0.20) where layers converge
+  // Cross-layer connections in the narrow tip (u < 0.20)
   for (let i = 0; i < rawNodes.length; i++) {
     const nA = rawNodes[i]
     if (nA.u >= 0.20) continue
     if (nA.connectedCount >= 2) continue
-    for (let j = 0; j < rawNodes.length; j++) {
-      if (i === j) continue
+    const maxEdgeDist = 0.38 * nA.hu + 0.025
+
+    grid.queryRadius(nA.pos.x, nA.pos.y, nA.pos.z, maxEdgeDist, rawNodes, (j, dist3D) => {
+      if (i === j) return
+      if (nA.connectedCount >= 2) return
       const nB = rawNodes[j]
-      if (nB.u >= 0.22) continue
-      if (Math.abs(nA.u - nB.u) > 0.035) continue
-      const dist3D = nA.pos.distanceTo(nB.pos)
-      const localH = Math.max(nA.hu, nB.hu)
-      const maxEdgeDist = 0.38 * localH + 0.025
-      if (dist3D <= maxEdgeDist && dist3D >= 0.005) {
-        if (!doesSegmentIntersectRibbons(nA.pos, nA.u, nB.pos, nB.u, H, config)) {
-          addEdge(i, j, dist3D, true)
-          if (nA.connectedCount >= 2) break
-        }
+      if (nB.u >= 0.22) return
+      if (Math.abs(nA.u - nB.u) > 0.035) return
+      if (dist3D < 0.005) return
+
+      if (!doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, nB.pos, nB.u, lut)) {
+        addEdge(i, j, dist3D, true)
       }
-    }
+    })
   }
 
-  // 3c. Local nearest-neighbor fallback (degree >= 2 where valid) with whisper-thin alpha so zero nodes float
+  // 3c. Local nearest-neighbor fallback
   for (let pass = 0; pass < 3; pass++) {
     for (let i = 0; i < rawNodes.length; i++) {
       const nA = rawNodes[i]
       while (nA.connectedCount < 2) {
         let bestJ = -1
         let bestDist = Infinity
-        for (let j = 0; j < rawNodes.length; j++) {
-          if (i === j) continue
-          const nB = rawNodes[j]
+        const maxEdgeDist = 0.38 * nA.hu + 0.025
+
+        grid.queryRadius(nA.pos.x, nA.pos.y, nA.pos.z, maxEdgeDist, rawNodes, (j, dist3D) => {
+          if (i === j) return
           const key = Math.min(i, j) + '-' + Math.max(i, j)
-          if (edgeSet.has(key)) continue
-          if (Math.abs(nA.u - nB.u) > 0.090) continue
-          const dist3D = nA.pos.distanceTo(nB.pos)
-          const localH = Math.max(nA.hu, nB.hu)
-          const maxEdgeDist = 0.38 * localH + 0.025
-          if (dist3D <= maxEdgeDist && dist3D < bestDist) {
-            if (!doesSegmentIntersectRibbons(nA.pos, nA.u, nB.pos, nB.u, H, config)) {
+          if (edgeSet.has(key)) return
+          const nB = rawNodes[j]
+          if (Math.abs(nA.u - nB.u) > 0.090) return
+
+          if (dist3D < bestDist) {
+            if (!doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, nB.pos, nB.u, lut)) {
               bestDist = dist3D
               bestJ = j
             }
           }
-        }
+        })
+
         if (bestJ !== -1) {
           addEdge(i, bestJ, bestDist, false, true)
         } else {
@@ -747,81 +934,110 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
     }
   }
 
-  // Component Unification Pass: merge any isolated components into a single spanning graph
-  function getComponents() {
-    const visited = new Uint8Array(rawNodes.length)
-    const comps = []
+  // Fast Disjoint Set Union (DSU) for Component Unification
+  class DSU {
+    constructor(n) {
+      this.parent = new Int32Array(n)
+      for (let i = 0; i < n; i++) this.parent[i] = i
+    }
+    find(i) {
+      let root = i
+      while (root !== this.parent[root]) root = this.parent[root]
+      let curr = i
+      while (curr !== root) {
+        let nxt = this.parent[curr]
+        this.parent[curr] = root
+        curr = nxt
+      }
+      return root
+    }
+    union(i, j) {
+      const rI = this.find(i)
+      const rJ = this.find(j)
+      if (rI !== rJ) {
+        this.parent[rI] = rJ
+        return true
+      }
+      return false
+    }
+  }
+
+  const dsu = new DSU(rawNodes.length)
+  for (let eIdx = 0; eIdx < edges.length; eIdx++) {
+    dsu.union(edges[eIdx].i, edges[eIdx].j)
+  }
+
+  for (let round = 0; round < 6; round++) {
+    const rootSizes = new Map()
     for (let i = 0; i < rawNodes.length; i++) {
-      if (rawNodes[i].connectedCount === 0 || visited[i]) continue
-      const comp = []
-      const queue = [i]
-      visited[i] = 1
-      while (queue.length > 0) {
-        const curr = queue.shift()
-        comp.push(curr)
-        const nbrs = adj[curr] || []
-        for (let k = 0; k < nbrs.length; k++) {
-          const neighbor = nbrs[k]
-          if (!visited[neighbor]) {
-            visited[neighbor] = 1
-            queue.push(neighbor)
-          }
-        }
-      }
-      comps.push(comp)
-    }
-    comps.sort((a, b) => b.length - a.length)
-    return comps
-  }
-
-  let loopCount = 0
-  while (loopCount++ < 120) {
-    const comps = getComponents()
-    if (comps.length <= 1) break
-
-    let bestI = -1, bestJ = -1, bestD = Infinity
-
-    for (let c1 = 0; c1 < comps.length; c1++) {
-      for (let c2 = c1 + 1; c2 < comps.length; c2++) {
-        const compA = comps[c1]
-        const compB = comps[c2]
-
-        for (let oi = 0; oi < compA.length; oi++) {
-          const i = compA[oi]
-          const nA = rawNodes[i]
-          for (let mi = 0; mi < compB.length; mi++) {
-            const j = compB[mi]
-            const nB = rawNodes[j]
-            if (Math.abs(nA.u - nB.u) > 0.090) continue
-            const dist3D = nA.pos.distanceTo(nB.pos)
-            const localH = Math.max(nA.hu, nB.hu)
-            const maxEdgeDist = 0.38 * localH + 0.025
-
-            if (dist3D <= maxEdgeDist && dist3D < bestD) {
-              if (!doesSegmentIntersectRibbons(nA.pos, nA.u, nB.pos, nB.u, H, config)) {
-                bestD = dist3D
-                bestI = i
-                bestJ = j
-              }
-            }
-          }
-        }
+      if (rawNodes[i].connectedCount > 0) {
+        const r = dsu.find(i)
+        rootSizes.set(r, (rootSizes.get(r) || 0) + 1)
       }
     }
+    if (rootSizes.size <= 1) break
 
-    if (bestI !== -1 && bestJ !== -1) {
-      addEdge(bestI, bestJ, bestD, false, true)
-    } else {
-      break
+    let maxRoot = -1, maxSize = -1
+    rootSizes.forEach((sz, r) => {
+      if (sz > maxSize) {
+        maxSize = sz
+        maxRoot = r
+      }
+    })
+
+    const compBest = new Map()
+
+    for (let i = 0; i < rawNodes.length; i++) {
+      if (rawNodes[i].connectedCount === 0) continue
+      const rootA = dsu.find(i)
+      if (rootA === maxRoot) continue
+
+      const nA = rawNodes[i]
+      const maxEdgeDist = 0.38 * nA.hu + 0.025
+
+      grid.queryRadius(nA.pos.x, nA.pos.y, nA.pos.z, maxEdgeDist, rawNodes, (j, dist3D) => {
+        if (rawNodes[j].connectedCount === 0) return
+        const rootB = dsu.find(j)
+        if (rootA === rootB) return
+        if (Math.abs(nA.u - rawNodes[j].u) > 0.090) return
+
+        if (!doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, rawNodes[j].pos, rawNodes[j].u, lut)) {
+          const curr = compBest.get(rootA)
+          if (!curr || dist3D < curr.bestD) {
+            compBest.set(rootA, { bestI: i, bestJ: j, bestD: dist3D })
+          }
+        }
+      })
     }
+
+    if (compBest.size === 0) break
+
+    let addedAny = false
+    compBest.forEach(({ bestI, bestJ, bestD }) => {
+      if (dsu.union(bestI, bestJ)) {
+        addEdge(bestI, bestJ, bestD, false, true)
+        addedAny = true
+      }
+    })
+
+    if (!addedAny) break
   }
 
-  // Retain all valid chamber networks (components with >= 4 nodes) and prune any node with degree < 2
-  const preComps = getComponents()
+  // Retain all valid chamber networks (components with >= 4 nodes)
+  const compSizes = new Map()
+  for (let i = 0; i < rawNodes.length; i++) {
+    if (rawNodes[i].connectedCount > 0) {
+      const root = dsu.find(i)
+      compSizes.set(root, (compSizes.get(root) || 0) + 1)
+    }
+  }
   let mainSet = new Set()
-  for (const comp of preComps) {
-    if (comp.length >= 4) {
-      for (const idx of comp) mainSet.add(idx)
+  for (let i = 0; i < rawNodes.length; i++) {
+    if (rawNodes[i].connectedCount > 0) {
+      const root = dsu.find(i)
+      if (compSizes.get(root) >= 4) {
+        mainSet.add(i)
+      }
     }
   }
 
@@ -837,7 +1053,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
   edges.length = 0
   edges.push(...unifiedEdges)
 
-  // Iteratively prune any leaf nodes (degree < 2) to strictly guarantee zero floating nodes
+  // Iteratively prune leaf nodes
   let pruneChanged = true
   while (pruneChanged) {
     pruneChanged = false
@@ -859,11 +1075,10 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
 
   const visibleNodes = rawNodes.filter((n, idx) => mainSet.has(idx) && n.connectedCount >= 2)
 
-  // Calibrated Hub Selection: Sparse 12–15% FG purely circular ice-white pinpoint hubs (Requirement 4)
+  // Hub Selection: Sparse 12–15% FG pinpoint hubs
   const fgNodes = visibleNodes.filter(n => n.depthTier === 'fg')
-  const targetHubCount = Math.round(0.135 * fgNodes.length) // 13.5% target
+  const targetHubCount = Math.round(0.135 * fgNodes.length)
 
-  // Eligible FG candidates: inside chamber body, good height, not right at the apex tip
   const eligibleHubs = fgNodes.filter(n => Math.abs(n.v_rel) < 0.65 && n.u >= 0.22 && n.u <= 0.88 && n.hu >= 0.10)
   eligibleHubs.sort((a, b) => {
     const scoreA = a.connectedCount * 2.0 + (1.0 - Math.abs(a.v_rel)) + (1.0 - Math.abs(a.w_depth - 0.50))
@@ -896,13 +1111,12 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
     }
   }
 
-  // Assign final node styling, colors, and sizes
+  // Node styling
   for (const node of visibleNodes) {
     const isHighlight = chosenHubs.has(node.idx) ? 1.0 : 0.0
     node.isHighlight = isHighlight
 
-    // Proximity to Ribbon 2 (purple wave) for subtle electric-indigo/violet rim tinting (#5e48ff)
-    const bLocal = getAlmondPocketBounds(node.u, H, config)
+    const bLocal = lut.getBounds(node.u)
     const dHero2 = Math.hypot(node.pos.y - bLocal.y2, node.pos.z - bLocal.z2)
     const violetProx = Math.max(0.0, 1.0 - dHero2 / Math.max(0.04, 0.32 * bLocal.envHeight))
     const marginProx = Math.max(0.0, (Math.abs(node.v_rel) - 0.70) / 0.30)
@@ -913,44 +1127,38 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
 
     if (node.depthTier === 'fg') {
       if (isHighlight > 0.5) {
-        // Sparse 12–15% FG purely circular ice-white pinpoint hubs (#ffffff)
         color = new THREE.Color('#ffffff')
         lineColor = new THREE.Color('#28a0ff')
-        size = 3.8 + prng() * 0.8 // Sized for 14-22px quad in shader
+        size = 3.8 + prng() * 0.8
         alpha = 1.0
         lineAlpha = 0.35 + prng() * 0.03
       } else {
-        // 6–10px cyan FG stars
         color = new THREE.Color('#28d8ff').lerp(new THREE.Color('#38e0ff'), prng() * 0.35)
         lineColor = new THREE.Color('#1c70e8')
-        size = 1.6 + prng() * 0.5 // Sized for 6-10px quad in shader
+        size = 1.6 + prng() * 0.5
         alpha = 0.92 + prng() * 0.06
         lineAlpha = 0.30 + prng() * 0.04
       }
     } else if (node.depthTier === 'mid') {
-      // MID 4–7px cobalt/royal-blue nodes and crisp webbing
       color = new THREE.Color('#1460ff').lerp(new THREE.Color('#1c84ff'), prng() * 0.40)
       lineColor = new THREE.Color('#0e4cd8')
-      size = 1.2 + prng() * 0.4 // Sized for 4-7px quad in shader
+      size = 1.2 + prng() * 0.4
       alpha = 0.72 + prng() * 0.08
       lineAlpha = 0.18 + prng() * 0.04
     } else {
-      // BG 1.5–3px dim sapphire micro-dots and faint deep-navy sub-web
       color = new THREE.Color('#061a55').lerp(new THREE.Color('#08226c'), prng() * 0.40)
       lineColor = new THREE.Color('#06184c')
-      size = 0.8 + prng() * 0.3 // Sized for 1.5-3px quad in shader
+      size = 0.8 + prng() * 0.3
       alpha = 0.25 + prng() * 0.06
       lineAlpha = 0.07 + prng() * 0.02
     }
 
-    // Soft margin alpha feathering past |v_rel| = 0.78
     if (Math.abs(node.v_rel) > 0.78) {
       const marginFeather = 1.0 - THREE.MathUtils.smoothstep(Math.abs(node.v_rel), 0.78, 0.96)
       alpha *= Math.max(0.08, marginFeather)
       lineAlpha *= Math.max(0.08, marginFeather)
     }
 
-    // Dynamic h(u) feathering inside crossing throats
     if (node.localSubHeight < 0.09) {
       const throatFactor2 = THREE.MathUtils.smoothstep(node.localSubHeight, minSubGap, 0.09)
       alpha *= (0.50 + 0.50 * throatFactor2)
@@ -958,14 +1166,12 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
       size *= (0.65 + 0.35 * throatFactor2)
     }
 
-    // Subtle electric-indigo/violet rim tinting near purple wave edges
     if (rimTintFactor > 0.06) {
       const violetTint = new THREE.Color('#5e48ff').lerp(new THREE.Color('#7858ff'), prng() * 0.30)
       color.lerp(violetTint, rimTintFactor * 0.75)
       lineColor.lerp(violetTint, rimTintFactor * 0.70)
     }
 
-    // Theme modulation
     if (themeConfig && themeConfig.primaryWire) {
       color.lerp(new THREE.Color(themeConfig.primaryWire), 0.08)
       lineColor.lerp(new THREE.Color(themeConfig.primaryWire), 0.08)
@@ -978,15 +1184,15 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
     node.size = size
   }
 
-  // 4. Wave Margin Tethering:
-  // Outer boundary nodes (|v_rel| >= 0.65) tether cleanly to nearest invisible margin anchors extending all the way to u = 1.0
+  // 4. Wave Margin Tethering
   const tetherEdges = []
   for (const node of visibleNodes) {
     if (Math.abs(node.v_rel) >= 0.65) {
       let bestAnchor = null
       let bestDist = Infinity
 
-      for (const anc of anchors) {
+      for (let aIdx = 0; aIdx < anchors.length; aIdx++) {
+        const anc = anchors[aIdx]
         if (Math.abs(node.u - anc.u) > 0.080) continue
 
         const isUpperAnchor = anc.id.includes('upper')
@@ -997,7 +1203,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
         const localH = Math.min(node.hu, anc.hu)
         const maxEdgeDist = 0.38 * localH + 0.025
         if (dist <= maxEdgeDist && dist < bestDist) {
-          if (!doesSegmentIntersectRibbons(node.pos, node.u, anc.pos, anc.u, H, config, true)) {
+          if (!doesSegmentIntersectRibbonsLUT(node.pos, node.u, anc.pos, anc.u, lut, true)) {
             bestDist = dist
             bestAnchor = anc
           }
@@ -1045,7 +1251,8 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
     return 0.16 + prng() * 0.06
   }
 
-  edges.forEach(({ i, j, isInterLayer, isFallback }) => {
+  for (let eIdx = 0; eIdx < edges.length; eIdx++) {
+    const { i, j, isInterLayer, isFallback } = edges[eIdx]
     const nA = rawNodes[i]
     const nB = rawNodes[j]
 
@@ -1074,19 +1281,19 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
       nA.pos, nA.u, nA.weight, nA.layer, aA, nA.relativeCoord, cA,
       nB.pos, nB.u, nB.weight, nB.layer, aB, nB.relativeCoord, cB
     )
-  })
+  }
 
   const defaultTetherColor = new THREE.Color('#104fe0')
   const violetTetherColor = new THREE.Color('#5e48ff')
 
-  tetherEdges.forEach(({ node, anchor }) => {
+  for (let tIdx = 0; tIdx < tetherEdges.length; tIdx++) {
+    const { node, anchor } = tetherEdges[tIdx]
     const tetherFeather = 1.0 - THREE.MathUtils.smoothstep(Math.abs(node.v_rel), 0.74, 0.98)
     const aNode = THREE.MathUtils.clamp((node.lineAlpha || 0.16) * 0.35 * tetherFeather, 0.0, 0.10)
     const aAnchor = 0.0
 
-    const y2 = heroY2(node.u, H, config)
-    const z2 = heroZ(2, node.u, H, config)
-    const dHero2 = Math.hypot(node.pos.y - y2, node.pos.z - z2)
+    const bLocal = lut.getBounds(node.u)
+    const dHero2 = Math.hypot(node.pos.y - bLocal.y2, node.pos.z - bLocal.z2)
     const isAdjacentToViolet = dHero2 < 0.22 || Math.abs(node.v_rel) >= 0.70
     const tColor = isAdjacentToViolet ? violetTetherColor : defaultTetherColor
     const nColor = isAdjacentToViolet ? (node.lineColor.clone().lerp(violetTetherColor, 0.80)) : (node.lineColor || node.color)
@@ -1095,7 +1302,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
       node.pos, node.u, node.weight, node.layer, aNode, node.relativeCoord, nColor,
       anchor.pos, anchor.u, anchor.weight, 0.0, aAnchor, anchor.relativeCoord, tColor
     )
-  })
+  }
 
   const linesGeo = new THREE.BufferGeometry()
   linesGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3))
@@ -1106,6 +1313,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
   linesGeo.setAttribute('aAlpha', new THREE.Float32BufferAttribute(lineAlphas, 1))
   linesGeo.setAttribute('aRelativeCoord', new THREE.Float32BufferAttribute(lineRelativeCoords, 4))
   linesGeo.setAttribute('color', new THREE.Float32BufferAttribute(lineColors, 3))
+  linesGeo.computeBoundingSphere()
 
   // 6. Build Points BufferGeometry (Multi-Scale Starlight Field: micro-nodes + ice-white hubs)
   const pointPositions = []
@@ -1119,7 +1327,8 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
   const pointHighlights = []
   const pointRelativeCoords = []
 
-  visibleNodes.forEach((n) => {
+  for (let nIdx = 0; nIdx < visibleNodes.length; nIdx++) {
+    const n = visibleNodes[nIdx]
     pointPositions.push(n.pos.x, n.pos.y, n.pos.z)
     pointBasePositions.push(n.pos.x, n.pos.y, n.pos.z)
     pointUs.push(n.u)
@@ -1130,7 +1339,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
     pointColors.push(n.color.r, n.color.g, n.color.b)
     pointHighlights.push(n.isHighlight)
     pointRelativeCoords.push(n.relativeCoord[0], n.relativeCoord[1], n.relativeCoord[2], n.relativeCoord[3])
-  })
+  }
 
   const pointsGeo = new THREE.BufferGeometry()
   pointsGeo.setAttribute('position', new THREE.Float32BufferAttribute(pointPositions, 3))
@@ -1143,11 +1352,9 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
   pointsGeo.setAttribute('color', new THREE.Float32BufferAttribute(pointColors, 3))
   pointsGeo.setAttribute('aIsHighlight', new THREE.Float32BufferAttribute(pointHighlights, 1))
   pointsGeo.setAttribute('aRelativeCoord', new THREE.Float32BufferAttribute(pointRelativeCoords, 4))
+  pointsGeo.computeBoundingSphere()
 
   // 7. Restrained Deep Sapphire Chamber Haze (Answer 5)
-  // Capped at 350–500 deep sapphire (#041038 to #061b4d) particles per side strictly inside
-  // r_norm < 0.65 and w_depth < -0.20 with peak opacity 0.025–0.032, radius scaled to h(u),
-  // slight bias behind dense node clusters, smooth Gaussian falloff, and zero throat bleed.
   const hazePositions = []
   const hazeBasePositions = []
   const hazeUs = []
@@ -1162,16 +1369,15 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
 
   while (hazePositions.length / 3 < hazeCountTarget && hazeAttempts++ < 6000) {
     const u = 0.12 + prng() * (0.98 - 0.12)
-    const b = getAlmondPocketBounds(u, H, config)
-    if (b.envHeight < 0.09) continue // Zero throat bleed
+    const b = lut.getBounds(u)
+    if (b.envHeight < 0.09) continue
 
-    const pockets = getAllSubPockets(u, H, config, 0.08)
+    const pockets = lut.getSubPockets(u, 0.08)
     if (pockets.length === 0) continue
 
     const chosenPocket = pockets[Math.floor(prng() * pockets.length)]
     if (chosenPocket.height < 0.08) continue
 
-    // Strictly inside r_norm < 0.65 and w_depth < -0.20
     const w_depth = -0.22 - prng() * 0.48
     const maxV = Math.sqrt(Math.max(0.0, 0.64 * 0.64 - w_depth * w_depth))
     if (maxV <= 0.01) continue
@@ -1191,17 +1397,11 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
     const boundaryFade = Math.max(0.0, 1.0 - Math.pow(r_norm / 0.65, 2.0))
     const weight = computeConstraintWeight(u)
 
-    // Peak opacity 0.025–0.032
     const baseAlpha = 0.025 + prng() * 0.007
     const alpha = baseAlpha * boundaryFade * weight
-
-    // Radius scaled to h(u)
     const baseSize = Math.max(20.0, Math.min(65.0, chosenPocket.height * 80.0 + prng() * 10.0))
-
-    // Palette: Deep sapphire (#041038 to #061b4d)
     const col = new THREE.Color('#041038').lerp(new THREE.Color('#061b4d'), prng())
 
-    // Proximity to Ribbon 2 violet tinting
     const dHero2 = Math.hypot(y - b.y2, z - b.z2)
     if (dHero2 < 0.16) {
       col.lerp(new THREE.Color('#1a164c'), 0.25)
@@ -1226,6 +1426,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}) {
   hazeGeo.setAttribute('alpha', new THREE.Float32BufferAttribute(hazeAlphas, 1))
   hazeGeo.setAttribute('color', new THREE.Float32BufferAttribute(hazeColors, 3))
   hazeGeo.setAttribute('aRelativeCoord', new THREE.Float32BufferAttribute(hazeRelativeCoords, 4))
+  hazeGeo.computeBoundingSphere()
 
   return {
     linesGeo,
