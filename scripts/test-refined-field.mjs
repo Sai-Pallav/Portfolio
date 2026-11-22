@@ -14,6 +14,8 @@ for (const side of ['left', 'right']) {
   let bgAlphas = [], midAlphas = [], fgAlphas = []
 
   // Check 3D edge distances and alphas
+  let overLimitCount = 0
+  let maxEdgeRatio = 0
   for (let e = 0; e < numEdges; e++) {
     const x1 = pos[e*6], y1 = pos[e*6+1], z1 = pos[e*6+2]
     const x2 = pos[e*6+3], y2 = pos[e*6+4], z2 = pos[e*6+5]
@@ -22,9 +24,10 @@ for (const side of ['left', 'right']) {
     const b1 = getAlmondPocketBounds(u1)
     const b2 = getAlmondPocketBounds(u2)
     const localH = Math.max(b1.envHeight, b2.envHeight)
-    const ratio = d3D / localH
-    if (ratio > maxRatio) maxRatio = ratio
-    if (ratio > 0.26001) overCount++
+    const limit = 0.38 * localH + 0.025
+    const ratio = d3D / limit
+    if (ratio > maxEdgeRatio) maxEdgeRatio = ratio
+    if (ratio > 1.0001) overLimitCount++
 
     const a = 0.5 * (alpha[e*2] + alpha[e*2+1])
     if (a <= 0.12) bgAlphas.push(a)
@@ -33,11 +36,11 @@ for (const side of ['left', 'right']) {
   }
 
   console.log(`Total line segments: ${numEdges}`)
-  console.log(`Max 3D dist / localH: ${maxRatio.toFixed(4)}`)
-  console.log(`Edges with 3D dist > 0.26 * localH: ${overCount}`)
-  console.log(`BG line alphas (target 0.05-0.10): count = ${bgAlphas.length}, min = ${Math.min(...bgAlphas).toFixed(3)}, max = ${Math.max(...bgAlphas).toFixed(3)}, avg = ${(bgAlphas.reduce((s,x)=>s+x,0)/bgAlphas.length).toFixed(3)}`)
-  console.log(`MID line alphas (target 0.14-0.24): count = ${midAlphas.length}, min = ${Math.min(...midAlphas).toFixed(3)}, max = ${Math.max(...midAlphas).toFixed(3)}, avg = ${(midAlphas.reduce((s,x)=>s+x,0)/midAlphas.length).toFixed(3)}`)
-  console.log(`FG line alphas (target 0.28-0.40): count = ${fgAlphas.length}, min = ${Math.min(...fgAlphas).toFixed(3)}, max = ${Math.max(...fgAlphas).toFixed(3)}, avg = ${(fgAlphas.reduce((s,x)=>s+x,0)/fgAlphas.length).toFixed(3)}`)
+  console.log(`Max 3D dist / (0.38*localH + 0.025): ${maxEdgeRatio.toFixed(4)}`)
+  console.log(`Edges exceeding 0.38*localH + 0.025 clamp: ${overLimitCount}`)
+  console.log(`BG line alphas (target 0.05-0.09): count = ${bgAlphas.length}, min = ${Math.min(...bgAlphas).toFixed(3)}, max = ${Math.max(...bgAlphas).toFixed(3)}, avg = ${(bgAlphas.reduce((s,x)=>s+x,0)/bgAlphas.length).toFixed(3)}`)
+  console.log(`MID line alphas (target 0.16-0.24): count = ${midAlphas.length}, min = ${Math.min(...midAlphas).toFixed(3)}, max = ${Math.max(...midAlphas).toFixed(3)}, avg = ${(midAlphas.reduce((s,x)=>s+x,0)/midAlphas.length).toFixed(3)}`)
+  console.log(`FG line alphas (target 0.28-0.38): count = ${fgAlphas.length}, min = ${Math.min(...fgAlphas).toFixed(3)}, max = ${Math.max(...fgAlphas).toFixed(3)}, avg = ${(fgAlphas.reduce((s,x)=>s+x,0)/fgAlphas.length).toFixed(3)}`)
 
   // Check Points
   const ptPos = field.pointsGeo.getAttribute('position').array
@@ -65,8 +68,24 @@ for (const side of ['left', 'right']) {
   // Check Haze
   const hazePos = field.hazeGeo.getAttribute('position').array
   const relHaze = field.hazeGeo.getAttribute('aRelativeCoord')
+  const hazeAlpha = field.hazeGeo.getAttribute('alpha').array
   const numHaze = hazePos.length / 3
-  console.log(`Haze particles: ${numHaze}`)
+  let maxHazeRNorm = 0
+  let maxHazeWDepth = -Infinity
+  let minHazeAlpha = Infinity, maxHazeAlpha = -Infinity
+  for (let h = 0; h < numHaze; h++) {
+    const rNorm = relHaze.array[h*4 + 3]
+    const wDepth = relHaze.array[h*4 + 2]
+    const a = hazeAlpha[h]
+    if (rNorm > maxHazeRNorm) maxHazeRNorm = rNorm
+    if (wDepth > maxHazeWDepth) maxHazeWDepth = wDepth
+    if (a < minHazeAlpha) minHazeAlpha = a
+    if (a > maxHazeAlpha) maxHazeAlpha = a
+  }
+  console.log(`Haze particles: ${numHaze} (target 350-500)`)
+  console.log(`Haze r_norm max: ${maxHazeRNorm.toFixed(3)} (strictly < 0.65)`)
+  console.log(`Haze w_depth max: ${maxHazeWDepth.toFixed(3)} (strictly < -0.20)`)
+  console.log(`Haze alpha min/max: ${minHazeAlpha.toFixed(4)} / ${maxHazeAlpha.toFixed(4)} (peak 0.025-0.032)`)
 
   // Verify aRelativeCoord attribute integrity
   console.log(`aRelativeCoord valid: linesGeo (${relLines?.itemSize === 4}), pointsGeo (${relPoints?.itemSize === 4}), hazeGeo (${relHaze?.itemSize === 4})`)

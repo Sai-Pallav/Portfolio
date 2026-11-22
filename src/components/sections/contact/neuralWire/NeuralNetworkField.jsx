@@ -1,7 +1,7 @@
 import { memo, useMemo, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { useFrame } from '@react-three/fiber'
-import { getGlowTexture, getHeroGlowTexture, H_VAL } from './generateWireGeometry'
+import { getGlowTexture, H_VAL } from './generateWireGeometry'
 import { generateRefinedNeuralField } from './neuralPocketBounds'
 import { useWireframeConfig } from './WireframeConfigContext'
 
@@ -26,10 +26,10 @@ const NeuralLineShader = {
       // Stage 1: Static almond chamber position (aRelativeCoord stored for Stage 2 helical sync)
       vec3 pos = position;
 
-      float innerFeather = smoothstep(0.09, 0.16, aU);
-      float outerFeather = 1.0 - smoothstep(0.93, 0.97, aU);
+      float innerFeather = smoothstep(0.06, 0.20, aU);
+      float outerFeather = 1.0 - smoothstep(0.995, 1.02, aU);
 
-      // Whispering gossamer connective tissue (Gap 1): line alpha pre-calibrated to BG 0.05–0.10, MID 0.14–0.24, FG 0.28–0.40
+      // Whispering gossamer connective tissue: line alpha pre-calibrated to BG 0.05–0.09, MID 0.16–0.24, FG 0.28–0.38
       vAlpha = aAlpha * innerFeather * outerFeather * uOpacity;
       vColor = color;
       vLayer = aLayer;
@@ -68,39 +68,43 @@ const NeuralPointShader = {
     varying vec3 vColor;
     varying float vIsHighlight;
     varying float vLayer;
+    varying vec4 vRelativeCoord;
 
     void main() {
       // Stage 1: Static almond chamber position (aRelativeCoord stored for Stage 2 helical sync)
       vec3 pos = position;
 
-      float innerFeather = smoothstep(0.09, 0.16, aU);
-      float outerFeather = 1.0 - smoothstep(0.93, 0.97, aU);
+      float innerFeather = smoothstep(0.06, 0.20, aU);
+      float outerFeather = 1.0 - smoothstep(0.995, 1.02, aU);
 
-      // 3-layer Z-depth contrast:
-      float depthCue = aLayer > 0.5 ? 1.20 : (aLayer < -0.5 ? 0.38 : 0.88);
+      // 3-layer Z-depth contrast cue
+      float depthCue = aLayer > 0.5 ? 1.25 : (aLayer < -0.5 ? 0.38 : 0.88);
 
-      // Fine twinkling starlight sparkle modulation across micro-nodes (Gap 2)
-      float twinkle = 0.68 + 0.32 * sin(uTime * 4.2 + pos.x * 22.0 + pos.y * 34.0 + pos.z * 26.0);
+      // Fine twinkling starlight sparkle modulation across micro-nodes
+      float twinkle = 0.74 + 0.26 * sin(uTime * 4.2 + pos.x * 22.0 + pos.y * 34.0 + pos.z * 26.0);
       if (aIsHighlight > 0.5) {
-        twinkle = 0.90 + 0.10 * sin(uTime * 2.8 + pos.x * 12.0);
+        twinkle = 0.94 + 0.06 * sin(uTime * 2.6 + pos.x * 12.0);
       }
 
       vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity * depthCue * twinkle;
       vColor = color;
       vIsHighlight = aIsHighlight;
       vLayer = aLayer;
+      vRelativeCoord = aRelativeCoord;
 
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
 
-      // Multi-scale starlight field point sizing (Gap 2):
-      // Radiant ice-white foreground hubs: 26.0 to 34.0 px on screen with diamond sparkle and lush micro-halo
-      // Foreground electric-cyan junctions: 9.0 to 14.0 px
-      // Midground micro-nodes: 5.0 to 9.0 px
-      // Background micro-dots: 2.2 to 4.5 px
-      float baseSize = size * uNodeScale * depthCue * (48.0 / -mvPosition.z) * min(1.15, uGlowIntensity);
-      float maxPointSize = aIsHighlight > 0.5 ? 34.0 : (aLayer > 0.5 ? 14.0 : (aLayer < -0.5 ? 4.5 : 9.0));
-      float minPointSize = aLayer < -0.5 ? 2.0 : (aIsHighlight > 0.5 ? 24.0 : 2.8);
-      gl_PointSize = clamp(baseSize, minPointSize, maxPointSize);
+      // Multi-scale starlight field point sizing matching Answer 4:
+      // FG ice-white pinpoint hubs: 14–22px quad
+      // FG cyan stars: 6–10px quad
+      // MID cobalt/royal-blue nodes: 4–7px quad
+      // BG sapphire micro-dots: 1.5–3px quad
+      float feather = innerFeather * outerFeather;
+      float scaleFeather = 0.25 + 0.75 * innerFeather;
+      float baseSize = size * uNodeScale * depthCue * (32.0 / -mvPosition.z) * min(1.15, uGlowIntensity) * max(0.20, feather);
+      float maxPointSize = aIsHighlight > 0.5 ? 22.0 : (aLayer > 0.5 ? 10.0 : (aLayer < -0.5 ? 3.0 : 7.0));
+      float minPointSize = aIsHighlight > 0.5 ? 14.0 : (aLayer > 0.5 ? 6.0 : (aLayer < -0.5 ? 1.5 : 4.0));
+      gl_PointSize = clamp(baseSize * scaleFeather, minPointSize * scaleFeather, maxPointSize);
       gl_Position = projectionMatrix * mvPosition;
     }
   `,
@@ -109,46 +113,63 @@ const NeuralPointShader = {
     varying vec3 vColor;
     varying float vIsHighlight;
     varying float vLayer;
+    varying vec4 vRelativeCoord;
 
     void main() {
+      // Purely circular radial coordinates - zero 4-point cross or star-spike math
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = length(coord) * 2.0;
       if (dist > 1.0) discard;
+      if (vAlpha < 0.003) discard;
 
-      // Razor-sharp bright pinpoint core (Gap 2)
-      float core = pow(clamp(1.0 - dist * 1.8, 0.0, 1.0), 3.2);
+      vec3 electricCyan = vec3(0.157, 0.847, 1.0); // #28d8ff
+      vec3 iceWhite = vec3(1.0, 1.0, 1.0);
+      vec3 cobaltCyan = vec3(0.055, 0.380, 0.920);
+      vec3 indigoViolet = vec3(0.369, 0.282, 1.0); // #5e48ff
 
-      // Tight exponential cyan-blue micro-halo (never oversized blurry bokeh orbs) (Gap 2)
-      float microHalo = exp(-dist * 4.6) * 0.55;
-      vec3 cyanHalo = vec3(0.08, 0.72, 1.0);
+      // Subtle indigo-violet rim tinting near purple wave rims
+      float rimProx = smoothstep(0.65, 0.90, abs(vRelativeCoord.y));
+      float colorViolet = clamp((vColor.r - 0.10) * 3.2, 0.0, 1.0);
+      float rimTint = max(rimProx * 0.70, colorViolet * 0.80);
 
       if (vIsHighlight > 0.5) {
-        // Radiant ice-white foreground hub: razor-sharp white core + 4-ray diamond sparkle + lush exponential cyan/cobalt micro-halo
-        float whiteCore = pow(clamp(1.0 - dist * 2.0, 0.0, 1.0), 4.2);
+        // Sparse 12–15% FG purely circular ice-white pinpoint hubs (Answer 4)
+        // Sharp 15–20% pure white core, tight exponential cyan-blue halo, zero spikes or bokeh blobs
+        float sharpCore = exp(-dist * dist * 65.0);
+        float whiteCore = pow(clamp(1.0 - dist * 2.5, 0.0, 1.0), 4.8);
+        float expHalo = exp(-dist * 6.2) * 0.82;
+        float circleCutoff = pow(clamp(1.0 - dist, 0.0, 1.0), 1.6);
 
-        // Crisp 4-ray diamond starlight sparkle
-        float rayH = pow(clamp(1.0 - abs(coord.x) * 2.0, 0.0, 1.0), 1.8) * pow(clamp(1.0 - abs(coord.y) * 12.0, 0.0, 1.0), 2.2);
-        float rayV = pow(clamp(1.0 - abs(coord.y) * 2.0, 0.0, 1.0), 1.8) * pow(clamp(1.0 - abs(coord.x) * 12.0, 0.0, 1.0), 2.2);
-        float rays = max(rayH, rayV) * 0.92;
+        vec3 haloCol = mix(cobaltCyan, electricCyan, clamp(1.0 - dist * 1.3, 0.0, 1.0));
+        haloCol = mix(haloCol, indigoViolet, rimTint * 0.35);
 
-        // Lush electric-cyan / cobalt exponential micro-halo
-        float expHalo = exp(-dist * 4.2) * 0.85;
-        vec3 cobaltCyan = mix(vec3(0.06, 0.38, 0.98), vec3(0.12, 0.82, 1.0), clamp(1.0 - dist * 1.2, 0.0, 1.0));
+        vec3 col = mix(haloCol, iceWhite, clamp(whiteCore * 1.7 + sharpCore * 0.95, 0.0, 1.0));
+        float hubAlpha = clamp(whiteCore * 0.96 + sharpCore * 0.60 + expHalo * circleCutoff, 0.0, 0.98);
 
-        vec3 col = mix(cobaltCyan, vec3(1.0, 1.0, 1.0), clamp(whiteCore * 1.8 + rays * 0.95, 0.0, 1.0));
-        float starAlpha = clamp(whiteCore * 1.0 + rays * 0.90 + expHalo * 0.75, 0.0, 0.98);
-
-        gl_FragColor = vec4(col, min(vAlpha * starAlpha, 0.98));
+        gl_FragColor = vec4(col, min(vAlpha * hubAlpha, 0.98));
       } else {
-        // Electric-cyan / cobalt micro-nodes & junctions (Gap 2)
-        // Correct GLSL smoothstep argument order: blendFactor in [0, 1]
-        float blendFactor = 1.0 - smoothstep(0.15, 0.70, dist);
-        vec3 col = mix(cyanHalo, vColor, blendFactor);
+        // Multi-scale starlight hierarchy: 6-10px cyan FG, 4-7px cobalt MID, 1.5-3px sapphire BG
+        float core = exp(-dist * dist * 36.0);
+        float expHalo = exp(-dist * 4.6) * 0.65;
+        float circleCutoff = pow(clamp(1.0 - dist, 0.0, 1.0), 1.4);
+
+        vec3 nodeCol = vColor;
         if (vLayer > 0.5) {
-          col = mix(col, vec3(1.0, 1.0, 1.0), core * 0.40);
+          // Foreground cyan stars
+          nodeCol = mix(vColor, iceWhite, core * 0.45);
+        } else if (vLayer < -0.5) {
+          // Background micro-dots: dim sapphire
+          nodeCol = vColor;
+        } else {
+          // Midground nodes: cobalt/royal-blue blend
+          nodeCol = mix(vColor, iceWhite, core * 0.25);
         }
-        float radialAlpha = core * 0.92 + microHalo;
-        gl_FragColor = vec4(col, min(vAlpha * radialAlpha, 0.96));
+
+        // Subtle indigo-violet rim tinting near purple wave edges
+        nodeCol = mix(nodeCol, indigoViolet, rimTint * 0.45);
+
+        float radialAlpha = (core * 0.72 + expHalo * 0.58) * circleCutoff;
+        gl_FragColor = vec4(nodeCol, min(vAlpha * radialAlpha, 0.96));
       }
     }
   `,
@@ -174,17 +195,18 @@ const NeuralHazeShader = {
     void main() {
       vec3 pos = position;
 
-      float innerFeather = smoothstep(0.09, 0.16, aU);
-      float outerFeather = 1.0 - smoothstep(0.93, 0.97, aU);
+      float innerFeather = smoothstep(0.06, 0.20, aU);
+      float outerFeather = 1.0 - smoothstep(0.98, 1.01, aU);
 
+      // Answer 5: peak opacity 0.025–0.032, deep sapphire (#041038 to #061b4d)
       vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity;
       vColor = color;
 
       vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
       float pointSize = clamp(
-        size * uNodeScale * (110.0 / -mvPosition.z) * min(1.15, uGlowIntensity),
-        22.0,
-        160.0
+        size * uNodeScale * (85.0 / -mvPosition.z) * min(1.15, uGlowIntensity),
+        18.0,
+        75.0
       );
       gl_PointSize = pointSize;
       gl_Position = projectionMatrix * mvPosition;
@@ -198,11 +220,12 @@ const NeuralHazeShader = {
       vec2 coord = gl_PointCoord - vec2(0.5);
       float dist = length(coord) * 2.0;
       if (dist > 1.0) discard;
+      if (vAlpha < 0.001) discard;
 
-      // Ultra-silky smooth quadratic Gaussian falloff (strictly zero circular blotches or bright hotspots) (Gap 4)
-      float falloff = exp(-dist * dist * 2.8) * pow(1.0 - dist, 1.2);
+      // Ultra-silky smooth quadratic Gaussian falloff (Answer 5: exp(-3.5 * dist^2))
+      float falloff = exp(-dist * dist * 3.5) * (1.0 - dist);
 
-      gl_FragColor = vec4(vColor, clamp(vAlpha * falloff, 0.0, 0.65));
+      gl_FragColor = vec4(vColor, clamp(vAlpha * falloff, 0.0, 0.032));
     }
   `,
 }
@@ -211,7 +234,7 @@ const NeuralHazeShader = {
  * NeuralNetworkField:
  * Standalone, high-performance 3D visualization component for Stage 1.
  * Renders the 3-layer volumetric neural web (points + line segments),
- * equalized deep-sapphire-to-electric-blue volumetric nebula glow across ALL chambers,
+ * restrained deep-sapphire volumetric nebula glow (#05164d) across chambers,
  * and delicate curve-crossing flares strictly inside negative-space pocket bounds.
  */
 export const NeuralNetworkField = memo(function NeuralNetworkField({
@@ -227,7 +250,6 @@ export const NeuralNetworkField = memo(function NeuralNetworkField({
   const glow = themeConfig.glowIntensity || 1.0
 
   const glowTexture = useMemo(() => getGlowTexture(64), [])
-  const heroTexture = useMemo(() => getHeroGlowTexture(128), [])
 
   // Access current live wireframe config so bounds match rendered ribbon shapes exactly
   const wireframeCtx = useWireframeConfig()
@@ -254,7 +276,6 @@ export const NeuralNetworkField = memo(function NeuralNetworkField({
   const lineMat = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
-        // Line opacities pre-calibrated to BG 0.05–0.10, MID 0.14–0.24, FG 0.28–0.40 (Gap 1)
         uOpacity: { value: 1.0 * Math.min(1.0, glow) },
         uInnerFade: { value: innerFade },
       },
@@ -313,14 +334,14 @@ export const NeuralNetworkField = memo(function NeuralNetworkField({
     return new THREE.PointsMaterial({
       color: new THREE.Color('#ffffff'),
       size: 0.012 * Math.min(1.15, glow) * nodeScale,
-      map: heroTexture,
+      map: glowTexture,
       transparent: true,
       opacity: 0.22,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
     })
-  }, [focalFlaresGeo, heroTexture, glow, nodeScale])
+  }, [focalFlaresGeo, glowTexture, glow, nodeScale])
 
   const flareHaloMat = useMemo(() => {
     if (!focalFlaresGeo) return null
@@ -367,7 +388,7 @@ export const NeuralNetworkField = memo(function NeuralNetworkField({
 
   return (
     <group>
-      {/* 1. Equalized Volumetric Nebula Glow (#061a66 to #0e52e8) across ALL chambers */}
+      {/* 1. Restrained Volumetric Nebula Glow (#05164d) across chambers */}
       {activeHazeGeo && <points geometry={activeHazeGeo} material={hazeMat} />}
 
       {/* 2. Whisper-Thin Gossamer Connective Tissue (max edge <= 0.26 * h(u)) */}
