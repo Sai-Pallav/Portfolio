@@ -34,8 +34,8 @@ export const H_VAL = 1.13
  * Strictly 0.0 at u = 0 (near central globe) to guarantee zero collision with orbital rings.
  */
 export function computeConstraintWeight(u) {
-  const innerFactor = THREE.MathUtils.smoothstep(u, 0.0, 0.20)
-  const outerFactor = 1.0 - 0.15 * THREE.MathUtils.smoothstep(u, 0.90, 1.05)
+  const innerFactor = THREE.MathUtils.smootherstep(u, 0.0, 0.20)
+  const outerFactor = 1.0 - 0.15 * THREE.MathUtils.smootherstep(u, 0.90, 1.05)
   return innerFactor * outerFactor
 }
 
@@ -59,16 +59,24 @@ export function computeVertexAlpha(u, innerFade = 0.04, outerFade = 0.08, maxU =
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. SMOOTH ANALYTICAL HERO WAVES (EXACT FORMULA LOCK + PARAMETRIC CONTROLLERS)
-// Continuous harmonic functions with N = 200 points per wave.
+// Continuous harmonic functions with N_HERO = 400 and N_SILK = 360 points per wave.
 // Zero sparse 5-point CatmullRom keyframes that kink at the apex!
 // ─────────────────────────────────────────────────────────────────────────────
+
+export const N_HERO = 400
+export const N_SILK = 360
 
 export function wingSweep(u, H, sweepVal = 0.28) {
   return sweepVal * H * Math.pow(u, 2.0)
 }
 
 export function env(u, H) {
-  return H * Math.pow(u, 0.85) * THREE.MathUtils.smootherstep(u, 0.0, 0.20)
+  const uNorm = Math.max(0.0, Math.min(1.0, u))
+  // C² continuous quintic envelope with zero derivatives at u = 0.
+  // Smoothly ramps up through the first almond pocket and reaches full volume outward without fractional-power cusp.
+  const innerRise = THREE.MathUtils.smootherstep(uNorm, 0.0, 0.25)
+  const outerScale = 0.35 + 0.65 * THREE.MathUtils.smootherstep(uNorm, 0.20, 1.0)
+  return H * innerRise * outerScale
 }
 
 /**
@@ -110,7 +118,7 @@ export function computeRibbonSpacingOffset(index, u, H, config = {}) {
 
   const uNorm = Math.max(0.0, Math.min(1.0, u))
 
-  // Smooth taper from inner (spInner) to outer (spOuter)
+  // Continuous C² taper from inner (spInner) to outer (spOuter)
   const tTaper = spInner + (spOuter - spInner) * THREE.MathUtils.smootherstep(uNorm, 0.0, 1.0)
 
   // Smooth connection to globe at u=0 (ensures clean socket connection without tearing)
@@ -122,10 +130,11 @@ export function computeRibbonSpacingOffset(index, u, H, config = {}) {
   // Ribbon 2: expands downward-mid (-0.20)
   // Ribbon 3: expands upward-mid (+0.20)
   const fanSigns = [0.45, -0.45, -0.20, 0.20]
-  const globalFanOuter = (spOuter - 1.0) * THREE.MathUtils.smootherstep(uNorm, 0.35, 1.0) * (fanSigns[index] ?? 0.0) * H
-  const globalFanInner = (spInner - 1.0) * (1.0 - THREE.MathUtils.smootherstep(uNorm, 0.0, 0.50)) * (fanSigns[index] ?? 0.0) * H * THREE.MathUtils.smootherstep(uNorm, 0.0, 0.15)
+  const sign = fanSigns[index] ?? 0.0
+  const fanMultiplier = (spInner - 1.0) + ((spOuter - 1.0) - (spInner - 1.0)) * THREE.MathUtils.smootherstep(uNorm, 0.10, 1.0)
+  const globalFan = fanMultiplier * sign * H * tGlobe
 
-  return pairwiseDy * tGlobe * tTaper + globalFanOuter + globalFanInner
+  return (pairwiseDy * tTaper + globalFan) * tGlobe
 }
 
 /**
@@ -155,23 +164,20 @@ export function computeHeroWaveY(index, u, H, config = {}) {
   const r3Y = config.ribbon3YOffset !== undefined ? config.ribbon3YOffset : 0.0
   const r4Y = config.ribbon4YOffset !== undefined ? config.ribbon4YOffset : 0.0
 
-  const r1Freq = config.ribbon1Freq !== undefined ? config.ribbon1Freq : 1.0
-  const r2Freq = config.ribbon2Freq !== undefined ? config.ribbon2Freq : 1.0
-  const r3Freq = config.ribbon3Freq !== undefined ? config.ribbon3Freq : 1.0
-  const r4Freq = config.ribbon4Freq !== undefined ? config.ribbon4Freq : 1.0
-
   const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
   const outerFlare = config.outerFlare !== undefined ? config.outerFlare : 0.6
 
-  // Two ends differential placement:
-  // innerY dominates at u=0 and tapers off; outerY dominates as u approaches/exceeds 1.0
-  const endsY = (1.0 - Math.pow(Math.min(1.0, u), 0.5)) * innerY + Math.pow(u, 1.6) * outerY
+  // Two ends differential placement with C² smooth endpoint interpolation:
+  // innerY smoothly tapers off; outerY smoothly activates towards the outer wings
+  const tInner = 1.0 - THREE.MathUtils.smootherstep(u, 0.0, 0.35)
+  const tOuter = THREE.MathUtils.smootherstep(u, 0.25, 1.0)
+  const endsY = tInner * innerY + tOuter * outerY
   const baseSweep = wingSweep(u, H, sweep)
   const e = env(u, H)
 
-  // Outer end flexibility & harmonic wave whip (activates gracefully for u > 0.55):
-  const outerT = Math.max(0.0, (u - 0.55) / 0.45)
-  const outerWhip = Math.pow(outerT, 1.7) * 0.22 * H * outerFlex * Math.sin(u * Math.PI * 2.8 * freq + index * 0.9)
+  // Outer end flexibility & harmonic wave whip (smooth C² activation for outer reach):
+  const outerT = THREE.MathUtils.smootherstep(u, 0.48, 1.0)
+  const outerWhip = outerT * outerT * 0.22 * H * outerFlex * Math.sin(u * Math.PI * 2.8 * freq + index * 0.9)
 
   // Outer flare offsets (fans out the 4 ribbons gracefully at the outer tips):
   // Ribbon 0 (Upper Arch): flares upward
@@ -179,32 +185,38 @@ export function computeHeroWaveY(index, u, H, config = {}) {
   // Ribbon 2 (Violet Accent): flows downward-mid
   // Ribbon 3 (Counter-Braid): flows upward-mid
   const flareSigns = [0.85, -0.85, -0.45, 0.45]
-  const flareOffset = Math.pow(outerT, 1.7) * 0.28 * H * outerFlare * (flareSigns[index] ?? 0.0)
+  const flareOffset = outerT * outerT * 0.28 * H * outerFlare * (flareSigns[index] ?? 0.0)
 
   // Live inter-ribbon distance & spacing offset (pairwise dist01/dist12/dist23 and outer/inner taper):
   const spacingOffset = computeRibbonSpacingOffset(index, u, H, config)
 
+  // Smooth inner ribbon offset taper: guarantees all 4 ribbons converge into a single seamless point at u = 0
+  const innerRibbonTaper = THREE.MathUtils.smootherstep(u, 0.0, 0.22)
+
+  // 1.25 wave cycles along the wing matching Glowing_wave_ribbons reference video
+  const k = 1.25 * 2.0 * Math.PI * freq
+
   switch (index) {
     case 0: {
       // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
-      // Pure harmonic formulation with natural outer lift, matching Ribbon 2's organic continuity with zero angular kinks
-      const wave = 0.48 * Math.sin(u * Math.PI * 1.62 * freq * r1Freq + 0.08) - 0.14 * Math.cos(u * Math.PI * 2.8 * freq * r1Freq) + 0.32 * Math.pow(u, 1.8)
-      return baseSweep + endsY + r1Y + flareOffset + outerWhip + spacingOffset + e * amp * r1Amp * wave
+      const phi = k * u + 0.0
+      return baseSweep + endsY + r1Y * innerRibbonTaper + flareOffset + outerWhip + spacingOffset + e * amp * 0.48 * r1Amp * Math.sin(phi)
     }
-    case 1:
+    case 1: {
       // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
-      return baseSweep + endsY + r2Y + flareOffset + outerWhip + spacingOffset + e * amp * r2Amp * (-0.50 * Math.sin(u * Math.PI * 1.68 * freq * r2Freq + 0.08) + 0.14 * Math.cos(u * Math.PI * 2.9 * freq * r2Freq))
-    case 2: {
-      // Ribbon 3 (Violet/Magenta Accent Wave #b83dff, Threads Center -> Lower Outer Sweep)
-      // Inner boost enhances amplitude sensitivity at inner end (u < 0.65) while preserving outer change setting as it is:
-      const r3InnerT = Math.max(0.0, Math.min(1.0, u / 0.65))
-      const r3InnerTaper = 1.0 - r3InnerT * r3InnerT * (3.0 - 2.0 * r3InnerT)
-      const r3InnerBoost = 0.52 * r3InnerTaper * Math.sin(u * Math.PI * 1.65 * freq * r3Freq)
-      return baseSweep + endsY + r3Y + flareOffset + outerWhip + spacingOffset + e * amp * r3Amp * (0.18 * Math.sin(u * Math.PI * 2.2 * freq * r3Freq - 0.5) - 0.42 * Math.pow(u, 1.4) * Math.sin(u * Math.PI * 1.35 * freq * r3Freq) + r3InnerBoost)
+      const phi = k * u + Math.PI
+      return baseSweep + endsY + r2Y * innerRibbonTaper + flareOffset + outerWhip + spacingOffset + e * amp * 0.48 * r2Amp * Math.sin(phi)
     }
-    case 3:
+    case 2: {
+      // Ribbon 3 (Violet/Magenta Accent Wave #b83dff, Threads Center of the Blue Loops)
+      const phi = k * u + 0.5 * Math.PI
+      return baseSweep + endsY + r3Y * innerRibbonTaper + flareOffset + outerWhip + spacingOffset + e * amp * 0.42 * r3Amp * Math.sin(phi)
+    }
+    case 3: {
       // Ribbon 4 (Secondary Inner-to-Outer Counter-Braid, Electric Blue-Cyan)
-      return baseSweep + endsY + r4Y + flareOffset + outerWhip + spacingOffset + e * amp * r4Amp * (-0.24 * Math.sin(u * Math.PI * 2.6 * freq * r4Freq + 0.9) + 0.30 * Math.pow(u, 1.6))
+      const phi = k * u + 1.5 * Math.PI
+      return baseSweep + endsY + r4Y * innerRibbonTaper + flareOffset + outerWhip + spacingOffset + e * amp * 0.42 * r4Amp * Math.sin(phi)
+    }
     default:
       return 0
   }
@@ -217,24 +229,24 @@ export function computeHeroWaveZ(index, u, H, config = {}) {
   const zAmp = config.zAmplitude !== undefined ? config.zAmplitude : 1.0
   const outerZ = config.outerZOffset !== undefined ? config.outerZOffset : 0.0
   const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
+  const freq = config.frequency !== undefined ? config.frequency : 1.0
   const rAmp = [
     config.ribbon1Amp ?? 1.0,
     config.ribbon2Amp ?? 1.0,
     config.ribbon3Amp ?? 1.0,
     config.ribbon4Amp ?? 1.0,
   ][index] ?? 1.0
-  const rFreq = [
-    config.ribbon1Freq ?? 1.0,
-    config.ribbon2Freq ?? 1.0,
-    config.ribbon3Freq ?? 1.0,
-    config.ribbon4Freq ?? 1.0,
-  ][index] ?? 1.0
 
-  const outerT = Math.max(0.0, (u - 0.55) / 0.45)
-  const zEnds = Math.pow(u, 1.6) * outerZ + Math.pow(outerT, 1.8) * 0.12 * H * outerFlex * Math.cos(u * Math.PI * 2.4 * rFreq)
+  const outerT = THREE.MathUtils.smootherstep(u, 0.48, 1.0)
+  const zEnds = THREE.MathUtils.smootherstep(u, 0.30, 1.0) * outerZ + outerT * outerT * 0.12 * H * outerFlex * Math.cos(u * Math.PI * 2.4 * freq)
   const rAmpClamped = Math.min(1.2, rAmp)
+  const e = env(u, H)
 
-  return zEnds + 0.25 * H * zAmp * rAmpClamped * Math.cos(u * Math.PI * 2.0 * rFreq + index * 1.3)
+  const k = 1.25 * 2.0 * Math.PI * freq
+  const alphas = [0.0, Math.PI, 0.5 * Math.PI, 1.5 * Math.PI]
+  const phi = k * u + alphas[index]
+
+  return zEnds + e * zAmp * 0.22 * rAmpClamped * Math.cos(phi)
 }
 
 // Backward-compatible individual functions
@@ -250,19 +262,19 @@ export const HERO_FUNCS = [heroY0, heroY1, heroY2, heroY3]
 export function getTravelProfile(index, u, H, config, out) {
   const amplitude = (config.amplitude ?? 1.0) * env(u, H)
   const frequency = config.frequency ?? 1.0
-  if (index === 0) {
-    out[0] = 0.48 * amplitude * (config.ribbon1Amp ?? 1.0)
-    out[1] = u * Math.PI * 1.62 * frequency * (config.ribbon1Freq ?? 1.0) + 0.08
-  } else if (index === 1) {
-    out[0] = -0.50 * amplitude * (config.ribbon2Amp ?? 1.0)
-    out[1] = u * Math.PI * 1.68 * frequency * (config.ribbon2Freq ?? 1.0) + 0.08
-  } else if (index === 2) {
-    out[0] = -0.42 * Math.pow(u, 1.4) * amplitude * (config.ribbon3Amp ?? 1.0)
-    out[1] = u * Math.PI * 1.35 * frequency * (config.ribbon3Freq ?? 1.0)
-  } else {
-    out[0] = -0.24 * amplitude * (config.ribbon4Amp ?? 1.0)
-    out[1] = u * Math.PI * 2.6 * frequency * (config.ribbon4Freq ?? 1.0) + 0.9
-  }
+  // Coordinated outward traveling wave: coherent phase and unified positive amplitude envelope
+  // Base spatial wavenumber k ~ 1.65 * PI * freq ensures a fluid outward traveling crest.
+  const basePhase = u * Math.PI * 1.65 * frequency + 0.08
+  const rAmp = [
+    config.ribbon1Amp ?? 1.0,
+    config.ribbon2Amp ?? 1.0,
+    config.ribbon3Amp ?? 1.0,
+    config.ribbon4Amp ?? 1.0,
+  ][index] ?? 1.0
+  // Gentle ambient pulse amplitude (~0.12) that feels atmospheric and luxurious
+  const ampScale = 0.12 * Math.min(1.2, Math.max(0.6, rAmp))
+  out[0] = ampScale * amplitude
+  out[1] = basePhase
   return out
 }
 
@@ -285,7 +297,7 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
   const ys = new Float64Array(4)
   const zs = new Float64Array(4)
   const stringCount = Math.max(2, Math.min(32, Math.round(config.stringCount ?? 11)))
-  const silkVerticesPerHero = stringCount * 2 * 179
+  const silkVerticesPerHero = stringCount * 2 * (N_SILK - 1)
   for (let i = 0; i < count; i++) {
     const u = uArray[i]
     let owner = wireIds?.[i] ?? 0
@@ -509,7 +521,6 @@ class ParameterizedPointsBuilder {
 function generateCompanionSilkStrands(side, H, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
-  const N_SILK = 180
   const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
   const outerFade = config.outerFade !== undefined ? config.outerFade : 0.15
   const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
@@ -552,10 +563,12 @@ function generateCompanionSilkStrands(side, H, config = {}) {
         const u = (s / (N_SILK - 1)) * strandMaxU
         const x = sign * 10.0 * u
         const e = env(u, H)
-        // Soft tip taper for Ribbon 1 companion silk strands to prevent outer tangling/bunching:
-        const tipTaper = i === 0 ? (1.0 - 0.35 * THREE.MathUtils.smootherstep(u, 0.75, strandMaxU)) : 1.0
-        const y = HERO_FUNCS[i](u, H, config) + e * (radialSpread * tipTaper * Math.sin(u * Math.PI * freq_k + phase_k))
-        const z = heroZ(i, u, H, config) + e * (0.08 * stringWidth * tipTaper * Math.cos(u * Math.PI * freq_k + phase_k))
+        // Smooth inner convergence taper pinning all silk strands to the core filament at u = 0
+        const innerSilkTaper = THREE.MathUtils.smootherstep(u, 0.0, 0.22)
+        // Smooth harmonious outer tip taper preventing tangling/bunching:
+        const tipTaper = 1.0 - 0.25 * THREE.MathUtils.smootherstep(u, 0.75, strandMaxU)
+        const y = HERO_FUNCS[i](u, H, config) + e * innerSilkTaper * (radialSpread * tipTaper * Math.sin(u * Math.PI * freq_k + phase_k))
+        const z = heroZ(i, u, H, config) + e * innerSilkTaper * (0.08 * stringWidth * tipTaper * Math.cos(u * Math.PI * freq_k + phase_k))
         const pt = new THREE.Vector3(x, y, z)
         const w = computeConstraintWeight(u)
 
@@ -1390,12 +1403,11 @@ export function generateSideWireData(side, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
   const H = H_VAL
-  const N_HERO = 240
   const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
   const outerFade = config.outerFade !== undefined ? config.outerFade : 0.15
   const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
 
-  // 1. Build smooth continuous Hero Wave paths (N = 240 points per wave) with organic staggered outer tips
+  // 1. Build smooth continuous Hero Wave paths (N_HERO = 400 points per wave) with organic staggered outer tips
   const heroStrands = []
   for (let i = 0; i < 4; i++) {
     const pts = []
@@ -1437,8 +1449,11 @@ export function generateSideWireData(side, config = {}) {
           const u2 = ((i + 1) / (count - 1)) * maxU
           const w1 = computeConstraintWeight(u1)
           const w2 = computeConstraintWeight(u2)
-          const p1 = new THREE.Vector3(pts[i].x, pts[i].y + dy, pts[i].z + dz)
-          const p2 = new THREE.Vector3(pts[i + 1].x, pts[i + 1].y + dy, pts[i + 1].z + dz)
+          // Smooth inner taper so all 6 aura passes smoothly converge into the core filament at u = 0
+          const taper1 = THREE.MathUtils.smootherstep(u1, 0.0, 0.20)
+          const taper2 = THREE.MathUtils.smootherstep(u2, 0.0, 0.20)
+          const p1 = new THREE.Vector3(pts[i].x, pts[i].y + dy * taper1, pts[i].z + dz * taper1)
+          const p2 = new THREE.Vector3(pts[i + 1].x, pts[i + 1].y + dy * taper2, pts[i + 1].z + dz * taper2)
           builder.addSegment(p1, u1, wireId, w1, p2, u2, wireId, w2, null, null, null, null, maxU)
         }
       })

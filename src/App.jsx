@@ -18,6 +18,8 @@ function App() {
   const activeSection = useScrollTrigger(sectionIds)
   const [showThemePicker, setShowThemePicker] = useState(false)
 
+  const isContactPreview = typeof window !== 'undefined' && window.location.search.includes('contact_preview')
+
   return (
     <div className="relative">
       <a
@@ -34,13 +36,19 @@ function App() {
 
       <SmoothScroll>
         <main id="main-content" className="relative">
-          <Hero />
-          <About />
-          <Skills />
-          <Projects />
-          <Experience />
-          <Contact />
-          <Footer />
+          {isContactPreview ? (
+            <Contact />
+          ) : (
+            <>
+              <Hero />
+              <About />
+              <Skills />
+              <Projects />
+              <Experience />
+              <Contact />
+              <Footer />
+            </>
+          )}
         </main>
       </SmoothScroll>
     </div>

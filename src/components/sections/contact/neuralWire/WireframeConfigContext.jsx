@@ -47,9 +47,9 @@ export const DEFAULT_SIDE_CONFIG = {
   ribbonSpacingInner: 0.85,  // Distance multiplier between all ribbons at inner globe connection (converging)
 
   // ── Two Ends Placement ──
-  innerGap: 0.7,             // Fine inner gap offset from globe center
+  innerGap: 0.2,             // Fine inner gap offset from globe center
   innerYOffset: 0,           // Inner end height offset
-  innerFade: 0.41,           // Inner tip feather distance (smoothstep cutoff)
+  innerFade: 0.05,           // Inner tip feather distance (crisp luminous entry matching reference video)
   outerXOffset: 0,           // Fine outer X offset
   outerYOffset: -0.3,        // Outer end lift/drop
   outerZOffset: -0.7,        // Outer end depth offset
@@ -142,7 +142,7 @@ export const PRESETS = {
   },
 }
 
-const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v20'
+const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v21'
 
 const WireframeConfigContext = createContext(null)
 
