@@ -1,18 +1,5 @@
 import { memo } from 'react'
 
-const getBadgeColor = (badge) => {
-  switch (badge) {
-    case 'Current':
-      return 'from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-400'
-    case 'Active':
-      return 'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-400'
-    case 'Leadership':
-      return 'from-purple-500/20 to-pink-500/20 border-purple-500/30 text-purple-400'
-    default:
-      return 'from-accent/20 to-accent-hover/20 border-accent/30 text-accent'
-  }
-}
-
 /**
  * Experience Card - Vertical cards displayed on mobile viewport.
  * Represents a single career milestone.
@@ -61,16 +48,6 @@ const ExperienceCard = memo(function ExperienceCard({ exp, index, total }) {
             </h3>
             <div className="flex items-center gap-4 flex-wrap">
               <p className="text-accent font-bold text-xl md:text-2xl">{exp.company}</p>
-              {exp.badge && (
-                <span
-                  className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r ${getBadgeColor(exp.badge)} text-sm font-semibold border backdrop-blur-sm`}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full bg-current animate-pulse"
-                  />
-                  {exp.badge}
-                </span>
-              )}
             </div>
           </div>
 

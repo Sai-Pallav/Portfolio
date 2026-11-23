@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
-import { X } from 'lucide-react'
-import { forwardRef, memo, useCallback } from 'react'
+import { forwardRef, memo } from 'react'
 
 /**
  * Experience Details Panel - Expanded view with holographic effects.
@@ -9,52 +8,47 @@ import { forwardRef, memo, useCallback } from 'react'
  * @param {{
  *   exp: Object,
  *   position: 'left' | 'right',
- *   onClose: () => void
+ *   onClose?: () => void
  * }} props
  */
 const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, position, onClose }, ref) {
-  const slideDirection = position === 'right' ? 60 : -60
+  const slideDirection = position === 'right' ? 30 : -30
   
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.3
+        staggerChildren: 0.04,
+        delayChildren: 0.05
       }
     }
   }
   
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 14 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: 0.6,
+        duration: 0.35,
         ease: [0.16, 1, 0.3, 1]
       }
     }
   }
-
-  // Memoize the close click handler to prevent inline recreation
-  const handleCloseClick = useCallback((e) => {
-    e.stopPropagation()
-    onClose()
-  }, [onClose])
   
   return (
     <motion.div
-      initial={{ opacity: 0, x: slideDirection, scale: 0.9, filter: 'blur(8px)' }}
-      animate={{ opacity: 1, x: 0, scale: 1, filter: 'blur(0px)' }}
-      exit={{ opacity: 0, x: slideDirection, scale: 0.9, filter: 'blur(8px)' }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0, x: slideDirection, scale: 0.96 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: slideDirection * 0.5, scale: 0.96, transition: { duration: 0.2, ease: 'easeIn' } }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       className="absolute top-[0%] md:top-[1%] lg:top-[2%] w-full max-w-[390px] md:max-w-[420px] lg:max-w-[440px]"
       style={{
         left: position === 'right' ? 'auto' : '0%',
         right: position === 'right' ? '0%' : 'auto',
-        zIndex: 60
+        zIndex: 60,
+        willChange: 'transform, opacity'
       }}
     >
       {/* Main panel */}
@@ -71,7 +65,7 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
+          transition={{ delay: 0.06, duration: 0.4 }}
           className="absolute inset-0 rounded-3xl pointer-events-none"
           style={{
             background: 'linear-gradient(135deg, transparent 30%, var(--accent) 50%, transparent 70%)',
@@ -113,19 +107,6 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
           }}
         />
         
-        {/* Close button */}
-        <motion.button
-          onClick={handleCloseClick}
-          whileHover={{ scale: 1.1, rotate: 90 }}
-          whileTap={{ scale: 0.9 }}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 flex items-center justify-center transition-colors z-20 text-white/70 hover:text-white"
-          aria-label="Close details panel"
-          type="button"
-          data-custom-cursor-ignore
-        >
-          <X className="w-4 h-4" />
-        </motion.button>
-        
         {/* Content Container */}
         <motion.div
           variants={containerVariants}
@@ -134,16 +115,11 @@ const ExperienceDetails = memo(forwardRef(function ExperienceDetails({ exp, posi
           className="relative p-6 sm:p-7 space-y-5"
         >
           {/* Header Section */}
-          <motion.div variants={itemVariants} className="space-y-2 pr-8">
+          <motion.div variants={itemVariants} className="space-y-2">
             <div className="flex items-center gap-2.5">
               <span className="text-2xl flex-shrink-0">
                 {exp.icon || '💼'}
               </span>
-              {exp.badge && (
-                <span className="text-[10px] font-mono uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent)]/30 font-semibold shadow-[0_0_8px_var(--accent-dim)]">
-                  {exp.badge}
-                </span>
-              )}
             </div>
             
             <h3 className="font-heading text-xl sm:text-2xl font-bold text-[var(--text-heading)] leading-snug tracking-tight">

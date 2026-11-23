@@ -179,7 +179,7 @@ const Projects = memo(function Projects() {
 
       {/* Category Filter Tabs */}
       <div className="flex justify-center items-center mt-12 mb-8 animate-fade-in">
-        <div 
+        <div
           className="inline-flex p-1 rounded-full border border-white/[0.05] backdrop-blur-md relative"
           style={{
             background: "rgba(10, 10, 11, 0.45)",

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useState, memo } from 'react'
+import { useState, useEffect, memo } from 'react'
 
 /**
  * Experience Node - Orbiting capsule representing a career milestone.
@@ -24,42 +24,83 @@ const ExperienceNode = memo(function ExperienceNode({
 }) {
   // Hover state for conditional scan line and scale interactions
   const [isHovered, setIsHovered] = useState(false)
+  const isHoverDisabled = isActive || isDimmed
+
+  useEffect(() => {
+    if (isHoverDisabled) {
+      setIsHovered(false)
+    }
+  }, [isHoverDisabled])
   
   return (
     <motion.button
       ref={nodeRef}
       onClick={() => onSelect(index)}
-      onMouseEnter={() => !isDimmed && setIsHovered(true)}
+      onMouseEnter={() => !isHoverDisabled && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`w-48 md:w-56 group transition-opacity duration-300 ${isDimmed ? 'opacity-15 pointer-events-none' : ''}`}
+      className={`w-48 md:w-56 group transition-opacity duration-300 ${isDimmed ? 'opacity-15 pointer-events-none' : ''} ${isActive ? 'cursor-default' : 'cursor-pointer'}`}
+      style={{ willChange: 'transform, opacity' }}
       animate={{
         scale: isDimmed ? 0.85 : (isActive ? 1.15 : 1),
-        opacity: isDimmed ? 0.15 : (isActive ? 1 : 0.7)
+        opacity: isDimmed ? 0.15 : (isActive ? 1 : 0.75)
       }}
       transition={{
         scale: {
-          duration: 0.4,
-          ease: [0.16, 1, 0.3, 1]
+          type: 'spring',
+          stiffness: 280,
+          damping: 24,
+          mass: 0.8
         },
         opacity: {
-          duration: 0.4
+          duration: 0.35,
+          ease: 'easeInOut'
         }
       }}
-      whileHover={{ scale: isDimmed ? 0.85 : (isActive ? 1.2 : 1.1), cursor: isDimmed ? 'default' : 'pointer' }}
-      whileTap={{ scale: isDimmed ? 0.85 : 0.98 }}
+      whileHover={
+        isDimmed
+          ? undefined
+          : {
+              scale: isActive ? 1.15 : 1.1,
+              opacity: 1,
+              transition: {
+                type: 'spring',
+                stiffness: 280,
+                damping: 24,
+                mass: 0.8
+              }
+            }
+      }
+      whileTap={
+        isDimmed
+          ? undefined
+          : {
+              scale: isActive ? 1.15 : 1.05,
+              transition: {
+                type: 'spring',
+                stiffness: 350,
+                damping: 25
+              }
+            }
+      }
       aria-label={`View details for ${exp.role} at ${exp.company}`}
       aria-expanded={isActive}
       disabled={isDimmed}
     >
       {/* Node card */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 shadow-2xl transition-all duration-300 group-hover:border-accent/60 group-hover:shadow-accent/30">
+      <div
+        className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border shadow-2xl transition-all duration-400 ease-out ${
+          isActive
+            ? 'border-accent/60 shadow-[0_0_35px_var(--accent-dim)]'
+            : `border-white/20 ${isDimmed ? '' : 'group-hover:border-accent/60 group-hover:shadow-accent/30'}`
+        }`}
+      >
         
         {/* Glow effect when active */}
         {isActive && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
             className="absolute inset-0 rounded-2xl"
             style={{
               boxShadow: '0 0 40px var(--accent), inset 0 0 20px var(--accent)',
@@ -104,11 +145,6 @@ const ExperienceNode = memo(function ExperienceNode({
               <span className="text-[10px] text-secondary/80">
                 {exp.duration}
               </span>
-              {exp.badge && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent border border-accent/30 font-semibold">
-                  {exp.badge}
-                </span>
-              )}
             </div>
           </div>
         </div>

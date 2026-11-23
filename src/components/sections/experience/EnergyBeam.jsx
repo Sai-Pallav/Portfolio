@@ -6,6 +6,7 @@ import { memo, useId } from 'react'
  * Uses a straight path and scales dynamically via SVG.
  * 
  * @param {{
+ * @param {{
  *   startX: number,
  *   startY: number,
  *   endX: number,
@@ -17,15 +18,15 @@ import { memo, useId } from 'react'
 const EnergyBeam = memo(function EnergyBeam({ startX, startY, endX, endY, width, height }) {
   const idSuffix = useId().replace(/:/g, '')
   const uid = `energy-beam-${idSuffix}`
-  
+
   const centerX = startX
   const centerY = startY
   const targetX = endX
   const targetY = endY
-  
+
   // Straight path: starts at center, ends at the node
   const beamPath = `M ${centerX} ${centerY} L ${targetX} ${targetY}`
-  
+
   return (
     <motion.svg
       className="absolute inset-0 pointer-events-none"
@@ -55,7 +56,7 @@ const EnergyBeam = memo(function EnergyBeam({ startX, startY, endX, endY, width,
           <stop offset="40%" stopColor="var(--accent)" stopOpacity="0.9" />
           <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.3" />
         </linearGradient>
-        
+
         {/* Glow filter */}
         <filter id={`beamGlow-${uid}`} filterUnits="userSpaceOnUse">
           <feGaussianBlur stdDeviation="3" result="blur" />
@@ -64,14 +65,14 @@ const EnergyBeam = memo(function EnergyBeam({ startX, startY, endX, endY, width,
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        
+
         {/* Pulse gradient */}
         <radialGradient id={`pulseGradient-${uid}`}>
           <stop offset="0%" stopColor="var(--accent)" stopOpacity="1" />
           <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
         </radialGradient>
       </defs>
-      
+
       {/* Outer glow layer (diffuse blur) */}
       <motion.path
         d={beamPath}
@@ -82,10 +83,10 @@ const EnergyBeam = memo(function EnergyBeam({ startX, startY, endX, endY, width,
         strokeLinecap="round"
         initial={{ pathLength: 0 }}
         animate={{ pathLength: 1 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+        transition={{ duration: 0.42, ease: "easeOut" }}
         filter={`url(#beamGlow-${uid})`}
       />
-      
+
       {/* Mid glow layer (ambient laser color) */}
       <motion.path
         d={beamPath}
@@ -96,7 +97,7 @@ const EnergyBeam = memo(function EnergyBeam({ startX, startY, endX, endY, width,
         strokeLinecap="round"
         initial={{ pathLength: 0 }}
         animate={{ pathLength: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut", delay: 0.02 }}
+        transition={{ duration: 0.36, ease: "easeOut", delay: 0.02 }}
       />
 
       {/* Inner hot core (high intensity laser center) */}
@@ -109,9 +110,9 @@ const EnergyBeam = memo(function EnergyBeam({ startX, startY, endX, endY, width,
         strokeLinecap="round"
         initial={{ pathLength: 0 }}
         animate={{ pathLength: 1 }}
-        transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
+        transition={{ duration: 0.32, ease: "easeOut", delay: 0.04 }}
       />
-      
+
       {/* Energy pulse 1 traveling along beam */}
       <motion.circle
         r="3"
@@ -131,7 +132,7 @@ const EnergyBeam = memo(function EnergyBeam({ startX, startY, endX, endY, width,
           path={beamPath}
         />
       </motion.circle>
-      
+
       {/* Energy pulse 2 (staggered delay) */}
       <motion.circle
         r="2.5"
@@ -151,103 +152,105 @@ const EnergyBeam = memo(function EnergyBeam({ startX, startY, endX, endY, width,
           path={beamPath}
         />
       </motion.circle>
-      
-      {/* Node endpoint - rotating tech reticle */}
-      <motion.circle
-        cx={targetX}
-        cy={targetY}
-        r="9"
-        stroke="var(--accent)"
-        strokeWidth="1"
-        strokeDasharray="4 2"
-        strokeOpacity="0.8"
-        fill="none"
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1, rotate: 360 }}
-        style={{ transformOrigin: `${targetX}px ${targetY}px` }}
-        transition={{
-          scale: { duration: 0.4 },
-          opacity: { duration: 0.4 },
-          rotate: { duration: 8, repeat: Infinity, ease: "linear" }
-        }}
-      />
-      
-      {/* Node endpoint - diamond bracket */}
-      <motion.rect
-        x={targetX - 6.5}
-        y={targetY - 6.5}
-        width="13"
-        height="13"
-        rx="1"
-        stroke="var(--accent-hover)"
-        strokeWidth="0.8"
-        strokeOpacity="0.5"
-        fill="none"
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: [0.3, 0.7, 0.3], rotate: 45 }}
-        style={{ transformOrigin: `${targetX}px ${targetY}px` }}
-        transition={{
-          scale: { duration: 0.4 },
-          rotate: { duration: 0 },
-          opacity: { duration: 2.5, repeat: Infinity, ease: "easeInOut" }
-        }}
-      />
 
-      {/* Node endpoint - center micro target dot */}
-      <motion.circle
-        cx={targetX}
-        cy={targetY}
-        r="3"
-        fill="#ffffff"
-        stroke="var(--accent)"
-        strokeWidth="1.2"
-        initial={{ scale: 0 }}
-        animate={{ scale: [1, 1.25, 1] }}
+      {/* Node endpoint - reticle group centered at targetX, targetY */}
+      <g transform={`translate(${targetX}, ${targetY})`}>
+        {/* Rotating tech reticle */}
+        <motion.circle
+          cx={0}
+          cy={0}
+          r="9"
+          stroke="var(--accent)"
+          strokeWidth="1"
+          strokeDasharray="4 2"
+          strokeOpacity="0.8"
+          fill="none"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1, rotate: 360 }}
+          transition={{
+            scale: { duration: 0.3 },
+            opacity: { duration: 0.3 },
+            rotate: { duration: 8, repeat: Infinity, ease: "linear" }
+          }}
+        />
 
-        transition={{
-          scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }
-        }}
-        filter={`url(#beamGlow-${uid})`}
-      />
-      
-      {/* Core emission - outer energy ring */}
-      <motion.circle
-        cx={centerX}
-        cy={centerY}
-        r="12"
-        stroke="var(--accent)"
-        strokeWidth="1"
-        strokeOpacity="0.4"
-        fill="none"
-        animate={{
-          scale: [1, 1.35, 1],
-          opacity: [0.1, 0.5, 0.1]
-        }}
-        transition={{
-          duration: 2.2,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-      />
+        {/* Counter-rotating inner circular reticle (anti-clockwise) */}
+        <motion.circle
+          cx={0}
+          cy={0}
+          r="5.5"
+          stroke="var(--accent-hover)"
+          strokeWidth="0.8"
+          strokeDasharray="3 2"
+          strokeOpacity="0.75"
+          fill="none"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: [0.4, 0.85, 0.4], rotate: -360 }}
+          transition={{
+            scale: { duration: 0.3 },
+            opacity: { duration: 2.5, repeat: Infinity, ease: "easeInOut" },
+            rotate: { duration: 6, repeat: Infinity, ease: "linear" }
+          }}
+        />
 
-      {/* Core emission - center pulsing dot */}
-      <motion.circle
-        cx={centerX}
-        cy={centerY}
-        r="5"
-        fill="#ffffff"
-        stroke="var(--accent)"
-        strokeWidth="1.8"
-        animate={{
-          scale: [1, 1.2, 1]
-        }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        filter={`url(#beamGlow-${uid})`}
-      />
+        {/* Center micro target dot */}
+        <motion.circle
+          cx={0}
+          cy={0}
+          r="3"
+          fill="#ffffff"
+          stroke="var(--accent)"
+          strokeWidth="1.2"
+          initial={{ scale: 0 }}
+          animate={{ scale: [1, 1.25, 1] }}
+          transition={{
+            scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+          }}
+          filter={`url(#beamGlow-${uid})`}
+        />
+      </g>
+
+      {/* Core emission group centered at centerX, centerY */}
+      <g transform={`translate(${centerX}, ${centerY})`}>
+        {/* Outer energy ring */}
+        <motion.circle
+          cx={0}
+          cy={0}
+          r="12"
+          stroke="var(--accent)"
+          strokeWidth="1"
+          strokeOpacity="0.4"
+          fill="none"
+          animate={{
+            scale: [1, 1.35, 1],
+            opacity: [0.1, 0.5, 0.1]
+          }}
+          transition={{
+            duration: 2.2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+
+        {/* Center pulsing dot */}
+        <motion.circle
+          cx={0}
+          cy={0}
+          r="5"
+          fill="#ffffff"
+          stroke="var(--accent)"
+          strokeWidth="1.8"
+          animate={{
+            scale: [1, 1.2, 1]
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          filter={`url(#beamGlow-${uid})`}
+        />
+      </g>
     </motion.svg>
   )
 })

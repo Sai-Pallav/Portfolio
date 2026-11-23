@@ -95,22 +95,34 @@ const OrbitRing = memo(function OrbitRing({
           }}
         />
         
-        {/* Active highlight ring */}
+        {/* Active highlight ring - rotating anti-clockwise */}
         {isActive && (
-          <motion.circle
-            cx={center}
-            cy={center}
-            r={radius}
-            stroke="var(--accent)"
-            strokeWidth="2"
-            strokeOpacity="0.6"
-            fill="none"
-            strokeDasharray="20 10"
-            filter={`url(#glow-${uid})`}
-            style={{
-              transformOrigin: `${center}px ${center}px`
-            }}
-          />
+          <g transform={`translate(${center}, ${center})`}>
+            {/* Primary active dashed orbit ring */}
+            <motion.circle
+              cx={0}
+              cy={0}
+              r={radius}
+              stroke="var(--accent)"
+              strokeWidth="2"
+              strokeOpacity="0.7"
+              fill="none"
+              strokeDasharray="20 10"
+              filter={`url(#glow-${uid})`}
+              style={{ transformOrigin: '0px 0px' }}
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ 
+                scale: 1, 
+                opacity: 0.75,
+                rotate: -360 
+              }}
+              transition={{
+                scale: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+                opacity: { duration: 0.4 },
+                rotate: { duration: duration || 35, repeat: Infinity, ease: "linear" }
+              }}
+            />
+          </g>
         )}
         
         {/* Ambient particles that actually travel along the orbit */}

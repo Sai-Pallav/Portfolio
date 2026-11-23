@@ -45,27 +45,40 @@ function Experience() {
   const [selectedNodeIndex, setSelectedNodeIndex] = useState(-1)
   const [isMobile, setIsMobile] = useState(false)
   const [detailsPosition, setDetailsPosition] = useState('left')
-  
+
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768)
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
-  
+
   // Use only manually selected node (not scroll-based)
   const currentNodeIndex = selectedNodeIndex
-  
+
   const handleNodeSelect = useCallback((index) => {
-    setSelectedNodeIndex(prev => prev === index ? -1 : index)
+    setSelectedNodeIndex(prev => {
+      if (prev === index) {
+        return -1
+      }
+      // Calculate dynamic details panel position synchronously to prevent double-render
+      const nodeEl = nodeRefs.current[index]
+      if (nodeEl) {
+        const rect = nodeEl.getBoundingClientRect()
+        const centerX = window.innerWidth / 2
+        const nodeCenterX = rect.left + rect.width / 2
+        setDetailsPosition(nodeCenterX >= centerX ? 'left' : 'right')
+      }
+      return index
+    })
   }, [])
-  
+
   const handleCloseDetails = useCallback(() => {
     setSelectedNodeIndex(prev => {
       const prevIndex = prev
       // Restore focus to the node button that opened the panel
       if (prevIndex !== -1 && nodeRefs.current[prevIndex]) {
-        nodeRefs.current[prevIndex].focus()
+        nodeRefs.current[prevIndex].focus({ preventScroll: true })
       }
       return -1
     })
@@ -75,7 +88,7 @@ function Experience() {
   useEffect(() => {
     if (selectedNodeIndex !== -1 && detailsRef.current) {
       // Small timeout to let the enter animation start before focusing
-      const t = setTimeout(() => detailsRef.current?.focus(), 50)
+      const t = setTimeout(() => detailsRef.current?.focus({ preventScroll: true }), 100)
       return () => clearTimeout(t)
     }
   }, [selectedNodeIndex])
@@ -88,7 +101,33 @@ function Experience() {
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [selectedNodeIndex, handleCloseDetails])
-  
+
+  // Click anywhere outside closes the details panel (matching X button behavior)
+  useEffect(() => {
+    if (selectedNodeIndex === -1) return
+
+    const handleClickOutside = (e) => {
+      // If click was inside the details panel, do nothing
+      if (detailsRef.current && detailsRef.current.contains(e.target)) {
+        return
+      }
+      // If clicked on the active node, let its own click handler toggle/close it
+      if (nodeRefs.current[selectedNodeIndex]?.contains(e.target)) {
+        return
+      }
+      handleCloseDetails()
+    }
+
+    const timer = setTimeout(() => {
+      document.addEventListener('pointerdown', handleClickOutside)
+    }, 50)
+
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('pointerdown', handleClickOutside)
+    }
+  }, [selectedNodeIndex, handleCloseDetails])
+
   // Keep wrapper and node animations perfectly synchronized and controlled
   useEffect(() => {
     const syncAndControlAnimations = () => {
@@ -147,27 +186,13 @@ function Experience() {
       nodeRefs.current[i] = el
     })
   }, [])
-  
-  // Calculate dynamic details panel position based on selected node's placement in viewport
-  useEffect(() => {
-    if (currentNodeIndex === -1) return
-    const nodeEl = nodeRefs.current[currentNodeIndex]
-    if (nodeEl) {
-      const rect = nodeEl.getBoundingClientRect()
-      const centerX = window.innerWidth / 2
-      const nodeCenterX = rect.left + rect.width / 2
-      setDetailsPosition(nodeCenterX >= centerX ? 'left' : 'right')
-    }
-  }, [currentNodeIndex])
 
   const [beamCoords, setBeamCoords] = useState(null)
 
   useEffect(() => {
     if (selectedNodeIndex === -1 || isMobile) {
-      const timer = setTimeout(() => {
-        setBeamCoords(null)
-      }, 0)
-      return () => clearTimeout(timer)
+      setBeamCoords(null)
+      return
     }
 
     const updateCoords = () => {
@@ -179,7 +204,7 @@ function Experience() {
       const nodeRect = activeNode.getBoundingClientRect()
 
       // Top-left corner of the node button relative to the container, offset inwards
-      const offset = 10
+      const offset = 16
       const x = nodeRect.left - containerRect.left + offset
       const y = nodeRect.top - containerRect.top + offset
 
@@ -193,16 +218,21 @@ function Experience() {
       })
     }
 
-    // Run immediately after layout is stable
-    const timer = setTimeout(updateCoords, 50)
+    // Measure immediately
+    updateCoords()
+
+    // Settle pass after spring animation finishes without frame thrashing
+    const settleTimer = setTimeout(updateCoords, 220)
 
     window.addEventListener('resize', updateCoords)
+    window.addEventListener('scroll', updateCoords, { passive: true })
     return () => {
-      clearTimeout(timer)
+      clearTimeout(settleTimer)
       window.removeEventListener('resize', updateCoords)
+      window.removeEventListener('scroll', updateCoords)
     }
   }, [selectedNodeIndex, isMobile])
-  
+
   // Orbit entrance animations
   const orbitSystemVariants = {
     hidden: { opacity: 0 },
@@ -214,7 +244,7 @@ function Experience() {
       }
     }
   }
-  
+
   const coreVariants = {
     hidden: { scale: 0, opacity: 0 },
     visible: {
@@ -228,7 +258,7 @@ function Experience() {
       }
     }
   }
-  
+
   const ringVariants = {
     hidden: { scale: 0, opacity: 0 },
     visible: (i) => ({
@@ -253,14 +283,14 @@ function Experience() {
       <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden" aria-hidden="true">
         {/* Deep gradient base */}
         <div className="absolute inset-0 bg-gradient-to-br from-surface/50 via-bg to-surface/50" />
-        
+
         {/* Animated gradient orbs */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={isInView ? { opacity: 0.25, scale: 1 } : { opacity: 0, scale: 0.8 }}
           transition={{ duration: 1.5, ease: 'easeOut' }}
           className="absolute -top-32 -right-32 w-[600px] h-[600px] rounded-full blur-[120px]"
-          style={{ 
+          style={{
             background: 'radial-gradient(circle, var(--accent) 0%, var(--accent-hover) 50%, transparent 70%)',
           }}
         />
@@ -269,11 +299,11 @@ function Experience() {
           animate={isInView ? { opacity: 0.2, scale: 1 } : { opacity: 0, scale: 0.8 }}
           transition={{ duration: 1.5, ease: 'easeOut', delay: 0.2 }}
           className="absolute bottom-0 left-1/3 w-[500px] h-[500px] rounded-full blur-[100px]"
-          style={{ 
+          style={{
             background: 'radial-gradient(circle, var(--accent-hover) 0%, var(--accent) 50%, transparent 70%)',
           }}
         />
-        
+
         {/* Animated mesh pattern */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -337,7 +367,7 @@ function Experience() {
             </motion.div>
           ) : (
             // Desktop: Immersive orbit system with entrance animations
-            <motion.div 
+            <motion.div
               initial="hidden"
               animate="visible"
               variants={orbitSystemVariants}
@@ -375,16 +405,16 @@ function Experience() {
                 `}</style>
 
                 {/* Central Core with entrance animation */}
-                <motion.div 
+                <motion.div
                   variants={coreVariants}
                   className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"
                 >
                   <CareerCore isActive={currentNodeIndex !== -1} />
                 </motion.div>
-                
+
                 {/* Orbit Rings with staggered entrance */}
                 {ORBIT_RADII.map((radius, i) => (
-                  <motion.div 
+                  <motion.div
                     key={i}
                     variants={ringVariants}
                     custom={i}
@@ -399,8 +429,8 @@ function Experience() {
                     />
                   </motion.div>
                 ))}
-                
-                 {/* Rotating Parent Container */}
+
+                {/* Rotating Parent Container */}
                 <div
                   className="orbit-rotating-parent"
                 >
@@ -465,7 +495,7 @@ function Experience() {
                   />
                 )}
               </div>
-              
+
               {/* Details Panel */}
               <AnimatePresence mode="wait">
                 {currentNodeIndex !== -1 && (

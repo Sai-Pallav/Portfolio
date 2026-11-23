@@ -3,7 +3,6 @@ export const experience = [
     id:          1,
     role:        'Full-Stack Developer Intern',
     company:     'Fission AI',
-    badge:       'Current',
     duration:    'May 2025 - July 2025',
     icon:        '🚀',
     bullets: [
@@ -21,7 +20,6 @@ export const experience = [
     id:          2,
     role:        'Open Source Developer',
     company:     'Mozilla (Campus Contributions)',
-    badge:       'Active',
     duration:    'Jan 2025 - Present',
     icon:        '🌐',
     bullets: [
@@ -39,7 +37,6 @@ export const experience = [
     id:          3,
     role:        'Technical Head',
     company:     'BITS Computer Science Society',
-    badge:       'Leadership',
     duration:    'Aug 2024 - Present',
     icon:        '👥',
     bullets: [
