@@ -220,9 +220,14 @@ function addPocketTravelAttributes(geometry, H, config) {
   const flowPair = new Float32Array(count * 4)
   const flowMeta = new Float32Array(count * 2)
   const axis = new Float32Array(count * 3)
-  const other0 = new Float32Array(count * 3)
-  const other1 = new Float32Array(count * 3)
+  const frame = new Float32Array(count * 4)
+  const wall = new Float32Array(count * 4)
+  const center = new Float32Array(count * 3)
+  const normal = new Float32Array(count * 3)
+  const other0 = new Float32Array(count * 4)
+  const other1 = new Float32Array(count * 4)
   const ys = new Float64Array(4)
+  const zs = new Float64Array(4)
   const ids = new Int8Array(4)
   const profile = new Float64Array(2)
   for (let i = 0; i < count; i++) {
@@ -232,6 +237,10 @@ function addPocketTravelAttributes(geometry, H, config) {
     ys[1] = heroY1(u, H, config)
     ys[2] = heroY2(u, H, config)
     ys[3] = heroY3(u, H, config)
+    zs[0] = heroZ(0, u, H, config)
+    zs[1] = heroZ(1, u, H, config)
+    zs[2] = heroZ(2, u, H, config)
+    zs[3] = heroZ(3, u, H, config)
     for (let k = 0; k < 4; k++) ids[k] = k
     for (let k = 1; k < 4; k++) {
       const id = ids[k]
@@ -248,7 +257,25 @@ function addPocketTravelAttributes(geometry, H, config) {
     const height = Math.max(0.0001, ys[high] - ys[low])
     flowMeta[2 * i] = Math.max(0, Math.min(1, (y - ys[low]) / height))
     flowMeta[2 * i + 1] = height
-    axis[3 * i + 1] = 1
+    const bounds = getAlmondPocketBounds(u, H, config)
+    const outsidePrimary = y > bounds.yUpper || y < bounds.yLower
+    const centerY = outsidePrimary ? bounds.envCenterY : bounds.gapCenterY
+    const centerZ = outsidePrimary ? bounds.envCenterZ : bounds.gapCenterZ
+    const radiusY = outsidePrimary ? bounds.envRy : bounds.Ry
+    const radiusZ = outsidePrimary ? bounds.envRz : bounds.Rz
+    frame[4 * i] = centerY
+    frame[4 * i + 1] = centerZ
+    frame[4 * i + 2] = Math.max(0.002, radiusY)
+    frame[4 * i + 3] = Math.max(0.002, radiusZ)
+    center[3 * i] = positions[3 * i]
+    center[3 * i + 1] = centerY
+    center[3 * i + 2] = centerZ
+    normal[3 * i + 1] = 1.0
+    wall[4 * i] = ys[low] - centerY
+    wall[4 * i + 1] = zs[low] - centerZ
+    wall[4 * i + 2] = ys[high] - centerY
+    wall[4 * i + 3] = zs[high] - centerZ
+    axis[3 * i] = positions[3 * i] < -0.0001 ? -1 : 1
     getTravelProfile(low, u, H, config, profile)
     flowPair[4 * i] = profile[0]
     flowPair[4 * i + 1] = profile[1]
@@ -261,16 +288,21 @@ function addPocketTravelAttributes(geometry, H, config) {
       if (id === low || id === high) continue
       const other = otherSlot++ === 0 ? other0 : other1
       getTravelProfile(id, u, H, config, profile)
-      other[3 * i] = profile[0]
-      other[3 * i + 1] = profile[1]
-      other[3 * i + 2] = ys[id] - y
+      other[4 * i] = profile[0]
+      other[4 * i + 1] = profile[1]
+      other[4 * i + 2] = ys[id] - y
+      other[4 * i + 3] = zs[id] - positions[3 * i + 2]
     }
   }
   geometry.setAttribute('aFlowPair', new THREE.BufferAttribute(flowPair, 4))
   geometry.setAttribute('aFlowMeta', new THREE.BufferAttribute(flowMeta, 2))
   geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
-  geometry.setAttribute('aFlowOther0', new THREE.BufferAttribute(other0, 3))
-  geometry.setAttribute('aFlowOther1', new THREE.BufferAttribute(other1, 3))
+  geometry.setAttribute('aFlowFrame', new THREE.BufferAttribute(frame, 4))
+  geometry.setAttribute('aFlowWall', new THREE.BufferAttribute(wall, 4))
+  geometry.setAttribute('aFlowCenter', new THREE.BufferAttribute(center, 3))
+  geometry.setAttribute('aFlowNormal', new THREE.BufferAttribute(normal, 3))
+  geometry.setAttribute('aFlowOther0', new THREE.BufferAttribute(other0, 4))
+  geometry.setAttribute('aFlowOther1', new THREE.BufferAttribute(other1, 4))
 }
 
 /**

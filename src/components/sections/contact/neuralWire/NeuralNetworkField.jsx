@@ -104,8 +104,8 @@ function mergeTransformedGeometries(geoA, matA, geoB, matB) {
     const itemSize = attrA.itemSize
     const arr = new attrA.array.constructor(total * itemSize)
 
-    if (attrName === 'position' || attrName === 'aBasePos' || attrName === 'aFlowAxis') {
-      const isDirection = attrName === 'aFlowAxis'
+    if (attrName === 'position' || attrName === 'aBasePos' || attrName === 'aFlowAxis' || attrName === 'aFlowCenter' || attrName === 'aFlowNormal') {
+      const isDirection = attrName === 'aFlowAxis' || attrName === 'aFlowNormal'
       const srcA = attrA.array
       for (let i = 0, j = 0; i < vA; i++, j += 3) {
         const x = srcA[j], y = srcA[j + 1], z = srcA[j + 2]
@@ -124,6 +124,31 @@ function mergeTransformedGeometries(geoA, matA, geoB, matB) {
     } else {
       arr.set(attrA.array, 0)
       arr.set(attrB.array, vA * itemSize)
+    }
+
+    if (attrName === 'aFlowFrame') {
+      const scaleYA = Math.hypot(a1, a5, a9)
+      const scaleZA = Math.hypot(a2, a6, a10)
+      const scaleYB = Math.hypot(b1, b5, b9)
+      const scaleZB = Math.hypot(b2, b6, b10)
+      arr[2] *= scaleYA
+      arr[3] *= scaleZA
+      arr[vA * itemSize + 2] *= scaleYB
+      arr[vA * itemSize + 3] *= scaleZB
+    } else if (attrName === 'aFlowWall') {
+      const scaleYA = Math.hypot(a1, a5, a9)
+      const scaleZA = Math.hypot(a2, a6, a10)
+      const scaleYB = Math.hypot(b1, b5, b9)
+      const scaleZB = Math.hypot(b2, b6, b10)
+      arr[0] *= scaleYA
+      arr[1] *= scaleZA
+      arr[2] *= scaleYA
+      arr[3] *= scaleZA
+      const offset = vA * itemSize
+      arr[offset] *= scaleYB
+      arr[offset + 1] *= scaleZB
+      arr[offset + 2] *= scaleYB
+      arr[offset + 3] *= scaleZB
     }
 
     merged.setAttribute(attrName, new THREE.BufferAttribute(arr, itemSize))
@@ -147,13 +172,9 @@ function disposeNeuralField(field) {
 
 const NeuralLineShader = {
   vertexShader: `
-    attribute vec3 aBasePos;
-    attribute float aU;
     attribute float aWeight;
     attribute float aLayer;
     attribute float aAlpha;
-    attribute vec3 aFlowOther0;
-    attribute vec3 aFlowOther1;
     attribute vec3 color;
 
     uniform float uOpacity;
@@ -166,14 +187,14 @@ const NeuralLineShader = {
     void main() {
       vec3 pos = position;
 
-      float innerFeather = smoothstep(0.06, 0.20, aU);
-      float outerFeather = 1.0 - smoothstep(0.995, 1.02, aU);
+      float innerFeather = smoothstep(0.06, 0.20, aRelativeCoord.x);
+      float outerFeather = 1.0 - smoothstep(0.995, 1.02, aRelativeCoord.x);
 
       // Whispering gossamer connective tissue: line alpha pre-calibrated to depth tiers
       vAlpha = aAlpha * innerFeather * outerFeather * uOpacity;
-      if (uTime > 0.0) vAlpha *= flowPocketVisibility(aFlowOther0, aFlowOther1);
+      if (uTime > 0.0) vAlpha *= flowPocketVisibility();
       if (uTime > 0.0) {
-        float phase = 6.28318530718 * aU;
+        float phase = 6.28318530718 * aRelativeCoord.x;
         vAlpha *= 1.0 + 0.018 *
           (sin(phase - 0.44 * uTime) - sin(phase));
       }
@@ -195,16 +216,12 @@ const NeuralLineShader = {
 
 const NeuralPointShader = {
   vertexShader: `
-    attribute vec3 aBasePos;
-    attribute float aU;
     attribute float aWeight;
     attribute float aLayer;
     attribute float size;
     attribute float alpha;
     attribute vec3 color;
     attribute float aIsHighlight;
-    attribute vec3 aFlowOther0;
-    attribute vec3 aFlowOther1;
 
     uniform float uGlowIntensity;
     uniform float uNodeScale;
@@ -219,17 +236,17 @@ const NeuralPointShader = {
     void main() {
       vec3 pos = position;
 
-      float innerFeather = smoothstep(0.06, 0.20, aU);
-      float outerFeather = 1.0 - smoothstep(0.995, 1.02, aU);
+      float innerFeather = smoothstep(0.06, 0.20, aRelativeCoord.x);
+      float outerFeather = 1.0 - smoothstep(0.995, 1.02, aRelativeCoord.x);
 
       // 3-layer Z-depth contrast cue
       float depthCue = aLayer > 0.5 ? 1.15 : (aLayer < -0.5 ? 0.48 : 0.88);
 
       // Stable tiers with a small periodic breath on foreground hubs.
       vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity * depthCue;
-      if (uTime > 0.0) vAlpha *= flowPocketVisibility(aFlowOther0, aFlowOther1);
+      if (uTime > 0.0) vAlpha *= flowPocketVisibility();
       if (uTime > 0.0 && aIsHighlight > 0.5) {
-        float phase = 13.0 * aU;
+        float phase = 13.0 * aRelativeCoord.x;
         vAlpha *= 1.0 + 0.025 *
           (sin(phase - 0.66 * uTime) - sin(phase));
       }
@@ -315,13 +332,9 @@ const NeuralPointShader = {
 
 const NeuralHazeShader = {
   vertexShader: `
-    attribute vec3 aBasePos;
-    attribute float aU;
     attribute float aWeight;
     attribute float size;
     attribute float alpha;
-    attribute vec3 aFlowOther0;
-    attribute vec3 aFlowOther1;
     attribute vec3 color;
 
     uniform float uGlowIntensity;
@@ -335,11 +348,11 @@ const NeuralHazeShader = {
     void main() {
       vec3 pos = position;
 
-      float innerFeather = smoothstep(0.06, 0.20, aU);
-      float outerFeather = 1.0 - smoothstep(0.98, 1.01, aU);
+      float innerFeather = smoothstep(0.06, 0.20, aRelativeCoord.x);
+      float outerFeather = 1.0 - smoothstep(0.98, 1.01, aRelativeCoord.x);
 
       vAlpha = alpha * innerFeather * outerFeather * uGlowIntensity;
-      if (uTime > 0.0) vAlpha *= flowPocketVisibility(aFlowOther0, aFlowOther1);
+      if (uTime > 0.0) vAlpha *= flowPocketVisibility();
       vColor = color;
 
       vec4 mvPosition = flowViewPosition(pos);

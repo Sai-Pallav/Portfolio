@@ -9,7 +9,12 @@ import { WirePaths } from './WirePaths'
 import { BeadedStreams } from './BeadedStreams'
 import { NeuralNetworkField } from './NeuralNetworkField'
 import { NetworkParticles } from './NetworkParticles'
-import { FlowTimeContext, FLOW_PERIOD } from './animationContract'
+import { FlowTimeContext } from './animationContract'
+
+// Temporary visual toggle retained as a one-line rollback switch while Stage 2
+// is validated in the live Contact section.
+const TEMPORARILY_STATIC = false
+const SHOW_NEURAL_NETWORK = false
 
 // The uniform is an imperative GPU value; updating it does not change React state.
 function setFlowTime(uniform, value) {
@@ -84,7 +89,10 @@ function NeuralScene({ themeKey, isInView, reducedMotion }) {
 
   useFrame((_, delta) => {
     if (!isInView || reducedMotion) return
-    elapsed.current = (elapsed.current + Math.min(delta, 0.05)) % FLOW_PERIOD
+    // Keep one monotonically advancing phase clock. The shader owns the
+    // periodic wave through sin/cos(theta); wrapping this value would reset
+    // the animation clock at the cycle boundary.
+    elapsed.current += Math.min(delta, 0.05)
     setFlowTime(timeUniform, elapsed.current)
   })
 
@@ -175,16 +183,18 @@ function NeuralScene({ themeKey, isInView, reducedMotion }) {
               themeConfig={themeConfig}
               nodeScale={layout.nodeScale}
             />
-            <NeuralNetworkField
-              linesGeo={wireData.neuralLinesGeo}
-              pointsGeo={wireData.neuralPointsGeo}
-              hazeGeo={wireData.neuralHazeGeo}
-              focalFlaresGeo={wireData.focalFlaresGeo}
-              themeConfig={themeConfig}
-              nodeScale={layout.nodeScale}
-              innerFade={ribbon.innerFade ?? 0.04}
-              side={ribbon.side}
-            />
+            {SHOW_NEURAL_NETWORK && (
+              <NeuralNetworkField
+                linesGeo={wireData.neuralLinesGeo}
+                pointsGeo={wireData.neuralPointsGeo}
+                hazeGeo={wireData.neuralHazeGeo}
+                focalFlaresGeo={wireData.focalFlaresGeo}
+                themeConfig={themeConfig}
+                nodeScale={layout.nodeScale}
+                innerFade={ribbon.innerFade ?? 0.04}
+                side={ribbon.side}
+              />
+            )}
             <NetworkParticles
               stardustGeo={wireData.stardustGeo}
               bokehGeo={wireData.bokehGeo}
@@ -203,7 +213,8 @@ function NeuralScene({ themeKey, isInView, reducedMotion }) {
  */
 export default memo(function SideWireNetwork({ isInView = true }) {
   const [webglSupported, setWebglSupported] = useState(true)
-  const reducedMotion = useReducedMotion()
+  const prefersReducedMotion = useReducedMotion()
+  const reducedMotion = TEMPORARILY_STATIC || prefersReducedMotion
   const themeCtx = useThemeContext()
 
   const [domTheme, setDomTheme] = useState(() => {

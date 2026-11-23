@@ -62,6 +62,10 @@ function mergeWirePathLayers(layers) {
   const flowArr = new Float32Array(totalVerts * 4)
   const flowMetaArr = new Float32Array(totalVerts * 2)
   const flowAxisArr = new Float32Array(totalVerts * 3)
+  const flowFrameArr = new Float32Array(totalVerts * 4)
+  const flowWallArr = new Float32Array(totalVerts * 4)
+  const flowCenterArr = new Float32Array(totalVerts * 3)
+  const flowNormalArr = new Float32Array(totalVerts * 3)
   const colArr = new Float32Array(totalVerts * 3)
 
   let offset = 0
@@ -79,6 +83,11 @@ function mergeWirePathLayers(layers) {
     const layer = geo.attributes.aLayer ? geo.attributes.aLayer.array : null
     const rel = geo.attributes.aRelativeCoord ? geo.attributes.aRelativeCoord.array : null
     const flow = geo.attributes.aFlowPair?.array
+    const flowMeta = geo.attributes.aFlowMeta?.array
+    const flowFrame = geo.attributes.aFlowFrame?.array
+    const flowWall = geo.attributes.aFlowWall?.array
+    const flowCenter = geo.attributes.aFlowCenter?.array
+    const flowNormal = geo.attributes.aFlowNormal?.array
     const col = geo.attributes.color ? geo.attributes.color.array : null
 
     const cr = defaultColor.r, cg = defaultColor.g, cb = defaultColor.b
@@ -118,7 +127,48 @@ function mergeWirePathLayers(layers) {
         flowArr[target + 2] = flow[source + 2]
         flowArr[target + 3] = flow[source + 3]
       }
-      flowAxisArr[idx3 + 1] = 1
+      if (flowMeta) {
+        flowMetaArr[idx * 2] = flowMeta[i * 2]
+        flowMetaArr[idx * 2 + 1] = flowMeta[i * 2 + 1]
+      }
+      if (flowFrame) {
+        const source = 4 * i
+        const target = 4 * idx
+        flowFrameArr[target] = flowFrame[source]
+        flowFrameArr[target + 1] = flowFrame[source + 1]
+        flowFrameArr[target + 2] = flowFrame[source + 2]
+        flowFrameArr[target + 3] = flowFrame[source + 3]
+      }
+      if (flowWall) {
+        const source = 4 * i
+        const target = 4 * idx
+        flowWallArr[target] = flowWall[source]
+        flowWallArr[target + 1] = flowWall[source + 1]
+        flowWallArr[target + 2] = flowWall[source + 2]
+        flowWallArr[target + 3] = flowWall[source + 3]
+      }
+      if (flowCenter) {
+        const source = 3 * i
+        const target = 3 * idx
+        flowCenterArr[target] = flowCenter[source]
+        flowCenterArr[target + 1] = flowCenter[source + 1]
+        flowCenterArr[target + 2] = flowCenter[source + 2]
+      }
+      if (flowNormal) {
+        const source = 3 * i
+        const target = 3 * idx
+        flowNormalArr[target] = flowNormal[source]
+        flowNormalArr[target + 1] = flowNormal[source + 1]
+        flowNormalArr[target + 2] = flowNormal[source + 2]
+      }
+      if (geo.attributes.aFlowAxis) {
+        const source = 3 * i
+        flowAxisArr[idx3] = geo.attributes.aFlowAxis.array[source]
+        flowAxisArr[idx3 + 1] = geo.attributes.aFlowAxis.array[source + 1]
+        flowAxisArr[idx3 + 2] = geo.attributes.aFlowAxis.array[source + 2]
+      } else {
+        flowAxisArr[idx3] = pos[i3] < -0.0001 ? -1 : 1
+      }
 
       if (col) {
         colArr[idx3] = col[i3]
@@ -146,6 +196,10 @@ function mergeWirePathLayers(layers) {
   merged.setAttribute('aFlowPair', new THREE.BufferAttribute(flowArr, 4))
   merged.setAttribute('aFlowMeta', new THREE.BufferAttribute(flowMetaArr, 2))
   merged.setAttribute('aFlowAxis', new THREE.BufferAttribute(flowAxisArr, 3))
+  merged.setAttribute('aFlowFrame', new THREE.BufferAttribute(flowFrameArr, 4))
+  merged.setAttribute('aFlowWall', new THREE.BufferAttribute(flowWallArr, 4))
+  merged.setAttribute('aFlowCenter', new THREE.BufferAttribute(flowCenterArr, 3))
+  merged.setAttribute('aFlowNormal', new THREE.BufferAttribute(flowNormalArr, 3))
   merged.setAttribute('color', new THREE.BufferAttribute(colArr, 3))
   merged.computeBoundingSphere()
   return merged

@@ -269,6 +269,7 @@ export function getTravelProfile(index, u, H, config, out) {
 /** Bake the wave phase for cores, auras, silk, beads, and stardust. */
 export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
   if (!geometry?.getAttribute('position')) return
+  const positionArray = geometry.getAttribute('position').array
   const uArray = geometry.getAttribute('aU')?.array
   if (!uArray) return
   const wireIds = geometry.getAttribute('aWireId')?.array
@@ -276,7 +277,13 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
   const profile = new Float32Array(count * 4)
   const meta = new Float32Array(count * 2)
   const axis = new Float32Array(count * 3)
+  const frame = new Float32Array(count * 4)
+  const wall = new Float32Array(count * 4)
+  const center = new Float32Array(count * 3)
+  const normal = new Float32Array(count * 3)
   const scratch = new Float64Array(2)
+  const ys = new Float64Array(4)
+  const zs = new Float64Array(4)
   const stringCount = Math.max(2, Math.min(32, Math.round(config.stringCount ?? 11)))
   const silkVerticesPerHero = stringCount * 2 * 179
   for (let i = 0; i < count; i++) {
@@ -289,11 +296,45 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
     profile[4 * i + 1] = scratch[1]
     profile[4 * i + 2] = scratch[0]
     profile[4 * i + 3] = scratch[1]
-    axis[3 * i + 1] = 1.0
+
+    ys[0] = heroY0(u, H, config)
+    ys[1] = heroY1(u, H, config)
+    ys[2] = heroY2(u, H, config)
+    ys[3] = heroY3(u, H, config)
+    zs[0] = heroZ(0, u, H, config)
+    zs[1] = heroZ(1, u, H, config)
+    zs[2] = heroZ(2, u, H, config)
+    zs[3] = heroZ(3, u, H, config)
+    const minY = Math.min(ys[0], ys[1], ys[2], ys[3])
+    const maxY = Math.max(ys[0], ys[1], ys[2], ys[3])
+    const minZ = Math.min(zs[0], zs[1], zs[2], zs[3])
+    const maxZ = Math.max(zs[0], zs[1], zs[2], zs[3])
+    const frameOffset = 4 * i
+    frame[frameOffset] = 0.5 * (minY + maxY)
+    frame[frameOffset + 1] = 0.5 * (minZ + maxZ)
+    frame[frameOffset + 2] = Math.max(0.08, 0.5 * (maxY - minY))
+    frame[frameOffset + 3] = Math.max(0.06, 0.5 * (maxZ - minZ))
+    center[3 * i] = positionArray[3 * i]
+    center[3 * i + 1] = frame[frameOffset]
+    center[3 * i + 2] = frame[frameOffset + 1]
+    normal[3 * i + 1] = 1.0
+    wall[frameOffset] = ys[owner] - frame[frameOffset]
+    wall[frameOffset + 1] = zs[owner] - frame[frameOffset + 1]
+    wall[frameOffset + 2] = ys[owner] - frame[frameOffset]
+    wall[frameOffset + 3] = zs[owner] - frame[frameOffset + 1]
+    meta[2 * i] = 0.5
+    meta[2 * i + 1] = 0.0
+    // u increases toward the outer edge on both wings. Preserve that signed
+    // tangent so the shared phase is outward on left and right alike.
+    axis[3 * i] = positionArray[3 * i] < -0.0001 ? -1.0 : 1.0
   }
   geometry.setAttribute('aFlowPair', new THREE.BufferAttribute(profile, 4))
   geometry.setAttribute('aFlowMeta', new THREE.BufferAttribute(meta, 2))
   geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
+  geometry.setAttribute('aFlowFrame', new THREE.BufferAttribute(frame, 4))
+  geometry.setAttribute('aFlowWall', new THREE.BufferAttribute(wall, 4))
+  geometry.setAttribute('aFlowCenter', new THREE.BufferAttribute(center, 3))
+  geometry.setAttribute('aFlowNormal', new THREE.BufferAttribute(normal, 3))
 }
 
 /**
