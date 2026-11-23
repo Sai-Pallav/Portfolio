@@ -142,7 +142,7 @@ export const PRESETS = {
   },
 }
 
-const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v21'
+const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v22'
 
 const WireframeConfigContext = createContext(null)
 

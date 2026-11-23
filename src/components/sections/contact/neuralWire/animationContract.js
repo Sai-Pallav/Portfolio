@@ -56,9 +56,10 @@ export const TRAVEL_DEFORMATION_GLSL = `
     float dyRot = dy0 * c - dz0 * (Ry / Rz) * s;
     float dzRot = dz0 * c + dy0 * (Rz / Ry) * s;
 
-    // Smoothly pin dynamic wave displacement to strictly 0.0 at inner tip (u = 0)
+    // C2-continuous quintic smootherstep pinning (continuous 1st and 2nd derivatives everywhere)
     // Guarantees zero wobble, splitting, or socket tearing near the globe
-    float tipPin = smoothstep(0.0, 0.12, aU);
+    float tPin = clamp(aRelativeCoord.x / 0.12, 0.0, 1.0);
+    float tipPin = tPin * tPin * tPin * (tPin * (tPin * 6.0 - 15.0) + 10.0);
     float dy = dy0 + (dyRot - dy0) * tipPin;
     float dz = dz0 + (dzRot - dz0) * tipPin;
 

@@ -72,11 +72,9 @@ export function wingSweep(u, H, sweepVal = 0.28) {
 
 export function env(u, H) {
   const uNorm = Math.max(0.0, Math.min(1.0, u))
-  // C² continuous quintic envelope with zero derivatives at u = 0.
-  // Smoothly ramps up through the first almond pocket and reaches full volume outward without fractional-power cusp.
-  const innerRise = THREE.MathUtils.smootherstep(uNorm, 0.0, 0.25)
-  const outerScale = 0.35 + 0.65 * THREE.MathUtils.smootherstep(uNorm, 0.20, 1.0)
-  return H * innerRise * outerScale
+  // C² continuous smooth envelope: zero derivatives at u = 0, perfectly smooth curvature transition.
+  // u * smootherstep(u, 0, 0.20) reaches exactly linear u for u >= 0.20 with zero second-derivative jump.
+  return H * uNorm * THREE.MathUtils.smootherstep(uNorm, 0.0, 0.20)
 }
 
 /**
@@ -132,7 +130,7 @@ export function computeRibbonSpacingOffset(index, u, H, config = {}) {
   const fanSigns = [0.45, -0.45, -0.20, 0.20]
   const sign = fanSigns[index] ?? 0.0
   const fanMultiplier = (spInner - 1.0) + ((spOuter - 1.0) - (spInner - 1.0)) * THREE.MathUtils.smootherstep(uNorm, 0.10, 1.0)
-  const globalFan = fanMultiplier * sign * H * tGlobe
+  const globalFan = fanMultiplier * sign * H
 
   return (pairwiseDy * tTaper + globalFan) * tGlobe
 }
@@ -317,15 +315,26 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
     zs[1] = heroZ(1, u, H, config)
     zs[2] = heroZ(2, u, H, config)
     zs[3] = heroZ(3, u, H, config)
-    const minY = Math.min(ys[0], ys[1], ys[2], ys[3])
-    const maxY = Math.max(ys[0], ys[1], ys[2], ys[3])
-    const minZ = Math.min(zs[0], zs[1], zs[2], zs[3])
-    const maxZ = Math.max(zs[0], zs[1], zs[2], zs[3])
+    // C2-continuous centroid spine
+    const yCenter = 0.25 * (ys[0] + ys[1] + ys[2] + ys[3])
+    const zCenter = 0.25 * (zs[0] + zs[1] + zs[2] + zs[3])
+
+    // C2-continuous quadrature envelope (eliminates phase oscillation, rail swaps, and curve-crossing kinks)
+    // Orthogonal hero wave pairs cancel sinusoidal variation: (sin^2 + cos^2 = 1)
+    const dY01 = ys[0] - ys[1]
+    const dY23 = ys[2] - ys[3]
+    const dZ01 = zs[0] - zs[1]
+    const dZ23 = zs[2] - zs[3]
+
+    const rawRy = 0.5 * Math.sqrt(dY01 * dY01 + dY23 * dY23)
+    const rawRz = 0.5 * Math.sqrt(dZ01 * dZ01 + dZ23 * dZ23)
+
     const frameOffset = 4 * i
-    frame[frameOffset] = 0.5 * (minY + maxY)
-    frame[frameOffset + 1] = 0.5 * (minZ + maxZ)
-    frame[frameOffset + 2] = Math.max(0.08, 0.5 * (maxY - minY))
-    frame[frameOffset + 3] = Math.max(0.06, 0.5 * (maxZ - minZ))
+    frame[frameOffset] = yCenter
+    frame[frameOffset + 1] = zCenter
+    // C2-smooth floor without sharp clamp corners
+    frame[frameOffset + 2] = Math.sqrt(rawRy * rawRy + 0.08 * 0.08)
+    frame[frameOffset + 3] = Math.sqrt(rawRz * rawRz + 0.06 * 0.06)
     center[3 * i] = positionArray[3 * i]
     center[3 * i + 1] = frame[frameOffset]
     center[3 * i + 2] = frame[frameOffset + 1]
@@ -1582,7 +1591,7 @@ export function getGeometryCacheKey(side, config = {}) {
   const spOuter = (config.ribbonSpacingOuter !== undefined ? config.ribbonSpacingOuter : 1.0).toFixed(2)
   const spInner = (config.ribbonSpacingInner !== undefined ? config.ribbonSpacingInner : 1.0).toFixed(2)
 
-  return `v11:${side}:${amp}:${freq}:${sweep}:${innerY}:${outerY}:${zAmp}:${strandSpread}:${innerFade}:${strCount}:${strWidth}:${r1Amp}:${r2Amp}:${r3Amp}:${r4Amp}:${r1Y}:${r2Y}:${r3Y}:${r4Y}:${r1F}:${r2F}:${r3F}:${r4F}:${oFlex}:${oFlare}:${oFade}:${oZ}:${d01}:${d12}:${d23}:${spOuter}:${spInner}`
+  return `v12:${side}:${amp}:${freq}:${sweep}:${innerY}:${outerY}:${zAmp}:${strandSpread}:${innerFade}:${strCount}:${strWidth}:${r1Amp}:${r2Amp}:${r3Amp}:${r4Amp}:${r1Y}:${r2Y}:${r3Y}:${r4Y}:${r1F}:${r2F}:${r3F}:${r4F}:${oFlex}:${oFlare}:${oFade}:${oZ}:${d01}:${d12}:${d23}:${spOuter}:${spInner}`
 }
 
 export function getSideWireData(side, config = {}) {
