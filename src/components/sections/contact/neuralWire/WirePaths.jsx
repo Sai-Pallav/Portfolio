@@ -20,8 +20,8 @@ const LineFeatherShader = {
     }
 
     void main() {
-      float feather = tipSmoother(aU / max(0.12, uInnerFade));
-      float energy = mix(max(1.0, uTipEnergy), 1.0, tipSmoother(aU / 0.16));
+      float feather = tipSmoother(aU / max(0.06, uInnerFade));
+      float energy = mix(max(1.0, uTipEnergy), 1.0, tipSmoother(aU / 0.10));
       vAlpha = aAlpha * feather * uOpacity / energy;
       vColor = color;
       gl_Position = flowClipPosition(position);

@@ -4,6 +4,12 @@ import {
   DEFAULT_SIDE_CONFIG,
   PRESETS,
 } from './WireframeConfigContext'
+import {
+  isWaveAnimationPaused,
+  setWaveAnimationPaused,
+  seekWaveAnimationTime,
+  FLOW_PERIOD,
+} from './animationContract'
 
 /* ─── Thin scrollbar style injected once ──────────────────────────────── */
 const SCROLLBAR_STYLE = `
@@ -323,6 +329,41 @@ export default memo(function WireframeController() {
   const [pasteInput, setPasteInput] = useState('')
   const [pasteError, setPasteError] = useState(null)
 
+  // ── PAUSE / FREEZE ANIMATION STATE ──
+  const [isPaused, setIsPaused] = useState(() => isWaveAnimationPaused)
+  const [freezeTime, setFreezeTime] = useState(0)
+
+  useEffect(() => {
+    const handlePauseChange = (e) => {
+      setIsPaused(Boolean(e.detail?.paused))
+    }
+    const handleSeekChange = (e) => {
+      if (typeof e.detail?.time === 'number') {
+        setFreezeTime(e.detail.time)
+      }
+    }
+    window.addEventListener('wave-animation-pause-change', handlePauseChange)
+    window.addEventListener('wave-animation-seek', handleSeekChange)
+    return () => {
+      window.removeEventListener('wave-animation-pause-change', handlePauseChange)
+      window.removeEventListener('wave-animation-seek', handleSeekChange)
+    }
+  }, [])
+
+  const togglePause = useCallback(() => {
+    setIsPaused((prev) => {
+      const next = !prev
+      setWaveAnimationPaused(next)
+      return next
+    })
+  }, [])
+
+  const handleSeek = useCallback((time) => {
+    const t = Math.max(0, Math.min(FLOW_PERIOD || 4.0, Number(time)))
+    setFreezeTime(t)
+    seekWaveAnimationTime(t)
+  }, [])
+
   // ── DRAGGABLE PANEL POSITION STATE ──
   const [panelPos, setPanelPos] = useState(null) // null = default bottom-right
   const [isDraggingPanel, setIsDraggingPanel] = useState(false)
@@ -617,6 +658,18 @@ export default memo(function WireframeController() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={togglePause}
+            className={`text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-all border ${
+              isPaused
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.3)] animate-pulse'
+                : 'bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border-white/10'
+            }`}
+            title={isPaused ? 'Resume wave animation' : 'Pause wave animation to adjust parameters'}
+          >
+            <span>{isPaused ? '▶' : '⏸'}</span>
+            <span>{isPaused ? 'Resume' : 'Pause'}</span>
+          </button>
           {panelPos && (
             <button
               onClick={() => setPanelPos(null)}
@@ -642,6 +695,58 @@ export default memo(function WireframeController() {
           </button>
         </div>
       </div>
+
+      {/* ── PAUSE / FREEZE PHASE SCRUBBER (Active when paused) ── */}
+      {isPaused && (
+        <div className="px-3 py-1.5 border-b border-amber-500/30 bg-amber-950/30 flex items-center justify-between text-[11px] gap-2">
+          <div className="flex items-center gap-1.5 text-amber-300 font-medium shrink-0">
+            <span>⏸</span>
+            <span>Frozen at {freezeTime.toFixed(2)}s</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-1 max-w-[190px]">
+            <input
+              type="range"
+              min={0}
+              max={4.0}
+              step={0.05}
+              value={freezeTime}
+              onChange={(e) => handleSeek(parseFloat(e.target.value))}
+              className="w-full accent-amber-400 cursor-pointer h-1.5 bg-white/20 rounded"
+              title="Scrub frozen wave phase (0.0s to 4.0s)"
+            />
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => handleSeek(0)}
+              className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 hover:bg-white/20 text-neutral-200 transition-colors"
+              title="Freeze at t = 0s"
+            >
+              0s
+            </button>
+            <button
+              onClick={() => handleSeek(1.0)}
+              className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 hover:bg-white/20 text-neutral-200 transition-colors"
+              title="Freeze at t = 1.0s (25%)"
+            >
+              1s
+            </button>
+            <button
+              onClick={() => handleSeek(2.0)}
+              className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 hover:bg-white/20 text-neutral-200 transition-colors"
+              title="Freeze at t = 2.0s (50%)"
+            >
+              2s
+            </button>
+            <button
+              onClick={() => handleSeek(3.0)}
+              className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 hover:bg-white/20 text-neutral-200 transition-colors"
+              title="Freeze at t = 3.0s (75%)"
+            >
+              3s
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── PRESETS BAR ── */}
       <div className="px-3 py-2 border-b border-white/5 bg-white/[0.01]">

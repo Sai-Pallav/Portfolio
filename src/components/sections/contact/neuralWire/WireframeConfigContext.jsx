@@ -24,14 +24,14 @@ export const DEFAULT_SIDE_CONFIG = {
   wingSweep: 0.34,           // Wing sweep curvature (outer parabolic lift)
 
   // ── 4 Hero Waves (Individual Ribbon Controls - Mirrored Symmetrically) ──
-  ribbon1Amp: 0.65,          // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
-  ribbon2Amp: 0.5,           // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
+  ribbon1Amp: 0.85,          // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
+  ribbon2Amp: 0.9,           // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
   ribbon3Amp: 0.9,           // Ribbon 3 (Violet/Magenta Accent Wave #b83dff)
   ribbon4Amp: 1.05,          // Ribbon 4 (Counter-Braid, Electric Blue-Cyan)
 
-  ribbon1YOffset: 0.06,      // Vertical shift for Ribbon 1
-  ribbon2YOffset: -0.04,     // Vertical shift for Ribbon 2
-  ribbon3YOffset: -0.1,      // Vertical shift for Ribbon 3
+  ribbon1YOffset: 0.1,       // Vertical shift for Ribbon 1
+  ribbon2YOffset: -0.08,     // Vertical shift for Ribbon 2
+  ribbon3YOffset: -0.02,     // Vertical shift for Ribbon 3
   ribbon4YOffset: 0.04,      // Vertical shift for Ribbon 4
 
   ribbon1Freq: 1,            // Frequency/cycle density for Ribbon 1
@@ -142,7 +142,7 @@ export const PRESETS = {
   },
 }
 
-const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v23'
+const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v24'
 
 const WireframeConfigContext = createContext(null)
 

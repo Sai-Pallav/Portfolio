@@ -9,7 +9,7 @@ import { WirePaths } from './WirePaths'
 import { BeadedStreams } from './BeadedStreams'
 import { NeuralNetworkField } from './NeuralNetworkField'
 import { NetworkParticles } from './NetworkParticles'
-import { FlowTimeContext } from './animationContract'
+import { FlowTimeContext, isWaveAnimationPaused } from './animationContract'
 
 // Temporary visual toggle retained as a one-line rollback switch while Stage 2
 // is validated in the live Contact section.
@@ -86,9 +86,30 @@ function NeuralScene({ themeKey, isInView, reducedMotion }) {
   const { viewport, invalidate } = useThree()
   const timeUniform = useMemo(() => ({ value: 0 }), [])
   const elapsed = useRef(0)
+  const [isPaused, setIsPaused] = useState(() => isWaveAnimationPaused)
+
+  useEffect(() => {
+    const handlePause = (e) => {
+      setIsPaused(Boolean(e.detail?.paused))
+      invalidate()
+    }
+    const handleSeek = (e) => {
+      if (typeof e.detail?.time === 'number') {
+        elapsed.current = e.detail.time
+        setFlowTime(timeUniform, elapsed.current)
+        invalidate()
+      }
+    }
+    window.addEventListener('wave-animation-pause-change', handlePause)
+    window.addEventListener('wave-animation-seek', handleSeek)
+    return () => {
+      window.removeEventListener('wave-animation-pause-change', handlePause)
+      window.removeEventListener('wave-animation-seek', handleSeek)
+    }
+  }, [invalidate, timeUniform])
 
   useFrame((_, delta) => {
-    if (!isInView || reducedMotion) return
+    if (!isInView || reducedMotion || isPaused) return
     // Keep one monotonically advancing phase clock. The shader owns the
     // periodic wave through sin/cos(theta); wrapping this value would reset
     // the animation clock at the cycle boundary.

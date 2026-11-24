@@ -109,8 +109,8 @@ export function computeRibbonSpacingOffset(index, u, H, config = {}) {
   // Continuous C² taper from inner (spInner) to outer (spOuter)
   const tTaper = spInner + (spOuter - spInner) * THREE.MathUtils.smootherstep(uNorm, 0.0, 1.0)
 
-  // Smooth connection to globe at u=0 (ensures clean socket connection without tearing)
-  const tGlobe = THREE.MathUtils.smootherstep(uNorm, 0.0, 0.22)
+  // Controlled inner connection maintaining ribbon bundle separation at the globe socket
+  const tGlobe = 0.45 + 0.55 * THREE.MathUtils.smootherstep(uNorm, 0.0, 0.22)
 
   // Natural vertical fanning signs for global outer/inner spacing multiplier:
   // Ribbon 0: expands upward (+0.45)
@@ -134,13 +134,18 @@ const heroProfileScratch = new Float64Array(5)
 /** Build-time analytic profile: [biasY, biasZ, amplitudeY, amplitudeZ, phase]. */
 export function getHeroWaveProfile(index, u, H, config, out) {
   const rAmp = config[`ribbon${index + 1}Amp`] ?? 1.0
-  const rY = config[`ribbon${index + 1}YOffset`] ?? 0.0
+  let rY = config[`ribbon${index + 1}YOffset`] ?? 0.0
+  // Symmetrically balance Ribbon 3 (Violet Accent, index 2) with Ribbon 4 (+0.04) and Arch Pair center (+0.010).
+  // Historically defaulted to -0.10, which dragged the violet accent into a downward tilt and clumped with Ribbon 2.
+  if (index === 2 && (rY === -0.1 || config.ribbon3YOffset === undefined)) {
+    rY = -0.02
+  }
   const outerT = THREE.MathUtils.smootherstep(u, 0.48, 1.0)
   const e = env(u, H) * (1.0 + 0.15 * (config.outerFlexibility ?? 1.0) * outerT)
   out[0] = wingSweep(u, H, config.wingSweep ?? 0.28)
     + (1.0 - THREE.MathUtils.smootherstep(u, 0.0, 0.35)) * (config.innerYOffset ?? 0)
     + THREE.MathUtils.smootherstep(u, 0.25, 1.0) * (config.outerYOffset ?? 0)
-    + rY * THREE.MathUtils.smootherstep(u, 0.0, 0.22)
+    + rY * (0.45 + 0.55 * THREE.MathUtils.smootherstep(u, 0.0, 0.22))
     + outerT * outerT * 0.28 * H * (config.outerFlare ?? 0.6) * HERO_FLARE_SIGNS[index]
     + computeRibbonSpacingOffset(index, u, H, config)
   out[1] = THREE.MathUtils.smootherstep(u, 0.30, 1.0) * (config.outerZOffset ?? 0)
@@ -489,8 +494,8 @@ function generateCompanionSilkStrands(side, H, config = {}) {
         const u = (s / (N_SILK - 1)) * strandMaxU
         const x = sign * 10.0 * u
         const e = env(u, H)
-        // Smooth inner convergence taper pinning all silk strands to the core filament at u = 0
-        const innerSilkTaper = THREE.MathUtils.smootherstep(u, 0.0, 0.22)
+        // Controlled inner convergence taper retaining healthy bundle volume near u = 0
+        const innerSilkTaper = 0.45 + 0.55 * THREE.MathUtils.smootherstep(u, 0.0, 0.22)
         // Refined outer tip taper: prevents excessive strand spreading as envelope e(u) grows toward outer ends
         const tipTaper = 1.0 - 0.48 * THREE.MathUtils.smootherstep(u, 0.55, strandMaxU)
         const y = HERO_FUNCS[i](u, H, config) + e * innerSilkTaper * (radialSpread * tipTaper * Math.sin(u * Math.PI * freq_k + phase_k))
@@ -1353,9 +1358,9 @@ export function generateSideWireData(side, config = {}) {
           const u2 = ((i + 1) / (count - 1)) * maxU
           const w1 = computeConstraintWeight(u1)
           const w2 = computeConstraintWeight(u2)
-          // Smooth inner taper so all 6 aura passes smoothly converge into the core filament at u = 0
-          const taper1 = THREE.MathUtils.smootherstep(u1, 0.0, 0.20)
-          const taper2 = THREE.MathUtils.smootherstep(u2, 0.0, 0.20)
+          // Controlled inner taper so aura passes maintain cylindrical bulk at u = 0
+          const taper1 = 0.45 + 0.55 * THREE.MathUtils.smootherstep(u1, 0.0, 0.20)
+          const taper2 = 0.45 + 0.55 * THREE.MathUtils.smootherstep(u2, 0.0, 0.20)
           const p1 = new THREE.Vector3(pts[i].x, pts[i].y + dy * taper1, pts[i].z + dz * taper1)
           const p2 = new THREE.Vector3(pts[i + 1].x, pts[i + 1].y + dy * taper2, pts[i + 1].z + dz * taper2)
           builder.addSegment(p1, u1, wireId, w1, p2, u2, wireId, w2, null, null, null, null, maxU)
@@ -1467,7 +1472,9 @@ export function getGeometryCacheKey(side, config = {}) {
 
   const r1Y = (config.ribbon1YOffset !== undefined ? config.ribbon1YOffset : 0.0).toFixed(2)
   const r2Y = (config.ribbon2YOffset !== undefined ? config.ribbon2YOffset : 0.0).toFixed(2)
-  const r3Y = (config.ribbon3YOffset !== undefined ? config.ribbon3YOffset : 0.0).toFixed(2)
+  let r3YVal = config.ribbon3YOffset !== undefined ? config.ribbon3YOffset : 0.0
+  if (r3YVal === -0.1 || config.ribbon3YOffset === undefined) r3YVal = -0.02
+  const r3Y = r3YVal.toFixed(2)
   const r4Y = (config.ribbon4YOffset !== undefined ? config.ribbon4YOffset : 0.0).toFixed(2)
 
   const r1F = (config.ribbon1Freq !== undefined ? config.ribbon1Freq : 1.0).toFixed(2)

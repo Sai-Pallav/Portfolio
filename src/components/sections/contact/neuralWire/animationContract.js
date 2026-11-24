@@ -23,6 +23,21 @@ export const FLOW_SPEED = 1.57079632679 // pi / 2 rad/s = 1 cycle per 4.0s (matc
 export const FLOW_OMEGA = FLOW_SPEED
 export const FLOW_PERIOD = 2 * Math.PI / FLOW_SPEED
 
+export let isWaveAnimationPaused = false
+
+export function setWaveAnimationPaused(paused) {
+  isWaveAnimationPaused = Boolean(paused)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('wave-animation-pause-change', { detail: { paused: isWaveAnimationPaused } }))
+  }
+}
+
+export function seekWaveAnimationTime(time) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('wave-animation-seek', { detail: { time } }))
+  }
+}
+
 // Motion vectors encode the parent's harmonic, never the companion offset.
 // Transform these vectors without translation when baking a world-space mesh.
 export const TRAVEL_DEFORMATION_GLSL = `
