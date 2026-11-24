@@ -4,7 +4,7 @@ import {
   GraphNode,
   segmentsIntersect2D,
 } from './neuralGraphModel.js'
-import { computeNeuralDeformationJS, SIDE_ANIMATION_CONFIG } from './animationContract.js'
+import { computeNeuralDeformationJS, SIDE_ANIMATION_CONFIG, ANIMATION_CONTRACT_VERSION } from './animationContract.js'
 import {
   getAlmondPocketBounds,
   computeRelativeCoordArray,
@@ -43,25 +43,17 @@ export function computeConstraintWeight(u) {
  * Feather fade at inner tip (near globe) and outer tip (extended outer reach):
  * Softens both endpoints so ribbons dissolve seamlessly into the cosmos rather than cutting off bluntly.
  */
-export function computeVertexAlpha(u, innerFade = 0.04, outerFade = 0.08, maxU = 1.0) {
-  const fadeDist = Math.max(0.005, innerFade)
-  const innerAlpha = THREE.MathUtils.smoothstep(u, 0.0, fadeDist)
-
-  if (outerFade <= 0.001) return innerAlpha
-  const safeMax = Math.max(0.2, maxU)
-  const outerStart = safeMax - Math.max(0.01, outerFade * safeMax)
-  const outerEnd = safeMax
-  // As u increases from outerStart to outerEnd, smoothstep goes from 0.0 to 1.0,
-  // so (1.0 - smoothstep) smoothly fades the tip from 1.0 down to 0.0!
-  const outerS = Math.max(0.0, Math.min(1.0, 1.0 - THREE.MathUtils.smoothstep(u, outerStart, outerEnd)))
-  return innerAlpha * Math.pow(outerS, 1.5)
+export function computeOuterVertexAlpha(u, outerFade = 0.08, maxU = 1.0) {
+  if (outerFade <= 0.001) return 1.0
+  const end = Math.max(0.2, maxU)
+  const start = end - Math.max(0.01, outerFade * end)
+  return Math.pow(1.0 - THREE.MathUtils.smootherstep(u, start, end), 1.5)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. SMOOTH ANALYTICAL HERO WAVES (EXACT FORMULA LOCK + PARAMETRIC CONTROLLERS)
-// Continuous harmonic functions with N_HERO = 400 and N_SILK = 360 points per wave.
-// Zero sparse 5-point CatmullRom keyframes that kink at the apex!
-// ─────────────────────────────────────────────────────────────────────────────
+export function computeVertexAlpha(u, innerFade = 0.04, outerFade = 0.08, maxU = 1.0) {
+  const inner = THREE.MathUtils.smootherstep(u, 0.0, Math.max(0.12, innerFade))
+  return inner * computeOuterVertexAlpha(u, outerFade, maxU)
+}
 
 export const N_HERO = 400
 export const N_SILK = 360
@@ -71,10 +63,8 @@ export function wingSweep(u, H, sweepVal = 0.28) {
 }
 
 export function env(u, H) {
-  const uNorm = Math.max(0.0, Math.min(1.0, u))
-  // C² continuous smooth envelope: zero derivatives at u = 0, perfectly smooth curvature transition.
-  // u * smootherstep(u, 0, 0.20) reaches exactly linear u for u >= 0.20 with zero second-derivative jump.
-  return H * uNorm * THREE.MathUtils.smootherstep(uNorm, 0.0, 0.20)
+  // C2 at the socket and at .08; continue linearly through extended tips.
+  return H * u * THREE.MathUtils.smootherstep(u, 0.0, 0.08)
 }
 
 /**
@@ -135,116 +125,68 @@ export function computeRibbonSpacingOffset(index, u, H, config = {}) {
   return (pairwiseDy * tTaper + globalFan) * tGlobe
 }
 
-/**
- * Core mathematical wave evaluator supporting live parametric adjustments:
- * - amplitude: scales vertical wave oscillation peaks
- * - frequency: scales wave cycle density
- * - wingSweep: controls outer parabolic wing lift
- * - innerYOffset: shifts inner connection point near the globe
- * - outerYOffset: lifts or lowers the outer wingtips
- * - outerFlexibility: fluid wave harmonic whip & flutter at the outer ends
- * - outerFlare: vertical separation & fanning out of the 4 ribbons at outer tips
- */
-export function computeHeroWaveY(index, u, H, config = {}) {
-  const amp = config.amplitude !== undefined ? config.amplitude : 1.0
-  const freq = config.frequency !== undefined ? config.frequency : 1.0
-  const sweep = config.wingSweep !== undefined ? config.wingSweep : 0.28
-  const innerY = config.innerYOffset !== undefined ? config.innerYOffset : 0.0
-  const outerY = config.outerYOffset !== undefined ? config.outerYOffset : 0.0
+const HERO_PHASES = [0, Math.PI, 0.5 * Math.PI, 1.5 * Math.PI]
+const HERO_Y_SCALES = [0.48, 0.48, 0.42, 0.42]
+const HERO_FLARE_SIGNS = [0.85, -0.85, -0.45, 0.45]
+const BEAD_PARENTS = [0, 0, 1, 1, 2]
+const heroProfileScratch = new Float64Array(5)
 
-  const r1Amp = config.ribbon1Amp !== undefined ? config.ribbon1Amp : 1.0
-  const r2Amp = config.ribbon2Amp !== undefined ? config.ribbon2Amp : 1.0
-  const r3Amp = config.ribbon3Amp !== undefined ? config.ribbon3Amp : 1.0
-  const r4Amp = config.ribbon4Amp !== undefined ? config.ribbon4Amp : 1.0
-
-  const r1Y = config.ribbon1YOffset !== undefined ? config.ribbon1YOffset : 0.0
-  const r2Y = config.ribbon2YOffset !== undefined ? config.ribbon2YOffset : 0.0
-  const r3Y = config.ribbon3YOffset !== undefined ? config.ribbon3YOffset : 0.0
-  const r4Y = config.ribbon4YOffset !== undefined ? config.ribbon4YOffset : 0.0
-
-  const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
-  const outerFlare = config.outerFlare !== undefined ? config.outerFlare : 0.6
-
-  // Two ends differential placement with C² smooth endpoint interpolation:
-  // innerY smoothly tapers off; outerY smoothly activates towards the outer wings
-  const tInner = 1.0 - THREE.MathUtils.smootherstep(u, 0.0, 0.35)
-  const tOuter = THREE.MathUtils.smootherstep(u, 0.25, 1.0)
-  const endsY = tInner * innerY + tOuter * outerY
-  const baseSweep = wingSweep(u, H, sweep)
-  const e = env(u, H)
-
-  // Outer end flexibility & harmonic wave whip (smooth C² activation for outer reach):
+/** Build-time analytic profile: [biasY, biasZ, amplitudeY, amplitudeZ, phase]. */
+export function getHeroWaveProfile(index, u, H, config, out) {
+  const rAmp = config[`ribbon${index + 1}Amp`] ?? 1.0
+  const rY = config[`ribbon${index + 1}YOffset`] ?? 0.0
   const outerT = THREE.MathUtils.smootherstep(u, 0.48, 1.0)
-  const outerWhip = outerT * outerT * 0.22 * H * outerFlex * Math.sin(u * Math.PI * 2.8 * freq + index * 0.9)
-
-  // Outer flare offsets (fans out the 4 ribbons gracefully at the outer tips):
-  // Ribbon 0 (Upper Arch): flares upward
-  // Ribbon 1 (Lower Arch): flares downward
-  // Ribbon 2 (Violet Accent): flows downward-mid
-  // Ribbon 3 (Counter-Braid): flows upward-mid
-  const flareSigns = [0.85, -0.85, -0.45, 0.45]
-  const flareOffset = outerT * outerT * 0.28 * H * outerFlare * (flareSigns[index] ?? 0.0)
-
-  // Live inter-ribbon distance & spacing offset (pairwise dist01/dist12/dist23 and outer/inner taper):
-  const spacingOffset = computeRibbonSpacingOffset(index, u, H, config)
-
-  // Smooth inner ribbon offset taper: guarantees all 4 ribbons converge into a single seamless point at u = 0
-  const innerRibbonTaper = THREE.MathUtils.smootherstep(u, 0.0, 0.22)
-
-  // 1.25 wave cycles along the wing matching Glowing_wave_ribbons reference video
-  const k = 1.25 * 2.0 * Math.PI * freq
-
-  switch (index) {
-    case 0: {
-      // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
-      const phi = k * u + 0.0
-      return baseSweep + endsY + r1Y * innerRibbonTaper + flareOffset + outerWhip + spacingOffset + e * amp * 0.48 * r1Amp * Math.sin(phi)
-    }
-    case 1: {
-      // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
-      const phi = k * u + Math.PI
-      return baseSweep + endsY + r2Y * innerRibbonTaper + flareOffset + outerWhip + spacingOffset + e * amp * 0.48 * r2Amp * Math.sin(phi)
-    }
-    case 2: {
-      // Ribbon 3 (Violet/Magenta Accent Wave #b83dff, Threads Center of the Blue Loops)
-      const phi = k * u + 0.5 * Math.PI
-      return baseSweep + endsY + r3Y * innerRibbonTaper + flareOffset + outerWhip + spacingOffset + e * amp * 0.42 * r3Amp * Math.sin(phi)
-    }
-    case 3: {
-      // Ribbon 4 (Secondary Inner-to-Outer Counter-Braid, Electric Blue-Cyan)
-      const phi = k * u + 1.5 * Math.PI
-      return baseSweep + endsY + r4Y * innerRibbonTaper + flareOffset + outerWhip + spacingOffset + e * amp * 0.42 * r4Amp * Math.sin(phi)
-    }
-    default:
-      return 0
-  }
+  const e = env(u, H) * (1.0 + 0.15 * (config.outerFlexibility ?? 1.0) * outerT)
+  out[0] = wingSweep(u, H, config.wingSweep ?? 0.28)
+    + (1.0 - THREE.MathUtils.smootherstep(u, 0.0, 0.35)) * (config.innerYOffset ?? 0)
+    + THREE.MathUtils.smootherstep(u, 0.25, 1.0) * (config.outerYOffset ?? 0)
+    + rY * THREE.MathUtils.smootherstep(u, 0.0, 0.22)
+    + outerT * outerT * 0.28 * H * (config.outerFlare ?? 0.6) * HERO_FLARE_SIGNS[index]
+    + computeRibbonSpacingOffset(index, u, H, config)
+  out[1] = THREE.MathUtils.smootherstep(u, 0.30, 1.0) * (config.outerZOffset ?? 0)
+  out[2] = e * (config.amplitude ?? 1.0) * HERO_Y_SCALES[index] * rAmp
+  out[3] = e * (config.zAmplitude ?? 1.0) * 0.22 * Math.min(1.2, rAmp)
+  out[4] = 2.5 * Math.PI * (config.frequency ?? 1.0) * u + HERO_PHASES[index]
+  return out
 }
 
-/**
- * Smooth Z-depth oscillation with optional zAmplitude control, outer flexibility and 3D end placement
- */
+export function computeHeroWaveY(index, u, H, config = {}) {
+  const p = getHeroWaveProfile(index, u, H, config, heroProfileScratch)
+  return p[0] + p[2] * Math.sin(p[4])
+}
+
 export function computeHeroWaveZ(index, u, H, config = {}) {
-  const zAmp = config.zAmplitude !== undefined ? config.zAmplitude : 1.0
-  const outerZ = config.outerZOffset !== undefined ? config.outerZOffset : 0.0
-  const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
-  const freq = config.frequency !== undefined ? config.frequency : 1.0
-  const rAmp = [
-    config.ribbon1Amp ?? 1.0,
-    config.ribbon2Amp ?? 1.0,
-    config.ribbon3Amp ?? 1.0,
-    config.ribbon4Amp ?? 1.0,
-  ][index] ?? 1.0
+  const p = getHeroWaveProfile(index, u, H, config, heroProfileScratch)
+  return p[1] + p[3] * Math.cos(p[4])
+}
 
-  const outerT = THREE.MathUtils.smootherstep(u, 0.48, 1.0)
-  const zEnds = THREE.MathUtils.smootherstep(u, 0.30, 1.0) * outerZ + outerT * outerT * 0.12 * H * outerFlex * Math.cos(u * Math.PI * 2.4 * freq)
-  const rAmpClamped = Math.min(1.2, rAmp)
-  const e = env(u, H)
+/** Harmonic coefficients for P(t) = P(0) + C(cos(wt)-1) + S sin(wt). */
+export function getHeroMotion(index, u, H, config, cosOut, sinOut, offset = 0) {
+  const p = getHeroWaveProfile(index, u, H, config, heroProfileScratch)
+  const s = Math.sin(p[4]), c = Math.cos(p[4])
+  cosOut[offset] = 0
+  cosOut[offset + 1] = p[2] * s
+  cosOut[offset + 2] = p[3] * c
+  sinOut[offset] = 0
+  sinOut[offset + 1] = -p[2] * c
+  sinOut[offset + 2] = p[3] * s
+}
 
-  const k = 1.25 * 2.0 * Math.PI * freq
-  const alphas = [0.0, Math.PI, 0.5 * Math.PI, 1.5 * Math.PI]
-  const phi = k * u + alphas[index]
-
-  return zEnds + e * zAmp * 0.22 * rAmpClamped * Math.cos(phi)
+/** Shared non-oscillating frame; independent of instantaneous strand crossings. */
+export function getSharedWaveFrame(u, H, config, out, offset = 0) {
+  let y = 0, z = 0, ry2 = 0, rz2 = 0
+  for (let i = 0; i < 4; i++) {
+    const p = getHeroWaveProfile(i, u, H, config, heroProfileScratch)
+    y += p[0]
+    z += p[1]
+    ry2 += p[2] * p[2]
+    rz2 += p[3] * p[3]
+  }
+  out[offset] = y * 0.25
+  out[offset + 1] = z * 0.25
+  out[offset + 2] = Math.sqrt(0.25 * ry2 + 0.08 * 0.08)
+  out[offset + 3] = Math.sqrt(0.25 * rz2 + 0.06 * 0.06)
+  return out
 }
 
 // Backward-compatible individual functions
@@ -258,21 +200,9 @@ export const HERO_FUNCS = [heroY0, heroY1, heroY2, heroY3]
 
 /** The dominant harmonic of each existing hero ribbon, evaluated at build time. */
 export function getTravelProfile(index, u, H, config, out) {
-  const amplitude = (config.amplitude ?? 1.0) * env(u, H)
-  const frequency = config.frequency ?? 1.0
-  // Coordinated outward traveling wave: coherent phase and unified positive amplitude envelope
-  // Base spatial wavenumber k ~ 1.65 * PI * freq ensures a fluid outward traveling crest.
-  const basePhase = u * Math.PI * 1.65 * frequency + 0.08
-  const rAmp = [
-    config.ribbon1Amp ?? 1.0,
-    config.ribbon2Amp ?? 1.0,
-    config.ribbon3Amp ?? 1.0,
-    config.ribbon4Amp ?? 1.0,
-  ][index] ?? 1.0
-  // Gentle ambient pulse amplitude (~0.12) that feels atmospheric and luxurious
-  const ampScale = 0.12 * Math.min(1.2, Math.max(0.6, rAmp))
-  out[0] = ampScale * amplitude
-  out[1] = basePhase
+  const p = getHeroWaveProfile(index, u, H, config, heroProfileScratch)
+  out[0] = p[2]
+  out[1] = p[4]
   return out
 }
 
@@ -291,6 +221,8 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
   const wall = new Float32Array(count * 4)
   const center = new Float32Array(count * 3)
   const normal = new Float32Array(count * 3)
+  const motionCos = new Float32Array(count * 3)
+  const motionSin = new Float32Array(count * 3)
   const scratch = new Float64Array(2)
   const ys = new Float64Array(4)
   const zs = new Float64Array(4)
@@ -300,7 +232,8 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
     const u = uArray[i]
     let owner = wireIds?.[i] ?? 0
     if (kind === 'silk') owner = Math.min(3, Math.floor(i / silkVerticesPerHero))
-    else if (kind === 'bead') owner = owner === 82 || owner === 83 || (owner === 84 && u >= 0.58) ? 1 : 0
+    else if (kind === 'bead') owner = BEAD_PARENTS[owner - 80]
+    getHeroMotion(owner, u, H, config, motionCos, motionSin, 3 * i)
     getTravelProfile(owner, u, H, config, scratch)
     profile[4 * i] = scratch[0]
     profile[4 * i + 1] = scratch[1]
@@ -315,26 +248,8 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
     zs[1] = heroZ(1, u, H, config)
     zs[2] = heroZ(2, u, H, config)
     zs[3] = heroZ(3, u, H, config)
-    // C2-continuous centroid spine
-    const yCenter = 0.25 * (ys[0] + ys[1] + ys[2] + ys[3])
-    const zCenter = 0.25 * (zs[0] + zs[1] + zs[2] + zs[3])
-
-    // C2-continuous quadrature envelope (eliminates phase oscillation, rail swaps, and curve-crossing kinks)
-    // Orthogonal hero wave pairs cancel sinusoidal variation: (sin^2 + cos^2 = 1)
-    const dY01 = ys[0] - ys[1]
-    const dY23 = ys[2] - ys[3]
-    const dZ01 = zs[0] - zs[1]
-    const dZ23 = zs[2] - zs[3]
-
-    const rawRy = 0.5 * Math.sqrt(dY01 * dY01 + dY23 * dY23)
-    const rawRz = 0.5 * Math.sqrt(dZ01 * dZ01 + dZ23 * dZ23)
-
     const frameOffset = 4 * i
-    frame[frameOffset] = yCenter
-    frame[frameOffset + 1] = zCenter
-    // C2-smooth floor without sharp clamp corners
-    frame[frameOffset + 2] = Math.sqrt(rawRy * rawRy + 0.08 * 0.08)
-    frame[frameOffset + 3] = Math.sqrt(rawRz * rawRz + 0.06 * 0.06)
+    getSharedWaveFrame(u, H, config, frame, frameOffset)
     center[3 * i] = positionArray[3 * i]
     center[3 * i + 1] = frame[frameOffset]
     center[3 * i + 2] = frame[frameOffset + 1]
@@ -349,6 +264,8 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
     // tangent so the shared phase is outward on left and right alike.
     axis[3 * i] = positionArray[3 * i] < -0.0001 ? -1.0 : 1.0
   }
+  geometry.setAttribute('aFlowCos', new THREE.BufferAttribute(motionCos, 3))
+  geometry.setAttribute('aFlowSin', new THREE.BufferAttribute(motionSin, 3))
   geometry.setAttribute('aFlowPair', new THREE.BufferAttribute(profile, 4))
   geometry.setAttribute('aFlowMeta', new THREE.BufferAttribute(meta, 2))
   geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
@@ -410,8 +327,8 @@ class ParameterizedLineBuilder {
     l1 = 0.0, l2 = 0.0,
     rel1 = null, rel2 = null
   ) {
-    const alpha1 = a1 !== null ? a1 : computeVertexAlpha(u1, this.innerFade, this.outerFade, maxU)
-    const alpha2 = a2 !== null ? a2 : computeVertexAlpha(u2, this.innerFade, this.outerFade, maxU)
+    const alpha1 = a1 !== null ? a1 : computeOuterVertexAlpha(u1, this.outerFade, maxU)
+    const alpha2 = a2 !== null ? a2 : computeOuterVertexAlpha(u2, this.outerFade, maxU)
 
     this.positions.push(p1.x, p1.y, p1.z)
     this.basePositions.push(p1.x, p1.y, p1.z)
@@ -574,16 +491,16 @@ function generateCompanionSilkStrands(side, H, config = {}) {
         const e = env(u, H)
         // Smooth inner convergence taper pinning all silk strands to the core filament at u = 0
         const innerSilkTaper = THREE.MathUtils.smootherstep(u, 0.0, 0.22)
-        // Smooth harmonious outer tip taper preventing tangling/bunching:
-        const tipTaper = 1.0 - 0.25 * THREE.MathUtils.smootherstep(u, 0.75, strandMaxU)
+        // Refined outer tip taper: prevents excessive strand spreading as envelope e(u) grows toward outer ends
+        const tipTaper = 1.0 - 0.48 * THREE.MathUtils.smootherstep(u, 0.55, strandMaxU)
         const y = HERO_FUNCS[i](u, H, config) + e * innerSilkTaper * (radialSpread * tipTaper * Math.sin(u * Math.PI * freq_k + phase_k))
         const z = heroZ(i, u, H, config) + e * innerSilkTaper * (0.08 * stringWidth * tipTaper * Math.cos(u * Math.PI * freq_k + phase_k))
         const pt = new THREE.Vector3(x, y, z)
         const w = computeConstraintWeight(u)
 
         if (prevPt) {
-          const a1 = strandAlpha * computeVertexAlpha(prevU, innerFade, outerFade, strandMaxU)
-          const a2 = strandAlpha * computeVertexAlpha(u, innerFade, outerFade, strandMaxU)
+          const a1 = strandAlpha * computeOuterVertexAlpha(prevU, outerFade, strandMaxU)
+          const a2 = strandAlpha * computeOuterVertexAlpha(u, outerFade, strandMaxU)
           builder.addSegment(
             prevPt,
             prevU,
@@ -1212,39 +1129,17 @@ function generate5SweepingOuterBeadedStreams(side, H, config = {}) {
   const pointsBuilder = new ParameterizedPointsBuilder(H, config)
   const beadColor = new THREE.Color('#30d5ff').lerp(new THREE.Color('#0055ff'), 0.35)
 
-  // 5 outer arc definitions
-  const arcConfigs = [
-    // Arc 0: High upper canopy arc well above top wave
-    {
-      calcY: (u) => heroY0(u, H, config) + (0.28 + 0.35 * u) * H + 0.04 * H * Math.sin(u * Math.PI * 2.2),
-      calcZ: (u) => heroZ(0, u, H, config) + 0.08 * Math.cos(u * Math.PI * 2.0),
-      wireId: 80,
-    },
-    // Arc 1: Mid-high upper canopy arc
-    {
-      calcY: (u) => heroY0(u, H, config) + (0.20 + 0.26 * u) * H + 0.03 * H * Math.cos(u * Math.PI * 2.6),
-      calcZ: (u) => heroZ(0, u, H, config) + 0.05 * Math.sin(u * Math.PI * 2.2),
-      wireId: 81,
-    },
-    // Arc 2: Deep lower root arc well below bottom wave
-    {
-      calcY: (u) => heroY1(u, H, config) - (0.28 + 0.35 * u) * H - 0.04 * H * Math.cos(u * Math.PI * 2.2),
-      calcZ: (u) => heroZ(1, u, H, config) - 0.08 * Math.cos(u * Math.PI * 2.0),
-      wireId: 82,
-    },
-    // Arc 3: Mid-deep lower root arc
-    {
-      calcY: (u) => heroY1(u, H, config) - (0.20 + 0.26 * u) * H - 0.03 * H * Math.sin(u * Math.PI * 2.6),
-      calcZ: (u) => heroZ(1, u, H, config) - 0.05 * Math.sin(u * Math.PI * 2.2),
-      wireId: 83,
-    },
-    // Arc 4: Outer flaring canopy arc
-    {
-      calcY: (u) => (u < 0.58 ? heroY0(u, H, config) : heroY1(u, H, config)) + (0.35 + 0.40 * u) * H,
-      calcZ: (u) => 0.10 * H * Math.sin(u * Math.PI * 2.4),
-      wireId: 84,
-    },
-  ]
+  // Each dotted stream follows one fixed parent; no mid-stream parent switch.
+  const width = Math.max(0.1, config.stringWidth ?? 1.0)
+  const arcConfigs = BEAD_PARENTS.map((owner, i) => {
+    const angle = i * 2 * Math.PI / BEAD_PARENTS.length
+    const offset = (u) => 0.018 * width * THREE.MathUtils.smootherstep(u, 0, 0.08)
+    return {
+      calcY: (u) => computeHeroWaveY(owner, u, H, config) + offset(u) * Math.cos(angle),
+      calcZ: (u) => computeHeroWaveZ(owner, u, H, config) + offset(u) * Math.sin(angle),
+      wireId: 80 + i,
+    }
+  })
 
   arcConfigs.forEach(({ calcY, calcZ, wireId }) => {
     for (let idx = 0; idx < N_DOTS; idx++) {
@@ -1591,7 +1486,7 @@ export function getGeometryCacheKey(side, config = {}) {
   const spOuter = (config.ribbonSpacingOuter !== undefined ? config.ribbonSpacingOuter : 1.0).toFixed(2)
   const spInner = (config.ribbonSpacingInner !== undefined ? config.ribbonSpacingInner : 1.0).toFixed(2)
 
-  return `v12:${side}:${amp}:${freq}:${sweep}:${innerY}:${outerY}:${zAmp}:${strandSpread}:${innerFade}:${strCount}:${strWidth}:${r1Amp}:${r2Amp}:${r3Amp}:${r4Amp}:${r1Y}:${r2Y}:${r3Y}:${r4Y}:${r1F}:${r2F}:${r3F}:${r4F}:${oFlex}:${oFlare}:${oFade}:${oZ}:${d01}:${d12}:${d23}:${spOuter}:${spInner}`
+  return `v13:${side}:${amp}:${freq}:${sweep}:${innerY}:${outerY}:${zAmp}:${strandSpread}:${innerFade}:${strCount}:${strWidth}:${r1Amp}:${r2Amp}:${r3Amp}:${r4Amp}:${r1Y}:${r2Y}:${r3Y}:${r4Y}:${r1F}:${r2F}:${r3F}:${r4F}:${oFlex}:${oFlare}:${oFade}:${oZ}:${d01}:${d12}:${d23}:${spOuter}:${spInner}:${ANIMATION_CONTRACT_VERSION}`
 }
 
 export function getSideWireData(side, config = {}) {

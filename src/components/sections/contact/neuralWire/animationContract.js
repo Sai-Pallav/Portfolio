@@ -1,15 +1,15 @@
 /**
  * @file animationContract.js
  * Architecture Contract & Deformation Specification for side-wave GPU animation.
- * Version 4.2.0 — Unwrapped Outward Traveling Transverse Wave Contract.
+ * Version 5.0.0 — Parent-bound outward traveling waves.
  *
  * This contract establishes the mathematical, topological, and attribute guarantees baked into
  * the static BufferGeometries and canonical NeuralWireGraph, ensuring:
  * 1. The neural network lives exclusively in the negative-space gaps between the primary wave strands.
  * 2. Wave crests propagate outward while every vertex keeps its original world X coordinate.
- * 3. The globe stays static and the inner tip is fixed by the original envelope.
+ * 3. The globe stays static and a C2 envelope fixes the inner tip.
  * 4. Neural vertices interpolate their adjacent wave-boundary displacements.
- * 5. The original static render is exact at t=0.
+ * 5. The baked rest geometry is exact at t=0 and every full period.
  * 6. Both wings advance from their own inner tips to their outer edges.
  * 7. 100% synchronized deformation between node points and connection edges.
  */
@@ -23,7 +23,8 @@ export const FLOW_SPEED = 1.57079632679 // pi / 2 rad/s = 1 cycle per 4.0s (matc
 export const FLOW_OMEGA = FLOW_SPEED
 export const FLOW_PERIOD = 2 * Math.PI / FLOW_SPEED
 
-// GPU Vertex Shader: Exact invariant elliptical helical braid matching Glowing_wave_ribbons_animating_o... video
+// Motion vectors encode the parent's harmonic, never the companion offset.
+// Transform these vectors without translation when baking a world-space mesh.
 export const TRAVEL_DEFORMATION_GLSL = `
   attribute vec4 aFlowPair;
   attribute vec2 aFlowMeta;
@@ -33,37 +34,17 @@ export const TRAVEL_DEFORMATION_GLSL = `
   attribute vec3 aFlowCenter;
   attribute vec3 aFlowNormal;
   attribute vec4 aRelativeCoord;
+  attribute vec3 aFlowCos;
+  attribute vec3 aFlowSin;
   uniform float uTime;
 
   // Exact 4.0s wave cycle matching Glowing_wave_ribbons_animating_o... video
   const float FLOW_OMEGA = 1.57079632679;
 
   vec3 flowRibbonPosition(vec3 rest) {
-    float yCenter = aFlowFrame.x;
-    float zCenter = aFlowFrame.y;
-    float Ry = max(0.001, aFlowFrame.z);
-    float Rz = max(0.001, aFlowFrame.w);
-
-    float dy0 = rest.y - yCenter;
-    float dz0 = rest.z - zCenter;
-
-    // Outward traveling wave phase
     float angle = FLOW_OMEGA * uTime;
-    float c = cos(angle);
-    float s = sin(angle);
-
-    // Exact invariant elliptical rotation preserving all strand distances, bundle coherence, and non-uniform aspect ratio
-    float dyRot = dy0 * c - dz0 * (Ry / Rz) * s;
-    float dzRot = dz0 * c + dy0 * (Rz / Ry) * s;
-
-    // C2-continuous quintic smootherstep pinning (continuous 1st and 2nd derivatives everywhere)
-    // Guarantees zero wobble, splitting, or socket tearing near the globe
-    float tPin = clamp(aRelativeCoord.x / 0.12, 0.0, 1.0);
-    float tipPin = tPin * tPin * tPin * (tPin * (tPin * 6.0 - 15.0) + 10.0);
-    float dy = dy0 + (dyRot - dy0) * tipPin;
-    float dz = dz0 + (dzRot - dz0) * tipPin;
-
-    vec3 localPos = vec3(rest.x, yCenter + dy, zCenter + dz);
+    vec3 localPos = rest + aFlowCos * (cos(angle) - 1.0)
+                         + aFlowSin * sin(angle);
     return (modelMatrix * vec4(localPos, 1.0)).xyz;
   }
 
@@ -84,7 +65,7 @@ export const TRAVEL_DEFORMATION_GLSL = `
   }
 `
 
-export const ANIMATION_CONTRACT_VERSION = '4.2.0'
+export const ANIMATION_CONTRACT_VERSION = '5.0.0'
 
 export const SIDE_ANIMATION_CONFIG = {
   left: {

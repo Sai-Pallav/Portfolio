@@ -19,7 +19,7 @@ const BeadedShader = {
       if (uTime > 0.0) {
         float phase = 6.28318530718 * aRelativeCoord.x;
         vAlpha *= 1.0 + 0.020 *
-          (sin(phase - 0.44 * uTime) - sin(phase));
+          (sin(phase - FLOW_OMEGA * uTime) - sin(phase));
       }
       vColor = color;
       vec4 mvPosition = flowViewPosition(position);
@@ -42,8 +42,8 @@ const BeadedShader = {
 }
 
 /**
- * 5 Sweeping Outer Beaded Dot-Streams (75 beads per arc)
- * Floating well outside the main waves in the dark space above and below the stream.
+ * 5 Parent-Bound Beaded Dot-Streams (75 beads per strand)
+ * Fixed local offsets keep the dots inside their parent ribbon bundles.
  * Softly glowing cyan/blue dots (opacity: 0.55, fading at both ends).
  */
 export const BeadedStreams = memo(function BeadedStreams({

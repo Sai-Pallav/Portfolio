@@ -9,15 +9,20 @@ const LineFeatherShader = {
     attribute vec3 color;
     uniform float uOpacity;
     uniform float uInnerFade;
+    uniform float uTipEnergy;
     varying float vAlpha;
     varying vec3 vColor;
     ${TRAVEL_DEFORMATION_GLSL}
 
+    float tipSmoother(float x) {
+      x = clamp(x, 0.0, 1.0);
+      return x * x * x * (x * (x * 6.0 - 15.0) + 10.0);
+    }
+
     void main() {
-      // Dynamic inner tip fade near the globe: smoothstep(0.0, max(0.005, uInnerFade), aU)
-      float fadeDist = max(0.005, uInnerFade);
-      float feather = smoothstep(0.0, fadeDist, aU);
-      vAlpha = aAlpha * feather * uOpacity;
+      float feather = tipSmoother(aU / max(0.12, uInnerFade));
+      float energy = mix(max(1.0, uTipEnergy), 1.0, tipSmoother(aU / 0.16));
+      vAlpha = aAlpha * feather * uOpacity / energy;
       vColor = color;
       gl_Position = flowClipPosition(position);
     }
@@ -68,12 +73,17 @@ function mergeWirePathLayers(layers) {
   const flowNormalArr = new Float32Array(totalVerts * 3)
   const colArr = new Float32Array(totalVerts * 3)
 
+  const flowCosArr = new Float32Array(totalVerts * 3)
+  const flowSinArr = new Float32Array(totalVerts * 3)
+  let tipEnergy = 0
   let offset = 0
   for (let l = 0; l < layers.length; l++) {
     const { geo, defaultColor, alphaMultiplier } = layers[l]
     if (!geo || !geo.attributes.position) continue
 
     const count = geo.attributes.position.count
+    flowCosArr.set(geo.attributes.aFlowCos.array, offset * 3)
+    flowSinArr.set(geo.attributes.aFlowSin.array, offset * 3)
     const pos = geo.attributes.position.array
     const basePos = geo.attributes.aBasePos ? geo.attributes.aBasePos.array : pos
     const u = geo.attributes.aU ? geo.attributes.aU.array : null
@@ -179,12 +189,18 @@ function mergeWirePathLayers(layers) {
         colArr[idx3 + 1] = cg
         colArr[idx3 + 2] = cb
       }
+      if (u && u[i] === 0 && i % 2 === 0) {
+        tipEnergy += alphaArr[idx] * Math.max(colArr[idx3], colArr[idx3 + 1], colArr[idx3 + 2])
+      }
     }
 
     offset += count
   }
 
   const merged = new THREE.BufferGeometry()
+  merged.userData.tipEnergy = tipEnergy
+  merged.setAttribute('aFlowCos', new THREE.BufferAttribute(flowCosArr, 3))
+  merged.setAttribute('aFlowSin', new THREE.BufferAttribute(flowSinArr, 3))
   merged.setAttribute('position', new THREE.BufferAttribute(posArr, 3))
   merged.setAttribute('aBasePos', new THREE.BufferAttribute(basePosArr, 3))
   merged.setAttribute('aU', new THREE.BufferAttribute(uArr, 1))
@@ -266,6 +282,7 @@ export const WirePaths = memo(function WirePaths({
         uColor: { value: new THREE.Color('#0048ff') },
         uOpacity: { value: Math.min(1.0, opacity) },
         uInnerFade: { value: innerFade },
+        uTipEnergy: { value: (mergedLineGeo?.userData.tipEnergy ?? 1) * Math.min(1.0, opacity) },
         uTime: timeUniform,
       },
       vertexShader: LineFeatherShader.vertexShader,
@@ -274,7 +291,7 @@ export const WirePaths = memo(function WirePaths({
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
-  }, [opacity, innerFade, timeUniform])
+  }, [opacity, innerFade, timeUniform, mergedLineGeo])
 
   const prevGeoRef = useRef(mergedLineGeo)
   useEffect(() => {

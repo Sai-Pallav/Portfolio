@@ -6,7 +6,7 @@ export const DEFAULT_SIDE_CONFIG = {
   lengthMultiplier: 1,       // Total wireframe length multiplier
   breadthMultiplier: 1.35,   // Vertical ribbon breadth / height multiplier
   depthMultiplier: 0.3,      // Depth thickness multiplier
-  strandSpread: 1,           // Companion silk strands width/spread multiplier
+  strandSpread: 0.85,        // Companion silk strands width/spread multiplier (refined balance)
   stringCount: 13,           // Number of strings/strands per hero wave
   stringWidth: 0.95,         // Width and thickness of individual strings
 
@@ -142,7 +142,7 @@ export const PRESETS = {
   },
 }
 
-const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v22'
+const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v23'
 
 const WireframeConfigContext = createContext(null)
 

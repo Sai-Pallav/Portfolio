@@ -17,6 +17,8 @@ import {
   H_VAL,
   computeConstraintWeight,
   getTravelProfile,
+  getHeroMotion,
+  getSharedWaveFrame,
 } from './generateWireGeometry.js'
 import { segmentsIntersect2D } from './neuralGraphModel.js'
 
@@ -230,6 +232,10 @@ function addPocketTravelAttributes(geometry, H, config) {
   const zs = new Float64Array(4)
   const ids = new Int8Array(4)
   const profile = new Float64Array(2)
+  const motionCos = new Float32Array(count * 3)
+  const motionSin = new Float32Array(count * 3)
+  const lowCos = new Float64Array(3), lowSin = new Float64Array(3)
+  const highCos = new Float64Array(3), highSin = new Float64Array(3)
   for (let i = 0; i < count; i++) {
     const u = us[i]
     const y = positions[3 * i + 1]
@@ -257,16 +263,15 @@ function addPocketTravelAttributes(geometry, H, config) {
     const height = Math.max(0.0001, ys[high] - ys[low])
     flowMeta[2 * i] = Math.max(0, Math.min(1, (y - ys[low]) / height))
     flowMeta[2 * i + 1] = height
-    const bounds = getAlmondPocketBounds(u, H, config)
-    const outsidePrimary = y > bounds.yUpper || y < bounds.yLower
-    const centerY = outsidePrimary ? bounds.envCenterY : bounds.gapCenterY
-    const centerZ = outsidePrimary ? bounds.envCenterZ : bounds.gapCenterZ
-    const radiusY = outsidePrimary ? bounds.envRy : bounds.Ry
-    const radiusZ = outsidePrimary ? bounds.envRz : bounds.Rz
-    frame[4 * i] = centerY
-    frame[4 * i + 1] = centerZ
-    frame[4 * i + 2] = Math.max(0.002, radiusY)
-    frame[4 * i + 3] = Math.max(0.002, radiusZ)
+    getSharedWaveFrame(u, H, config, frame, 4 * i)
+    const centerY = frame[4 * i], centerZ = frame[4 * i + 1]
+    getHeroMotion(low, u, H, config, lowCos, lowSin)
+    getHeroMotion(high, u, H, config, highCos, highSin)
+    const attachment = flowMeta[2 * i]
+    for (let j = 0; j < 3; j++) {
+      motionCos[3 * i + j] = lowCos[j] + attachment * (highCos[j] - lowCos[j])
+      motionSin[3 * i + j] = lowSin[j] + attachment * (highSin[j] - lowSin[j])
+    }
     center[3 * i] = positions[3 * i]
     center[3 * i + 1] = centerY
     center[3 * i + 2] = centerZ
@@ -294,6 +299,8 @@ function addPocketTravelAttributes(geometry, H, config) {
       other[4 * i + 3] = zs[id] - positions[3 * i + 2]
     }
   }
+  geometry.setAttribute('aFlowCos', new THREE.BufferAttribute(motionCos, 3))
+  geometry.setAttribute('aFlowSin', new THREE.BufferAttribute(motionSin, 3))
   geometry.setAttribute('aFlowPair', new THREE.BufferAttribute(flowPair, 4))
   geometry.setAttribute('aFlowMeta', new THREE.BufferAttribute(flowMeta, 2))
   geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))

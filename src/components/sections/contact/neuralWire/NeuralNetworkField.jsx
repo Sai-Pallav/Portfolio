@@ -104,8 +104,9 @@ function mergeTransformedGeometries(geoA, matA, geoB, matB) {
     const itemSize = attrA.itemSize
     const arr = new attrA.array.constructor(total * itemSize)
 
-    if (attrName === 'position' || attrName === 'aBasePos' || attrName === 'aFlowAxis' || attrName === 'aFlowCenter' || attrName === 'aFlowNormal') {
+    if (attrName === 'position' || attrName === 'aBasePos' || attrName === 'aFlowAxis' || attrName === 'aFlowCenter' || attrName === 'aFlowNormal' || attrName === 'aFlowCos' || attrName === 'aFlowSin') {
       const isDirection = attrName === 'aFlowAxis' || attrName === 'aFlowNormal'
+        || attrName === 'aFlowCos' || attrName === 'aFlowSin'
       const srcA = attrA.array
       for (let i = 0, j = 0; i < vA; i++, j += 3) {
         const x = srcA[j], y = srcA[j + 1], z = srcA[j + 2]
@@ -126,31 +127,8 @@ function mergeTransformedGeometries(geoA, matA, geoB, matB) {
       arr.set(attrB.array, vA * itemSize)
     }
 
-    if (attrName === 'aFlowFrame') {
-      const scaleYA = Math.hypot(a1, a5, a9)
-      const scaleZA = Math.hypot(a2, a6, a10)
-      const scaleYB = Math.hypot(b1, b5, b9)
-      const scaleZB = Math.hypot(b2, b6, b10)
-      arr[2] *= scaleYA
-      arr[3] *= scaleZA
-      arr[vA * itemSize + 2] *= scaleYB
-      arr[vA * itemSize + 3] *= scaleZB
-    } else if (attrName === 'aFlowWall') {
-      const scaleYA = Math.hypot(a1, a5, a9)
-      const scaleZA = Math.hypot(a2, a6, a10)
-      const scaleYB = Math.hypot(b1, b5, b9)
-      const scaleZB = Math.hypot(b2, b6, b10)
-      arr[0] *= scaleYA
-      arr[1] *= scaleZA
-      arr[2] *= scaleYA
-      arr[3] *= scaleZA
-      const offset = vA * itemSize
-      arr[offset] *= scaleYB
-      arr[offset + 1] *= scaleZB
-      arr[offset + 2] *= scaleYB
-      arr[offset + 3] *= scaleZB
-    }
-
+    // Scalar frame/wall data remains in the shared local coordinate system.
+    // Centers and motion vectors above carry the complete affine transform.
     merged.setAttribute(attrName, new THREE.BufferAttribute(arr, itemSize))
   }
 
