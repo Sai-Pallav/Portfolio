@@ -62,9 +62,17 @@ export function wingSweep(u, H, sweepVal = 0.28) {
   return sweepVal * H * Math.pow(u, 2.0)
 }
 
+export const TAPER_INNER_TIGHTNESS = 0.18 // Controls inner tip tightness near globe socket (u -> 0)
+export const TAPER_MID_RAMP = 1.28        // Progressive ramp (1.20 - 1.35)
+export const TAPER_OUTER_CAP = 0.82       // Controls maximum outer envelope height cap within viewport
+export const TAPER_SATURATION_K = 0.55    // C2-smooth outer saturation cap factor
+
 export function env(u, H) {
-  // C2 at the socket and at .08; continue linearly through extended tips.
-  return H * u * THREE.MathUtils.smootherstep(u, 0.0, 0.08)
+  const safeU = Math.max(0.0, u)
+  const innerPinch = THREE.MathUtils.smootherstep(safeU, 0.0, TAPER_INNER_TIGHTNESS)
+  const midRamp = Math.pow(safeU, TAPER_MID_RAMP)
+  const sat = Math.tanh(TAPER_SATURATION_K * midRamp) / Math.tanh(TAPER_SATURATION_K)
+  return H * TAPER_OUTER_CAP * innerPinch * sat
 }
 
 /**
@@ -110,7 +118,7 @@ export function computeRibbonSpacingOffset(index, u, H, config = {}) {
   const tTaper = spInner + (spOuter - spInner) * THREE.MathUtils.smootherstep(uNorm, 0.0, 1.0)
 
   // Controlled inner connection maintaining ribbon bundle separation at the globe socket
-  const tGlobe = 0.45 + 0.55 * THREE.MathUtils.smootherstep(uNorm, 0.0, 0.22)
+  const tGlobe = THREE.MathUtils.smootherstep(uNorm, 0.0, 0.22)
 
   // Natural vertical fanning signs for global outer/inner spacing multiplier:
   // Ribbon 0: expands upward (+0.45)
@@ -126,7 +134,8 @@ export function computeRibbonSpacingOffset(index, u, H, config = {}) {
 }
 
 const HERO_PHASES = [0, Math.PI, 0.5 * Math.PI, 1.5 * Math.PI]
-const HERO_Y_SCALES = [0.48, 0.48, 0.42, 0.42]
+export const HERO_SCALE = 0.46
+const HERO_Y_SCALES = [HERO_SCALE, HERO_SCALE, HERO_SCALE, HERO_SCALE]
 const HERO_FLARE_SIGNS = [0.85, -0.85, -0.45, 0.45]
 const BEAD_PARENTS = [0, 0, 1, 1, 2]
 const heroProfileScratch = new Float64Array(5)
@@ -145,7 +154,7 @@ export function getHeroWaveProfile(index, u, H, config, out) {
   out[0] = wingSweep(u, H, config.wingSweep ?? 0.28)
     + (1.0 - THREE.MathUtils.smootherstep(u, 0.0, 0.35)) * (config.innerYOffset ?? 0)
     + THREE.MathUtils.smootherstep(u, 0.25, 1.0) * (config.outerYOffset ?? 0)
-    + rY * (0.45 + 0.55 * THREE.MathUtils.smootherstep(u, 0.0, 0.22))
+    + rY * THREE.MathUtils.smootherstep(u, 0.0, 0.22)
     + outerT * outerT * 0.28 * H * (config.outerFlare ?? 0.6) * HERO_FLARE_SIGNS[index]
     + computeRibbonSpacingOffset(index, u, H, config)
   out[1] = THREE.MathUtils.smootherstep(u, 0.30, 1.0) * (config.outerZOffset ?? 0)
@@ -495,7 +504,7 @@ function generateCompanionSilkStrands(side, H, config = {}) {
         const x = sign * 10.0 * u
         const e = env(u, H)
         // Controlled inner convergence taper retaining healthy bundle volume near u = 0
-        const innerSilkTaper = 0.45 + 0.55 * THREE.MathUtils.smootherstep(u, 0.0, 0.22)
+        const innerSilkTaper = THREE.MathUtils.smootherstep(u, 0.0, 0.22)
         // Refined outer tip taper: prevents excessive strand spreading as envelope e(u) grows toward outer ends
         const tipTaper = 1.0 - 0.48 * THREE.MathUtils.smootherstep(u, 0.55, strandMaxU)
         const y = HERO_FUNCS[i](u, H, config) + e * innerSilkTaper * (radialSpread * tipTaper * Math.sin(u * Math.PI * freq_k + phase_k))
@@ -1359,8 +1368,8 @@ export function generateSideWireData(side, config = {}) {
           const w1 = computeConstraintWeight(u1)
           const w2 = computeConstraintWeight(u2)
           // Controlled inner taper so aura passes maintain cylindrical bulk at u = 0
-          const taper1 = 0.45 + 0.55 * THREE.MathUtils.smootherstep(u1, 0.0, 0.20)
-          const taper2 = 0.45 + 0.55 * THREE.MathUtils.smootherstep(u2, 0.0, 0.20)
+          const taper1 = THREE.MathUtils.smootherstep(u1, 0.0, 0.20)
+          const taper2 = THREE.MathUtils.smootherstep(u2, 0.0, 0.20)
           const p1 = new THREE.Vector3(pts[i].x, pts[i].y + dy * taper1, pts[i].z + dz * taper1)
           const p2 = new THREE.Vector3(pts[i + 1].x, pts[i + 1].y + dy * taper2, pts[i + 1].z + dz * taper2)
           builder.addSegment(p1, u1, wireId, w1, p2, u2, wireId, w2, null, null, null, null, maxU)

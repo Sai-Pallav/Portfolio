@@ -24,15 +24,15 @@ export const DEFAULT_SIDE_CONFIG = {
   wingSweep: 0.34,           // Wing sweep curvature (outer parabolic lift)
 
   // ── 4 Hero Waves (Individual Ribbon Controls - Mirrored Symmetrically) ──
-  ribbon1Amp: 0.85,          // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
-  ribbon2Amp: 0.9,           // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
-  ribbon3Amp: 0.9,           // Ribbon 3 (Violet/Magenta Accent Wave #b83dff)
-  ribbon4Amp: 1.05,          // Ribbon 4 (Counter-Braid, Electric Blue-Cyan)
+  ribbon1Amp: 1.0,           // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
+  ribbon2Amp: 1.0,           // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
+  ribbon3Amp: 1.0,           // Ribbon 3 (Violet/Magenta Accent Wave #b83dff)
+  ribbon4Amp: 1.0,           // Ribbon 4 (Counter-Braid, Electric Blue-Cyan)
 
-  ribbon1YOffset: 0.1,       // Vertical shift for Ribbon 1
-  ribbon2YOffset: -0.08,     // Vertical shift for Ribbon 2
-  ribbon3YOffset: -0.02,     // Vertical shift for Ribbon 3
-  ribbon4YOffset: 0.04,      // Vertical shift for Ribbon 4
+  ribbon1YOffset: 0.0,       // Vertical shift for Ribbon 1
+  ribbon2YOffset: 0.0,       // Vertical shift for Ribbon 2
+  ribbon3YOffset: 0.0,       // Vertical shift for Ribbon 3
+  ribbon4YOffset: 0.0,       // Vertical shift for Ribbon 4
 
   ribbon1Freq: 1,            // Frequency/cycle density for Ribbon 1
   ribbon2Freq: 1.05,         // Frequency/cycle density for Ribbon 2
@@ -40,11 +40,11 @@ export const DEFAULT_SIDE_CONFIG = {
   ribbon4Freq: 0.9,          // Frequency/cycle density for Ribbon 4
 
   // ── Inter-Ribbon Spacing & Distances (Pairwise & Outer/Inner Taper) ──
-  distRibbon01: -0.04,       // Distance offset between Ribbon 0 (Upper Arch) and Ribbon 1 (Lower Arch)
-  distRibbon12: 0.02,        // Distance offset between Ribbon 1 (Lower Arch) and Ribbon 2 (Violet Accent)
+  distRibbon01: 0,           // Distance offset between Ribbon 0 (Upper Arch) and Ribbon 1 (Lower Arch)
+  distRibbon12: 0,           // Distance offset between Ribbon 1 (Lower Arch) and Ribbon 2 (Violet Accent)
   distRibbon23: 0,           // Distance offset between Ribbon 2 (Violet Accent) and Ribbon 3 (Counter-Braid)
-  ribbonSpacingOuter: 0.4,   // Distance multiplier between all ribbons at outer wingtips (fanning out)
-  ribbonSpacingInner: 0.85,  // Distance multiplier between all ribbons at inner globe connection (converging)
+  ribbonSpacingOuter: 1.0,   // Distance multiplier between all ribbons at outer wingtips (fanning out)
+  ribbonSpacingInner: 1.0,   // Distance multiplier between all ribbons at inner globe connection (converging)
 
   // ── Two Ends Placement ──
   innerGap: 0.2,             // Fine inner gap offset from globe center
@@ -142,7 +142,7 @@ export const PRESETS = {
   },
 }
 
-const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v24'
+const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v25'
 
 const WireframeConfigContext = createContext(null)
 
