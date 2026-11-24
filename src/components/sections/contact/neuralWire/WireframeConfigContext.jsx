@@ -6,28 +6,28 @@ export const DEFAULT_SIDE_CONFIG = {
   lengthMultiplier: 1,       // Total wireframe length multiplier
   breadthMultiplier: 1.35,   // Vertical ribbon breadth / height multiplier
   depthMultiplier: 0.3,      // Depth thickness multiplier
-  strandSpread: 0.85,        // Companion silk strands width/spread multiplier (refined balance)
+  strandSpread: 1.65,        // Companion silk strands width/spread multiplier (refined balance)
   stringCount: 13,           // Number of strings/strands per hero wave
   stringWidth: 0.95,         // Width and thickness of individual strings
 
   // ── Independent End Lengths & Outer Flexibility ──
-  innerExtension: 1.3,       // Lengthens inner end inward towards globe (positive = closer / into globe)
+  innerExtension: 0.8,       // Lengthens inner end inward towards globe (positive = closer / into globe)
   outerExtension: -2,        // Lengthens outer end outward past screen edge
   outerFlexibility: 0,       // Wave flexibility & harmonic whip at outer ends (0.0 = rigid, 1.0 = natural silk)
   outerFlare: 0,             // Vertical fan-out & separation of ribbon streams at outer tips
-  outerFade: 0.07,           // Soft feather fade distance at outer tips
+  outerFade: 0.13,           // Soft feather fade distance at outer tips
 
   // ── Waves & Amplitude ──
-  amplitude: 1.65,           // Wave oscillation amplitude multiplier
+  amplitude: 1.9,            // Wave oscillation amplitude multiplier
   frequency: 0.85,           // Wave frequency / cycles multiplier
   zAmplitude: 1.5,           // Z-depth wave oscillation multiplier
   wingSweep: 0.34,           // Wing sweep curvature (outer parabolic lift)
 
   // ── 4 Hero Waves (Individual Ribbon Controls - Mirrored Symmetrically) ──
-  ribbon1Amp: 1.0,           // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
-  ribbon2Amp: 1.0,           // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
-  ribbon3Amp: 1.0,           // Ribbon 3 (Violet/Magenta Accent Wave #b83dff)
-  ribbon4Amp: 1.0,           // Ribbon 4 (Counter-Braid, Electric Blue-Cyan)
+  ribbon1Amp: 1.05,          // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
+  ribbon2Amp: 1.05,          // Ribbon 2 (Lower Almond Arch, Cyan-White Core)
+  ribbon3Amp: 1.05,          // Ribbon 3 (Violet/Magenta Accent Wave #b83dff)
+  ribbon4Amp: 1.05,          // Ribbon 4 (Counter-Braid, Electric Blue-Cyan)
 
   ribbon1YOffset: 0.0,       // Vertical shift for Ribbon 1
   ribbon2YOffset: 0.0,       // Vertical shift for Ribbon 2
@@ -44,20 +44,20 @@ export const DEFAULT_SIDE_CONFIG = {
   distRibbon12: 0,           // Distance offset between Ribbon 1 (Lower Arch) and Ribbon 2 (Violet Accent)
   distRibbon23: 0,           // Distance offset between Ribbon 2 (Violet Accent) and Ribbon 3 (Counter-Braid)
   ribbonSpacingOuter: 1.0,   // Distance multiplier between all ribbons at outer wingtips (fanning out)
-  ribbonSpacingInner: 1.0,   // Distance multiplier between all ribbons at inner globe connection (converging)
+  ribbonSpacingInner: 0.9,   // Distance multiplier between all ribbons at inner globe connection (converging)
 
   // ── Two Ends Placement ──
-  innerGap: 0.2,             // Fine inner gap offset from globe center
+  innerGap: -0.42,           // Fine inner gap offset from globe center
   innerYOffset: 0,           // Inner end height offset
-  innerFade: 0.05,           // Inner tip feather distance (crisp luminous entry matching reference video)
-  outerXOffset: 0,           // Fine outer X offset
+  innerFade: 0.25,           // Inner tip feather distance (crisp luminous entry matching reference video)
+  outerXOffset: -0.4,        // Fine outer X offset
   outerYOffset: -0.3,        // Outer end lift/drop
-  outerZOffset: -0.7,        // Outer end depth offset
+  outerZOffset: -0.3,        // Outer end depth offset
 
   // ── Overall Placement & Tilt ──
   yOffset: 0,                // Global Y offset
-  xOffset: 0,                // Global X offset
-  zOffset: 0.2,              // Global Z depth offset
+  xOffset: 0.5,              // Global X offset
+  zOffset: 0.15,             // Global Z depth offset
   tiltZ: 0,                  // 2D tilt angle (degrees)
   pitchX: 2,                 // 3D pitch tilt (degrees)
   yawY: 16,                  // 3D yaw tilt (degrees)
@@ -142,7 +142,7 @@ export const PRESETS = {
   },
 }
 
-const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v25'
+const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v28'
 
 const WireframeConfigContext = createContext(null)
 
