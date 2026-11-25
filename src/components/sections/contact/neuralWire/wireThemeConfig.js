@@ -5,75 +5,75 @@
  */
 
 export const WIRE_THEME_PALETTES = {
-  // 1. Obsidian Terminal: Deep electric cyan-blue & vivid cobalt-violet
+  // 1. Obsidian Terminal: Exact --accent (#2563eb), --accent-secondary (#6366f1), --accent-hover (#3b82f6)
   'obsidian': {
-    primaryWire: '#00d2ff',
-    secondaryWire: '#818cf8',
-    connectionNode: '#38bdf8',
-    highlightNode: '#ffffff',
-    particle: '#93c5fd',
+    primaryWire: '#2563eb',
+    secondaryWire: '#6366f1',
+    connectionNode: '#3b82f6',
+    highlightNode: '#eef4ff',
+    particle: '#60a5fa',
     wireOpacity: 0.94,
-    glowIntensity: 1.30,
-  },
-  // 2. Electric Blue: Brilliant electric cyan & vivid electric violet (Exact reference look!)
-  'electric-blue': {
-    primaryWire: '#00e5ff',
-    secondaryWire: '#a855f7',
-    connectionNode: '#38bdf8',
-    highlightNode: '#ffffff',
-    particle: '#67e8f9',
-    wireOpacity: 0.96,
-    glowIntensity: 1.40,
-  },
-  // 3. Nordic Frost: Ice blue & glacial arctic blue
-  'nordic-frost': {
-    primaryWire: '#38bdf8',
-    secondaryWire: '#818cf8',
-    connectionNode: '#93c5fd',
-    highlightNode: '#f0f9ff',
-    particle: '#bfdbfe',
-    wireOpacity: 0.90,
-    glowIntensity: 1.20,
-  },
-  // 4. Midnight Violet: Luminous lavender violet & electric accent
-  'midnight-violet': {
-    primaryWire: '#c084fc',
-    secondaryWire: '#38bdf8',
-    connectionNode: '#e9d5ff',
-    highlightNode: '#ffffff',
-    particle: '#ddd6fe',
-    wireOpacity: 0.92,
-    glowIntensity: 1.30,
-  },
-  // 5. Emerald Noir: Luminous emerald & cyber teal
-  'emerald-noir': {
-    primaryWire: '#10b981',
-    secondaryWire: '#06b6d4',
-    connectionNode: '#34d399',
-    highlightNode: '#f0fdf4',
-    particle: '#6ee7b7',
-    wireOpacity: 0.90,
-    glowIntensity: 1.25,
-  },
-  // 6. Graphite: High-tech metallic platinum & deep cool slate
-  'graphite': {
-    primaryWire: '#e2e8f0',
-    secondaryWire: '#94a3b8',
-    connectionNode: '#cbd5e1',
-    highlightNode: '#ffffff',
-    particle: '#cbd5e1',
-    wireOpacity: 0.88,
     glowIntensity: 1.15,
   },
-  // 7. Professional: Royal sapphire & cobalt
-  'professional': {
+  // 2. Electric Blue: Exact --accent (#00e5ff), --accent-secondary (#0077ff), --accent-hover (#38bdf8)
+  'electric-blue': {
+    primaryWire: '#00e5ff',
+    secondaryWire: '#0077ff',
+    connectionNode: '#38bdf8',
+    highlightNode: '#e0f2fe',
+    particle: '#7dd3fc',
+    wireOpacity: 0.94,
+    glowIntensity: 1.15,
+  },
+  // 3. Nordic Frost: Exact --accent (#3b82f6), --accent-secondary (#6366f1), --accent-hover (#60a5fa)
+  'nordic-frost': {
     primaryWire: '#3b82f6',
-    secondaryWire: '#818cf8',
+    secondaryWire: '#6366f1',
     connectionNode: '#60a5fa',
-    highlightNode: '#ffffff',
+    highlightNode: '#f8fafc',
     particle: '#93c5fd',
     wireOpacity: 0.90,
-    glowIntensity: 1.25,
+    glowIntensity: 1.10,
+  },
+  // 4. Midnight Violet: Exact --accent (#a78bfa), --accent-secondary (#9f7aea), --accent-hover (#c4b5fd)
+  'midnight-violet': {
+    primaryWire: '#a78bfa',
+    secondaryWire: '#9f7aea',
+    connectionNode: '#c4b5fd',
+    highlightNode: '#f4f0ff',
+    particle: '#c4b5fd',
+    wireOpacity: 0.90,
+    glowIntensity: 1.05,
+  },
+  // 5. Emerald Noir: Exact --accent (#10b981), --accent-secondary (#14b8a6), --accent-hover (#34d399)
+  'emerald-noir': {
+    primaryWire: '#10b981',
+    secondaryWire: '#14b8a6',
+    connectionNode: '#34d399',
+    highlightNode: '#e6fff5',
+    particle: '#6ee7b7',
+    wireOpacity: 0.90,
+    glowIntensity: 1.10,
+  },
+  // 6. Graphite: Exact --accent (#9ca3af), --accent-secondary (#6b7280), --accent-hover (#d1d5db)
+  'graphite': {
+    primaryWire: '#9ca3af',
+    secondaryWire: '#6b7280',
+    connectionNode: '#d1d5db',
+    highlightNode: '#f8fafc',
+    particle: '#d1d5db',
+    wireOpacity: 0.88,
+    glowIntensity: 1.00,
+  },
+  // 7. Professional: Exact --accent (#2563eb), --accent-secondary (#6366f1), --accent-hover (#3b82f6)
+  'professional': {
+    primaryWire: '#2563eb',
+    secondaryWire: '#6366f1',
+    connectionNode: '#3b82f6',
+    highlightNode: '#eef4ff',
+    particle: '#60a5fa',
+    wireOpacity: 0.90,
+    glowIntensity: 1.10,
   },
 }
 

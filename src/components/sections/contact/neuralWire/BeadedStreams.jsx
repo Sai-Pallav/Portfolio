@@ -1,29 +1,37 @@
-import { memo, useMemo, useEffect, useRef, useContext } from 'react'
+import { memo, useMemo, useEffect, useLayoutEffect, useRef, useContext } from 'react'
 import * as THREE from 'three'
 import { getGlowTexture } from './generateWireGeometry'
-import { FlowTimeContext, TRAVEL_DEFORMATION_GLSL } from './animationContract'
+import {
+  FlowTimeContext,
+  FlowTrigContext,
+  TRAVEL_DEFORMATION_GLSL,
+  DEPTH_DIM_MIN,
+  DEPTH_DIM_MAX,
+} from './animationContract'
 
 const BeadedShader = {
   vertexShader: `
+    attribute float aU;
     attribute float size;
     attribute float alpha;
-    attribute vec3 color;
     uniform float uGlowIntensity;
-    uniform float uNodeScale;
+    uniform float uPointSizeScale;
+    uniform float uDepthDimMin;
+    uniform float uDepthDimMax;
     varying float vAlpha;
-    varying vec3 vColor;
+    varying float vDepthRgbScale;
     ${TRAVEL_DEFORMATION_GLSL}
 
     void main() {
-      vAlpha = alpha * uGlowIntensity;
-      if (uTime > 0.0) {
-        float phase = 6.28318530718 * aRelativeCoord.x;
-        vAlpha *= 1.0 + 0.020 *
-          (sin(phase - FLOW_OMEGA * uTime) - sin(phase));
-      }
-      vColor = color;
+      float phase = 6.28318530718 * aU;
+      vAlpha = alpha * uGlowIntensity * (1.0 + 0.020 * (sin(phase) * (uFlowTrig.x - 1.0) - cos(phase) * uFlowTrig.y));
+      float depthFactor = flowDepthFactor(uDepthDimMin, uDepthDimMax);
+      float rgbScale = min(sqrt(depthFactor), 1.0);
+      float alphaScale = depthFactor / rgbScale;
+      vAlpha *= alphaScale;
+      vDepthRgbScale = rgbScale;
       vec4 mvPosition = flowViewPosition(position);
-      gl_PointSize = clamp(size * uNodeScale * (28.0 / -mvPosition.z) * min(1.25, uGlowIntensity), 1.6, 4.0);
+      gl_PointSize = clamp(size * uPointSizeScale / -mvPosition.z, 1.6, 4.0);
       gl_Position = projectionMatrix * mvPosition;
     }
   `,
@@ -31,11 +39,11 @@ const BeadedShader = {
     uniform vec3 uColor;
     uniform sampler2D uTexture;
     varying float vAlpha;
-    varying vec3 vColor;
+    varying float vDepthRgbScale;
 
     void main() {
       vec4 tex = texture2D(uTexture, gl_PointCoord);
-      vec3 col = dot(vColor, vColor) > 0.0001 ? vColor : uColor;
+      vec3 col = uColor * vDepthRgbScale;
       gl_FragColor = vec4(col, tex.a * clamp(vAlpha, 0.0, 1.0));
     }
   `,
@@ -44,41 +52,56 @@ const BeadedShader = {
 /**
  * 5 Parent-Bound Beaded Dot-Streams (75 beads per strand)
  * Fixed local offsets keep the dots inside their parent ribbon bundles.
- * Softly glowing cyan/blue dots (opacity: 0.55, fading at both ends).
+ * Softly glowing theme-tinted dots (opacity: 0.55, fading at both ends).
  */
 export const BeadedStreams = memo(function BeadedStreams({
   beadedStreamsGeo,
-  themeConfig,
+  themeConfig = {},
   nodeScale = 1.0,
 }) {
   const timeUniform = useContext(FlowTimeContext)
+  const flowTrigUniform = useContext(FlowTrigContext)
   const glow = themeConfig.glowIntensity || 1.0
   const glowTexture = useMemo(() => getGlowTexture(64), [])
 
+  const beadColor = useMemo(() => {
+    const bright = new THREE.Color(themeConfig.connectionNode || themeConfig.primaryWire || '#38d8ff')
+    const base = new THREE.Color(themeConfig.primaryWire || '#0055ff')
+    return bright.lerp(base, 0.35)
+  }, [themeConfig.connectionNode, themeConfig.primaryWire])
+
   const beadedMat = useMemo(() => {
-    const col = new THREE.Color('#38d8ff').lerp(new THREE.Color('#0055ff'), 0.35)
     return new THREE.ShaderMaterial({
       uniforms: {
-        uColor: { value: col },
+        uColor: { value: new THREE.Color() },
         uTexture: { value: glowTexture },
-        uGlowIntensity: { value: glow },
-        uNodeScale: { value: nodeScale },
+        uGlowIntensity: { value: 1.0 },
+        uPointSizeScale: { value: 28.0 },
         uTime: timeUniform,
+        uFlowTrig: flowTrigUniform,
+        uDepthDimMin: { value: DEPTH_DIM_MIN },
+        uDepthDimMax: { value: DEPTH_DIM_MAX },
       },
       vertexShader: BeadedShader.vertexShader,
       fragmentShader: BeadedShader.fragmentShader,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      depthTest: false,
     })
-  }, [glowTexture, glow, nodeScale, timeUniform])
+  }, [glowTexture, timeUniform, flowTrigUniform])
 
-  const prevMatRef = useRef(beadedMat)
+  useLayoutEffect(() => {
+    beadedMat.uniforms.uColor.value.copy(beadColor)
+    beadedMat.uniforms.uTexture.value = glowTexture
+    beadedMat.uniforms.uGlowIntensity.value = glow
+    beadedMat.uniforms.uPointSizeScale.value = 28.0 * nodeScale * Math.min(1.25, glow)
+  }, [beadedMat, beadColor, glowTexture, glow, nodeScale])
+
   useEffect(() => {
-    if (prevMatRef.current && prevMatRef.current !== beadedMat) {
-      prevMatRef.current.dispose()
+    return () => {
+      beadedMat.dispose()
     }
-    prevMatRef.current = beadedMat
   }, [beadedMat])
 
   const meshRef = useRef(null)

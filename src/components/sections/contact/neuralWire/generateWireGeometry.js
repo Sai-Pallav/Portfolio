@@ -4,7 +4,7 @@ import {
   GraphNode,
   segmentsIntersect2D,
 } from './neuralGraphModel.js'
-import { computeNeuralDeformationJS, SIDE_ANIMATION_CONFIG, ANIMATION_CONTRACT_VERSION } from './animationContract.js'
+import { computeNeuralDeformationJS, SIDE_ANIMATION_CONFIG, ANIMATION_CONTRACT_VERSION, DEPTH_NORM_EPS } from './animationContract.js'
 import {
   getAlmondPocketBounds,
   computeRelativeCoordArray,
@@ -237,17 +237,21 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
   const normal = new Float32Array(count * 3)
   const motionCos = new Float32Array(count * 3)
   const motionSin = new Float32Array(count * 3)
+  const invRadiusZ = new Float32Array(count)
   const scratch = new Float64Array(2)
   const ys = new Float64Array(4)
   const zs = new Float64Array(4)
   const stringCount = Math.max(2, Math.min(32, Math.round(config.stringCount ?? 11)))
-  const silkVerticesPerHero = stringCount * 2 * (N_SILK - 1)
+  const silkVerticesPerHero = geometry.index ? stringCount * N_SILK : stringCount * 2 * (N_SILK - 1)
   for (let i = 0; i < count; i++) {
     const u = uArray[i]
     let owner = wireIds?.[i] ?? 0
     if (kind === 'silk') owner = Math.min(3, Math.floor(i / silkVerticesPerHero))
     else if (kind === 'bead') owner = BEAD_PARENTS[owner - 80]
     getHeroMotion(owner, u, H, config, motionCos, motionSin, 3 * i)
+    const cz = motionCos[3 * i + 2]
+    const sz = motionSin[3 * i + 2]
+    invRadiusZ[i] = 1.0 / Math.sqrt(cz * cz + sz * sz + DEPTH_NORM_EPS * DEPTH_NORM_EPS)
     getTravelProfile(owner, u, H, config, scratch)
     profile[4 * i] = scratch[0]
     profile[4 * i + 1] = scratch[1]
@@ -280,6 +284,7 @@ export function addTravelFlowAttributes(geometry, H, config, kind = 'hero') {
   }
   geometry.setAttribute('aFlowCos', new THREE.BufferAttribute(motionCos, 3))
   geometry.setAttribute('aFlowSin', new THREE.BufferAttribute(motionSin, 3))
+  geometry.setAttribute('aFlowInvRadiusZ', new THREE.BufferAttribute(invRadiusZ, 1))
   geometry.setAttribute('aFlowPair', new THREE.BufferAttribute(profile, 4))
   geometry.setAttribute('aFlowMeta', new THREE.BufferAttribute(meta, 2))
   geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
@@ -461,15 +466,34 @@ class ParameterizedPointsBuilder {
 function generateCompanionSilkStrands(side, H, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
-  const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
   const outerFade = config.outerFade !== undefined ? config.outerFade : 0.15
   const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
   const strandSpread = config.strandSpread !== undefined ? config.strandSpread : 1.0
   const stringCount = config.stringCount !== undefined ? Math.max(2, Math.min(32, Math.round(config.stringCount))) : 11
   const stringWidth = config.stringWidth !== undefined ? Math.max(0.1, config.stringWidth) : 1.0
-  const builder = new ParameterizedLineBuilder(innerFade, outerFade, H, config)
+
+  const totalStrands = 4 * stringCount
+  const vertCount = totalStrands * N_SILK
+  const indexCount = totalStrands * (N_SILK - 1) * 2
+
+  const posArr = new Float32Array(vertCount * 3)
+  const uArr = new Float32Array(vertCount)
+  const alphaArr = new Float32Array(vertCount)
+  const colArr = new Float32Array(vertCount * 3)
+  const flowCosArr = new Float32Array(vertCount * 3)
+  const flowSinArr = new Float32Array(vertCount * 3)
+  const invRzArr = new Float32Array(vertCount)
+  const IndexArray = vertCount > 65535 ? Uint32Array : Uint16Array
+  const indexArr = new IndexArray(indexCount)
+
+  const colorScratch = new THREE.Color()
+  const prof = heroProfileScratch
+  let vCursor = 0
+  let iCursor = 0
 
   for (let i = 0; i < 4; i++) {
+    const profileCache = new Map()
+
     for (let k = 0; k < stringCount; k++) {
       const spreadSign = (k % 2 === 0 ? 1.0 : -1.0)
       const kFrac = stringCount > 1 ? k / (stringCount - 1) : 0.5
@@ -493,52 +517,111 @@ function generateCompanionSilkStrands(side, H, config = {}) {
         // Hero 0 & 1 companion strands: Cyan (#30d5ff) & Royal-Blue (#0a52ff)
         hexColor = (k % 2 === 0 ? '#30d5ff' : '#0a52ff')
       }
-      const color = new THREE.Color(hexColor)
+      colorScratch.set(hexColor)
+      const cr = colorScratch.r
+      const cg = colorScratch.g
+      const cb = colorScratch.b
 
-      let prevPt = null
-      let prevU = null
-      let prevW = null
+      let cached = profileCache.get(strandMaxU)
+      if (!cached) {
+        const xs = new Float64Array(N_SILK)
+        const us = new Float64Array(N_SILK)
+        const heroYs = new Float64Array(N_SILK)
+        const heroZs = new Float64Array(N_SILK)
+        const eInners = new Float64Array(N_SILK)
+        const tipTapers = new Float64Array(N_SILK)
+        const outerAlphas = new Float64Array(N_SILK)
+        const cosY = new Float32Array(N_SILK)
+        const cosZ = new Float32Array(N_SILK)
+        const sinY = new Float32Array(N_SILK)
+        const sinZ = new Float32Array(N_SILK)
+        const invRz = new Float32Array(N_SILK)
 
-      for (let s = 0; s < N_SILK; s++) {
-        const u = (s / (N_SILK - 1)) * strandMaxU
-        const x = sign * 10.0 * u
-        const e = env(u, H)
-        // Controlled inner convergence taper retaining healthy bundle volume near u = 0
-        const innerSilkTaper = THREE.MathUtils.smootherstep(u, 0.0, 0.22)
-        // Refined outer tip taper: prevents excessive strand spreading as envelope e(u) grows toward outer ends
-        const tipTaper = 1.0 - 0.48 * THREE.MathUtils.smootherstep(u, 0.55, strandMaxU)
-        const y = HERO_FUNCS[i](u, H, config) + e * innerSilkTaper * (radialSpread * tipTaper * Math.sin(u * Math.PI * freq_k + phase_k))
-        const z = heroZ(i, u, H, config) + e * innerSilkTaper * (0.08 * stringWidth * tipTaper * Math.cos(u * Math.PI * freq_k + phase_k))
-        const pt = new THREE.Vector3(x, y, z)
-        const w = computeConstraintWeight(u)
+        for (let s = 0; s < N_SILK; s++) {
+          const u = (s / (N_SILK - 1)) * strandMaxU
+          getHeroWaveProfile(i, u, H, config, prof)
+          const biasY = prof[0]
+          const biasZ = prof[1]
+          const ampY = prof[2]
+          const ampZ = prof[3]
+          const phase = prof[4]
+          const sinP = Math.sin(phase)
+          const cosP = Math.cos(phase)
 
-        if (prevPt) {
-          const a1 = strandAlpha * computeOuterVertexAlpha(prevU, outerFade, strandMaxU)
-          const a2 = strandAlpha * computeOuterVertexAlpha(u, outerFade, strandMaxU)
-          builder.addSegment(
-            prevPt,
-            prevU,
-            10 + i * 11 + k,
-            prevW,
-            pt,
-            u,
-            10 + i * 11 + k,
-            w,
-            a1,
-            a2,
-            color,
-            color,
-            strandMaxU
-          )
+          xs[s] = sign * 10.0 * u
+          us[s] = u
+          heroYs[s] = biasY + ampY * sinP
+          heroZs[s] = biasZ + ampZ * cosP
+          eInners[s] = env(u, H) * THREE.MathUtils.smootherstep(u, 0.0, 0.22)
+          tipTapers[s] = 1.0 - 0.48 * THREE.MathUtils.smootherstep(u, 0.55, strandMaxU)
+          outerAlphas[s] = computeOuterVertexAlpha(u, outerFade, strandMaxU)
+
+          const cy = ampY * sinP
+          const cz = ampZ * cosP
+          const sy = -ampY * cosP
+          const sz = ampZ * sinP
+          cosY[s] = cy
+          cosZ[s] = cz
+          sinY[s] = sy
+          sinZ[s] = sz
+          invRz[s] = 1.0 / Math.sqrt(cz * cz + sz * sz + DEPTH_NORM_EPS * DEPTH_NORM_EPS)
         }
-        prevPt = pt
-        prevU = u
-        prevW = w
+
+        cached = { xs, us, heroYs, heroZs, eInners, tipTapers, outerAlphas, cosY, cosZ, sinY, sinZ, invRz }
+        profileCache.set(strandMaxU, cached)
       }
+
+      const { xs, us, heroYs, heroZs, eInners, tipTapers, outerAlphas, cosY, cosZ, sinY, sinZ, invRz } = cached
+      const vBase = vCursor
+
+      uArr.set(us, vBase)
+      invRzArr.set(invRz, vBase)
+
+      const zScale = 0.08 * stringWidth
+      for (let s = 0; s < N_SILK; s++) {
+        const u = us[s]
+        const angleK = u * Math.PI * freq_k + phase_k
+        const eInner = eInners[s]
+        const tipTaper = tipTapers[s]
+        const vIdx = vBase + s
+        const v3 = vIdx * 3
+
+        posArr[v3] = xs[s]
+        posArr[v3 + 1] = heroYs[s] + eInner * (radialSpread * tipTaper * Math.sin(angleK))
+        posArr[v3 + 2] = heroZs[s] + eInner * (zScale * tipTaper * Math.cos(angleK))
+
+        alphaArr[vIdx] = strandAlpha * outerAlphas[s]
+
+        colArr[v3] = cr
+        colArr[v3 + 1] = cg
+        colArr[v3 + 2] = cb
+
+        flowCosArr[v3 + 1] = cosY[s]
+        flowCosArr[v3 + 2] = cosZ[s]
+        flowSinArr[v3 + 1] = sinY[s]
+        flowSinArr[v3 + 2] = sinZ[s]
+      }
+
+      for (let s = 0; s < N_SILK - 1; s++) {
+        indexArr[iCursor++] = vBase + s
+        indexArr[iCursor++] = vBase + s + 1
+      }
+
+      vCursor += N_SILK
     }
   }
 
-  return builder.buildGeometry()
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3))
+  geo.setAttribute('aU', new THREE.BufferAttribute(uArr, 1))
+  geo.setAttribute('aAlpha', new THREE.BufferAttribute(alphaArr, 1))
+  geo.setAttribute('color', new THREE.BufferAttribute(colArr, 3))
+  geo.setAttribute('aFlowCos', new THREE.BufferAttribute(flowCosArr, 3))
+  geo.setAttribute('aFlowSin', new THREE.BufferAttribute(flowSinArr, 3))
+  geo.setAttribute('aFlowInvRadiusZ', new THREE.BufferAttribute(invRzArr, 1))
+  geo.setIndex(new THREE.BufferAttribute(indexArr, 1))
+  geo.userData = { isAnimationReady: true, wireParams: WIRE_ANIMATION_PARAMS }
+  return geo
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1139,84 +1222,80 @@ function generate5SweepingOuterBeadedStreams(side, H, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
   const N_DOTS = 75
+  const vertCount = BEAD_PARENTS.length * N_DOTS
   const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
-  const pointsBuilder = new ParameterizedPointsBuilder(H, config)
-  const beadColor = new THREE.Color('#30d5ff').lerp(new THREE.Color('#0055ff'), 0.35)
-
-  // Each dotted stream follows one fixed parent; no mid-stream parent switch.
   const width = Math.max(0.1, config.stringWidth ?? 1.0)
-  const arcConfigs = BEAD_PARENTS.map((owner, i) => {
-    const angle = i * 2 * Math.PI / BEAD_PARENTS.length
-    const offset = (u) => 0.018 * width * THREE.MathUtils.smootherstep(u, 0, 0.08)
-    return {
-      calcY: (u) => computeHeroWaveY(owner, u, H, config) + offset(u) * Math.cos(angle),
-      calcZ: (u) => computeHeroWaveZ(owner, u, H, config) + offset(u) * Math.sin(angle),
-      wireId: 80 + i,
-    }
-  })
 
-  arcConfigs.forEach(({ calcY, calcZ, wireId }) => {
+  const posArr = new Float32Array(vertCount * 3)
+  const uArr = new Float32Array(vertCount)
+  const sizeArr = new Float32Array(vertCount)
+  const alphaArr = new Float32Array(vertCount)
+  const flowCosArr = new Float32Array(vertCount * 3)
+  const flowSinArr = new Float32Array(vertCount * 3)
+  const invRzArr = new Float32Array(vertCount)
+  const prof = heroProfileScratch
+  let vIdx = 0
+
+  for (let i = 0; i < BEAD_PARENTS.length; i++) {
+    const owner = BEAD_PARENTS[i]
+    const angle = (i * 2 * Math.PI) / BEAD_PARENTS.length
+    const cosAng = Math.cos(angle)
+    const sinAng = Math.sin(angle)
+
     for (let idx = 0; idx < N_DOTS; idx++) {
       const t = idx / (N_DOTS - 1)
       const u = 0.22 + t * (0.98 - 0.22)
-      const x = sign * 10.0 * u
-      const y = calcY(u)
-      const z = calcZ(u)
-      const weight = computeConstraintWeight(u)
-      const feather = computeVertexAlpha(u, innerFade)
+      const offset = 0.018 * width * THREE.MathUtils.smootherstep(u, 0, 0.08)
 
-      // Fading at both ends: Math.sin(t * PI)
+      getHeroWaveProfile(owner, u, H, config, prof)
+      const biasY = prof[0]
+      const biasZ = prof[1]
+      const ampY = prof[2]
+      const ampZ = prof[3]
+      const phase = prof[4]
+      const sinP = Math.sin(phase)
+      const cosP = Math.cos(phase)
+
+      const x = sign * 10.0 * u
+      const y = biasY + ampY * sinP + offset * cosAng
+      const z = biasZ + ampZ * cosP + offset * sinAng
+
+      const feather = computeVertexAlpha(u, innerFade)
       const fade = Math.sin(t * Math.PI)
       const alpha = 0.55 * fade * feather
       const size = 0.26 * (0.80 + 0.40 * fade)
 
-      pointsBuilder.addPoint(
-        new THREE.Vector3(x, y, z),
-        u,
-        wireId,
-        weight,
-        size,
-        alpha,
-        beadColor
-      )
+      const cy = ampY * sinP
+      const cz = ampZ * cosP
+      const sy = -ampY * cosP
+      const sz = ampZ * sinP
+
+      const v3 = vIdx * 3
+      posArr[v3] = x
+      posArr[v3 + 1] = y
+      posArr[v3 + 2] = z
+      uArr[vIdx] = u
+      sizeArr[vIdx] = size
+      alphaArr[vIdx] = alpha
+      flowCosArr[v3 + 1] = cy
+      flowCosArr[v3 + 2] = cz
+      flowSinArr[v3 + 1] = sy
+      flowSinArr[v3 + 2] = sz
+      invRzArr[vIdx] = 1.0 / Math.sqrt(cz * cz + sz * sz + DEPTH_NORM_EPS * DEPTH_NORM_EPS)
+      vIdx++
     }
-  })
-
-  return pointsBuilder.buildGeometry(true, true)
-}
-
-
-
-function generate25BackgroundBokehCircles(side, H, prng) {
-  const isLeft = side === 'left'
-  const sign = isLeft ? -1 : 1
-  const pointsBuilder = new ParameterizedPointsBuilder(H)
-  const bokehColor = new THREE.Color('#0048ff')
-
-  for (let b = 0; b < 25; b++) {
-    const u = 0.24 + (b / 24.0) * (0.98 - 0.24)
-    const feather = computeVertexAlpha(u)
-    const weight = computeConstraintWeight(u)
-
-    const x = sign * (10.0 * u + (prng() - 0.5) * 0.40)
-    const y = (prng() - 0.5) * 1.6 * H
-    const z = -0.38 - prng() * 0.35
-
-    const size = 0.45 + prng() * 0.30
-    const alpha = (0.08 + prng() * 0.10) * feather
-
-    pointsBuilder.addPoint(
-      new THREE.Vector3(x, y, z),
-      u,
-      90,
-      weight,
-      size,
-      alpha,
-      bokehColor
-    )
   }
 
-  return pointsBuilder.buildGeometry(true, true)
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3))
+  geo.setAttribute('aU', new THREE.BufferAttribute(uArr, 1))
+  geo.setAttribute('size', new THREE.BufferAttribute(sizeArr, 1))
+  geo.setAttribute('alpha', new THREE.BufferAttribute(alphaArr, 1))
+  geo.setAttribute('aFlowCos', new THREE.BufferAttribute(flowCosArr, 3))
+  geo.setAttribute('aFlowSin', new THREE.BufferAttribute(flowSinArr, 3))
+  geo.setAttribute('aFlowInvRadiusZ', new THREE.BufferAttribute(invRzArr, 1))
+  geo.userData = { isAnimationReady: true, wireParams: WIRE_ANIMATION_PARAMS }
+  return geo
 }
 
 export function get6ExactCurveCrossingFlares(side, H, config = {}) {
@@ -1258,7 +1337,6 @@ function generate900PinpointStardust(side, H, prng, config = {}) {
   const sign = isLeft ? -1 : 1
   const STARDUST_COUNT = 900
   const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
-  const pointsBuilder = new ParameterizedPointsBuilder(H, config)
 
   const colorPalette = [
     new THREE.Color('#1068ff'), // Electric Royal-Blue
@@ -1270,11 +1348,27 @@ function generate900PinpointStardust(side, H, prng, config = {}) {
     new THREE.Color('#e0ffff'), // Crisp White-Cyan
   ]
 
+  const posArr = new Float32Array(STARDUST_COUNT * 3)
+  const sizeArr = new Float32Array(STARDUST_COUNT)
+  const alphaArr = new Float32Array(STARDUST_COUNT)
+  const colArr = new Float32Array(STARDUST_COUNT * 3)
+  const flowCosArr = new Float32Array(STARDUST_COUNT * 3)
+  const flowSinArr = new Float32Array(STARDUST_COUNT * 3)
+  const prof = heroProfileScratch
+
   for (let p = 0; p < STARDUST_COUNT; p++) {
     const u = 0.20 + prng() * (0.98 - 0.20)
     const curveId = Math.floor(prng() * 4)
-    const yBase = HERO_FUNCS[curveId](u, H, config)
-    const zBase = heroZ(curveId, u, H, config)
+    getHeroWaveProfile(curveId, u, H, config, prof)
+    const biasY = prof[0]
+    const biasZ = prof[1]
+    const ampY = prof[2]
+    const ampZ = prof[3]
+    const phase = prof[4]
+    const sinP = Math.sin(phase)
+    const cosP = Math.cos(phase)
+    const yBase = biasY + ampY * sinP
+    const zBase = biasZ + ampZ * cosP
 
     const r1 = prng()
     const r2 = prng()
@@ -1285,7 +1379,6 @@ function generate900PinpointStardust(side, H, prng, config = {}) {
     const y = yBase + gaussY * 0.07 * H
     const z = zBase + gaussZ * 0.07 * H
 
-    const weight = computeConstraintWeight(u)
     const feather = computeVertexAlpha(u, innerFade)
 
     // Tiny 1.0px - 2.2px pinpoint stardust
@@ -1293,18 +1386,30 @@ function generate900PinpointStardust(side, H, prng, config = {}) {
     const alpha = (0.55 + prng() * 0.45) * feather
     const color = colorPalette[Math.floor(prng() * colorPalette.length)]
 
-    pointsBuilder.addPoint(
-      new THREE.Vector3(x, y, z),
-      u,
-      curveId,
-      weight,
-      size,
-      alpha,
-      color
-    )
+    const p3 = p * 3
+    posArr[p3] = x
+    posArr[p3 + 1] = y
+    posArr[p3 + 2] = z
+    sizeArr[p] = size
+    alphaArr[p] = alpha
+    colArr[p3] = color.r
+    colArr[p3 + 1] = color.g
+    colArr[p3 + 2] = color.b
+    flowCosArr[p3 + 1] = ampY * sinP
+    flowCosArr[p3 + 2] = ampZ * cosP
+    flowSinArr[p3 + 1] = -ampY * cosP
+    flowSinArr[p3 + 2] = ampZ * sinP
   }
 
-  return pointsBuilder.buildGeometry(true, true)
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3))
+  geo.setAttribute('size', new THREE.BufferAttribute(sizeArr, 1))
+  geo.setAttribute('alpha', new THREE.BufferAttribute(alphaArr, 1))
+  geo.setAttribute('color', new THREE.BufferAttribute(colArr, 3))
+  geo.setAttribute('aFlowCos', new THREE.BufferAttribute(flowCosArr, 3))
+  geo.setAttribute('aFlowSin', new THREE.BufferAttribute(flowSinArr, 3))
+  geo.userData = { isAnimationReady: true, wireParams: WIRE_ANIMATION_PARAMS }
+  return geo
 }
 
 /**
@@ -1321,62 +1426,186 @@ export function generateSideWireData(side, config = {}) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
   const H = H_VAL
-  const innerFade = config.innerFade !== undefined ? config.innerFade : 0.04
   const outerFade = config.outerFade !== undefined ? config.outerFade : 0.15
   const outerFlex = config.outerFlexibility !== undefined ? config.outerFlexibility : 1.0
 
-  // 1. Build smooth continuous Hero Wave paths (N_HERO = 400 points per wave) with organic staggered outer tips
+  // 1. Precompute smooth continuous Hero Wave samples once per (i, s)
   const heroStrands = []
+  const prof = heroProfileScratch
   for (let i = 0; i < 4; i++) {
-    const pts = []
     const heroMaxU = 1.0 + ([0.05, 0.02, 0.07, 0.04][i] ?? 0.0) * outerFlex
+    const xs = new Float64Array(N_HERO)
+    const ys = new Float64Array(N_HERO)
+    const zs = new Float64Array(N_HERO)
+    const us = new Float32Array(N_HERO)
+    const alphas = new Float32Array(N_HERO)
+    const tapers = new Float64Array(N_HERO)
+    const cosY = new Float32Array(N_HERO)
+    const cosZ = new Float32Array(N_HERO)
+    const sinY = new Float32Array(N_HERO)
+    const sinZ = new Float32Array(N_HERO)
+    const invRz = new Float32Array(N_HERO)
+
     for (let s = 0; s < N_HERO; s++) {
       const u = (s / (N_HERO - 1)) * heroMaxU
-      const x = sign * 10.0 * u
-      const y = HERO_FUNCS[i](u, H, config)
-      const z = heroZ(i, u, H, config)
-      pts.push(new THREE.Vector3(x, y, z))
+      getHeroWaveProfile(i, u, H, config, prof)
+      const biasY = prof[0]
+      const biasZ = prof[1]
+      const ampY = prof[2]
+      const ampZ = prof[3]
+      const phase = prof[4]
+      const sinP = Math.sin(phase)
+      const cosP = Math.cos(phase)
+
+      xs[s] = sign * 10.0 * u
+      ys[s] = biasY + ampY * sinP
+      zs[s] = biasZ + ampZ * cosP
+      us[s] = u
+      alphas[s] = computeOuterVertexAlpha(u, outerFade, heroMaxU)
+      tapers[s] = THREE.MathUtils.smootherstep(u, 0.0, 0.20)
+
+      const cy = ampY * sinP
+      const cz = ampZ * cosP
+      const sy = -ampY * cosP
+      const sz = ampZ * sinP
+      cosY[s] = cy
+      cosZ[s] = cz
+      sinY[s] = sy
+      sinZ[s] = sz
+      invRz[s] = 1.0 / Math.sqrt(cz * cz + sz * sz + DEPTH_NORM_EPS * DEPTH_NORM_EPS)
     }
-    heroStrands.push({ wireId: i, pts, maxU: heroMaxU })
-    graph.primaryFilamentPaths.push({ wireId: i, length: pts.length })
+
+    heroStrands.push({
+      wireId: i,
+      count: N_HERO,
+      xs,
+      ys,
+      zs,
+      us,
+      alphas,
+      tapers,
+      cosY,
+      cosZ,
+      sinY,
+      sinZ,
+      invRz,
+    })
+    graph.primaryFilamentPaths.push({ wireId: i, length: N_HERO })
   }
 
-  // 2. 6-pass micro-offset additive glow bundle builder for Hero Waves
+  // 2. Indexed LineSegments builders for Hero Wave cores and 6-pass aura bundles
   function buildCoreLineGeo(strandList) {
-    const builder = new ParameterizedLineBuilder(innerFade, outerFade, H, config)
-    strandList.forEach(({ wireId, pts, maxU = 1.0 }) => {
-      const count = pts.length
-      for (let i = 0; i < count - 1; i++) {
-        const u1 = (i / (count - 1)) * maxU
-        const u2 = ((i + 1) / (count - 1)) * maxU
-        const w1 = computeConstraintWeight(u1)
-        const w2 = computeConstraintWeight(u2)
-        builder.addSegment(pts[i], u1, wireId, w1, pts[i + 1], u2, wireId, w2, null, null, null, null, maxU)
+    let vertCount = 0
+    let indexCount = 0
+    for (let i = 0; i < strandList.length; i++) {
+      const c = strandList[i].count
+      vertCount += c
+      indexCount += (c - 1) * 2
+    }
+
+    const posArr = new Float32Array(vertCount * 3)
+    const uArr = new Float32Array(vertCount)
+    const alphaArr = new Float32Array(vertCount)
+    const flowCosArr = new Float32Array(vertCount * 3)
+    const flowSinArr = new Float32Array(vertCount * 3)
+    const invRzArr = new Float32Array(vertCount)
+    const IndexArray = vertCount > 65535 ? Uint32Array : Uint16Array
+    const indexArr = new IndexArray(indexCount)
+
+    let vOffset = 0
+    let iCursor = 0
+    for (let l = 0; l < strandList.length; l++) {
+      const { count, xs, ys, zs, us, alphas, cosY, cosZ, sinY, sinZ, invRz } = strandList[l]
+      uArr.set(us, vOffset)
+      alphaArr.set(alphas, vOffset)
+      invRzArr.set(invRz, vOffset)
+
+      for (let s = 0; s < count; s++) {
+        const v3 = (vOffset + s) * 3
+        posArr[v3] = xs[s]
+        posArr[v3 + 1] = ys[s]
+        posArr[v3 + 2] = zs[s]
+        flowCosArr[v3 + 1] = cosY[s]
+        flowCosArr[v3 + 2] = cosZ[s]
+        flowSinArr[v3 + 1] = sinY[s]
+        flowSinArr[v3 + 2] = sinZ[s]
       }
-    })
-    return builder.buildGeometry()
+      for (let s = 0; s < count - 1; s++) {
+        indexArr[iCursor++] = vOffset + s
+        indexArr[iCursor++] = vOffset + s + 1
+      }
+      vOffset += count
+    }
+
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3))
+    geo.setAttribute('aU', new THREE.BufferAttribute(uArr, 1))
+    geo.setAttribute('aAlpha', new THREE.BufferAttribute(alphaArr, 1))
+    geo.setAttribute('aFlowCos', new THREE.BufferAttribute(flowCosArr, 3))
+    geo.setAttribute('aFlowSin', new THREE.BufferAttribute(flowSinArr, 3))
+    geo.setAttribute('aFlowInvRadiusZ', new THREE.BufferAttribute(invRzArr, 1))
+    geo.setIndex(new THREE.BufferAttribute(indexArr, 1))
+    geo.userData = { isAnimationReady: true, wireParams: WIRE_ANIMATION_PARAMS }
+    return geo
   }
 
   function buildOffsetAuraLineGeo(strandList, offsets) {
-    const builder = new ParameterizedLineBuilder(innerFade, outerFade, H, config)
-    strandList.forEach(({ wireId, pts, maxU = 1.0 }) => {
-      const count = pts.length
-      offsets.forEach(({ dy, dz }) => {
-        for (let i = 0; i < count - 1; i++) {
-          const u1 = (i / (count - 1)) * maxU
-          const u2 = ((i + 1) / (count - 1)) * maxU
-          const w1 = computeConstraintWeight(u1)
-          const w2 = computeConstraintWeight(u2)
-          // Controlled inner taper so aura passes maintain cylindrical bulk at u = 0
-          const taper1 = THREE.MathUtils.smootherstep(u1, 0.0, 0.20)
-          const taper2 = THREE.MathUtils.smootherstep(u2, 0.0, 0.20)
-          const p1 = new THREE.Vector3(pts[i].x, pts[i].y + dy * taper1, pts[i].z + dz * taper1)
-          const p2 = new THREE.Vector3(pts[i + 1].x, pts[i + 1].y + dy * taper2, pts[i + 1].z + dz * taper2)
-          builder.addSegment(p1, u1, wireId, w1, p2, u2, wireId, w2, null, null, null, null, maxU)
+    let vertCount = 0
+    let indexCount = 0
+    for (let i = 0; i < strandList.length; i++) {
+      const c = strandList[i].count
+      vertCount += c * offsets.length
+      indexCount += (c - 1) * 2 * offsets.length
+    }
+
+    const posArr = new Float32Array(vertCount * 3)
+    const uArr = new Float32Array(vertCount)
+    const alphaArr = new Float32Array(vertCount)
+    const flowCosArr = new Float32Array(vertCount * 3)
+    const flowSinArr = new Float32Array(vertCount * 3)
+    const invRzArr = new Float32Array(vertCount)
+    const IndexArray = vertCount > 65535 ? Uint32Array : Uint16Array
+    const indexArr = new IndexArray(indexCount)
+
+    let vOffset = 0
+    let iCursor = 0
+    for (let l = 0; l < strandList.length; l++) {
+      const { count, xs, ys, zs, us, alphas, tapers, cosY, cosZ, sinY, sinZ, invRz } = strandList[l]
+      for (let o = 0; o < offsets.length; o++) {
+        const { dy, dz } = offsets[o]
+        uArr.set(us, vOffset)
+        alphaArr.set(alphas, vOffset)
+        invRzArr.set(invRz, vOffset)
+
+        for (let s = 0; s < count; s++) {
+          const v3 = (vOffset + s) * 3
+          const taper = tapers[s]
+          posArr[v3] = xs[s]
+          posArr[v3 + 1] = ys[s] + dy * taper
+          posArr[v3 + 2] = zs[s] + dz * taper
+          flowCosArr[v3 + 1] = cosY[s]
+          flowCosArr[v3 + 2] = cosZ[s]
+          flowSinArr[v3 + 1] = sinY[s]
+          flowSinArr[v3 + 2] = sinZ[s]
         }
-      })
-    })
-    return builder.buildGeometry()
+        for (let s = 0; s < count - 1; s++) {
+          indexArr[iCursor++] = vOffset + s
+          indexArr[iCursor++] = vOffset + s + 1
+        }
+        vOffset += count
+      }
+    }
+
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3))
+    geo.setAttribute('aU', new THREE.BufferAttribute(uArr, 1))
+    geo.setAttribute('aAlpha', new THREE.BufferAttribute(alphaArr, 1))
+    geo.setAttribute('aFlowCos', new THREE.BufferAttribute(flowCosArr, 3))
+    geo.setAttribute('aFlowSin', new THREE.BufferAttribute(flowSinArr, 3))
+    geo.setAttribute('aFlowInvRadiusZ', new THREE.BufferAttribute(invRzArr, 1))
+    geo.setIndex(new THREE.BufferAttribute(indexArr, 1))
+    geo.userData = { isAnimationReady: true, wireParams: WIRE_ANIMATION_PARAMS }
+    return geo
   }
 
   // Hero Waves 0, 1, 3: Cyan-White Core & 6-Pass Royal-Blue (#0048ff) Aura
@@ -1408,17 +1637,13 @@ export function generateSideWireData(side, config = {}) {
   // 6. 6 Exact Curve-Crossing Flares (obsolete / unused by active render tree)
   const focalFlaresGeo = new THREE.BufferGeometry()
 
-  // 7. 25 Soft Out-of-Focus Background Bokeh Discs
-  const bokehGeo = generate25BackgroundBokehCircles(side, H, prng)
+  // 7. Skip dead bokehGeo build while advancing PRNG by 25 * 5 = 125 calls
+  // so stardustGeo positions & attributes stay bit-identical to baseline.
+  for (let b = 0; b < 125; b++) prng()
+  const bokehGeo = null
 
   // 8. 900 Tiny Pinpoint Stardust Specks
   const stardustGeo = generate900PinpointStardust(side, H, prng, config)
-
-  for (const geometry of [primaryCoreGeo, primaryHaloGeo, secondaryGeo, depthGeo, stardustGeo]) {
-    addTravelFlowAttributes(geometry, H, config)
-  }
-  addTravelFlowAttributes(subFilamentsGeo, H, config, 'silk')
-  addTravelFlowAttributes(beadedStreamsGeo, H, config, 'bead')
 
   // Canonical graph exports
   const canonicalModel = graph.exportCanonicalModel()

@@ -185,10 +185,15 @@ export function WireframeConfigProvider({ children }) {
   })
 
   // ── Exactly 2 Ribbons (1 Left, 1 Right) directly derived from configs ──
-  const ribbons = useMemo(() => [
-    { ...leftConfig, id: 0, label: 'Left Ribbon', side: 'left' },
-    { ...rightConfig, id: 1, label: 'Right Ribbon', side: 'right' },
-  ], [leftConfig, rightConfig])
+  const leftRibbon = useMemo(
+    () => ({ ...leftConfig, id: 0, label: 'Left Ribbon', side: 'left' }),
+    [leftConfig]
+  )
+  const rightRibbon = useMemo(
+    () => ({ ...rightConfig, id: 1, label: 'Right Ribbon', side: 'right' }),
+    [rightConfig]
+  )
+  const ribbons = useMemo(() => [leftRibbon, rightRibbon], [leftRibbon, rightRibbon])
 
   // Global window reference for inspection & automated evaluation
   useEffect(() => {

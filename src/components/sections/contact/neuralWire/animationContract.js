@@ -19,9 +19,13 @@ import { createContext } from 'react'
 
 // One uniform object is shared by every animated material in the side scene.
 export const FlowTimeContext = createContext({ value: 0 })
+export const FlowTrigContext = createContext({ value: new THREE.Vector2(1, 0) })
 export const FLOW_SPEED = 1.57079632679 // pi / 2 rad/s = 1 cycle per 4.0s (matching reference video)
 export const FLOW_OMEGA = FLOW_SPEED
 export const FLOW_PERIOD = 2 * Math.PI / FLOW_SPEED
+export const DEPTH_DIM_MIN = 0.60
+export const DEPTH_DIM_MAX = 1.04
+export const DEPTH_NORM_EPS = 0.015
 
 export let isWaveAnimationPaused = false
 
@@ -41,26 +45,23 @@ export function seekWaveAnimationTime(time) {
 // Motion vectors encode the parent's harmonic, never the companion offset.
 // Transform these vectors without translation when baking a world-space mesh.
 export const TRAVEL_DEFORMATION_GLSL = `
-  attribute vec4 aFlowPair;
-  attribute vec2 aFlowMeta;
-  attribute vec3 aFlowAxis;
-  attribute vec4 aFlowFrame;
-  attribute vec4 aFlowWall;
-  attribute vec3 aFlowCenter;
-  attribute vec3 aFlowNormal;
   attribute vec4 aRelativeCoord;
   attribute vec3 aFlowCos;
   attribute vec3 aFlowSin;
+  attribute float aFlowInvRadiusZ;
   uniform float uTime;
+  uniform vec2 uFlowTrig;
 
   // Exact 4.0s wave cycle matching Glowing_wave_ribbons_animating_o... video
   const float FLOW_OMEGA = 1.57079632679;
 
+  vec3 flowLocalPosition(vec3 rest) {
+    return rest + aFlowCos * (uFlowTrig.x - 1.0)
+                + aFlowSin * uFlowTrig.y;
+  }
+
   vec3 flowRibbonPosition(vec3 rest) {
-    float angle = FLOW_OMEGA * uTime;
-    vec3 localPos = rest + aFlowCos * (cos(angle) - 1.0)
-                         + aFlowSin * sin(angle);
-    return (modelMatrix * vec4(localPos, 1.0)).xyz;
+    return (modelMatrix * vec4(flowLocalPosition(rest), 1.0)).xyz;
   }
 
   vec3 flowPosition(vec3 rest) {
@@ -68,15 +69,30 @@ export const TRAVEL_DEFORMATION_GLSL = `
   }
 
   vec4 flowClipPosition(vec3 rest) {
-    if (uTime == 0.0) {
-      return projectionMatrix * modelViewMatrix * vec4(rest, 1.0);
-    }
-    return projectionMatrix * viewMatrix * vec4(flowPosition(rest), 1.0);
+    return projectionMatrix * modelViewMatrix * vec4(flowLocalPosition(rest), 1.0);
   }
 
   vec4 flowViewPosition(vec3 rest) {
-    if (uTime == 0.0) return modelViewMatrix * vec4(rest, 1.0);
-    return viewMatrix * vec4(flowPosition(rest), 1.0);
+    return modelViewMatrix * vec4(flowLocalPosition(rest), 1.0);
+  }
+
+  float flowLocalDzNorm() {
+    float dz = aFlowCos.z * uFlowTrig.x + aFlowSin.z * uFlowTrig.y;
+    return clamp(dz * aFlowInvRadiusZ, -1.0, 1.0);
+  }
+
+  float flowLocalDzNorm(float eps) {
+    return flowLocalDzNorm();
+  }
+
+  float flowDepthFactor(float minFactor, float maxFactor) {
+    float dzNorm = flowLocalDzNorm();
+    float t = smoothstep(0.0, 1.0, 0.5 + 0.5 * dzNorm);
+    return mix(minFactor, maxFactor, t);
+  }
+
+  float flowDepthFactor(float minFactor, float maxFactor, float eps) {
+    return flowDepthFactor(minFactor, maxFactor);
   }
 `
 

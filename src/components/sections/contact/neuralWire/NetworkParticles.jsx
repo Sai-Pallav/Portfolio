@@ -1,7 +1,7 @@
-import { memo, useMemo, useEffect, useRef, useContext } from 'react'
+import { memo, useMemo, useEffect, useLayoutEffect, useRef, useContext } from 'react'
 import * as THREE from 'three'
-import { getGlowTexture, getBokehTexture } from './generateWireGeometry'
-import { FlowTimeContext, TRAVEL_DEFORMATION_GLSL } from './animationContract'
+import { getGlowTexture } from './generateWireGeometry'
+import { FlowTimeContext, FlowTrigContext, TRAVEL_DEFORMATION_GLSL } from './animationContract'
 
 const StardustShader = {
   vertexShader: `
@@ -9,16 +9,29 @@ const StardustShader = {
     attribute float alpha;
     attribute vec3 color;
     uniform float uGlowIntensity;
+    uniform float uPointSizeScale;
+    uniform vec3 uPrimaryColor;
+    uniform vec3 uSecondaryColor;
+    uniform vec3 uParticleColor;
+    uniform vec3 uHighlightColor;
     varying float vAlpha;
     varying vec3 vColor;
     ${TRAVEL_DEFORMATION_GLSL}
 
     void main() {
       vAlpha = alpha * uGlowIntensity;
-      vColor = color;
+      if (color.r > 0.8 && color.g > 0.8 && color.b > 0.8) {
+        vColor = uHighlightColor;
+      } else if (color.r > 0.35 && color.g < 0.6) {
+        vColor = uSecondaryColor;
+      } else if (color.g > 0.65) {
+        vColor = uParticleColor;
+      } else {
+        vColor = uPrimaryColor;
+      }
       vec4 mvPosition = flowViewPosition(position);
       // Crisp 1.0px - 2.2px pinpoint stardust
-      gl_PointSize = clamp(size * (20.0 / -mvPosition.z) * min(1.25, uGlowIntensity), 1.0, 2.2);
+      gl_PointSize = clamp(size * uPointSizeScale / -mvPosition.z, 1.0, 2.2);
       gl_Position = projectionMatrix * mvPosition;
     }
   `,
@@ -35,103 +48,95 @@ const StardustShader = {
 }
 
 /**
- * 900 Tiny Pinpoint Stardust Specks (1.0px–2.2px)
- * + 25 Large Out-of-Focus Royal-Blue Bokeh Circles (opacity: 0.08–0.18) in the outer background.
+ * 900 Tiny Pinpoint Stardust Specks (1.0px–2.2px).
  */
 export const NetworkParticles = memo(function NetworkParticles({
   stardustGeo,
   particlesGeo,
-  bokehGeo,
-  themeConfig,
+  themeConfig = {},
 }) {
   const timeUniform = useContext(FlowTimeContext)
+  const flowTrigUniform = useContext(FlowTrigContext)
   const glowTexture = useMemo(() => getGlowTexture(32), [])
-  const bokehTexture = useMemo(() => getBokehTexture(64), [])
   const glow = themeConfig.glowIntensity || 1.0
+
+  const primaryColor = useMemo(
+    () => new THREE.Color(themeConfig.primaryWire || '#1068ff'),
+    [themeConfig.primaryWire]
+  )
+  const particleColor = useMemo(
+    () => new THREE.Color(themeConfig.particle || themeConfig.connectionNode || '#30d5ff'),
+    [themeConfig.particle, themeConfig.connectionNode]
+  )
+  const secondaryColor = particleColor
+  const highlightColor = useMemo(
+    () => new THREE.Color(themeConfig.highlightNode || '#e0ffff'),
+    [themeConfig.highlightNode]
+  )
 
   const sGeo = stardustGeo || particlesGeo
 
-  // 1. 900 Tiny Pinpoint Stardust Specks (1.0px - 2.2px)
+  // 900 Tiny Pinpoint Stardust Specks (1.0px - 2.2px) (uniforms updated in-place)
   const stardustMat = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
         uTexture: { value: glowTexture },
-        uGlowIntensity: { value: glow },
+        uGlowIntensity: { value: 1.0 },
+        uPointSizeScale: { value: 20.0 },
+        uPrimaryColor: { value: new THREE.Color() },
+        uSecondaryColor: { value: new THREE.Color() },
+        uParticleColor: { value: new THREE.Color() },
+        uHighlightColor: { value: new THREE.Color() },
         uTime: timeUniform,
+        uFlowTrig: flowTrigUniform,
       },
       vertexShader: StardustShader.vertexShader,
       fragmentShader: StardustShader.fragmentShader,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      depthTest: false,
     })
-  }, [glow, glowTexture, timeUniform])
+  }, [glowTexture, timeUniform, flowTrigUniform])
 
-  // 2. 25 Soft Background Bokeh Circles (opacity: 0.08 to 0.18, Royal-Blue #0048ff)
-  const bokehMat = useMemo(() => {
-    const col = new THREE.Color('#0048ff')
-    return new THREE.PointsMaterial({
-      color: col,
-      size: 0.52 * glow,
-      map: bokehTexture,
-      transparent: true,
-      opacity: Math.min(0.18, Math.max(0.08, 0.12 * glow)),
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true,
-    })
-  }, [bokehTexture, glow])
+  useLayoutEffect(() => {
+    stardustMat.uniforms.uTexture.value = glowTexture
+    stardustMat.uniforms.uGlowIntensity.value = glow
+    stardustMat.uniforms.uPointSizeScale.value = 20.0 * Math.min(1.25, glow)
+    stardustMat.uniforms.uPrimaryColor.value.copy(primaryColor)
+    stardustMat.uniforms.uSecondaryColor.value.copy(secondaryColor)
+    stardustMat.uniforms.uParticleColor.value.copy(particleColor)
+    stardustMat.uniforms.uHighlightColor.value.copy(highlightColor)
+  }, [stardustMat, glow, glowTexture, primaryColor, secondaryColor, particleColor, highlightColor])
 
-  const prevMatsRef = useRef({})
   useEffect(() => {
-    const current = { stardustMat, bokehMat }
-    Object.keys(prevMatsRef.current).forEach((k) => {
-      const oldMat = prevMatsRef.current[k]
-      if (oldMat && oldMat !== current[k]) {
-        oldMat.dispose()
-      }
-    })
-    prevMatsRef.current = current
-  }, [stardustMat, bokehMat])
+    return () => {
+      stardustMat.dispose()
+    }
+  }, [stardustMat])
 
-  const bokehMeshRef = useRef(null)
   const stardustMeshRef = useRef(null)
 
   useEffect(() => {
-    if (bokehMeshRef.current) {
-      bokehMeshRef.current.matrixAutoUpdate = false
-      bokehMeshRef.current.updateMatrix()
-    }
     if (stardustMeshRef.current) {
       stardustMeshRef.current.matrixAutoUpdate = false
       stardustMeshRef.current.updateMatrix()
     }
   }, [])
 
+  if (!sGeo) return null
+
   return (
     <group matrixAutoUpdate={false}>
-      {/* 25 Background Soft Bokeh Circles */}
-      {bokehGeo && (
-        <points
-          ref={bokehMeshRef}
-          geometry={bokehGeo}
-          material={bokehMat}
-          matrixAutoUpdate={false}
-          onUpdate={(self) => self.updateMatrix()}
-        />
-      )}
-
       {/* 900 Tiny Pinpoint Stardust Specks */}
-      {sGeo && (
-        <points
-          ref={stardustMeshRef}
-          geometry={sGeo}
-          material={stardustMat}
-          matrixAutoUpdate={false}
-          frustumCulled={false}
-          onUpdate={(self) => self.updateMatrix()}
-        />
-      )}
+      <points
+        ref={stardustMeshRef}
+        geometry={sGeo}
+        material={stardustMat}
+        matrixAutoUpdate={false}
+        frustumCulled={false}
+        onUpdate={(self) => self.updateMatrix()}
+      />
     </group>
   )
 })

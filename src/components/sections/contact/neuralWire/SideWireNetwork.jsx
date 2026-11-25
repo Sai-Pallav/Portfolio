@@ -1,5 +1,6 @@
-import { useMemo, useEffect, useState, useCallback, useRef, memo, Component } from 'react'
-import { Canvas, useThree, useFrame } from '@react-three/fiber'
+import { useMemo, useEffect, useLayoutEffect, useState, useCallback, useRef, useSyncExternalStore, memo, Component } from 'react'
+import * as THREE from 'three'
+import { Canvas, useThree, useFrame, useStore } from '@react-three/fiber'
 import { useReducedMotion } from 'framer-motion'
 import { useThemeContext } from '@/context/ThemeContext'
 import { getWireThemeConfig } from './wireThemeConfig'
@@ -9,16 +10,42 @@ import { WirePaths } from './WirePaths'
 import { BeadedStreams } from './BeadedStreams'
 import { NeuralNetworkField } from './NeuralNetworkField'
 import { NetworkParticles } from './NetworkParticles'
-import { FlowTimeContext, isWaveAnimationPaused } from './animationContract'
+import { FlowTimeContext, FlowTrigContext, FLOW_OMEGA, isWaveAnimationPaused } from './animationContract'
 
 // Temporary visual toggle retained as a one-line rollback switch while Stage 2
 // is validated in the live Contact section.
 const TEMPORARILY_STATIC = false
 const SHOW_NEURAL_NETWORK = false
 
-// The uniform is an imperative GPU value; updating it does not change React state.
-function setFlowTime(uniform, value) {
-  uniform.value = value
+const CANVAS_GL_CONFIG = {
+  depth: false,
+  stencil: false,
+  powerPreference: 'high-performance',
+  antialias: true,
+  alpha: true,
+}
+const CANVAS_CAMERA_CONFIG = { position: [0, 0, 8], fov: 45 }
+const CANVAS_STYLE = { pointerEvents: 'none', width: '100%', height: '100%' }
+
+function subscribeDocumentVisibility(callback) {
+  if (typeof document === 'undefined') return () => {}
+  document.addEventListener('visibilitychange', callback)
+  return () => document.removeEventListener('visibilitychange', callback)
+}
+
+function getDocumentHidden() {
+  return typeof document !== 'undefined' ? document.hidden : false
+}
+
+function getServerDocumentHidden() {
+  return false
+}
+
+// The uniforms are imperative GPU values; updating them does not change React state.
+function setFlowTime(timeUniform, flowTrigUniform, value) {
+  timeUniform.value = value
+  const angle = FLOW_OMEGA * value
+  flowTrigUniform.value.set(Math.cos(angle), Math.sin(angle))
 }
 
 /**
@@ -49,54 +76,81 @@ class CanvasErrorBoundary extends Component {
 /**
  * A single ribbon group with responsive layout, transform & positioning.
  */
-function RibbonGroup({ ribbon, layout, children }) {
+const RibbonGroup = memo(function RibbonGroup({ ribbon, layout, children }) {
   const isLeft = ribbon.side === 'left'
 
   const posX = isLeft
     ? -layout.xStart - (ribbon.xOffset ?? 0)
     : layout.xStart + (ribbon.xOffset ?? 0)
+  const yOffset = ribbon.yOffset ?? 0
+  const zOffset = ribbon.zOffset ?? 0
+  const pitchX = ribbon.pitchX ?? 0
+  const yawY = ribbon.yawY ?? 0
+  const tiltZ = ribbon.tiltZ ?? 0
+
+  const position = useMemo(() => [posX, yOffset, zOffset], [posX, yOffset, zOffset])
+  const scale = useMemo(
+    () => [layout.scaleX, layout.scaleY, layout.scaleZ],
+    [layout.scaleX, layout.scaleY, layout.scaleZ]
+  )
+  const rotation = useMemo(
+    () => [
+      (pitchX * Math.PI) / 180,
+      isLeft ? (yawY * Math.PI) / 180 : -(yawY * Math.PI) / 180,
+      isLeft ? -(tiltZ * Math.PI) / 180 : (tiltZ * Math.PI) / 180,
+    ],
+    [pitchX, yawY, tiltZ, isLeft]
+  )
 
   return (
-    <group
-      position={[
-        posX,
-        ribbon.yOffset ?? 0,
-        ribbon.zOffset ?? 0,
-      ]}
-      scale={[layout.scaleX, layout.scaleY, layout.scaleZ]}
-      rotation={[
-        ((ribbon.pitchX ?? 0) * Math.PI) / 180,
-        isLeft
-          ? ((ribbon.yawY ?? 0) * Math.PI) / 180
-          : -((ribbon.yawY ?? 0) * Math.PI) / 180,
-        isLeft
-          ? -((ribbon.tiltZ ?? 0) * Math.PI) / 180
-          : ((ribbon.tiltZ ?? 0) * Math.PI) / 180,
-      ]}
-    >
+    <group position={position} scale={scale} rotation={rotation}>
       {children}
     </group>
   )
-}
+})
 
 /**
  * Responsive 3D scene containing 4 independent ribbon groups.
  */
-function NeuralScene({ themeKey, isInView, reducedMotion }) {
-  const { viewport, invalidate } = useThree()
+function NeuralScene({ themeKey, isInView, isDocumentHidden, reducedMotion, onContextLost, sceneStoreRef }) {
+  const { gl, viewport, invalidate } = useThree()
+  const store = useStore()
   const timeUniform = useMemo(() => ({ value: 0 }), [])
+  const flowTrigUniform = useMemo(() => ({ value: new THREE.Vector2(1, 0) }), [])
   const elapsed = useRef(0)
   const [isPaused, setIsPaused] = useState(() => isWaveAnimationPaused)
+
+  useLayoutEffect(() => {
+    if (sceneStoreRef) sceneStoreRef.current = store
+    return () => {
+      if (sceneStoreRef && sceneStoreRef.current === store) {
+        sceneStoreRef.current = null
+      }
+    }
+  }, [sceneStoreRef, store])
+
+  useEffect(() => {
+    const canvasEl = gl.domElement
+    const handleContextLost = (e) => {
+      e.preventDefault()
+      onContextLost?.()
+    }
+    canvasEl.addEventListener('webglcontextlost', handleContextLost)
+    return () => {
+      canvasEl.removeEventListener('webglcontextlost', handleContextLost)
+    }
+  }, [gl, onContextLost])
 
   useEffect(() => {
     const handlePause = (e) => {
       setIsPaused(Boolean(e.detail?.paused))
+      setFlowTime(timeUniform, flowTrigUniform, elapsed.current)
       invalidate()
     }
     const handleSeek = (e) => {
       if (typeof e.detail?.time === 'number') {
         elapsed.current = e.detail.time
-        setFlowTime(timeUniform, elapsed.current)
+        setFlowTime(timeUniform, flowTrigUniform, elapsed.current)
         invalidate()
       }
     }
@@ -106,37 +160,74 @@ function NeuralScene({ themeKey, isInView, reducedMotion }) {
       window.removeEventListener('wave-animation-pause-change', handlePause)
       window.removeEventListener('wave-animation-seek', handleSeek)
     }
-  }, [invalidate, timeUniform])
+  }, [invalidate, timeUniform, flowTrigUniform])
 
   useFrame((_, delta) => {
-    if (!isInView || reducedMotion || isPaused) return
+    if (!isInView || isDocumentHidden || reducedMotion || isPaused) return
     // Keep one monotonically advancing phase clock. The shader owns the
     // periodic wave through sin/cos(theta); wrapping this value would reset
     // the animation clock at the cycle boundary.
     elapsed.current += Math.min(delta, 0.05)
-    setFlowTime(timeUniform, elapsed.current)
+    setFlowTime(timeUniform, flowTrigUniform, elapsed.current)
   })
 
+  const isActive = isInView && !isDocumentHidden
+  const isActiveRef = useRef(isActive)
+  const inactiveAtFrameRef = useRef(gl.info.render.frame)
+  const prevActiveRef = useRef(isActive)
+
+  useLayoutEffect(() => {
+    isActiveRef.current = isActive
+    if (!isActive) {
+      store.getState().internal.frames = 0
+    }
+  }, [isActive, store])
+
+  const reducedMountedRef = useRef(false)
   useEffect(() => {
     if (reducedMotion) {
       elapsed.current = 0
-      setFlowTime(timeUniform, 0)
+      setFlowTime(timeUniform, flowTrigUniform, 0)
     }
-    invalidate()
-  }, [reducedMotion, timeUniform, invalidate])
-  const baseThemeConfig = useMemo(() => getWireThemeConfig(themeKey), [themeKey])
-  const { ribbons, leftConfig, rightConfig } = useWireframeConfig()
+    if (!reducedMountedRef.current) {
+      reducedMountedRef.current = true
+      return
+    }
+    if (isActiveRef.current) {
+      invalidate()
+    }
+  }, [reducedMotion, timeUniform, flowTrigUniform, invalidate])
 
-  // Invalidate canvas to re-render when theme, inView, viewport, or ribbon configs update
+  // Trigger a single invalidate() when resuming from document.hidden or off-screen under demand frameloop
+  // only if R3F's frameloop 'never' -> 'demand' transition has not already queued/rendered a frame.
   useEffect(() => {
-    invalidate()
-    const r1 = requestAnimationFrame(() => invalidate())
-    const t1 = setTimeout(() => invalidate(), 100)
-    return () => {
-      cancelAnimationFrame(r1)
-      clearTimeout(t1)
+    if (prevActiveRef.current && !isActive) {
+      inactiveAtFrameRef.current = gl.info.render.frame
+    } else if (!prevActiveRef.current && isActive) {
+      if (
+        gl.info.render.frame === inactiveAtFrameRef.current &&
+        store.getState().internal.frames === 0
+      ) {
+        invalidate()
+      }
     }
-  }, [baseThemeConfig, isInView, viewport.width, viewport.height, leftConfig, rightConfig, ribbons, invalidate])
+    prevActiveRef.current = isActive
+  }, [isActive, gl, store, invalidate])
+
+  const baseThemeConfig = useMemo(() => getWireThemeConfig(themeKey), [themeKey])
+  const { ribbons } = useWireframeConfig()
+
+  // Invalidate canvas once to re-render when theme, viewport, or ribbon configs update
+  const depsMountedRef = useRef(false)
+  useEffect(() => {
+    if (!depsMountedRef.current) {
+      depsMountedRef.current = true
+      return
+    }
+    if (isActiveRef.current) {
+      invalidate()
+    }
+  }, [baseThemeConfig, viewport.width, viewport.height, ribbons, invalidate])
 
   // Responsive layout calculation per ribbon config
   const calculateLayout = useCallback((ribbonConfig) => {
@@ -167,63 +258,73 @@ function NeuralScene({ themeKey, isInView, reducedMotion }) {
     return { xStart: xInner, xEnd: xOuter, span, scaleX, scaleY, scaleZ, nodeScale }
   }, [viewport.width])
 
-  // Per-ribbon geometry & layout (memoized per ribbon's shape params)
-  const ribbonData = useMemo(() => {
-    return ribbons.map(ribbon => {
-      const wireData = getSideWireData(ribbon.side, ribbon)
-      const layout = calculateLayout(ribbon)
-      const themeConfig = {
+  // Decoupled memoization: geometry, layout, and themeConfig update independently
+  const wireEntries = useMemo(
+    () => ribbons.map(ribbon => getSideWireData(ribbon.side, ribbon)),
+    [ribbons]
+  )
+
+  const layouts = useMemo(
+    () => ribbons.map(ribbon => calculateLayout(ribbon)),
+    [ribbons, calculateLayout]
+  )
+
+  const themeConfigs = useMemo(
+    () =>
+      ribbons.map(ribbon => ({
         ...baseThemeConfig,
         glowIntensity: (baseThemeConfig.glowIntensity || 1.0) * (ribbon.glowIntensity ?? 1.0),
         wireOpacity: (baseThemeConfig.wireOpacity || 0.94) * (ribbon.wireOpacity ?? 1.0),
-      }
-      return { ribbon, wireData, layout, themeConfig }
-    })
-  }, [
-    baseThemeConfig,
-    calculateLayout,
-    ribbons,
-  ])
+      })),
+    [baseThemeConfig, ribbons]
+  )
 
   return (
     <FlowTimeContext.Provider value={timeUniform}>
-      <group>
-        {ribbonData.map(({ ribbon, wireData, layout, themeConfig }) => (
-          <RibbonGroup key={ribbon.id} ribbon={ribbon} layout={layout}>
-            <WirePaths
-              primaryCoreGeo={wireData.primaryCoreGeo}
-              primaryHaloGeo={wireData.primaryHaloGeo}
-              secondaryGeo={wireData.secondaryGeo}
-              depthGeo={wireData.depthGeo}
-              subFilamentsGeo={wireData.subFilamentsGeo}
-              themeConfig={themeConfig}
-              innerFade={ribbon.innerFade ?? 0.04}
-            />
-            <BeadedStreams
-              beadedStreamsGeo={wireData.beadedStreamsGeo}
-              themeConfig={themeConfig}
-              nodeScale={layout.nodeScale}
-            />
-            {SHOW_NEURAL_NETWORK && (
-              <NeuralNetworkField
-                linesGeo={wireData.neuralLinesGeo}
-                pointsGeo={wireData.neuralPointsGeo}
-                hazeGeo={wireData.neuralHazeGeo}
-                focalFlaresGeo={wireData.focalFlaresGeo}
-                themeConfig={themeConfig}
-                nodeScale={layout.nodeScale}
-                innerFade={ribbon.innerFade ?? 0.04}
-                side={ribbon.side}
-              />
-            )}
-            <NetworkParticles
-              stardustGeo={wireData.stardustGeo}
-              bokehGeo={wireData.bokehGeo}
-              themeConfig={themeConfig}
-            />
-          </RibbonGroup>
-        ))}
-      </group>
+      <FlowTrigContext.Provider value={flowTrigUniform}>
+        <group>
+          {ribbons.map((ribbon, idx) => {
+            const wireData = wireEntries[idx]
+            const layout = layouts[idx]
+            const themeConfig = themeConfigs[idx]
+            return (
+              <RibbonGroup key={ribbon.id} ribbon={ribbon} layout={layout}>
+                <WirePaths
+                  primaryCoreGeo={wireData.primaryCoreGeo}
+                  primaryHaloGeo={wireData.primaryHaloGeo}
+                  secondaryGeo={wireData.secondaryGeo}
+                  depthGeo={wireData.depthGeo}
+                  subFilamentsGeo={wireData.subFilamentsGeo}
+                  themeConfig={themeConfig}
+                  innerFade={ribbon.innerFade ?? 0.04}
+                />
+                <BeadedStreams
+                  beadedStreamsGeo={wireData.beadedStreamsGeo}
+                  themeConfig={themeConfig}
+                  nodeScale={layout.nodeScale}
+                />
+                {SHOW_NEURAL_NETWORK && (
+                  <NeuralNetworkField
+                    linesGeo={wireData.neuralLinesGeo}
+                    pointsGeo={wireData.neuralPointsGeo}
+                    hazeGeo={wireData.neuralHazeGeo}
+                    focalFlaresGeo={wireData.focalFlaresGeo}
+                    themeConfig={themeConfig}
+                    nodeScale={layout.nodeScale}
+                    innerFade={ribbon.innerFade ?? 0.04}
+                    side={ribbon.side}
+                  />
+                )}
+                <NetworkParticles
+                  stardustGeo={wireData.stardustGeo}
+                  bokehGeo={wireData.bokehGeo}
+                  themeConfig={themeConfig}
+                />
+              </RibbonGroup>
+            )
+          })}
+        </group>
+      </FlowTrigContext.Provider>
     </FlowTimeContext.Provider>
   )
 }
@@ -234,9 +335,26 @@ function NeuralScene({ themeKey, isInView, reducedMotion }) {
  */
 export default memo(function SideWireNetwork({ isInView = true }) {
   const [webglSupported, setWebglSupported] = useState(true)
+  const isDocumentHidden = useSyncExternalStore(
+    subscribeDocumentVisibility,
+    getDocumentHidden,
+    getServerDocumentHidden
+  )
   const prefersReducedMotion = useReducedMotion()
   const reducedMotion = TEMPORARILY_STATIC || prefersReducedMotion
   const themeCtx = useThemeContext()
+  const sceneStoreRef = useRef(null)
+
+  const handleContextLost = useCallback(() => {
+    setWebglSupported(false)
+  }, [])
+
+  useLayoutEffect(() => {
+    const st = sceneStoreRef.current?.getState()
+    if (st && (!isInView || isDocumentHidden)) {
+      st.internal.frames = 0
+    }
+  }, [isInView, isDocumentHidden])
 
   const [domTheme, setDomTheme] = useState(() => {
     if (typeof document !== 'undefined') {
@@ -269,28 +387,20 @@ export default memo(function SideWireNetwork({ isInView = true }) {
     <div className="w-full h-full pointer-events-none relative flex items-center justify-center">
       <CanvasErrorBoundary>
         <Canvas
-          frameloop={isInView ? (reducedMotion ? 'demand' : 'always') : 'never'}
+          frameloop={isInView && !isDocumentHidden ? (reducedMotion ? 'demand' : 'always') : 'never'}
           dpr={[1, 1.5]}
-          gl={{
-            powerPreference: 'high-performance',
-            antialias: true,
-            alpha: true,
-          }}
-          camera={{ position: [0, 0, 8], fov: 45 }}
-          onCreated={({ gl }) => {
-            const canvasEl = gl.domElement
-            const handleContextLost = (e) => {
-              e.preventDefault()
-              setWebglSupported(false)
-            }
-            canvasEl.addEventListener('webglcontextlost', handleContextLost)
-            return () => {
-              canvasEl.removeEventListener('webglcontextlost', handleContextLost)
-            }
-          }}
-          style={{ pointerEvents: 'none', width: '100%', height: '100%' }}
+          gl={CANVAS_GL_CONFIG}
+          camera={CANVAS_CAMERA_CONFIG}
+          style={CANVAS_STYLE}
         >
-          <NeuralScene themeKey={activeTheme} isInView={isInView} reducedMotion={reducedMotion} />
+          <NeuralScene
+            themeKey={activeTheme}
+            isInView={isInView}
+            isDocumentHidden={isDocumentHidden}
+            reducedMotion={reducedMotion}
+            onContextLost={handleContextLost}
+            sceneStoreRef={sceneStoreRef}
+          />
         </Canvas>
       </CanvasErrorBoundary>
     </div>
