@@ -6,8 +6,8 @@ export const DEFAULT_SIDE_CONFIG = {
   lengthMultiplier: 1,       // Total wireframe length multiplier
   breadthMultiplier: 1.35,   // Vertical ribbon breadth / height multiplier
   depthMultiplier: 0.3,      // Depth thickness multiplier
-  strandSpread: 1.65,        // Companion silk strands width/spread multiplier (refined balance)
-  stringCount: 13,           // Number of strings/strands per hero wave
+  strandSpread: 1.8,         // Companion silk strands width/spread multiplier (refined balance)
+  stringCount: 14,           // Number of strings/strands per hero wave
   stringWidth: 0.95,         // Width and thickness of individual strings
 
   // ── Independent End Lengths & Outer Flexibility ──
@@ -21,7 +21,7 @@ export const DEFAULT_SIDE_CONFIG = {
   amplitude: 1.9,            // Wave oscillation amplitude multiplier
   frequency: 0.85,           // Wave frequency / cycles multiplier
   zAmplitude: 1.5,           // Z-depth wave oscillation multiplier
-  wingSweep: 0.34,           // Wing sweep curvature (outer parabolic lift)
+  wingSweep: 0,              // Wing sweep curvature (outer parabolic lift)
 
   // ── 4 Hero Waves (Individual Ribbon Controls - Mirrored Symmetrically) ──
   ribbon1Amp: 1.05,          // Ribbon 1 (Upper Almond Arch, Cyan-White Core)
@@ -43,15 +43,15 @@ export const DEFAULT_SIDE_CONFIG = {
   distRibbon01: 0,           // Distance offset between Ribbon 0 (Upper Arch) and Ribbon 1 (Lower Arch)
   distRibbon12: 0,           // Distance offset between Ribbon 1 (Lower Arch) and Ribbon 2 (Violet Accent)
   distRibbon23: 0,           // Distance offset between Ribbon 2 (Violet Accent) and Ribbon 3 (Counter-Braid)
-  ribbonSpacingOuter: 1.0,   // Distance multiplier between all ribbons at outer wingtips (fanning out)
-  ribbonSpacingInner: 0.9,   // Distance multiplier between all ribbons at inner globe connection (converging)
+  ribbonSpacingOuter: 1,     // Distance multiplier between all ribbons at outer wingtips (fanning out)
+  ribbonSpacingInner: 1,     // Distance multiplier between all ribbons at inner globe connection (converging)
 
   // ── Two Ends Placement ──
   innerGap: -0.42,           // Fine inner gap offset from globe center
   innerYOffset: 0,           // Inner end height offset
   innerFade: 0.25,           // Inner tip feather distance (crisp luminous entry matching reference video)
   outerXOffset: -0.4,        // Fine outer X offset
-  outerYOffset: -0.3,        // Outer end lift/drop
+  outerYOffset: 0,           // Outer end lift/drop
   outerZOffset: -0.3,        // Outer end depth offset
 
   // ── Overall Placement & Tilt ──
@@ -59,7 +59,7 @@ export const DEFAULT_SIDE_CONFIG = {
   xOffset: 0.5,              // Global X offset
   zOffset: 0.15,             // Global Z depth offset
   tiltZ: 0,                  // 2D tilt angle (degrees)
-  pitchX: 2,                 // 3D pitch tilt (degrees)
+  pitchX: 0,                 // 3D pitch tilt (degrees)
   yawY: 16,                  // 3D yaw tilt (degrees)
 
   // ── Styling & Appearance ──
@@ -142,7 +142,7 @@ export const PRESETS = {
   },
 }
 
-const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v28'
+const STORAGE_KEY = 'portfolio_wireframe_ribbon_config_v30'
 
 const WireframeConfigContext = createContext(null)
 
