@@ -186,14 +186,40 @@ function computeThemeRamp(themeConfig, outBase, outMid, outHot) {
     (_cPrimary.b * w1 + _cSecondary.b * w2) / wSum
   )
   outBase.getHSL(_hslScratch)
-  // Keep neutral low-saturation themes (e.g. graphite) slightly subdued so haze stays velvety
-  const maxL = _hslScratch.s < 0.20 ? 0.24 : 0.34
-  const minL = _hslScratch.s < 0.20 ? 0.18 : 0.24
-  const clampedL = Math.max(minL, Math.min(maxL, _hslScratch.l))
-  outBase.setHSL(_hslScratch.h, _hslScratch.s, clampedL)
+  const isNeutral = _hslScratch.s < 0.18
+  // Keep linear saturation vibrant while normalizing perceived luminance across all hues
+  if (!isNeutral && _hslScratch.s < 0.85) {
+    outBase.setHSL(_hslScratch.h, 0.85, _hslScratch.l)
+  }
+  const baseLum = Math.max(1e-4, 0.2126 * outBase.r + 0.7152 * outBase.g + 0.0722 * outBase.b)
+  const targetBaseLum = isNeutral ? 0.085 : 0.135
+  const maxBaseChan = Math.max(outBase.r, outBase.g, outBase.b, 1e-4)
+  const baseScale = Math.min(targetBaseLum / baseLum, 0.72 / maxBaseChan)
+  outBase.multiplyScalar(baseScale)
 
-  outMid.copy(_cNode).lerp(_cParticle, 0.28)
-  outHot.copy(_cHighlight).lerp(_cWhite, 0.72)
+  // Rich saturated theme mid-tint (preserves deep cobalt/violet/emerald without grey-white wash)
+  outMid.copy(_cNode).lerp(_cParticle, 0.24)
+  const dR = _cNode.r - _cParticle.r
+  const dG = _cNode.g - _cParticle.g
+  const dB = _cNode.b - _cParticle.b
+  const nodeSameAsParticle = (dR * dR + dG * dG + dB * dB) < 1e-4
+  if (nodeSameAsParticle) {
+    outMid.lerp(_cPrimary, 0.28)
+  }
+  if (!isNeutral) {
+    outMid.getHSL(_hslScratch)
+    if (_hslScratch.s < 0.80) {
+      outMid.setHSL(_hslScratch.h, 0.80, _hslScratch.l)
+    }
+  }
+  const midLum = Math.max(1e-4, 0.2126 * outMid.r + 0.7152 * outMid.g + 0.0722 * outMid.b)
+  const maxMidLum = isNeutral ? 0.34 : 0.36
+  if (midLum > maxMidLum) {
+    outMid.multiplyScalar(maxMidLum / midLum)
+  }
+
+  // Crisp near-white hot core reserved strictly for Tier-1 pinpoint star centers
+  outHot.copy(_cHighlight).lerp(_cWhite, 0.76)
 }
 
 // Compact 11-attribute vertex interface stays strictly below WebGL's 16-attribute minimum.
@@ -274,31 +300,40 @@ const POCKET_VISIBILITY_GLSL = `
 
 const NeuralLineShader = {
   vertexShader: `
-    attribute vec2 aLineStyle;
+    attribute vec4 aLineStyle;
     uniform vec2 uLineOpacityPair;
     varying float vAlpha;
     varying float vHubAccent;
+    varying vec2 vPulseTrig;
     ${POCKET_VISIBILITY_GLSL}
     void main() {
       PocketEval p = evalPocketVertex(position, 0.5);
       float lineOpacity = mix(uLineOpacityPair.x, uLineOpacityPair.y, aWingSide);
-      float strandYield = mix(0.52, 1.0, smoothstep(0.0, 0.07 * p.radius + 0.014, p.minStrandDist));
+      float strandYield = mix(0.56, 1.0, smoothstep(0.0, 0.06 * p.radius + 0.012, p.minStrandDist));
       vAlpha = aLineStyle.x * lineOpacity * flowPocketVisibility() * strandYield;
       vHubAccent = aLineStyle.y;
+      vPulseTrig = aLineStyle.zw;
       gl_Position = projectionMatrix * p.view;
     }
   `,
   fragmentShader: `
+    uniform vec2 uFlowTrig;
     uniform vec3 uBaseColor;
     uniform vec3 uMidColor;
     uniform vec3 uHotColor;
     varying float vAlpha;
     varying float vHubAccent;
+    varying vec2 vPulseTrig;
     void main() {
       if (vAlpha <= 0.001) discard;
-      vec3 webTint = mix(uBaseColor, uMidColor, 0.75);
-      vec3 lineCol = mix(webTint, uHotColor, 0.24 * clamp(vHubAccent, 0.0, 1.0));
-      gl_FragColor = vec4(lineCol, clamp(vAlpha, 0.0, 0.46));
+      vec2 pDir = vPulseTrig * inversesqrt(max(dot(vPulseTrig, vPulseTrig), 1e-4));
+      float pulse = 0.5 + 0.5 * dot(pDir, uFlowTrig);
+      float pulseWave = pulse * pulse;
+      float accent = clamp(vHubAccent, 0.0, 1.0);
+      float pulseBoost = mix(0.86, 1.18, pulseWave) * (1.0 + 0.14 * accent * pulseWave);
+      vec3 webTint = mix(uBaseColor, uMidColor, 0.66 + 0.14 * pulseWave);
+      vec3 lineCol = mix(webTint, uHotColor, clamp((0.14 + 0.10 * pulseWave) * accent, 0.0, 0.26));
+      gl_FragColor = vec4(lineCol, clamp(vAlpha * pulseBoost, 0.0, 0.44));
     }
   `,
 }
@@ -316,21 +351,33 @@ const NeuralPointShader = {
       vTier = aPointStyle.z;
       float glowIntensity = mix(uGlowIntensityPair.x, uGlowIntensityPair.y, aWingSide);
       float nodeScale = mix(uNodeScalePair.x, uNodeScalePair.y, aWingSide);
-      float depthCue = mix(0.60, 1.0, clamp(0.5 + 0.5 * aRelativeCoord.z, 0.0, 1.0));
-      float funnel = mix(0.75, 1.0, pocketEase((aRelativeCoord.x - 0.06) / 0.22));
+      float zNorm = clamp(0.5 + 0.5 * aRelativeCoord.z, 0.0, 1.0);
+      float depthCue = vTier > 1.5
+        ? mix(0.82, 1.04, zNorm)
+        : mix(0.32, 1.06, zNorm);
+      float depthSize = vTier > 1.5
+        ? mix(0.92, 1.06, zNorm)
+        : mix(0.64, 1.14, zNorm);
+      float funnel = vTier > 1.5
+        ? mix(0.58, 1.0, pocketEase((aRelativeCoord.x - 0.14) / 0.24))
+        : mix(0.76, 1.0, pocketEase((aRelativeCoord.x - 0.06) / 0.20));
       float persp = clamp(8.0 / max(-p.view.z, 1e-4), 0.75, 1.25);
-      float targetCss = aPointStyle.x * nodeScale * funnel * persp;
+      float minFloor = vTier < 1.5 ? 1.45 : 0.0;
+      float targetCss = max(minFloor, aPointStyle.x * nodeScale * funnel * persp * depthSize);
       float maxCss = max(0.0, 2.0 * p.wallClearancePx);
-      float pointCss = clamp(min(targetCss, maxCss), 0.0, 24.0);
+      float maxTierCss = vTier > 1.5 ? 16.5 : 10.5;
+      float pointCss = clamp(min(targetCss, maxCss), 0.0, maxTierCss);
       float wallFade = smoothstep(0.0, 1.5, p.wallClearancePx);
-      float strandYield = mix(0.62, 1.0, smoothstep(0.0, 0.065 * p.radius + 0.014, p.minStrandDist));
+      float strandYield = vTier > 1.5
+        ? mix(0.76, 1.0, smoothstep(0.0, 0.055 * p.radius + 0.012, p.minStrandDist))
+        : mix(0.66, 1.0, smoothstep(0.0, 0.058 * p.radius + 0.012, p.minStrandDist));
       vAlpha = aPointStyle.y * glowIntensity * depthCue * flowPocketVisibility() * wallFade * strandYield;
       float safeDpr = clamp(uPixelRatio, 1.0, 2.5);
       if (pointCss <= 0.05 || vAlpha <= 0.001) {
         gl_PointSize = 0.0;
         vAlpha = 0.0;
       } else {
-        gl_PointSize = min(pointCss * safeDpr, 56.0);
+        gl_PointSize = min(pointCss * safeDpr, 40.0);
       }
       gl_Position = projectionMatrix * p.view;
     }
@@ -346,32 +393,32 @@ const NeuralPointShader = {
       vec2 p = gl_PointCoord - 0.5;
       float r2 = dot(p, p);
       if (r2 >= 0.25) discard;
-      float cutoff = 1.0 - smoothstep(0.12, 0.25, r2);
+      float cutoff = 1.0 - smoothstep(0.11, 0.25, r2);
 
       if (vTier > 1.5) {
-        // Tier 1: Hero Starburst Hub (crisp bright center + luminous bloom + soft halo + subtle 4-point glint)
-        float core = exp(-115.0 * r2);
-        float bloom = exp(-25.0 * r2) * 0.62;
-        float halo = exp(-8.5 * r2) * 0.30 * cutoff;
-        float glint = (exp(-520.0 * p.x * p.x - 28.0 * p.y * p.y)
-          + exp(-520.0 * p.y * p.y - 28.0 * p.x * p.x)) * 0.22 * cutoff;
-        vec3 col = mix(uBaseColor, uMidColor, clamp(bloom * 1.35 + 0.38, 0.0, 1.0));
-        col = mix(col, uHotColor, clamp(core * 1.25 + glint * 0.75, 0.0, 1.0));
+        // Tier 1: Razor-sharp pinpoint core + luminous tight inner bloom + restrained aura + crisp 4-point glint
+        float core = exp(-215.0 * r2);
+        float bloom = exp(-34.0 * r2) * 0.72;
+        float halo = exp(-12.0 * r2) * 0.24 * cutoff;
+        float glint = (exp(-960.0 * p.x * p.x - 48.0 * p.y * p.y)
+          + exp(-960.0 * p.y * p.y - 48.0 * p.x * p.x)) * 0.30 * cutoff;
+        vec3 col = mix(uBaseColor, uMidColor, clamp(bloom * 1.32 + halo * 0.70 + 0.42, 0.0, 1.0));
+        col = mix(col, uHotColor, clamp(core * 1.40 + glint * 0.72, 0.0, 1.0));
         float light = core + bloom + halo + glint;
         gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 1.0));
       } else if (vTier > 0.5) {
-        // Tier 2: Mid Constellation Vertex (clean luminous intersection, odd/even pixel stable)
-        float core = exp(-26.0 * r2) * 0.92;
-        float bloom = exp(-9.5 * r2) * 0.32 * cutoff;
-        vec3 col = mix(uBaseColor, uMidColor, clamp(0.50 + core * 0.55 + bloom * 0.35, 0.0, 1.0));
-        col = mix(col, uHotColor, clamp(core * 0.28, 0.0, 0.28));
+        // Tier 2: Mid Constellation Vertex (richly theme-colored with subtle crisp center)
+        float core = exp(-32.0 * r2) * 0.96;
+        float bloom = exp(-11.0 * r2) * 0.30 * cutoff;
+        vec3 col = mix(uBaseColor, uMidColor, clamp(0.55 + core * 0.45, 0.0, 1.0));
+        col = mix(col, uHotColor, clamp(core * 0.20, 0.0, 0.20));
         float light = (core + bloom) * cutoff;
         gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 0.92));
       } else {
-        // Tier 3: Subtle Micro-Dust (dimmer colored background sparkle visible at DPR 1.0 & 1.5, zero white core)
-        float core = exp(-12.0 * r2) * 0.85 * cutoff;
-        vec3 col = mix(uBaseColor, uMidColor, clamp(0.30 + core * 0.60, 0.0, 0.88));
-        gl_FragColor = vec4(col, clamp(vAlpha * core, 0.0, 0.44));
+        // Tier 3: Volumetric Micro-Dust (rich theme-colored arch & pocket sparkles, zero white wash)
+        float core = exp(-12.0 * r2) * 0.95 * cutoff;
+        vec3 col = mix(uBaseColor, uMidColor, clamp(0.48 + core * 0.52, 0.0, 1.0));
+        gl_FragColor = vec4(col, clamp(vAlpha * core, 0.0, 0.68));
       }
     }
   `,
@@ -385,18 +432,18 @@ const NeuralHazeShader = {
     varying float vAlpha;
     ${POCKET_VISIBILITY_GLSL}
     void main() {
-      PocketEval p = evalPocketVertex(position, 3.0);
+      PocketEval p = evalPocketVertex(position, 3.5);
       float hazeGlow = mix(uHazeGlowPair.x, uHazeGlowPair.y, aWingSide);
       float nodeScale = mix(uNodeScalePair.x, uNodeScalePair.y, aWingSide);
       float outerFadeHaze = 1.0 - pocketEase((aRelativeCoord.x - 0.88) / 0.11);
       float persp = clamp(8.0 / max(-p.view.z, 1e-4), 0.75, 1.25);
-      float targetHazeCss = clamp(p.halfHeightPx * 1.05, 16.0, 74.0) * aHazeStyle.x * nodeScale * persp;
+      float targetHazeCss = clamp(p.halfHeightPx * 1.06, 18.0, 74.0) * aHazeStyle.x * nodeScale * persp;
       float maxCss = max(0.0, 2.0 * p.wallClearancePx);
       float hazeCss = clamp(min(targetHazeCss, maxCss), 0.0, 76.0);
-      float wallFade = smoothstep(0.0, 2.5, p.wallClearancePx);
-      float chamberMask = smoothstep(0.008, 0.13 * p.radius + 0.015, p.minStrandDist);
+      float wallFade = smoothstep(0.0, 3.0, p.wallClearancePx);
+      float outerArchMask = 1.0 - 0.50 * smoothstep(0.58, 0.90, abs(aPocketFrame.x));
       float tipMask = smoothstep(0.025, 0.11, p.radius);
-      vAlpha = aHazeStyle.y * hazeGlow * flowPocketVisibility() * outerFadeHaze * wallFade * chamberMask * tipMask;
+      vAlpha = aHazeStyle.y * hazeGlow * flowPocketVisibility() * outerFadeHaze * wallFade * outerArchMask * tipMask;
       float safeDpr = clamp(uPixelRatio, 1.0, 2.5);
       if (hazeCss <= 0.05 || vAlpha <= 0.0005) {
         gl_PointSize = 0.0;
@@ -416,9 +463,9 @@ const NeuralHazeShader = {
       vec2 p = gl_PointCoord - 0.5;
       float r2 = dot(p, p);
       if (r2 >= 0.25) discard;
-      float falloff = exp(-4.5 * r2) * (1.0 - smoothstep(0.06, 0.25, r2));
-      vec3 hazeCol = mix(uBaseColor, uMidColor, 0.14);
-      gl_FragColor = vec4(hazeCol, min(vAlpha * falloff, 0.080));
+      float falloff = exp(-4.8 * r2) * (1.0 - smoothstep(0.06, 0.25, r2));
+      vec3 hazeCol = mix(uBaseColor, uMidColor, 0.18);
+      gl_FragColor = vec4(hazeCol, min(vAlpha * falloff, 0.088));
     }
   `,
 }
@@ -426,7 +473,7 @@ const NeuralHazeShader = {
 /**
  * NeuralNetworkField:
  * Merges both left/right wings and all depth tiers into at most 3 total draw calls
- * (1 Haze Points, 1 Indexed LineSegments, 1 Star Constellation Points) with
+ * (1 Localized Haze Points, 1 Non-Indexed LineSegments, 1 Star Constellation Points) with
  * zero per-frame CPU rasterization, zero DataTexture cutouts, and in-place uniform updates.
  */
 export const NeuralNetworkField = memo(function NeuralNetworkField({
@@ -686,17 +733,17 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     }
 
     lineMat.uniforms.uLineOpacityPair.value.set(
-      Math.min(1.12, leftGlow * 0.78),
-      Math.min(1.12, rightGlow * 0.78)
+      Math.min(1.12, leftGlow * 0.80),
+      Math.min(1.12, rightGlow * 0.80)
     )
     pointMat.uniforms.uGlowIntensityPair.value.set(
-      Math.min(1.30, leftGlow * 0.94),
-      Math.min(1.30, rightGlow * 0.94)
+      Math.min(1.32, leftGlow * 0.96),
+      Math.min(1.32, rightGlow * 0.96)
     )
     pointMat.uniforms.uNodeScalePair.value.set(leftNS, rightNS)
     hazeMat.uniforms.uHazeGlowPair.value.set(
-      Math.min(1.00, leftGlow * 0.70),
-      Math.min(1.00, rightGlow * 0.70)
+      Math.min(1.06, leftGlow * 0.76),
+      Math.min(1.06, rightGlow * 0.76)
     )
     hazeMat.uniforms.uNodeScalePair.value.set(leftNS, rightNS)
     // eslint-disable-next-line react-hooks/exhaustive-deps
