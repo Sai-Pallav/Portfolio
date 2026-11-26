@@ -16,9 +16,7 @@ import {
   heroZ,
   H_VAL,
   computeConstraintWeight,
-  getTravelProfile,
   getHeroMotion,
-  getSharedWaveFrame,
 } from './generateWireGeometry.js'
 import { segmentsIntersect2D } from './neuralGraphModel.js'
 
@@ -214,102 +212,118 @@ export function computeRelativeCoordArray(pos, u, H = H_VAL, config = {}) {
   return [u, v_rel, w_depth, r_norm]
 }
 
-/** Bind each neural vertex to its two neighboring static hero ribbons. */
-function addPocketTravelAttributes(geometry, H, config) {
+/**
+ * Soft smooth max matching POCKET_VISIBILITY_GLSL's safeMax() to 1e-5 precision.
+ */
+function safeMax(a, b) {
+  const diff = a - b
+  return 0.5 * (a + b + Math.sqrt(diff * diff + 1e-8) - 1e-4)
+}
+
+/** Bake all four live wall harmonics and a normalized vertical coordinate. */
+function addPocketTravelAttributes(geometry, H, config, profiles, maxVClamp = 0.88) {
   const positions = geometry.getAttribute('position').array
-  const us = geometry.getAttribute('aU').array
-  const count = us.length
-  const flowPair = new Float32Array(count * 4)
-  const flowMeta = new Float32Array(count * 2)
+  const relCoords = geometry.getAttribute('aRelativeCoord').array
+  const count = relCoords.length / 4
+  const bias = new Float32Array(count * 4)
+  const cos = new Float32Array(count * 4)
+  const sin = new Float32Array(count * 4)
+  const frame = new Float32Array(count * 3)
   const axis = new Float32Array(count * 3)
-  const frame = new Float32Array(count * 4)
-  const wall = new Float32Array(count * 4)
-  const center = new Float32Array(count * 3)
   const normal = new Float32Array(count * 3)
-  const other0 = new Float32Array(count * 4)
-  const other1 = new Float32Array(count * 4)
-  const ys = new Float64Array(4)
-  const zs = new Float64Array(4)
-  const ids = new Int8Array(4)
-  const profile = new Float64Array(2)
-  const motionCos = new Float32Array(count * 3)
-  const motionSin = new Float32Array(count * 3)
-  const lowCos = new Float64Array(3), lowSin = new Float64Array(3)
-  const highCos = new Float64Array(3), highSin = new Float64Array(3)
+  const depthMotion = new Float32Array(count * 2)
+  const heroes = [heroY0, heroY1, heroY2, heroY3]
+  const c = new Float64Array(3), s = new Float64Array(3)
+
   for (let i = 0; i < count; i++) {
-    const u = us[i]
-    const y = positions[3 * i + 1]
-    ys[0] = heroY0(u, H, config)
-    ys[1] = heroY1(u, H, config)
-    ys[2] = heroY2(u, H, config)
-    ys[3] = heroY3(u, H, config)
-    zs[0] = heroZ(0, u, H, config)
-    zs[1] = heroZ(1, u, H, config)
-    zs[2] = heroZ(2, u, H, config)
-    zs[3] = heroZ(3, u, H, config)
-    for (let k = 0; k < 4; k++) ids[k] = k
-    for (let k = 1; k < 4; k++) {
-      const id = ids[k]
-      let j = k - 1
-      while (j >= 0 && ys[ids[j]] > ys[id]) {
-        ids[j + 1] = ids[j]
-        j--
+    const u = relCoords[4 * i]
+    let profile = profiles.get(u)
+    if (!profile) {
+      profile = {
+        low: Infinity,
+        high: -Infinity,
+        bias: [0, 0, 0, 0],
+        cos: [0, 0, 0, 0],
+        sin: [0, 0, 0, 0],
+        restY: [0, 0, 0, 0],
+        depthCos: [0, 0, 0, 0],
+        depthSin: [0, 0, 0, 0],
       }
-      ids[j + 1] = id
+      for (let j = 0; j < 4; j++) {
+        const y = heroes[j](u, H, config)
+        getHeroMotion(j, u, H, config, c, s)
+        profile.restY[j] = y
+        profile.bias[j] = y - c[1]
+        profile.cos[j] = c[1]
+        profile.sin[j] = s[1]
+        profile.depthCos[j] = c[2]
+        profile.depthSin[j] = s[2]
+        profile.low = Math.min(profile.low, y)
+        profile.high = Math.max(profile.high, y)
+      }
+      // Match safeMax envelope used in GLSL
+      const lo = -safeMax(
+        safeMax(-profile.restY[0], -profile.restY[1]),
+        safeMax(-profile.restY[2], -profile.restY[3])
+      )
+      const hi = safeMax(
+        safeMax(profile.restY[0], profile.restY[1]),
+        safeMax(profile.restY[2], profile.restY[3])
+      )
+      profile.low = lo
+      profile.high = hi
+      profiles.set(u, profile)
     }
-    let pair = 0
-    while (pair < 2 && y > ys[ids[pair + 1]]) pair++
-    const low = ids[pair], high = ids[pair + 1]
-    const height = Math.max(0.0001, ys[high] - ys[low])
-    flowMeta[2 * i] = Math.max(0, Math.min(1, (y - ys[low]) / height))
-    flowMeta[2 * i + 1] = height
-    getSharedWaveFrame(u, H, config, frame, 4 * i)
-    const centerY = frame[4 * i], centerZ = frame[4 * i + 1]
-    getHeroMotion(low, u, H, config, lowCos, lowSin)
-    getHeroMotion(high, u, H, config, highCos, highSin)
-    const attachment = flowMeta[2 * i]
-    for (let j = 0; j < 3; j++) {
-      motionCos[3 * i + j] = lowCos[j] + attachment * (highCos[j] - lowCos[j])
-      motionSin[3 * i + j] = lowSin[j] + attachment * (highSin[j] - lowSin[j])
+
+    for (let j = 0; j < 4; j++) {
+      bias[4 * i + j] = profile.bias[j]
+      cos[4 * i + j] = profile.cos[j]
+      sin[4 * i + j] = profile.sin[j]
     }
-    center[3 * i] = positions[3 * i]
-    center[3 * i + 1] = centerY
-    center[3 * i + 2] = centerZ
-    normal[3 * i + 1] = 1.0
-    wall[4 * i] = ys[low] - centerY
-    wall[4 * i + 1] = zs[low] - centerZ
-    wall[4 * i + 2] = ys[high] - centerY
-    wall[4 * i + 3] = zs[high] - centerZ
-    axis[3 * i] = positions[3 * i] < -0.0001 ? -1 : 1
-    getTravelProfile(low, u, H, config, profile)
-    flowPair[4 * i] = profile[0]
-    flowPair[4 * i + 1] = profile[1]
-    getTravelProfile(high, u, H, config, profile)
-    flowPair[4 * i + 2] = profile[0]
-    flowPair[4 * i + 3] = profile[1]
-    let otherSlot = 0
-    for (let k = 0; k < 4; k++) {
-      const id = ids[k]
-      if (id === low || id === high) continue
-      const other = otherSlot++ === 0 ? other0 : other1
-      getTravelProfile(id, u, H, config, profile)
-      other[4 * i] = profile[0]
-      other[4 * i + 1] = profile[1]
-      other[4 * i + 2] = ys[id] - y
-      other[4 * i + 3] = zs[id] - positions[3 * i + 2]
+
+    const yRest = positions[3 * i + 1]
+    const zRest = positions[3 * i + 2]
+
+    // Inverse vertical proximity weighting across all 4 strands prevents phase cancellation
+    let sumW = 0.0
+    let dCos = 0.0
+    let dSin = 0.0
+    for (let j = 0; j < 4; j++) {
+      const w = 1.0 / (Math.abs(yRest - profile.restY[j]) + 0.05)
+      sumW += w
+      dCos += w * profile.depthCos[j]
+      dSin += w * profile.depthSin[j]
     }
+    const invSumW = sumW > 1e-6 ? 1.0 / sumW : 0.25
+    depthMotion[2 * i] = dCos * invSumW * 0.25
+    depthMotion[2 * i + 1] = dSin * invSumW * 0.25
+
+    const low = profile.low
+    const high = profile.high
+    const center = (low + high) * 0.5
+    const radius = Math.max((high - low) * 0.5, 1e-5)
+    const vFrame = Math.max(-maxVClamp, Math.min(maxVClamp, (yRest - center) / radius))
+
+    frame[3 * i] = vFrame
+    frame[3 * i + 1] = zRest
+    frame[3 * i + 2] = radius
+
+    // Keep synced v_frame in aRelativeCoord.y as well
+    relCoords[4 * i + 1] = vFrame
+
+    positions[3 * i + 1] = 0
+    positions[3 * i + 2] = 0
+    axis[3 * i + 1] = 1
+    normal[3 * i + 2] = 1
   }
-  geometry.setAttribute('aFlowCos', new THREE.BufferAttribute(motionCos, 3))
-  geometry.setAttribute('aFlowSin', new THREE.BufferAttribute(motionSin, 3))
-  geometry.setAttribute('aFlowPair', new THREE.BufferAttribute(flowPair, 4))
-  geometry.setAttribute('aFlowMeta', new THREE.BufferAttribute(flowMeta, 2))
+
+  geometry.setAttribute('aWaveBias', new THREE.BufferAttribute(bias, 4))
+  geometry.setAttribute('aWaveCos', new THREE.BufferAttribute(cos, 4))
+  geometry.setAttribute('aWaveSin', new THREE.BufferAttribute(sin, 4))
+  geometry.setAttribute('aDepthMotion', new THREE.BufferAttribute(depthMotion, 2))
+  geometry.setAttribute('aPocketFrame', new THREE.BufferAttribute(frame, 3))
   geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
-  geometry.setAttribute('aFlowFrame', new THREE.BufferAttribute(frame, 4))
-  geometry.setAttribute('aFlowWall', new THREE.BufferAttribute(wall, 4))
-  geometry.setAttribute('aFlowCenter', new THREE.BufferAttribute(center, 3))
   geometry.setAttribute('aFlowNormal', new THREE.BufferAttribute(normal, 3))
-  geometry.setAttribute('aFlowOther0', new THREE.BufferAttribute(other0, 4))
-  geometry.setAttribute('aFlowOther1', new THREE.BufferAttribute(other1, 4))
 }
 
 /**
@@ -375,15 +389,35 @@ export function generateMarginAnchors(side, H = H_VAL, config = {}, count = 64) 
  * 1D Lookup Table (LUT) of sorted active ribbon bounds along u once per build (Requirement 4).
  */
 export class RibbonBoundsLUT {
-  constructor(H = H_VAL, config = {}, samples = 1024) {
+  constructor(H = H_VAL, config = {}, samples = 1024, phases = 8) {
     this.samples = samples
+    this.phases = phases
     this.H = H
     this.config = config
     // Float64 preserves the original double-precision interpolation decisions.
     this.data = new Float64Array((samples + 1) * 17)
+    this.phaseMinY = new Float64Array((samples + 1) * phases)
+    this.phaseMaxY = new Float64Array((samples + 1) * phases)
+    this.maxEnvHeight = 0.0
+
+    const phaseCos = new Float64Array(phases)
+    const phaseSin = new Float64Array(phases)
+    for (let p = 0; p < phases; p++) {
+      const theta = (p * 2.0 * Math.PI) / phases
+      phaseCos[p] = Math.cos(theta)
+      phaseSin[p] = Math.sin(theta)
+    }
+
+    const c = new Float64Array(3)
+    const s = new Float64Array(3)
+    const bias = new Float64Array(4)
+    const cosY = new Float64Array(4)
+    const sinY = new Float64Array(4)
+
     const sample = {}
     for (let i = 0; i <= samples; i++) {
-      getAlmondPocketBounds(i / samples, H, config, sample)
+      const u = i / samples
+      getAlmondPocketBounds(u, H, config, sample)
       const offset = i * 17
       this.data[offset + 0] = sample.y0
       this.data[offset + 1] = sample.y1
@@ -402,6 +436,30 @@ export class RibbonBoundsLUT {
       this.data[offset + 14] = sample.envCenterZ
       this.data[offset + 15] = sample.safeMargin
       this.data[offset + 16] = sample.minGapHeight
+
+      if (u >= 0.08 && u <= 0.99 && sample.envHeight > this.maxEnvHeight) {
+        this.maxEnvHeight = sample.envHeight
+      }
+
+      for (let j = 0; j < 4; j++) {
+        const y0 = j === 0 ? sample.y0 : j === 1 ? sample.y1 : j === 2 ? sample.y2 : sample.y3
+        getHeroMotion(j, u, H, config, c, s, 0)
+        bias[j] = y0 - c[1]
+        cosY[j] = c[1]
+        sinY[j] = s[1]
+      }
+
+      const pBase = i * phases
+      for (let p = 0; p < phases; p++) {
+        const ct = phaseCos[p]
+        const st = phaseSin[p]
+        const yA = bias[0] + cosY[0] * ct + sinY[0] * st
+        const yB = bias[1] + cosY[1] * ct + sinY[1] * st
+        const yC = bias[2] + cosY[2] * ct + sinY[2] * st
+        const yD = bias[3] + cosY[3] * ct + sinY[3] * st
+        this.phaseMinY[pBase + p] = -safeMax(safeMax(-yA, -yB), safeMax(-yC, -yD))
+        this.phaseMaxY[pBase + p] = safeMax(safeMax(yA, yB), safeMax(yC, yD))
+      }
     }
     this._reusableBounds = {
       u: -0,
@@ -414,9 +472,36 @@ export class RibbonBoundsLUT {
       safeMargin: -0,
       minGapHeight: -0,
     }
+    this._reusablePhase = { lo: 0, hi: 0, center: 0, radius: 1e-5 }
     this._ribbons = Array.from({ length: 4 }, (_, id) => ({ id, y: 0, z: 0 }))
     this._pocketPool = Array.from({ length: 3 }, () => ({}))
     this._pockets = []
+  }
+
+  getPhaseBounds(u, phaseIdx, out = this._reusablePhase) {
+    const su = Math.max(0, Math.min(1, u)) * this.samples
+    const i = Math.floor(su)
+    const f = su - i
+    const phases = this.phases
+    if (i >= this.samples) {
+      const idx = this.samples * phases + phaseIdx
+      const lo = this.phaseMinY[idx]
+      const hi = this.phaseMaxY[idx]
+      out.lo = lo
+      out.hi = hi
+      out.center = 0.5 * (lo + hi)
+      out.radius = Math.max(0.5 * (hi - lo), 1e-5)
+      return out
+    }
+    const idx0 = i * phases + phaseIdx
+    const idx1 = idx0 + phases
+    const lo = this.phaseMinY[idx0] + f * (this.phaseMinY[idx1] - this.phaseMinY[idx0])
+    const hi = this.phaseMaxY[idx0] + f * (this.phaseMaxY[idx1] - this.phaseMaxY[idx0])
+    out.lo = lo
+    out.hi = hi
+    out.center = 0.5 * (lo + hi)
+    out.radius = Math.max(0.5 * (hi - lo), 1e-5)
+    return out
   }
 
   getBounds(u, out = this._reusableBounds) {
@@ -629,7 +714,7 @@ export class SpatialGrid3D {
     let used = 0
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i]
-      const count = this.queryRadius(node.pos.x, node.pos.y, node.pos.z, 0.42 * (node.hu + 0.035) + 0.030, nodes)
+      const count = this.queryRadius(node.pos.x, node.pos.y, node.pos.z, Math.min(0.24, 0.42 * (node.hu + 0.035) + 0.030), nodes)
       while (used + count > ids.length) {
         const nextIds = new Int32Array(ids.length * 2), nextDistances = new Float64Array(ids.length * 2)
         nextIds.set(ids); nextDistances.set(distances)
@@ -687,6 +772,84 @@ export class SpatialGrid3D {
 }
 
 /**
+ * 2D Isotropic Spatial Grid for accelerated blue-noise spacing and k-NN queries.
+ */
+class IsotropicGrid2D {
+  constructor(cellSize = 0.25) {
+    this.cellSize = cellSize
+    this.invCellSize = 1 / cellSize
+    this.cells = new IntegerBuckets()
+    this.queryIds = new Int32Array(256)
+    this.queryDistances = new Float64Array(256)
+  }
+
+  _key(ix, iy) {
+    return ((ix * 73856093) ^ (iy * 19349663)) | 0
+  }
+
+  insert(x, isoY, id) {
+    const ix = Math.floor(x * this.invCellSize)
+    const iy = Math.floor(isoY * this.invCellSize)
+    this.cells.insert(this._key(ix, iy), id)
+  }
+
+  hasNeighborWithin(isoX, isoY, minDist, nodes, searchRadius = minDist, minHubDist = minDist) {
+    const minX = Math.floor((isoX - searchRadius) * this.invCellSize)
+    const maxX = Math.floor((isoX + searchRadius) * this.invCellSize)
+    const minY = Math.floor((isoY - searchRadius) * this.invCellSize)
+    const maxY = Math.floor((isoY + searchRadius) * this.invCellSize)
+
+    for (let ix = minX; ix <= maxX; ix++) {
+      for (let iy = minY; iy <= maxY; iy++) {
+        for (let entry = this.cells.first(this._key(ix, iy)); entry !== -1; entry = this.cells.next[entry]) {
+          const other = nodes[this.cells.ids[entry]]
+          const dx = (other.isoX ?? other.pos.x) - isoX
+          const dy = other.isoY - isoY
+          const d2 = dx * dx + dy * dy
+          const req = other.tier === 2 ? minHubDist : minDist
+          if (d2 < req * req) return true
+        }
+      }
+    }
+    return false
+  }
+
+  queryRadius(isoX, isoY, radius, nodes) {
+    let count = 0
+    const r2 = radius * radius
+    const minX = Math.floor((isoX - radius) * this.invCellSize)
+    const maxX = Math.floor((isoX + radius) * this.invCellSize)
+    const minY = Math.floor((isoY - radius) * this.invCellSize)
+    const maxY = Math.floor((isoY + radius) * this.invCellSize)
+
+    for (let ix = minX; ix <= maxX; ix++) {
+      for (let iy = minY; iy <= maxY; iy++) {
+        for (let entry = this.cells.first(this._key(ix, iy)); entry !== -1; entry = this.cells.next[entry]) {
+          const id = this.cells.ids[entry]
+          const other = nodes[id]
+          const dx = (other.isoX ?? other.pos.x) - isoX
+          const dy = other.isoY - isoY
+          const d2 = dx * dx + dy * dy
+          if (d2 <= r2) {
+            if (count === this.queryIds.length) {
+              const ids = new Int32Array(count * 2)
+              const distances = new Float64Array(count * 2)
+              ids.set(this.queryIds)
+              distances.set(this.queryDistances)
+              this.queryIds = ids
+              this.queryDistances = distances
+            }
+            this.queryIds[count] = id
+            this.queryDistances[count++] = Math.sqrt(d2)
+          }
+        }
+      }
+    }
+    return count
+  }
+}
+
+/**
  * 2D Spatial Grid for fast edge crossing validation without heap allocations.
  */
 class EdgeGrid2D {
@@ -716,13 +879,12 @@ class EdgeGrid2D {
 
     for (let ix = minX; ix <= maxX; ix++) {
       for (let iy = minY; iy <= maxY; iy++) {
-        const k = this._key(ix, iy)
-        this.cells.insert(k, edgeIdx)
+        this.cells.insert(this._key(ix, iy), edgeIdx)
       }
     }
   }
 
-  hasCrossing(pA, pB, candI, candJ, edges, rawNodes, targetTier) {
+  hasCrossing(pA, pB, candI, candJ, edges, rawNodes, sameTierOnly = false, targetTier = null) {
     const minX = Math.floor(Math.min(pA.x, pB.x) * this.invCellSize)
     const maxX = Math.floor(Math.max(pA.x, pB.x) * this.invCellSize)
     const minY = Math.floor(Math.min(pA.y, pB.y) * this.invCellSize)
@@ -741,10 +903,9 @@ class EdgeGrid2D {
           if (i === candI || j === candI || i === candJ || j === candJ) continue
           const eA = rawNodes[i]
           const eB = rawNodes[j]
-          if (eA.depthTier === targetTier && eB.depthTier === targetTier) {
-            if (segmentsIntersect2D(pA, pB, eA.pos, eB.pos)) {
-              return true
-            }
+          if (sameTierOnly && (eA.depthTier !== targetTier || eB.depthTier !== targetTier)) continue
+          if (segmentsIntersect2D(pA, pB, eA.isoPos, eB.isoPos)) {
+            return true
           }
         }
       }
@@ -754,892 +915,518 @@ class EdgeGrid2D {
 }
 
 /**
- * Checks if a candidate line segment intersects any wave ribbon filament core using the 1D LUT.
- * Uses squared distances to eliminate heavy Math.hypot / Math.sqrt calls across tens of thousands of edge tests.
+ * Validates that a candidate line segment (A -> B) stays strictly inside the live
+ * 4-strand outer envelope across all 8 animation cycle phases at midpoints 0.25, 0.50, 0.75.
  */
-function crossesFilamentChord(ay, az, by, bz) {
-  const dy = by - ay, dz = bz - az
-  const length2 = dy * dy + dz * dz
-  const t = length2 > 1e-16 ? Math.max(0, Math.min(1, -(ay * dy + az * dz) / length2)) : 0
-  const y = ay + t * dy, z = az + t * dz
-  return y * y + z * z < 0.007 * 0.007
-}
+function segmentInside8PhaseEnvelope(uA, vA, uB, vB, lut, marginFraction = 0.045) {
+  const b = lut._reusablePhase
+  const phases = lut.phases || 8
+  for (let p = 0; p < phases; p++) {
+    lut.getPhaseBounds(uA, p, b)
+    const yA = b.center + b.radius * vA
+    lut.getPhaseBounds(uB, p, b)
+    const yB = b.center + b.radius * vB
 
-function crossesRibbonIntervals(pA, uA, pB, uB, lut) {
-  if (uB < uA) return crossesRibbonIntervals(pB, uB, pA, uA, lut)
-  const du = uB - uA, dy = pB.y - pA.y, dz = pB.z - pA.z
-  const b = lut.getBounds(uA)
-  if (pA.y > b.envMaxY + 0.014 || pA.y < b.envMinY - 0.014) return true
-  let y0 = pA.y - b.y0, z0 = pA.z - b.z0
-  let y1 = pA.y - b.y1, z1 = pA.z - b.z1
-  let y2 = pA.y - b.y2, z2 = pA.z - b.z2
-  let y3 = pA.y - b.y3, z3 = pA.z - b.z3
-  let t = 0
-  while (t < 1) {
-    const u = uA + t * du
-    const nextKnot = (Math.floor(u * lut.samples + 1e-8) + 1) / lut.samples
-    let nextT = du > 1e-12 ? Math.min(1, (nextKnot - uA) / du) : 1
-    // Explicit midpoint, plus every LUT knot: the relative chord is linear
-    // on each interval, so its closest approach cannot fall between tests.
-    if (t < 0.5 && nextT > 0.5) nextT = 0.5
-    const y = pA.y + nextT * dy, z = pA.z + nextT * dz
-    lut.getBounds(uA + nextT * du, b)
-    if (y > b.envMaxY + 0.014 || y < b.envMinY - 0.014) return true
-    const ny0 = y - b.y0, nz0 = z - b.z0
-    const ny1 = y - b.y1, nz1 = z - b.z1
-    const ny2 = y - b.y2, nz2 = z - b.z2
-    const ny3 = y - b.y3, nz3 = z - b.z3
-    if (crossesFilamentChord(y0, z0, ny0, nz0) || crossesFilamentChord(y1, z1, ny1, nz1)
-      || crossesFilamentChord(y2, z2, ny2, nz2) || crossesFilamentChord(y3, z3, ny3, nz3)) return true
-    y0 = ny0; z0 = nz0
-    y1 = ny1; z1 = nz1
-    y2 = ny2; z2 = nz2
-    y3 = ny3; z3 = nz3
-    t = nextT
-  }
-  return false
-}
-
-function doesSegmentIntersectRibbonsLUT(pA, uA, pB, uB, lut, isTether = false) {
-  if (!isTether) return crossesRibbonIntervals(pA, uA, pB, uB, lut)
-  // Even subdivision includes the exact midpoint; endpoints are checked too.
-  const samples = 8
-  const marginTol = isTether ? 0.006 : 0.014
-  const filamentTol = isTether ? 0.0060 : 0.0070
-  const filamentTol2 = filamentTol * filamentTol
-  const du = (uB - uA) / samples
-  const dy = (pB.y - pA.y) / samples
-  const dz = (pB.z - pA.z) / samples
-
-  const bounds = lut._reusableBounds
-
-  for (let s = 0; s <= samples; s++) {
-    const ut = uA + s * du
-    const yt = pA.y + s * dy
-    const zt = pA.z + s * dz
-
-    lut.getBounds(ut, bounds)
-    if (yt > bounds.envMaxY + marginTol || yt < bounds.envMinY - marginTol) {
-      return true
+    for (let s = 1; s <= 3; s++) {
+      const t = s * 0.25
+      const ut = uA + t * (uB - uA)
+      const yt = yA + t * (yB - yA)
+      lut.getPhaseBounds(ut, p, b)
+      const h = Math.max(0.0, b.hi - b.lo)
+      const margin = Math.max(0.005, marginFraction * h)
+      if (yt > b.hi - margin || yt < b.lo + margin) {
+        return false
+      }
     }
-
-    // Margin anchors terminate on the ribbon; only that endpoint is exempt.
-    if (isTether && s === samples) continue
-    const d0y = yt - bounds.y0
-    const d0z = zt - bounds.z0
-    if (d0y * d0y + d0z * d0z < filamentTol2) return true
-
-    const d1y = yt - bounds.y1
-    const d1z = zt - bounds.z1
-    if (d1y * d1y + d1z * d1z < filamentTol2) return true
-
-    const d2y = yt - bounds.y2
-    const d2z = zt - bounds.z2
-    if (d2y * d2y + d2z * d2z < filamentTol2) return true
-
-    const d3y = yt - bounds.y3
-    const d3z = zt - bounds.z3
-    if (d3y * d3y + d3z * d3z < filamentTol2) return true
   }
-  return false
+  return true
 }
 
-function getMinFilamentClearance(y, z, b) {
-  const d0y = y - b.y0, d0z = z - b.z0
-  const d1y = y - b.y1, d1z = z - b.z1
-  const d2y = y - b.y2, d2z = z - b.z2
-  const d3y = y - b.y3, d3z = z - b.z3
-  const d02 = d0y * d0y + d0z * d0z
-  const d12 = d1y * d1y + d1z * d1z
-  const d22 = d2y * d2y + d2z * d2z
-  const d32 = d3y * d3y + d3z * d3z
-  return Math.sqrt(Math.min(d02, d12, d22, d32))
+function computeVMax(envHeight, isoYScale, maxFrac, minIsoMargin) {
+  const halfIso = 0.5 * envHeight * isoYScale
+  if (halfIso <= minIsoMargin + 1e-4) return 0.0
+  return Math.max(0.0, Math.min(maxFrac, 1.0 - Math.max(1.0 - maxFrac, minIsoMargin / halfIso)))
 }
 
-// Keep the sampling and topology loops independently optimizable by the JS engine.
-function sampleNeuralNodes(sign, projectionAspect, lut, prng, minSubGap) {
-  // 2. True 3D Poisson-Disk Volumetric Sampling across all open sub-pockets
+function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) {
   const rawNodes = []
-  const grid = new SpatialGrid3D(0.10)
-  const projectedGrid = new SpatialGrid3D(0.10)
-  const basePockets = []
-  const basePocketPool = Array.from({ length: 3 }, () => ({}))
+  const gridCell = Math.max(0.08, 0.20 * envScale)
+  const grid = new IsotropicGrid2D(gridCell)
+  const phaseBuf = { lo: 0, hi: 0, center: 0, radius: 1e-5 }
 
-  // Equal longitudinal bins and area-weighted darts avoid density steps at
-  // u=.12/.22/.90. A separate borrowed-record pool survives nested LUT queries.
-  const du = 0.004
-  for (let uBin = 0.078; uBin < 1.0; uBin += du) {
-    const tipTaper = THREE.MathUtils.smoothstep(uBin, 0.06, 0.20)
-    if (tipTaper <= 0.001) continue
+  function runTierPass({
+    uStart,
+    uEnd,
+    cellIso,
+    minIsoHeight,
+    maxVFrac,
+    minIsoMargin,
+    minDistExisting,
+    minDistHub,
+    searchRadius,
+    tier,
+    isWeb,
+    maxAttempts,
+    wDepthMin,
+    wDepthMax,
+    organicCluster = false,
+  }) {
+    const du = cellIso / (10.0 * isoXScale)
+    for (let u0 = uStart; u0 < uEnd; u0 += du) {
+      const u1 = Math.min(uEnd, u0 + du)
+      const stripDu = u1 - u0
+      if (stripDu < 0.002) continue
+      const uMid = 0.5 * (u0 + u1)
+      const bMid = lut.getBounds(uMid)
+      if (bMid.envHeight * isoYScale < minIsoHeight) continue
 
-    const pocketsCheck = lut.getSubPockets(uBin, minSubGap, basePockets, basePocketPool)
-    if (pocketsCheck.length === 0) continue
-
-    for (const basePocket of pocketsCheck) {
-      const throatFactor = THREE.MathUtils.smoothstep(basePocket.height, minSubGap, 0.09)
-      const baseDarts = Math.max(2, Math.round(
-        (3 + 16 * basePocket.height) * (0.45 + 0.55 * throatFactor) * (0.65 + 0.35 * tipTaper)
-      ))
-
-      for (let d = 0; d < baseDarts; d++) {
-        const u = THREE.MathUtils.clamp(
-          uBin + (prng() - 0.5) * du * 0.92,
-          0.061,
-          0.999
-        )
-
-        const bLocal = lut.getBounds(u)
-        const pLocalList = lut.getSubPockets(u, minSubGap)
-        if (pLocalList.length === 0) continue
-
-        // Follow the same ribbon pair through a bin; never jump across a braid.
-        let pLocal = null
-        for (let k = 0; k < pLocalList.length; k++) {
-          const p = pLocalList[k]
-          if (p.lowerId === basePocket.lowerId && p.upperId === basePocket.upperId) { pLocal = p; break }
-        }
-        if (!pLocal) continue
-
-        // Allow nodes to populate right up to soft rim feathering
-        const v_rel = (prng() - 0.5) * 1.90
-        const w_depth = (prng() - 0.5) * 1.80
-        const r_norm = Math.hypot(v_rel, w_depth)
-        if (r_norm > 0.94) continue
-
-        const localRz = u < 0.20
-          ? Math.min(pLocal.rz, 1.1 * pLocal.height + 0.015)
-          : pLocal.rz
-
-        const y = pLocal.centerY + v_rel * pLocal.ry
-        const z = pLocal.centerZ + w_depth * localRz
-        const x = sign * 10.0 * u
-
-        // Loosened margin clearance right up to soft rim feathering
-        const marginClearance = Math.min(0.0016, 0.032 * bLocal.envHeight)
-        if (y > bLocal.envMaxY - marginClearance || y < bLocal.envMinY + marginClearance) continue
-
-        const minFilamentDist = getMinFilamentClearance(y, z, bLocal)
-        const heroClearance = pLocal.height < 0.06
-          ? Math.min(0.0032, 0.06 * pLocal.height)
-          : (u > 0.65 ? 0.0052 : (u < 0.20 ? Math.min(0.0038, 0.07 * pLocal.height) : 0.0060))
-        if (minFilamentDist < Math.max(0.0075, heroClearance)) continue
-
-        // Smooth, flattened blue-noise acceptance
-        const clusterNoise = 0.90 + 0.04 * Math.sin(0.9 * x + 0.3) * Math.cos(1.8 * y) + 0.02 * Math.sin(1.6 * x - 1.2 * z)
-        const noiseAccept = THREE.MathUtils.clamp(clusterNoise, 0.84, 0.96)
-        if (prng() > noiseAccept) continue
-
-        const isFG = w_depth > 0.25
-        const isBG = w_depth < -0.25
-        const depthTier = isFG ? 'fg' : (isBG ? 'bg' : 'mid')
-        const layer = isFG ? 1.0 : (isBG ? -1.0 : 0.0)
-
-        // Raised world-space Poisson-disk minimum clearance floor r_min(u)
-        // Calibrates uniform medium-coupled spacing across every pocket to match outer wing
-        const tipFactor = THREE.MathUtils.smoothstep(u, 0.08, 0.24)
-        const outerChamberBoost = 1.0 + 0.18 * THREE.MathUtils.smoothstep(u, 0.40, 0.95)
-        const floorTier = (depthTier === 'fg'
-          ? (0.025 + 0.024 * tipFactor)
-          : (depthTier === 'mid'
-            ? (0.020 + 0.020 * tipFactor)
-            : (0.017 + 0.017 * tipFactor))) * outerChamberBoost
-
-        const rMin = floorTier + 0.034 * Math.min(0.50, pLocal.height)
-
-        if (grid.isTooClose(x, y, z, rMin, rawNodes, false, 0.09)) continue
-        const projectedRadius = (0.022 + 0.026 * tipFactor) * (isFG ? 1.10 : 1.0)
-        if (!isBG && projectedGrid.isTooClose(x, y * projectionAspect, 0, projectedRadius, rawNodes, true, 0.06)) continue
-
-        const id = rawNodes.length
-        const pos = new THREE.Vector3(x, y, z)
-        const weight = computeConstraintWeight(u)
-        const localHeight = Math.max(0.024, bLocal.envHeight)
-
-        rawNodes.push({
-          id: `node_${id}`,
-          idx: id,
-          pos,
-          u,
-          hu: localHeight,
-          localSubHeight: pLocal.height,
-          radius: rMin,
-          projectedRadius,
-          projectedY: y * projectionAspect,
-          weight,
-          isAnchor: false,
-          connectedCount: 0,
-          layer,
-          depthTier,
-          v_rel,
-          w_depth,
-          r_norm,
-          isHighlight: 0.0,
-          alpha: -0, lineAlpha: -0, size: -0,
-          relativeCoord: [u, v_rel, w_depth, r_norm],
-        })
-        grid.insert(x, y, z, id)
-        if (!isBG) projectedGrid.insert(x, y * projectionAspect, 0, id)
+      const vMax = computeVMax(bMid.envHeight, isoYScale, maxVFrac, minIsoMargin)
+      if (vMax <= 0.05) continue
+      const activeIsoH = isoYScale * bMid.envHeight * vMax
+      let densityMod = 1.0
+      let localHubMin = minDistHub
+      if (organicCluster) {
+        const cellScale = Math.sqrt(envScale)
+        densityMod = 0.72 + 0.58 * (0.5 + 0.5 * Math.sin(uMid * 18.7 + sign * 1.1))
+        localHubMin = (0.24 + 0.20 * (0.5 + 0.5 * Math.cos(uMid * 14.3 - sign * 0.7))) * cellScale
       }
-    }
-  }
+      const lambda = ((10.0 * isoXScale * stripDu * activeIsoH) / (cellIso * cellIso)) * densityMod
+      const baseCount = Math.floor(lambda)
+      const count = baseCount + (prng() < (lambda - baseCount) ? 1 : 0)
+      if (count <= 0) continue
 
-  return { rawNodes, grid }
-}
+      for (let k = 0; k < count; k++) {
+        const vLo = -vMax + (2.0 * vMax) * (k / count)
+        const vHi = -vMax + (2.0 * vMax) * ((k + 1) / count)
 
-function connectNeuralNodes(rawNodes, grid, lut, projectionAspect) {
-  grid.prepareQueries(rawNodes)
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const u = u0 + (0.06 + 0.88 * prng()) * stripDu
+          const vRaw = vLo + (0.06 + 0.88 * prng()) * (vHi - vLo)
+          const bLoc = lut.getBounds(u)
+          if (bLoc.envHeight * isoYScale < minIsoHeight * 0.82) continue
 
-  // 3. Topology Connection using Spatial Hash Grid (Requirement 4)
-  const edgeCapacity = Math.ceil(rawNodes.length * 7 / 2)
-  const edges = {
-    length: 0,
-    i: new Int32Array(edgeCapacity), j: new Int32Array(edgeCapacity),
-    interLayer: new Uint8Array(edgeCapacity), fallback: new Uint8Array(edgeCapacity),
-  }
-  // Degree is capped at seven. Fixed adjacency slots also provide exact edge membership.
-  const adjacency = new Int32Array(rawNodes.length * 7)
-  const neighborIds = new Int32Array(7)
-  function hasEdge(i, j) {
-    for (let k = 0; k < rawNodes[i].connectedCount; k++) {
-      if (adjacency[i * 7 + k] === j) return true
-    }
-    return false
-  }
-  const edgeGrid = new EdgeGrid2D(0.20)
+          const vMaxLoc = computeVMax(bLoc.envHeight, isoYScale, maxVFrac, minIsoMargin)
+          if (vMaxLoc <= 0.05) continue
+          const v = vMax > 1e-4 ? vRaw * (vMaxLoc / vMax) : vRaw
+          if (Math.abs(v) > vMaxLoc) continue
 
-  function crowdedDirection(i, j) {
-    const a = rawNodes[i], b = rawNodes[j]
-    const dx = b.pos.x - a.pos.x, dy = (b.pos.y - a.pos.y) * projectionAspect
-    const length2 = dx * dx + dy * dy
-    if (length2 < 0.000064) return true
-    const vertical = Math.abs(dy) > 2.4 * Math.abs(dx)
-    for (let slot = 0; slot < a.connectedCount; slot++) {
-      const k = adjacency[i * 7 + slot]
-      const n = rawNodes[k]
-      const nx = n.pos.x - a.pos.x, ny = (n.pos.y - a.pos.y) * projectionAspect
-      // One steep strut is natural; repeated steep struts form ladders.
-      if (vertical && Math.abs(ny) > 2.4 * Math.abs(nx)) return true
-      if (n.depthTier !== b.depthTier) continue
-      const dot = dx * nx + dy * ny
-      if (dot > 0 && dot * dot > 0.88 * length2 * (nx * nx + ny * ny)) return true
-    }
-    return false
-  }
+          const x = sign * 10.0 * u
+          const y = bLoc.envCenterY + v * 0.5 * bLoc.envHeight
+          const isoX = x * isoXScale
+          const isoY = y * isoYScale
 
-  function addEdge(i, j, dist, isInterLayer = false, isFallback = false) {
-    if (hasEdge(i, j)) return false
-    const a = rawNodes[i], b = rawNodes[j]
-    if (a.connectedCount >= 7 || b.connectedCount >= 7) return false
-    if (crowdedDirection(i, j) || crowdedDirection(j, i)) return false
-    if (doesSegmentIntersectRibbonsLUT(a.pos, a.u, b.pos, b.u, lut)) return false
-    if (a.depthTier === b.depthTier && edgeGrid.hasCrossing(a.pos, b.pos, i, j, edges, rawNodes, a.depthTier)) return false
-    const edgeIdx = edges.length
-    edges.i[edgeIdx] = i
-    edges.j[edgeIdx] = j
-    edges.interLayer[edgeIdx] = isInterLayer
-    edges.fallback[edgeIdx] = isFallback
-    edges.length++
-    adjacency[i * 7 + rawNodes[i].connectedCount++] = j
-    adjacency[j * 7 + rawNodes[j].connectedCount++] = i
-    edgeGrid.insert(edgeIdx, rawNodes[i].pos, rawNodes[j].pos)
-    return true
-  }
+          const effSearch = Math.max(searchRadius, localHubMin)
+          if (grid.hasNeighborWithin(isoX, isoY, minDistExisting, rawNodes, effSearch, localHubMin)) continue
 
-  let candidateIds = new Int32Array(Math.max(256, rawNodes.length))
-  let candidateDistances = new Float64Array(candidateIds.length)
-  let candidateCount = 0
-  function insertCandidate(j, distance) {
-    if (candidateCount === candidateIds.length) {
-      const ids = new Int32Array(candidateCount * 2), distances = new Float64Array(candidateCount * 2)
-      ids.set(candidateIds); distances.set(candidateDistances)
-      candidateIds = ids; candidateDistances = distances
-    }
-    let slot = candidateCount++
-    while (slot > 0 && candidateDistances[slot - 1] > distance) {
-      candidateIds[slot] = candidateIds[slot - 1]
-      candidateDistances[slot] = candidateDistances[slot - 1]
-      slot--
-    }
-    candidateIds[slot] = j
-    candidateDistances[slot] = distance
-  }
+          const w_depth = wDepthMin + prng() * (wDepthMax - wDepthMin)
+          const envMinZ = Math.min(bLoc.z0, bLoc.z1, bLoc.z2, bLoc.z3)
+          const envMaxZ = Math.max(bLoc.z0, bLoc.z1, bLoc.z2, bLoc.z3)
+          const envRz = Math.max(0.015, 0.5 * (envMaxZ - envMinZ) + 0.025)
+          const z = bLoc.envCenterZ + w_depth * envRz
 
-  // 3a. Intra-layer Delaunay/k-NN connections
-  const layerIndices = new Int32Array(rawNodes.length)
-  const depthLayers = ['fg', 'mid', 'bg']
-  for (const lyr of depthLayers) {
-    let layerCount = 0
-    for (let i = 0; i < rawNodes.length; i++) {
-      if (rawNodes[i].depthTier === lyr) layerIndices[layerCount++] = i
-    }
+          lut.getPhaseBounds(u, 0, phaseBuf)
+          const v_frame = Math.max(-0.88, Math.min(0.88, (y - phaseBuf.center) / phaseBuf.radius))
+          const r_norm = Math.min(1.0, Math.hypot(v_frame, w_depth))
+          const depthTier = w_depth > 0.25 ? 'fg' : (w_depth < -0.25 ? 'bg' : 'mid')
+          const layer = w_depth > 0.25 ? 1.0 : (w_depth < -0.25 ? -1.0 : 0.0)
+          const id = rawNodes.length
+          const pos = new THREE.Vector3(x, y, z)
 
-    const targetK = lyr === 'mid' ? 4 : (lyr === 'fg' ? 4 : 3)
-
-    for (let a = 0; a < layerCount; a++) {
-      const i = layerIndices[a]
-      const nA = rawNodes[i]
-      candidateCount = 0
-
-      for (let nearby = grid.queryOffsets[i]; nearby < grid.queryOffsets[i + 1]; nearby++) {
-        const j = grid.queryIds[nearby], dist3D = grid.queryDistances[nearby]
-        if (i === j) continue
-        if (dist3D < 0.008) continue
-        const nB = rawNodes[j]
-        if (nB.depthTier !== lyr) continue
-        if (Math.abs(nA.u - nB.u) > 0.090) continue
-        const localH = Math.max(nA.hu, nB.hu)
-
-        const dx = Math.abs(nA.pos.x - nB.pos.x)
-        const dy = Math.abs(nA.pos.y - nB.pos.y)
-        if (localH > 0.18 && dist3D > 0.22 * localH && dy > 1.8 * dx) continue
-
-        if (crowdedDirection(i, j) || crowdedDirection(j, i)) continue
-
-        // Slightly widened valid diagonal edge reach to match new Poisson-disk spacing
-        const isDiagonal = dx > 0.012 && dy <= 1.25 * dx
-        const maxEdgeDist = isDiagonal ? (0.42 * localH + 0.030) : (0.38 * localH + 0.025)
-        if (dist3D > maxEdgeDist) continue
-
-        insertCandidate(j, dist3D)
-      }
-
-
-      for (let c = 0; c < candidateCount; c++) {
-        if (nA.connectedCount >= targetK) break
-        const j = candidateIds[c]
-        const nB = rawNodes[j]
-        if (nB.connectedCount >= targetK + 2) continue
-
-        addEdge(i, j, candidateDistances[c])
-      }
-    }
-
-    // Triangular face completion within layer
-    for (let a = 0; a < layerCount; a++) {
-      const i = layerIndices[a]
-      let neighborCount = 0
-      for (let slot = 0; slot < rawNodes[i].connectedCount; slot++) {
-        const nb = adjacency[i * 7 + slot]
-        if (rawNodes[nb].depthTier === lyr) neighborIds[neighborCount++] = nb
-      }
-      if (neighborCount < 2) continue
-
-      for (let p1 = 0; p1 < neighborCount; p1++) {
-        for (let p2 = p1 + 1; p2 < neighborCount; p2++) {
-          const j = neighborIds[p1]
-          const k = neighborIds[p2]
-          if (hasEdge(j, k)) continue
-          const nJ = rawNodes[j]
-          const nK = rawNodes[k]
-          if (nJ.connectedCount >= targetK + 1 || nK.connectedCount >= targetK + 1) continue
-
-          const dist3D = nJ.pos.distanceTo(nK.pos)
-          if (dist3D < 0.008) continue
-          if (Math.abs(nJ.u - nK.u) > 0.090) continue
-
-          const localH = Math.max(nJ.hu, nK.hu)
-          const dx = Math.abs(nJ.pos.x - nK.pos.x)
-          const dy = Math.abs(nJ.pos.y - nK.pos.y)
-          if (localH > 0.18 && dist3D > 0.22 * localH && dy > 1.8 * dx) continue
-
-          // Keep open polygon cells rather than closing skinny sliver triangles.
-          const area2 = Math.abs((nJ.pos.x - rawNodes[i].pos.x) * (nK.pos.y - rawNodes[i].pos.y)
-            - (nJ.pos.y - rawNodes[i].pos.y) * (nK.pos.x - rawNodes[i].pos.x))
-          if (area2 < 0.16 * dist3D * dist3D) continue
-
-          const isDiagonal = dx > 0.012 && dy <= 1.25 * dx
-          const maxEdgeDist = isDiagonal ? (0.42 * localH + 0.030) : (0.38 * localH + 0.025)
-          if (dist3D > maxEdgeDist) continue
-
-          addEdge(j, k, dist3D)
-        }
-      }
-    }
-  }
-
-  // 3b. Dual-tier FG-to-MID/BG links (FG -> MID, MID -> BG)
-  for (let i = 0; i < rawNodes.length; i++) {
-    const nA = rawNodes[i]
-    if (nA.depthTier !== 'fg') continue
-    candidateCount = 0
-
-    for (let nearby = grid.queryOffsets[i]; nearby < grid.queryOffsets[i + 1]; nearby++) {
-      const j = grid.queryIds[nearby], dist3D = grid.queryDistances[nearby]
-      const nB = rawNodes[j]
-      if (nB.depthTier !== 'mid') continue
-      if (Math.abs(nA.u - nB.u) > 0.085) continue
-      const localH = Math.max(nA.hu, nB.hu)
-      const dx = Math.abs(nA.pos.x - nB.pos.x)
-      const dy = Math.abs(nA.pos.y - nB.pos.y)
-      if (crowdedDirection(i, j) || crowdedDirection(j, i)) continue
-      const isDiagonal = dx > 0.012 && dy <= 1.25 * dx
-      const maxEdgeDist = isDiagonal ? (0.42 * localH + 0.030) : (0.38 * localH + 0.025)
-      if (dist3D > maxEdgeDist || dist3D < 0.008) continue
-      if (doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, nB.pos, nB.u, lut)) continue
-      insertCandidate(j, dist3D)
-    }
-
-    for (let m = 0; m < Math.min(2, candidateCount); m++) {
-      addEdge(i, candidateIds[m], candidateDistances[m], true)
-    }
-  }
-
-  for (let i = 0; i < rawNodes.length; i++) {
-    const nA = rawNodes[i]
-    if (nA.depthTier !== 'bg') continue
-    candidateCount = 0
-
-    for (let nearby = grid.queryOffsets[i]; nearby < grid.queryOffsets[i + 1]; nearby++) {
-      const j = grid.queryIds[nearby], dist3D = grid.queryDistances[nearby]
-      const nB = rawNodes[j]
-      if (nB.depthTier !== 'mid') continue
-      if (Math.abs(nA.u - nB.u) > 0.085) continue
-      const localH = Math.max(nA.hu, nB.hu)
-      const dx = Math.abs(nA.pos.x - nB.pos.x)
-      const dy = Math.abs(nA.pos.y - nB.pos.y)
-      if (crowdedDirection(i, j) || crowdedDirection(j, i)) continue
-      const isDiagonal = dx > 0.012 && dy <= 1.25 * dx
-      const maxEdgeDist = isDiagonal ? (0.42 * localH + 0.030) : (0.38 * localH + 0.025)
-      if (dist3D > maxEdgeDist || dist3D < 0.008) continue
-      if (doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, nB.pos, nB.u, lut)) continue
-      insertCandidate(j, dist3D)
-    }
-
-    for (let m = 0; m < Math.min(1, candidateCount); m++) {
-      addEdge(i, candidateIds[m], candidateDistances[m], true)
-    }
-  }
-
-  // Cross-layer connections in the narrow tip (u < 0.20)
-  for (let i = 0; i < rawNodes.length; i++) {
-    const nA = rawNodes[i]
-    if (nA.u >= 0.20) continue
-    if (nA.connectedCount >= 2) continue
-
-    for (let nearby = grid.queryOffsets[i]; nearby < grid.queryOffsets[i + 1]; nearby++) {
-      const j = grid.queryIds[nearby], dist3D = grid.queryDistances[nearby]
-      if (i === j) continue
-      if (nA.connectedCount >= 2) continue
-      const nB = rawNodes[j]
-      if (nB.u >= 0.22) continue
-      if (Math.abs(nA.u - nB.u) > 0.045) continue
-      const localH = Math.max(nA.hu, nB.hu)
-      const dx = Math.abs(nA.pos.x - nB.pos.x)
-      const dy = Math.abs(nA.pos.y - nB.pos.y)
-      const isDiagonal = dx > 0.010 && dy <= 1.25 * dx
-      const maxEdgeDist = isDiagonal ? (0.42 * localH + 0.030) : (0.38 * localH + 0.025)
-      if (dist3D > maxEdgeDist || dist3D < 0.005) continue
-
-      if (!doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, nB.pos, nB.u, lut)) {
-        addEdge(i, j, dist3D, true)
-      }
-    }
-  }
-
-  // 3c. Local nearest-neighbor fallback
-  for (let pass = 0; pass < 2; pass++) {
-    for (let i = 0; i < rawNodes.length; i++) {
-      const nA = rawNodes[i]
-      const minDegree = 2
-      while (nA.connectedCount < minDegree) {
-        let bestJ = -1
-        let bestDist = Infinity
-        let bestScore = Infinity
-
-        for (let nearby = grid.queryOffsets[i]; nearby < grid.queryOffsets[i + 1]; nearby++) {
-          const j = grid.queryIds[nearby], dist3D = grid.queryDistances[nearby]
-          if (i === j) continue
-          if (hasEdge(i, j)) continue
-          const nB = rawNodes[j]
-          if (nB.connectedCount >= 7 || crowdedDirection(i, j) || crowdedDirection(j, i)) continue
-          if (nA.depthTier === nB.depthTier && edgeGrid.hasCrossing(nA.pos, nB.pos, i, j, edges, rawNodes, nA.depthTier)) continue
-          if (Math.abs(nA.u - nB.u) > 0.090) continue
-          const localH = Math.max(nA.hu, nB.hu)
-          const dx = Math.abs(nA.pos.x - nB.pos.x)
-          const dy = Math.abs(nA.pos.y - nB.pos.y)
-          const isDiagonal = dx > 0.012 && dy <= 1.25 * dx
-          const maxEdgeDist = isDiagonal ? (0.42 * localH + 0.030) : (0.38 * localH + 0.025)
-          if (dist3D > maxEdgeDist) continue
-
-          // Strongly favor diagonal connections over vertical segments in fallback
-          const score = dist3D + (dy > 1.25 * dx ? 0.035 : 0.0)
-          if (score < bestScore) {
-            if (!doesSegmentIntersectRibbonsLUT(nA.pos, nA.u, nB.pos, nB.u, lut)) {
-              bestScore = score
-              bestDist = dist3D
-              bestJ = j
-            }
+          let size, alpha, lineAlpha, hubAccent, maxDeg
+          if (tier === 2) {
+            size = 13.5 + 5.0 * prng()
+            alpha = 0.94 + 0.06 * prng()
+            lineAlpha = 0.34 + 0.08 * prng()
+            hubAccent = 1.0
+            maxDeg = 6
+          } else if (tier === 1) {
+            size = 5.0 + 2.2 * prng()
+            alpha = 0.64 + 0.20 * prng()
+            lineAlpha = 0.21 + 0.08 * prng()
+            hubAccent = 0.42
+            maxDeg = 4
+          } else {
+            size = isWeb ? (2.5 + 0.9 * prng()) : (2.2 + 1.0 * prng())
+            alpha = isWeb ? (0.28 + 0.14 * prng()) : (0.24 + 0.16 * prng())
+            lineAlpha = 0.13 + 0.06 * prng()
+            hubAccent = 0.0
+            maxDeg = isWeb ? 3 : 0
           }
-        }
 
-        if (bestJ !== -1) {
-          if (!addEdge(i, bestJ, bestDist, nA.depthTier !== rawNodes[bestJ].depthTier, true)) break
-        } else {
+          rawNodes.push({
+            id: `node_${id}`,
+            idx: id,
+            pos,
+            isoX,
+            isoY,
+            isoPos: { x: isoX, y: isoY },
+            u,
+            hu: Math.max(0.020, bLoc.envHeight),
+            v_frame,
+            w_depth,
+            r_norm,
+            isWeb,
+            connectedCount: 0,
+            layer,
+            depthTier,
+            tier,
+            maxDeg,
+            alpha,
+            lineAlpha,
+            hubAccent,
+            size,
+            relativeCoord: [u, v_frame, w_depth, r_norm],
+          })
+          grid.insert(isoX, isoY, id)
           break
         }
       }
     }
   }
 
+  const cellScale = Math.sqrt(envScale)
+
+  // Pass 1: Tier-1 Hero Starburst Hubs (~6-7%, 2-4 per major open pocket + inner chamber anchor)
+  runTierPass({
+    uStart: 0.135,
+    uEnd: 0.975,
+    cellIso: 0.48 * cellScale,
+    minIsoHeight: 0.130 * envScale,
+    maxVFrac: 0.75,
+    minIsoMargin: 0.056 * envScale,
+    minDistExisting: 0.25 * cellScale,
+    minDistHub: 0.27 * cellScale,
+    searchRadius: 0.45 * cellScale,
+    tier: 2,
+    isWeb: true,
+    maxAttempts: 8,
+    wDepthMin: -0.22,
+    wDepthMax: 0.85,
+    organicCluster: true,
+  })
+
+  // Pass 2: Tier-2 Mid Constellation Vertices (~25%, full pocket height + inner throat anchors)
+  runTierPass({
+    uStart: 0.090,
+    uEnd: 0.985,
+    cellIso: 0.25 * cellScale,
+    minIsoHeight: 0.055 * envScale,
+    maxVFrac: 0.87,
+    minIsoMargin: 0.038 * envScale,
+    minDistExisting: 0.165 * cellScale,
+    minDistHub: 0.185 * cellScale,
+    searchRadius: 0.22 * cellScale,
+    tier: 1,
+    isWeb: true,
+    maxAttempts: 6,
+    wDepthMin: -0.78,
+    wDepthMax: 0.82,
+  })
+
+  // Pass 3A: Tier-3 Delicate Web Connectors (complete full-height triangulation without cage clutter)
+  runTierPass({
+    uStart: 0.088,
+    uEnd: 0.986,
+    cellIso: 0.275 * cellScale,
+    minIsoHeight: 0.040 * envScale,
+    maxVFrac: 0.88,
+    minIsoMargin: 0.032 * envScale,
+    minDistExisting: 0.140 * cellScale,
+    minDistHub: 0.150 * cellScale,
+    searchRadius: 0.17 * cellScale,
+    tier: 0,
+    isWeb: true,
+    maxAttempts: 5,
+    wDepthMin: -0.82,
+    wDepthMax: 0.55,
+  })
+
+  // Pass 3B: Tier-3 Volumetric Micro-Dust (dimmer background sparkles for 3D depth)
+  runTierPass({
+    uStart: 0.085,
+    uEnd: 0.988,
+    cellIso: 0.170 * cellScale,
+    minIsoHeight: 0.042 * envScale,
+    maxVFrac: 0.88,
+    minIsoMargin: 0.030 * envScale,
+    minDistExisting: 0.088 * cellScale,
+    minDistHub: 0.105 * cellScale,
+    searchRadius: 0.125 * cellScale,
+    tier: 0,
+    isWeb: false,
+    maxAttempts: 4,
+    wDepthMin: -0.88,
+    wDepthMax: 0.25,
+  })
+
+  // Build dedicated spatial grid over web nodes only for fast edge queries
+  const webGrid = new IsotropicGrid2D(gridCell)
+  for (let i = 0; i < rawNodes.length; i++) {
+    if (rawNodes[i].isWeb) {
+      webGrid.insert(rawNodes[i].isoX, rawNodes[i].isoY, i)
+    }
+  }
+
+  return { rawNodes, webGrid }
+}
+
+function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envScale) {
+  const nCount = rawNodes.length
+  const maxDegreeCap = 6
+  const edgeCapacity = Math.max(64, Math.ceil(nCount * maxDegreeCap / 2))
+  const edges = {
+    length: 0,
+    i: new Int32Array(edgeCapacity),
+    j: new Int32Array(edgeCapacity),
+    fallback: new Uint8Array(edgeCapacity),
+  }
+  const adjacency = new Int32Array(nCount * maxDegreeCap)
+  const edgeGrid = new EdgeGrid2D(Math.max(0.08, 0.24 * envScale), edgeCapacity)
+
+  function hasEdge(i, j) {
+    for (let k = 0; k < rawNodes[i].connectedCount; k++) {
+      if (adjacency[i * maxDegreeCap + k] === j) return true
+    }
+    return false
+  }
+
+  function hasTightAngle(i, j, cosLimit = 0.90) {
+    const a = rawNodes[i]
+    const b = rawNodes[j]
+    const dx = b.isoX - a.isoX
+    const dy = b.isoY - a.isoY
+    const l2 = dx * dx + dy * dy
+    if (l2 < 1e-8) return true
+    for (let slot = 0; slot < a.connectedCount; slot++) {
+      const n = rawNodes[adjacency[i * maxDegreeCap + slot]]
+      const nx = n.isoX - a.isoX
+      const ny = n.isoY - a.isoY
+      const dot = dx * nx + dy * ny
+      if (dot > 0 && dot * dot > cosLimit * cosLimit * l2 * (nx * nx + ny * ny)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  function tryAddEdge(i, j, allowCrossing = false, cosLimit = 0.90, isFallback = false, capOverride = maxDegreeCap) {
+    if (i === j || hasEdge(i, j)) return false
+    const a = rawNodes[i]
+    const b = rawNodes[j]
+    if (!a.isWeb || !b.isWeb) return false
+    const capA = Math.min(capOverride, a.maxDeg)
+    const capB = Math.min(capOverride, b.maxDeg)
+    if (a.connectedCount >= capA || b.connectedCount >= capB) return false
+    if (cosLimit < 1.0 && (hasTightAngle(i, j, cosLimit) || hasTightAngle(j, i, cosLimit))) return false
+    if (!segmentInside8PhaseEnvelope(a.u, a.v_frame, b.u, b.v_frame, lut, 0.045)) return false
+    if (!allowCrossing && edgeGrid.hasCrossing(a.isoPos, b.isoPos, i, j, edges, rawNodes, false)) return false
+
+    const edgeIdx = edges.length
+    edges.i[edgeIdx] = i
+    edges.j[edgeIdx] = j
+    edges.fallback[edgeIdx] = isFallback ? 1 : 0
+    edges.length++
+    adjacency[i * maxDegreeCap + rawNodes[i].connectedCount++] = j
+    adjacency[j * maxDegreeCap + rawNodes[j].connectedCount++] = i
+    edgeGrid.insert(edgeIdx, a.isoPos, b.isoPos)
+    return true
+  }
+
+  // Gather short-range isotropic neighbor pairs across web nodes and sort shortest-first
+  const pairCapacity = Math.max(256, nCount * 10)
+  let pairA = new Int32Array(pairCapacity)
+  let pairB = new Int32Array(pairCapacity)
+  let pairScore = new Float32Array(pairCapacity)
+  let pairCount = 0
+  const maxDu = 0.095 / Math.max(0.75, isoXScale)
+
+  for (let i = 0; i < nCount; i++) {
+    const nA = rawNodes[i]
+    if (!nA.isWeb) continue
+    const hIsoA = nA.hu * isoYScale
+    const searchR = Math.min(0.85 * envScale, Math.max(0.24 * envScale, 0.62 * hIsoA))
+    const qCount = webGrid.queryRadius(nA.isoX, nA.isoY, searchR, rawNodes)
+
+    for (let q = 0; q < qCount; q++) {
+      const j = webGrid.queryIds[q]
+      if (j <= i) continue
+      const distIso = webGrid.queryDistances[q]
+      if (distIso < 0.03 * envScale) continue
+      const nB = rawNodes[j]
+      if (!nB.isWeb || Math.abs(nA.u - nB.u) > maxDu) continue
+
+      const avgHIso = 0.5 * (nA.hu + nB.hu) * isoYScale
+      const maxEdgeDist = Math.min(0.68 * envScale, Math.max(0.18 * envScale, 0.50 * avgHIso))
+      if (distIso > maxEdgeDist) continue
+
+      const depthPenalty = 1.0 + 0.08 * Math.abs(nA.w_depth - nB.w_depth)
+      const score = distIso * depthPenalty
+
+      if (pairCount === pairA.length) {
+        const nextLen = pairA.length * 2
+        const nA2 = new Int32Array(nextLen)
+        const nB2 = new Int32Array(nextLen)
+        const nS2 = new Float32Array(nextLen)
+        nA2.set(pairA); nB2.set(pairB); nS2.set(pairScore)
+        pairA = nA2; pairB = nB2; pairScore = nS2
+      }
+      pairA[pairCount] = i
+      pairB[pairCount] = j
+      pairScore[pairCount] = score
+      pairCount++
+    }
+  }
+
+  const order = new Int32Array(pairCount)
+  for (let p = 0; p < pairCount; p++) order[p] = p
+  order.sort((a, b) => pairScore[a] - pairScore[b])
+
+  // Pass A: Shortest-first planar backbone up to degree 4
+  for (let p = 0; p < pairCount; p++) {
+    const idx = order[p]
+    tryAddEdge(pairA[idx], pairB[idx], false, 0.90, false, 4)
+  }
+
+  // Pass B: Repair under-connected web vertices (< 2 edges) before triangulation closure
+  function repairUnderConnected() {
+    const repairDu = 0.11 / Math.max(0.75, isoXScale)
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 0; i < nCount; i++) {
+        const nA = rawNodes[i]
+        if (!nA.isWeb || nA.connectedCount >= 2) continue
+        const hIso = nA.hu * isoYScale
+        const searchR = Math.min(1.0 * envScale, Math.max(0.30 * envScale, 0.78 * hIso))
+        const qCount = webGrid.queryRadius(nA.isoX, nA.isoY, searchR, rawNodes)
+
+        const cands = []
+        for (let q = 0; q < qCount; q++) {
+          const j = webGrid.queryIds[q]
+          if (j === i || hasEdge(i, j)) continue
+          const nB = rawNodes[j]
+          if (!nB.isWeb || nB.connectedCount >= nB.maxDeg || Math.abs(nA.u - nB.u) > repairDu) continue
+          cands.push({ j, d: webGrid.queryDistances[q] })
+        }
+        cands.sort((a, b) => a.d - b.d)
+
+        for (let c = 0; c < cands.length && nA.connectedCount < 2; c++) {
+          const allowCross = pass >= 2
+          const cosLim = pass === 0 ? 0.93 : 0.98
+          tryAddEdge(i, cands[c].j, allowCross, cosLim, pass > 0, maxDegreeCap)
+        }
+      }
+    }
+  }
+  repairUnderConnected()
+
+  // Pass C: Triangulated spiderweb closure up to per-tier maxDegree (6 for Tier-1, 4 for Tier-2, 3 for Tier-3)
+  for (let p = 0; p < pairCount; p++) {
+    const idx = order[p]
+    tryAddEdge(pairA[idx], pairB[idx], false, 0.92, false, maxDegreeCap)
+  }
+
+  // Pass D: Final repair ensuring every web node has >= 2 edges
+  repairUnderConnected()
+
   return edges
 }
 
 /**
  * Generates the refined volumetric neural field BufferGeometries (linesGeo, pointsGeo, hazeGeo).
- * Highly optimized with 1D LUT and 3D spatial hash grid (Requirement 4).
- * Precomputes bounding boxes and spheres; all emitted attribute values retain baseline precision.
+ * Area-proportional stratified sampling across full wave arches with organic hub clustering,
+ * triangulated indexed spiderweb, and velvety localized interior pocket nebula.
  *
  * @param {'left' | 'right'} side
  * @param {number} [H=H_VAL]
  * @param {object} [config={}]
  * @returns {{ linesGeo: THREE.BufferGeometry, pointsGeo: THREE.BufferGeometry, hazeGeo: THREE.BufferGeometry }}
  */
-export function generateRefinedNeuralField(side, H = H_VAL, config = {}, projectionAspect = 1.8 * (config.breadthMultiplier ?? 1)) {
+export function generateRefinedNeuralField(side, H = H_VAL, config = {}, projectionAspect = 1.8 * (config.breadthMultiplier ?? 1), xScale = 1.0) {
   const isLeft = side === 'left'
   const sign = isLeft ? -1 : 1
   const seed = isLeft ? 314159 : 271828
   const prng = createPrng(seed)
+  const safeXScale = Math.max(0.75, Math.min(2.6, xScale || 1.0))
+  const safeAspect = Math.max(0.5, Math.min(8.0, projectionAspect || 1.8))
+  const isoYScale = safeAspect * safeXScale
 
-  const themeConfig = config.themeConfig || {}
-  const minSubGap = 0.026
+  // 0. Precompute 8-phase LUT of ribbon bounds along u once per build
+  const lut = new RibbonBoundsLUT(H, config, 256, 8)
+  const baselineMaxIsoH = 2.8
+  const maxEnvIsoH = lut.maxEnvHeight * isoYScale
+  const envScale = THREE.MathUtils.clamp(maxEnvIsoH / baselineMaxIsoH, 0.38, 1.30)
 
-  // 0. Precompute 1D LUT of sorted active ribbon bounds along u once per build (Requirement 4)
-  const lut = new RibbonBoundsLUT(H, config, 1024)
+  // 1. Stratified organic constellation sampling + indexed triangulated spiderweb
+  const { rawNodes, webGrid } = sampleStratifiedNodes(sign, safeXScale, isoYScale, lut, prng, envScale)
+  const edges = connectNeuralNodes(rawNodes, webGrid, lut, safeXScale, isoYScale, envScale)
 
-  // 1. Invisible Anchor Points along inner ribbon margins (alpha = 0, size = 0)
-  const anchors = generateMarginAnchors(side, H, config, 64)
+  // Keep connected web nodes + background micro-dust sparkles
+  const visibleNodes = rawNodes.filter(n => !n.isWeb || n.connectedCount > 0)
 
-  const { rawNodes, grid } = sampleNeuralNodes(sign, projectionAspect, lut, prng, minSubGap)
-  const edges = connectNeuralNodes(rawNodes, grid, lut, projectionAspect)
-
-  // Each open chamber may be separated by an actual ribbon. Preserve its valid
-  // local graph instead of deleting small components to force a single wing graph.
-  // Repair above is bounded; only genuinely isolated samples are omitted.
-  const visibleNodes = rawNodes.filter(n => n.connectedCount > 0)
-
-  // Hub Selection: Sparse, well-spaced FG pinpoint hubs with clean tip tapering and outer extension
-  const fgNodes = visibleNodes.filter(n => n.depthTier === 'fg')
-  const targetHubCount = Math.min(22, Math.max(16, Math.round(0.045 * fgNodes.length)))
-
-  const eligibleHubs = fgNodes.filter(n => n.connectedCount >= 3 && Math.abs(n.v_rel) < 0.70 && n.u >= 0.10 && n.u <= 0.98)
-  const hubFlags = new Uint8Array(rawNodes.length)
-  const chosenHubs = new Int32Array(targetHubCount)
-  let hubCount = 0
-  // Farthest-point selection spreads highlights across chambers instead of
-  // concentrating them wherever the degree-first ordering finds a dense cluster.
-  while (hubCount < targetHubCount) {
-    let best = null, bestScore = -Infinity
-    for (const cand of eligibleHubs) {
-      if (hubFlags[cand.idx]) continue
-      let nearest = Infinity
-      for (let h = 0; h < hubCount; h++) {
-        const hIdx = chosenHubs[h]
-        const hub = rawNodes[hIdx]
-        const dx = cand.pos.x - hub.pos.x, dy = (cand.pos.y - hub.pos.y) * projectionAspect
-        nearest = Math.min(nearest, dx * dx + dy * dy)
-      }
-      const clearance = Math.max(0.34, 0.24 + 0.34 * cand.localSubHeight)
-      if (nearest < clearance * clearance) continue
-      const quality = cand.connectedCount + 1 - Math.abs(cand.v_rel)
-      const score = hubCount ? Math.min(nearest, 1.5) * (1 + 0.06 * quality) : quality
-      if (score > bestScore) { best = cand; bestScore = score }
-    }
-    if (!best) break
-    chosenHubs[hubCount++] = best.idx
-    hubFlags[best.idx] = 1
-  }
-
-  // Reuse color arithmetic objects; retain exact doubles in flat node-color pools.
-  const palette = {
-    c0: new THREE.Color('#ffffff'),
-    c1: new THREE.Color('#38aaff'),
-    c2: new THREE.Color('#28d8ff'),
-    c3: new THREE.Color('#38e0ff'),
-    c4: new THREE.Color('#2888ff'),
-    c5: new THREE.Color('#1460ff'),
-    c6: new THREE.Color('#1c84ff'),
-    c7: new THREE.Color('#1c60f0'),
-    c8: new THREE.Color('#061a55'),
-    c9: new THREE.Color('#08226c'),
-    c10: new THREE.Color('#06184c'),
-    c11: new THREE.Color('#5e48ff'),
-    c12: new THREE.Color('#7858ff'),
-    c13: new THREE.Color('#104fe0'),
-    c14: new THREE.Color('#041038'),
-    c15: new THREE.Color('#061b4d'),
-    c16: new THREE.Color('#1a164c'),
-  }
-  const colorScratch = new THREE.Color(), lineColorScratch = new THREE.Color()
-  const tintScratch = new THREE.Color(), endpointA = new THREE.Color(), endpointB = new THREE.Color()
-  const nodeColors = new Float64Array(rawNodes.length * 3)
-  const nodeLineColors = new Float64Array(rawNodes.length * 3)
-  const themeColor = themeConfig.primaryWire ? new THREE.Color(themeConfig.primaryWire) : null
-
-  // Node styling
-  for (const node of visibleNodes) {
-    const isHighlight = hubFlags[node.idx] ? 1.0 : 0.0
-    node.isHighlight = isHighlight
-
-    const bLocal = lut.getBounds(node.u)
-    const dHero2 = Math.hypot(node.pos.y - bLocal.y2, node.pos.z - bLocal.z2)
-    const violetProx = Math.max(0.0, 1.0 - dHero2 / Math.max(0.04, 0.32 * bLocal.envHeight))
-    const marginProx = Math.max(0.0, (Math.abs(node.v_rel) - 0.70) / 0.30)
-    const isAdjacentToViolet = (dHero2 < 0.20) || ((node.v_rel > 0 && bLocal.y2 > bLocal.envCenterY) || (node.v_rel < 0 && bLocal.y2 < bLocal.envCenterY))
-    const rimTintFactor = isAdjacentToViolet ? Math.max(violetProx * 0.95, marginProx * 0.85) : (violetProx * 0.65)
-
-    let color, lineColor, alpha, lineAlpha, size
-
-    if (node.depthTier === 'fg') {
-      if (isHighlight > 0.5) {
-        color = colorScratch.copy(palette.c0)
-        lineColor = lineColorScratch.copy(palette.c1)
-        const tipScale = THREE.MathUtils.smoothstep(node.u, 0.08, 0.24)
-        const chamberScale = THREE.MathUtils.clamp(node.hu / 0.22, 0.70, 1.0)
-        const hubScale = (0.65 + 0.35 * tipScale) * chamberScale
-        size = (3.2 + prng() * 0.5) * hubScale
-        alpha = 1.0
-        lineAlpha = 0.40 + prng() * 0.04
-      } else {
-        color = colorScratch.copy(palette.c2).lerp(palette.c3, prng() * 0.35)
-        lineColor = lineColorScratch.copy(palette.c4)
-        size = 1.45 + prng() * 0.35
-        alpha = 0.92 + prng() * 0.06
-        lineAlpha = 0.36 + prng() * 0.04
-      }
-    } else if (node.depthTier === 'mid') {
-      color = colorScratch.copy(palette.c5).lerp(palette.c6, prng() * 0.40)
-      lineColor = lineColorScratch.copy(palette.c7)
-      size = 1.15 + prng() * 0.35
-      alpha = 0.72 + prng() * 0.08
-      lineAlpha = 0.24 + prng() * 0.04
-    } else {
-      color = colorScratch.copy(palette.c8).lerp(palette.c9, prng() * 0.40)
-      lineColor = lineColorScratch.copy(palette.c10)
-      size = 0.8 + prng() * 0.3
-      alpha = 0.25 + prng() * 0.06
-      lineAlpha = 0.07 + prng() * 0.02
-    }
-
-    if (Math.abs(node.v_rel) > 0.78) {
-      const marginFeather = 1.0 - THREE.MathUtils.smoothstep(Math.abs(node.v_rel), 0.78, 0.96)
-      alpha *= Math.max(0.08, marginFeather)
-      lineAlpha *= Math.max(0.08, marginFeather)
-    }
-
-    if (node.localSubHeight < 0.09) {
-      const throatFactor2 = THREE.MathUtils.smoothstep(node.localSubHeight, minSubGap, 0.09)
-      alpha *= (0.50 + 0.50 * throatFactor2)
-      lineAlpha *= (0.50 + 0.50 * throatFactor2)
-      size *= (0.65 + 0.35 * throatFactor2)
-    }
-
-    if (rimTintFactor > 0.06) {
-      const violetTint = tintScratch.copy(palette.c11).lerp(palette.c12, prng() * 0.30)
-      if (!isHighlight) color.lerp(violetTint, rimTintFactor * 0.30)
-      lineColor.lerp(violetTint, rimTintFactor * 0.25)
-    }
-
-    if (themeConfig && themeConfig.primaryWire) {
-      color.lerp(themeColor, 0.08)
-      lineColor.lerp(themeColor, 0.08)
-    }
-
-    const colorOffset = node.idx * 3
-    nodeColors[colorOffset] = color.r
-    nodeColors[colorOffset + 1] = color.g
-    nodeColors[colorOffset + 2] = color.b
-    nodeLineColors[colorOffset] = lineColor.r
-    nodeLineColors[colorOffset + 1] = lineColor.g
-    nodeLineColors[colorOffset + 2] = lineColor.b
-    node.alpha = alpha
-    node.lineAlpha = lineAlpha
-    node.size = size
-  }
-
-  // 4. Wave Margin Tethering
-  const tetherNodes = new Int32Array(visibleNodes.length)
-  const tetherAnchors = new Int32Array(visibleNodes.length)
-  let tetherCount = 0
-  for (const node of visibleNodes) {
-    if (Math.abs(node.v_rel) >= 0.65) {
-      let bestAnchor = -1
-      let bestDist = Infinity
-
-      for (let aIdx = 0; aIdx < anchors.length; aIdx++) {
-        const anc = anchors[aIdx]
-        if (Math.abs(node.u - anc.u) > 0.080) continue
-
-        const isUpperAnchor = anc.id.includes('upper')
-        if (node.v_rel > 0 && !isUpperAnchor) continue
-        if (node.v_rel < 0 && isUpperAnchor) continue
-
-        const dist = node.pos.distanceTo(anc.pos)
-        const localH = Math.min(node.hu, anc.hu)
-        const maxEdgeDist = 0.38 * localH + 0.025
-        if (dist <= maxEdgeDist && dist < bestDist) {
-          if (!doesSegmentIntersectRibbonsLUT(node.pos, node.u, anc.pos, anc.u, lut, true)) {
-            bestDist = dist
-            bestAnchor = aIdx
-          }
-        }
-      }
-
-      if (bestAnchor !== -1) {
-        tetherNodes[tetherCount] = node.idx
-        tetherAnchors[tetherCount++] = bestAnchor
-      }
+  // 2. Build Indexed Lines BufferGeometry (Zero dangling wall stubs, shared endpoints via index buffer)
+  const connectedWebNodes = []
+  const nodeToLineVert = new Int32Array(rawNodes.length).fill(-1)
+  for (let i = 0; i < rawNodes.length; i++) {
+    const n = rawNodes[i]
+    if (n.isWeb && n.connectedCount > 0) {
+      nodeToLineVert[i] = connectedWebNodes.length
+      connectedWebNodes.push(n)
     }
   }
 
-  // 5. Build Lines BufferGeometry (Internal Constellation Edges + Wave Margin Tethers)
-  const lineVertexCount = (edges.length + tetherCount) * 2
-  let lineCursor = 0
-  const linePositions = new Float32Array(lineVertexCount * 3)
-  const lineUs = new Float32Array(lineVertexCount * 1)
-  const lineWeights = new Float32Array(lineVertexCount * 1)
-  const lineLayers = new Int8Array(lineVertexCount * 1)
-  const lineAlphas = new Float32Array(lineVertexCount * 1)
-  const lineRelativeCoords = new Float32Array(lineVertexCount * 4)
-  const lineColors = new Float32Array(lineVertexCount * 3)
+  const lineVertCount = connectedWebNodes.length
+  const linePositions = new Float32Array(lineVertCount * 3)
+  const lineStyles = new Float32Array(lineVertCount * 2)
+  const lineRelativeCoords = new Float32Array(lineVertCount * 4)
 
-  function addLineSegment(p1, u1, w1, l1, a1, rel1, c1, p2, u2, w2, l2, a2, rel2, c2) {
-    const vertex = lineCursor
-    lineCursor += 2
-    linePositions[vertex * 3] = p1.x
-    linePositions[vertex * 3 + 1] = p1.y
-    linePositions[vertex * 3 + 2] = p1.z
-    linePositions[vertex * 3 + 3] = p2.x
-    linePositions[vertex * 3 + 4] = p2.y
-    linePositions[vertex * 3 + 5] = p2.z
-    lineUs[vertex] = u1
-    lineUs[vertex * 1 + 1] = u2
-    lineWeights[vertex] = w1
-    lineWeights[vertex * 1 + 1] = w2
-    lineLayers[vertex] = l1
-    lineLayers[vertex * 1 + 1] = l2
-    lineAlphas[vertex] = a1
-    lineAlphas[vertex * 1 + 1] = a2
-    lineRelativeCoords[vertex * 4] = rel1[0]
-    lineRelativeCoords[vertex * 4 + 1] = rel1[1]
-    lineRelativeCoords[vertex * 4 + 2] = rel1[2]
-    lineRelativeCoords[vertex * 4 + 3] = rel1[3]
-    lineRelativeCoords[vertex * 4 + 4] = rel2[0]
-    lineRelativeCoords[vertex * 4 + 5] = rel2[1]
-    lineRelativeCoords[vertex * 4 + 6] = rel2[2]
-    lineRelativeCoords[vertex * 4 + 7] = rel2[3]
-    lineColors[vertex * 3] = c1.r
-    lineColors[vertex * 3 + 1] = c1.g
-    lineColors[vertex * 3 + 2] = c1.b
-    lineColors[vertex * 3 + 3] = c2.r
-    lineColors[vertex * 3 + 4] = c2.g
-    lineColors[vertex * 3 + 5] = c2.b
+  for (let vIdx = 0; vIdx < lineVertCount; vIdx++) {
+    const n = connectedWebNodes[vIdx]
+    const depthScale = 0.62 + 0.38 * (0.5 + 0.5 * n.w_depth)
+    linePositions[vIdx * 3] = n.pos.x
+    linePositions[vIdx * 3 + 1] = n.pos.y
+    linePositions[vIdx * 3 + 2] = n.pos.z
+    lineStyles[vIdx * 2] = n.lineAlpha * depthScale
+    lineStyles[vIdx * 2 + 1] = n.hubAccent
+    lineRelativeCoords[vIdx * 4] = n.relativeCoord[0]
+    lineRelativeCoords[vIdx * 4 + 1] = n.relativeCoord[1]
+    lineRelativeCoords[vIdx * 4 + 2] = n.relativeCoord[2]
+    lineRelativeCoords[vIdx * 4 + 3] = n.relativeCoord[3]
   }
 
-  function getTierAlpha(node) {
-    if (node.depthTier === 'fg') {
-      return (node.isHighlight > 0.5) ? 0.44 : (0.35 + prng() * 0.07)
-    }
-    if (node.depthTier === 'bg') {
-      return 0.065 + prng() * 0.025
-    }
-    return 0.22 + prng() * 0.05
-  }
-
+  const validEdgeIndices = []
   for (let eIdx = 0; eIdx < edges.length; eIdx++) {
-    const i = edges.i[eIdx], j = edges.j[eIdx]
-    const isInterLayer = edges.interLayer[eIdx], isFallback = edges.fallback[eIdx]
-    const nA = rawNodes[i]
-    const nB = rawNodes[j]
-
-    let alphaBaseA = getTierAlpha(nA)
-    let alphaBaseB = getTierAlpha(nB)
-
-    if (isFallback) {
-      // A repair edge must remain readable beside its node, especially FG hubs.
-      alphaBaseA *= 0.80
-      alphaBaseB *= 0.80
-    } else if (isInterLayer) {
-      alphaBaseA = Math.min(alphaBaseA, 0.26)
-      alphaBaseB = Math.min(alphaBaseB, 0.26)
-      if (nA.depthTier === 'bg') alphaBaseA = Math.min(alphaBaseA, 0.09)
-      if (nB.depthTier === 'bg') alphaBaseB = Math.min(alphaBaseB, 0.09)
+    const vA = nodeToLineVert[edges.i[eIdx]]
+    const vB = nodeToLineVert[edges.j[eIdx]]
+    if (vA >= 0 && vB >= 0 && vA !== vB) {
+      validEdgeIndices.push(vA, vB)
     }
-
-    const featherA = 1.0 - THREE.MathUtils.smoothstep(Math.abs(nA.v_rel), 0.78, 0.96)
-    const featherB = 1.0 - THREE.MathUtils.smoothstep(Math.abs(nB.v_rel), 0.78, 0.96)
-
-    const throatA = 0.50 + 0.50 * THREE.MathUtils.smoothstep(nA.localSubHeight, minSubGap, 0.09)
-    const throatB = 0.50 + 0.50 * THREE.MathUtils.smoothstep(nB.localSubHeight, minSubGap, 0.09)
-    const aA = alphaBaseA * Math.max(0.08, featherA) * throatA
-    const aB = alphaBaseB * Math.max(0.08, featherB) * throatB
-    const cA = endpointA.fromArray(nodeLineColors, nA.idx * 3)
-    const cB = endpointB.fromArray(nodeLineColors, nB.idx * 3)
-
-    addLineSegment(
-      nA.pos, nA.u, nA.weight, nA.layer, aA, nA.relativeCoord, cA,
-      nB.pos, nB.u, nB.weight, nB.layer, aB, nB.relativeCoord, cB
-    )
   }
-
-  const defaultTetherColor = new THREE.Color('#104fe0')
-  const violetTetherColor = new THREE.Color('#5e48ff')
-
-  for (let tIdx = 0; tIdx < tetherCount; tIdx++) {
-    const node = rawNodes[tetherNodes[tIdx]], anchor = anchors[tetherAnchors[tIdx]]
-    const tetherFeather = 1.0 - THREE.MathUtils.smoothstep(Math.abs(node.v_rel), 0.74, 0.98)
-    const aNode = THREE.MathUtils.clamp((node.lineAlpha || 0.16) * 0.35 * tetherFeather, 0.0, 0.10)
-    const aAnchor = 0.0
-
-    const bLocal = lut.getBounds(node.u)
-    const dHero2 = Math.hypot(node.pos.y - bLocal.y2, node.pos.z - bLocal.z2)
-    const isAdjacentToViolet = dHero2 < 0.22 || Math.abs(node.v_rel) >= 0.70
-    const tColor = isAdjacentToViolet ? violetTetherColor : defaultTetherColor
-    const nColor = endpointA.fromArray(nodeLineColors, node.idx * 3)
-    if (isAdjacentToViolet) nColor.lerp(violetTetherColor, 0.80)
-
-    addLineSegment(
-      node.pos, node.u, node.weight, node.layer, aNode, node.relativeCoord, nColor,
-      anchor.pos, anchor.u, anchor.weight, 0.0, aAnchor, anchor.relativeCoord, tColor
-    )
-  }
+  const IndexArray = lineVertCount > 65535 ? Uint32Array : Uint16Array
+  const lineIndexArray = new IndexArray(validEdgeIndices)
 
   const linesGeo = new THREE.BufferGeometry()
   linesGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
-  linesGeo.setAttribute('aBasePos', linesGeo.getAttribute('position'))
-  linesGeo.setAttribute('aU', new THREE.BufferAttribute(lineUs, 1))
-  linesGeo.setAttribute('aWeight', new THREE.BufferAttribute(lineWeights, 1))
-  linesGeo.setAttribute('aLayer', new THREE.BufferAttribute(lineLayers, 1))
-  linesGeo.setAttribute('aAlpha', new THREE.BufferAttribute(lineAlphas, 1))
+  linesGeo.setAttribute('aLineStyle', new THREE.BufferAttribute(lineStyles, 2))
   linesGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(lineRelativeCoords, 4))
-  linesGeo.setAttribute('color', new THREE.BufferAttribute(lineColors, 3))
-  linesGeo.computeBoundingBox()
-  linesGeo.computeBoundingSphere()
+  linesGeo.setIndex(new THREE.BufferAttribute(lineIndexArray, 1))
+  if (lineVertCount > 0) {
+    linesGeo.computeBoundingBox()
+    linesGeo.computeBoundingSphere()
+  }
 
-  // 6. Build Points BufferGeometry (Multi-Scale Starlight Field: micro-nodes + ice-white hubs)
-  const pointPositions = new Float32Array(visibleNodes.length * 3)
-  const pointUs = new Float32Array(visibleNodes.length * 1)
-  const pointWeights = new Float32Array(visibleNodes.length * 1)
-  const pointLayers = new Int8Array(visibleNodes.length * 1)
-  const pointSizes = new Float32Array(visibleNodes.length * 1)
-  const pointAlphas = new Float32Array(visibleNodes.length * 1)
-  const pointColors = new Float32Array(visibleNodes.length * 3)
-  const pointHighlights = new Uint8Array(visibleNodes.length * 1)
-  const pointRelativeCoords = new Float32Array(visibleNodes.length * 4)
+  // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation)
+  const pointCount = visibleNodes.length
+  const pointPositions = new Float32Array(pointCount * 3)
+  const pointStyles = new Float32Array(pointCount * 3)
+  const pointRelativeCoords = new Float32Array(pointCount * 4)
 
-  for (let nIdx = 0; nIdx < visibleNodes.length; nIdx++) {
+  for (let nIdx = 0; nIdx < pointCount; nIdx++) {
     const n = visibleNodes[nIdx]
     pointPositions[nIdx * 3] = n.pos.x
     pointPositions[nIdx * 3 + 1] = n.pos.y
     pointPositions[nIdx * 3 + 2] = n.pos.z
-    pointUs[nIdx] = n.u
-    pointWeights[nIdx] = n.weight
-    pointLayers[nIdx] = n.layer
-    pointSizes[nIdx] = n.size
-    pointAlphas[nIdx] = n.alpha
-    pointColors[nIdx * 3] = nodeColors[n.idx * 3 + 0]
-    pointColors[nIdx * 3 + 1] = nodeColors[n.idx * 3 + 1]
-    pointColors[nIdx * 3 + 2] = nodeColors[n.idx * 3 + 2]
-    pointHighlights[nIdx] = n.isHighlight
+    pointStyles[nIdx * 3] = n.size
+    pointStyles[nIdx * 3 + 1] = n.alpha
+    pointStyles[nIdx * 3 + 2] = n.tier
     pointRelativeCoords[nIdx * 4] = n.relativeCoord[0]
     pointRelativeCoords[nIdx * 4 + 1] = n.relativeCoord[1]
     pointRelativeCoords[nIdx * 4 + 2] = n.relativeCoord[2]
@@ -1648,109 +1435,127 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
 
   const pointsGeo = new THREE.BufferGeometry()
   pointsGeo.setAttribute('position', new THREE.BufferAttribute(pointPositions, 3))
-  pointsGeo.setAttribute('aBasePos', pointsGeo.getAttribute('position'))
-  pointsGeo.setAttribute('aU', new THREE.BufferAttribute(pointUs, 1))
-  pointsGeo.setAttribute('aWeight', new THREE.BufferAttribute(pointWeights, 1))
-  pointsGeo.setAttribute('aLayer', new THREE.BufferAttribute(pointLayers, 1))
-  pointsGeo.setAttribute('size', new THREE.BufferAttribute(pointSizes, 1))
-  pointsGeo.setAttribute('alpha', new THREE.BufferAttribute(pointAlphas, 1))
-  pointsGeo.setAttribute('color', new THREE.BufferAttribute(pointColors, 3))
-  pointsGeo.setAttribute('aIsHighlight', new THREE.BufferAttribute(pointHighlights, 1))
+  pointsGeo.setAttribute('aPointStyle', new THREE.BufferAttribute(pointStyles, 3))
   pointsGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(pointRelativeCoords, 4))
-  pointsGeo.computeBoundingBox()
-  pointsGeo.computeBoundingSphere()
+  if (pointCount > 0) {
+    pointsGeo.computeBoundingBox()
+    pointsGeo.computeBoundingSphere()
+  }
 
-  // 7. Restrained Deep Sapphire Chamber Haze (Answer 5)
-  const hazePositions = new Float32Array(180 * 3)
-  const hazeUs = new Float32Array(180 * 1)
-  const hazeWeights = new Float32Array(180 * 1)
-  const hazeSizes = new Float32Array(180 * 1)
-  const hazeAlphas = new Float32Array(180 * 1)
-  const hazeColors = new Float32Array(180 * 3)
-  const hazeRelativeCoords = new Float32Array(180 * 4)
-
-  const hazeCountTarget = 180
-  const hazeGrid = new SpatialGrid3D(0.18)
+  // 4. Velvety Interior Pocket Nebula (localized luminous glow inside open chamber bellies)
+  const cellScale = Math.sqrt(envScale)
+  const hazeSpanScale = Math.max(1.0, Math.sqrt(safeXScale / 1.55))
+  const hazeCellIso = 0.130 * cellScale * hazeSpanScale
+  const hazeDu = hazeCellIso / (10.0 * safeXScale)
+  const hazeGrid = new IsotropicGrid2D(Math.max(0.08, 0.15 * cellScale * hazeSpanScale))
   const hazeNodes = []
-  let hazeAttempts = 0
+  let hazeCap = 960
+  let hazePositions = new Float32Array(hazeCap * 3)
+  let hazeStyles = new Float32Array(hazeCap * 2)
+  let hazeRelativeCoords = new Float32Array(hazeCap * 4)
+  const hazePhaseBuf = { lo: 0, hi: 0, center: 0, radius: 1e-5 }
   let hazeCount = 0
 
-  while (hazeCount < hazeCountTarget && hazeAttempts++ < 6000) {
-    const u = 0.12 + prng() * (0.98 - 0.12)
-    const b = lut.getBounds(u)
-    if (b.envHeight < 0.09) continue
+  for (let u0 = 0.105; u0 < 0.982; u0 += hazeDu) {
+    const u1 = Math.min(0.982, u0 + hazeDu)
+    const stripDu = u1 - u0
+    if (stripDu < 0.002) continue
+    const uMid = 0.5 * (u0 + u1)
+    const bMid = lut.getBounds(uMid)
+    if (bMid.envHeight * isoYScale < 0.062 * envScale) continue
 
-    const pockets = lut.getSubPockets(u, 0.08)
-    if (pockets.length === 0) continue
+    const vMaxHaze = computeVMax(bMid.envHeight, isoYScale, 0.78, 0.048 * envScale)
+    if (vMaxHaze <= 0.05) continue
+    const activeIsoH = isoYScale * bMid.envHeight * vMaxHaze
+    const lambda = (10.0 * safeXScale * stripDu * activeIsoH) / (hazeCellIso * hazeCellIso)
+    const baseCount = Math.floor(lambda)
+    const count = baseCount + (prng() < (lambda - baseCount) ? 1 : 0)
+    if (count <= 0) continue
 
-    const chosenPocket = pockets[Math.floor(prng() * pockets.length)]
-    if (chosenPocket.height < 0.08) continue
+    for (let k = 0; k < count; k++) {
+      const vLo = -vMaxHaze + (2.0 * vMaxHaze) * (k / count)
+      const vHi = -vMaxHaze + (2.0 * vMaxHaze) * ((k + 1) / count)
 
-    const w_depth = -0.22 - prng() * 0.48
-    const maxV = Math.sqrt(Math.max(0.0, 0.64 * 0.64 - w_depth * w_depth))
-    if (maxV <= 0.01) continue
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const u = u0 + (0.08 + 0.84 * prng()) * stripDu
+        const vRaw = vLo + (0.08 + 0.84 * prng()) * (vHi - vLo)
+        const bLoc = lut.getBounds(u)
+        if (bLoc.envHeight * isoYScale < 0.055 * envScale) continue
 
-    const v_rel = (prng() - 0.5) * 2.0 * maxV
-    const r_norm = Math.hypot(v_rel, w_depth)
-    if (r_norm >= 0.65) continue
+        const vMaxLoc = computeVMax(bLoc.envHeight, isoYScale, 0.78, 0.048 * envScale)
+        if (vMaxLoc <= 0.05) continue
+        const v_rel = vMaxHaze > 1e-4 ? vRaw * (vMaxLoc / vMaxHaze) : vRaw
+        if (Math.abs(v_rel) > vMaxLoc) continue
 
-    const y = chosenPocket.centerY + v_rel * chosenPocket.ry
-    const z = chosenPocket.centerZ + w_depth * chosenPocket.rz
-    const x = sign * 10.0 * u
-    // Projected separation limits additive accumulation behind narrow chambers.
-    if (hazeGrid.isTooClose(x, y, 0, 0.15, hazeNodes, true)) continue
-    const pos = new THREE.Vector3(x, y, z)
+        const x = sign * 10.0 * u
+        const y = bLoc.envCenterY + v_rel * 0.5 * bLoc.envHeight
+        const isoX = x * safeXScale
+        const isoY = y * isoYScale
+        const minHazeDist = 0.068 * cellScale * hazeSpanScale
+        if (hazeGrid.hasNeighborWithin(isoX, isoY, minHazeDist, hazeNodes, minHazeDist * 1.15)) continue
 
-    const dHero = getMinFilamentClearance(y, z, b)
-    if (dHero < 0.009) continue
+        const w_depth = -0.18 - prng() * 0.54
+        const envMinZ = Math.min(bLoc.z0, bLoc.z1, bLoc.z2, bLoc.z3)
+        const envMaxZ = Math.max(bLoc.z0, bLoc.z1, bLoc.z2, bLoc.z3)
+        const envRz = Math.max(0.015, 0.5 * (envMaxZ - envMinZ) + 0.025)
+        const z = bLoc.envCenterZ + w_depth * envRz
 
-    const boundaryFade = Math.max(0.0, 1.0 - Math.pow(r_norm / 0.65, 2.0))
-    const weight = computeConstraintWeight(u)
+        lut.getPhaseBounds(u, 0, hazePhaseBuf)
+        const v_frame = Math.max(-0.78, Math.min(0.78, (y - hazePhaseBuf.center) / hazePhaseBuf.radius))
+        const r_norm = Math.min(1.0, Math.hypot(v_frame, w_depth))
 
-    const baseAlpha = 0.018 + prng() * 0.005
-    const alpha = baseAlpha * boundaryFade * weight
-    const baseSize = Math.max(20.0, Math.min(65.0, chosenPocket.height * 80.0 + prng() * 10.0))
-    const col = colorScratch.copy(palette.c14).lerp(palette.c15, prng())
+        const innerTipFade = THREE.MathUtils.smoothstep(u, 0.105, 0.22)
+        const vRatio = v_frame / Math.max(0.25, vMaxLoc)
+        const vTaper = 1.0 - 0.14 * vRatio * vRatio
+        const baseAlpha = 0.038 + prng() * 0.020
+        const alpha = baseAlpha * innerTipFade * vTaper
+        const sizeJitter = 0.90 + prng() * 0.26
 
-    const dHero2 = Math.hypot(y - b.y2, z - b.z2)
-    if (dHero2 < 0.16) {
-      col.lerp(palette.c16, 0.25)
+        if (hazeCount >= hazeCap) {
+          const nextCap = hazeCap * 2
+          const np = new Float32Array(nextCap * 3)
+          const ns = new Float32Array(nextCap * 2)
+          const nr = new Float32Array(nextCap * 4)
+          np.set(hazePositions)
+          ns.set(hazeStyles)
+          nr.set(hazeRelativeCoords)
+          hazePositions = np
+          hazeStyles = ns
+          hazeRelativeCoords = nr
+          hazeCap = nextCap
+        }
+
+        hazeGrid.insert(isoX, isoY, hazeNodes.length)
+        hazeNodes.push({ pos: { x, y, z }, isoX, isoY })
+
+        hazePositions[hazeCount * 3] = x
+        hazePositions[hazeCount * 3 + 1] = y
+        hazePositions[hazeCount * 3 + 2] = z
+        hazeStyles[hazeCount * 2] = sizeJitter
+        hazeStyles[hazeCount * 2 + 1] = alpha
+        hazeRelativeCoords[hazeCount * 4] = u
+        hazeRelativeCoords[hazeCount * 4 + 1] = v_frame
+        hazeRelativeCoords[hazeCount * 4 + 2] = w_depth
+        hazeRelativeCoords[hazeCount * 4 + 3] = r_norm
+        hazeCount++
+        break
+      }
     }
-
-    hazeGrid.insert(x, y, 0, hazeNodes.length)
-    hazeNodes.push({ pos })
-    hazePositions[hazeCount * 3] = pos.x
-    hazePositions[hazeCount * 3 + 1] = pos.y
-    hazePositions[hazeCount * 3 + 2] = pos.z
-    hazeUs[hazeCount] = u
-    hazeWeights[hazeCount] = weight
-    hazeSizes[hazeCount] = baseSize
-    hazeAlphas[hazeCount] = alpha
-    hazeColors[hazeCount * 3] = col.r
-    hazeColors[hazeCount * 3 + 1] = col.g
-    hazeColors[hazeCount * 3 + 2] = col.b
-    hazeRelativeCoords[hazeCount * 4] = u
-    hazeRelativeCoords[hazeCount * 4 + 1] = v_rel
-    hazeRelativeCoords[hazeCount * 4 + 2] = w_depth
-    hazeRelativeCoords[hazeCount * 4 + 3] = r_norm
-    hazeCount++
   }
 
   const hazeGeo = new THREE.BufferGeometry()
   hazeGeo.setAttribute('position', new THREE.BufferAttribute(hazePositions.slice(0, hazeCount * 3), 3))
-  hazeGeo.setAttribute('aBasePos', hazeGeo.getAttribute('position'))
-  hazeGeo.setAttribute('aU', new THREE.BufferAttribute(hazeUs.slice(0, hazeCount * 1), 1))
-  hazeGeo.setAttribute('aWeight', new THREE.BufferAttribute(hazeWeights.slice(0, hazeCount * 1), 1))
-  hazeGeo.setAttribute('size', new THREE.BufferAttribute(hazeSizes.slice(0, hazeCount * 1), 1))
-  hazeGeo.setAttribute('alpha', new THREE.BufferAttribute(hazeAlphas.slice(0, hazeCount * 1), 1))
-  hazeGeo.setAttribute('color', new THREE.BufferAttribute(hazeColors.slice(0, hazeCount * 3), 3))
+  hazeGeo.setAttribute('aHazeStyle', new THREE.BufferAttribute(hazeStyles.slice(0, hazeCount * 2), 2))
   hazeGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(hazeRelativeCoords.slice(0, hazeCount * 4), 4))
-  hazeGeo.computeBoundingBox()
-  hazeGeo.computeBoundingSphere()
+  if (hazeCount > 0) {
+    hazeGeo.computeBoundingBox()
+    hazeGeo.computeBoundingSphere()
+  }
 
-  addPocketTravelAttributes(linesGeo, H, config)
-  addPocketTravelAttributes(pointsGeo, H, config)
-  addPocketTravelAttributes(hazeGeo, H, config)
+  const travelProfiles = new Map()
+  addPocketTravelAttributes(linesGeo, H, config, travelProfiles, 0.88)
+  addPocketTravelAttributes(pointsGeo, H, config, travelProfiles, 0.88)
+  addPocketTravelAttributes(hazeGeo, H, config, travelProfiles, 0.78)
 
   return {
     linesGeo,

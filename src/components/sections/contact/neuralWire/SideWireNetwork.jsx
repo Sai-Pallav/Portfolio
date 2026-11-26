@@ -1,7 +1,6 @@
 import { useMemo, useEffect, useLayoutEffect, useState, useCallback, useRef, useSyncExternalStore, memo, Component } from 'react'
 import * as THREE from 'three'
 import { Canvas, useThree, useFrame, useStore } from '@react-three/fiber'
-import { useReducedMotion } from 'framer-motion'
 import { useThemeContext } from '@/context/ThemeContext'
 import { getWireThemeConfig } from './wireThemeConfig'
 import { getSideWireData } from './generateWireGeometry'
@@ -15,7 +14,7 @@ import { FlowTimeContext, FlowTrigContext, FLOW_OMEGA, isWaveAnimationPaused } f
 // Temporary visual toggle retained as a one-line rollback switch while Stage 2
 // is validated in the live Contact section.
 const TEMPORARILY_STATIC = false
-const SHOW_NEURAL_NETWORK = false
+const SHOW_NEURAL_NETWORK = true
 
 const CANVAS_GL_CONFIG = {
   depth: false,
@@ -39,6 +38,18 @@ function getDocumentHidden() {
 
 function getServerDocumentHidden() {
   return false
+}
+
+// Framer Motion's installed hook snapshots this preference only at mount.
+// Subscribe directly so enabling reduced motion also stops an already-live canvas.
+function subscribeReducedMotion(callback) {
+  const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+  media.addEventListener('change', callback)
+  return () => media.removeEventListener('change', callback)
+}
+
+function getReducedMotion() {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 // The uniforms are imperative GPU values; updating them does not change React state.
@@ -340,7 +351,11 @@ export default memo(function SideWireNetwork({ isInView = true }) {
     getDocumentHidden,
     getServerDocumentHidden
   )
-  const prefersReducedMotion = useReducedMotion()
+  const prefersReducedMotion = useSyncExternalStore(
+    subscribeReducedMotion,
+    getReducedMotion,
+    getServerDocumentHidden
+  )
   const reducedMotion = TEMPORARILY_STATIC || prefersReducedMotion
   const themeCtx = useThemeContext()
   const sceneStoreRef = useRef(null)
