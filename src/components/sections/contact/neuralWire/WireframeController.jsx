@@ -314,6 +314,8 @@ export default memo(function WireframeController() {
     rightConfig,
     linkSides,
     activeSideTab,
+    showNeuralNetwork,
+    setShowNeuralNetwork,
     updateParam,
     applyPreset,
     resetToDefaults,
@@ -657,7 +659,20 @@ export default memo(function WireframeController() {
             <p className="text-[10px] text-neutral-400 leading-none">Drag header · resize corner ↘</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowNeuralNetwork((prev) => !prev)}
+            className={`text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-all border whitespace-nowrap ${
+              showNeuralNetwork
+                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/25'
+                : 'bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white border-white/10'
+            }`}
+            title={showNeuralNetwork ? 'Hide neural network' : 'Unhide neural network'}
+            aria-pressed={showNeuralNetwork}
+          >
+            <span>{showNeuralNetwork ? 'Hide Neural' : 'Unhide Neural'}</span>
+          </button>
           <button
             onClick={togglePause}
             className={`text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-all border ${

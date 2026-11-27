@@ -149,6 +149,7 @@ const WireframeConfigContext = createContext(null)
 export function WireframeConfigProvider({ children }) {
   const [linkSides, setLinkSides] = useState(true)
   const [activeSideTab, setActiveSideTab] = useState('both') // 'both' | 'left' | 'right'
+  const [showNeuralNetwork, setShowNeuralNetwork] = useState(true)
 
   // ── Left Ribbon Config (side: 'left') ──
   const [leftConfig, setLeftConfig] = useState(() => {
@@ -317,6 +318,8 @@ export function WireframeConfigProvider({ children }) {
     setLinkSides,
     activeSideTab,
     setActiveSideTab,
+    showNeuralNetwork,
+    setShowNeuralNetwork,
     updateParam,
     updateRibbonParam,
     applyPreset,
@@ -332,6 +335,7 @@ export function WireframeConfigProvider({ children }) {
     rightConfig,
     linkSides,
     activeSideTab,
+    showNeuralNetwork,
     updateParam,
     updateRibbonParam,
     applyPreset,
@@ -364,6 +368,8 @@ export function useWireframeConfig() {
       linkSides: true,
       activeSideTab: 'both',
       setActiveSideTab: () => {},
+      showNeuralNetwork: true,
+      setShowNeuralNetwork: () => {},
       updateParam: () => {},
       updateRibbonParam: () => {},
       applyPreset: () => {},

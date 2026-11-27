@@ -14,7 +14,6 @@ import { FlowTimeContext, FlowTrigContext, FLOW_OMEGA, isWaveAnimationPaused } f
 // Temporary visual toggle retained as a one-line rollback switch while Stage 2
 // is validated in the live Contact section.
 const TEMPORARILY_STATIC = false
-const SHOW_NEURAL_NETWORK = true
 
 const CANVAS_GL_CONFIG = {
   depth: false,
@@ -226,7 +225,7 @@ function NeuralScene({ themeKey, isInView, isDocumentHidden, reducedMotion, onCo
   }, [isActive, gl, store, invalidate])
 
   const baseThemeConfig = useMemo(() => getWireThemeConfig(themeKey), [themeKey])
-  const { ribbons } = useWireframeConfig()
+  const { ribbons, showNeuralNetwork } = useWireframeConfig()
 
   // Invalidate canvas once to re-render when theme, viewport, or ribbon configs update
   const depsMountedRef = useRef(false)
@@ -238,7 +237,7 @@ function NeuralScene({ themeKey, isInView, isDocumentHidden, reducedMotion, onCo
     if (isActiveRef.current) {
       invalidate()
     }
-  }, [baseThemeConfig, viewport.width, viewport.height, ribbons, invalidate])
+  }, [baseThemeConfig, viewport.width, viewport.height, ribbons, showNeuralNetwork, invalidate])
 
   // Responsive layout calculation per ribbon config
   const calculateLayout = useCallback((ribbonConfig) => {
@@ -314,12 +313,10 @@ function NeuralScene({ themeKey, isInView, isDocumentHidden, reducedMotion, onCo
                   themeConfig={themeConfig}
                   nodeScale={layout.nodeScale}
                 />
-                {SHOW_NEURAL_NETWORK && (
+                {showNeuralNetwork && (
                   <NeuralNetworkField
-                    linesGeo={wireData.neuralLinesGeo}
-                    pointsGeo={wireData.neuralPointsGeo}
-                    hazeGeo={wireData.neuralHazeGeo}
-                    focalFlaresGeo={wireData.focalFlaresGeo}
+                    leftWaves={wireEntries[0]}
+                    rightWaves={wireEntries[1]}
                     themeConfig={themeConfig}
                     nodeScale={layout.nodeScale}
                     innerFade={ribbon.innerFade ?? 0.04}

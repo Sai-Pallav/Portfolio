@@ -15,10 +15,12 @@ import {
   heroY3,
   heroZ,
   H_VAL,
+  N_HERO,
   computeConstraintWeight,
   getHeroMotion,
 } from './generateWireGeometry.js'
 import { segmentsIntersect2D } from './neuralGraphModel.js'
+import { FLOW_OMEGA } from './animationContract.js'
 
 /**
  * Deterministic PRNG for neural pocket geometry.
@@ -220,110 +222,59 @@ function safeMax(a, b) {
   return 0.5 * (a + b + Math.sqrt(diff * diff + 1e-8) - 1e-4)
 }
 
-/** Bake all four live wall harmonics and a normalized vertical coordinate. */
-function addPocketTravelAttributes(geometry, H, config, profiles, maxVClamp = 0.88) {
-  const positions = geometry.getAttribute('position').array
-  const relCoords = geometry.getAttribute('aRelativeCoord').array
-  const count = relCoords.length / 4
-  const bias = new Float32Array(count * 4)
-  const cos = new Float32Array(count * 4)
-  const sin = new Float32Array(count * 4)
-  const frame = new Float32Array(count * 3)
-  const axis = new Float32Array(count * 3)
-  const normal = new Float32Array(count * 3)
-  const depthMotion = new Float32Array(count * 2)
-  const heroes = [heroY0, heroY1, heroY2, heroY3]
-  const c = new Float64Array(3), s = new Float64Array(3)
+export function getNeuralTravelOffset(time, waveNumber) {
+  const period = waveNumber / FLOW_OMEGA
+  if (!Number.isFinite(time) || !Number.isFinite(period) || period <= 1e-6) return 0
+  const offset = (time % period) / period
+  return offset < 0 ? offset + 1 : offset
+}
 
-  for (let i = 0; i < count; i++) {
-    const u = relCoords[4 * i]
-    let profile = profiles.get(u)
-    if (!profile) {
-      profile = {
-        low: Infinity,
-        high: -Infinity,
-        bias: [0, 0, 0, 0],
-        cos: [0, 0, 0, 0],
-        sin: [0, 0, 0, 0],
-        restY: [0, 0, 0, 0],
-        depthCos: [0, 0, 0, 0],
-        depthSin: [0, 0, 0, 0],
+/** Each rail has two texture rows: the rendered rest position and both Y/Z harmonics. */
+export function createNeuralWaveTexture(leftWaves, rightWaves) {
+  const data = new Float32Array(N_HERO * 16 * 4)
+  const ends = []
+
+  for (const { primaryCoreGeo, secondaryGeo } of [leftWaves, rightWaves]) {
+    const wing = ends.length
+    const wingEnds = new THREE.Vector4()
+    // The primary geometry contains strands 0, 1, and 3; the violet core is separate.
+    const coreSlots = [0, 1, 0, 2]
+    for (let strand = 0; strand < 4; strand++) {
+      const core = strand === 2 ? secondaryGeo : primaryCoreGeo
+      const start = coreSlots[strand] * N_HERO
+      const position = core.getAttribute('position').array
+      const cos = core.getAttribute('aFlowCos').array
+      const sin = core.getAttribute('aFlowSin').array
+      const u = core.getAttribute('aU').array
+      const restRow = (wing * 8 + strand * 2) * N_HERO * 4
+      const harmonicRow = restRow + N_HERO * 4
+      wingEnds.setComponent(strand, u[start + N_HERO - 1])
+      for (let sample = 0; sample < N_HERO; sample++) {
+        const i = (start + sample) * 3
+        const j = sample * 4
+        data[restRow + j] = position[i]
+        data[restRow + j + 1] = position[i + 1]
+        data[restRow + j + 2] = position[i + 2]
+        data[harmonicRow + j] = cos[i + 1]
+        data[harmonicRow + j + 1] = cos[i + 2]
+        data[harmonicRow + j + 2] = sin[i + 1]
+        data[harmonicRow + j + 3] = sin[i + 2]
       }
-      for (let j = 0; j < 4; j++) {
-        const y = heroes[j](u, H, config)
-        getHeroMotion(j, u, H, config, c, s)
-        profile.restY[j] = y
-        profile.bias[j] = y - c[1]
-        profile.cos[j] = c[1]
-        profile.sin[j] = s[1]
-        profile.depthCos[j] = c[2]
-        profile.depthSin[j] = s[2]
-        profile.low = Math.min(profile.low, y)
-        profile.high = Math.max(profile.high, y)
-      }
-      // Match safeMax envelope used in GLSL
-      const lo = -safeMax(
-        safeMax(-profile.restY[0], -profile.restY[1]),
-        safeMax(-profile.restY[2], -profile.restY[3])
-      )
-      const hi = safeMax(
-        safeMax(profile.restY[0], profile.restY[1]),
-        safeMax(profile.restY[2], profile.restY[3])
-      )
-      profile.low = lo
-      profile.high = hi
-      profiles.set(u, profile)
     }
-
-    for (let j = 0; j < 4; j++) {
-      bias[4 * i + j] = profile.bias[j]
-      cos[4 * i + j] = profile.cos[j]
-      sin[4 * i + j] = profile.sin[j]
-    }
-
-    const yRest = positions[3 * i + 1]
-    const zRest = positions[3 * i + 2]
-
-    // Inverse vertical proximity weighting across all 4 strands prevents phase cancellation
-    let sumW = 0.0
-    let dCos = 0.0
-    let dSin = 0.0
-    for (let j = 0; j < 4; j++) {
-      const w = 1.0 / (Math.abs(yRest - profile.restY[j]) + 0.05)
-      sumW += w
-      dCos += w * profile.depthCos[j]
-      dSin += w * profile.depthSin[j]
-    }
-    const invSumW = sumW > 1e-6 ? 1.0 / sumW : 0.25
-    depthMotion[2 * i] = dCos * invSumW * 0.25
-    depthMotion[2 * i + 1] = dSin * invSumW * 0.25
-
-    const low = profile.low
-    const high = profile.high
-    const center = (low + high) * 0.5
-    const radius = Math.max((high - low) * 0.5, 1e-5)
-    const vFrame = Math.max(-maxVClamp, Math.min(maxVClamp, (yRest - center) / radius))
-
-    frame[3 * i] = vFrame
-    frame[3 * i + 1] = zRest
-    frame[3 * i + 2] = radius
-
-    // Keep synced v_frame in aRelativeCoord.y as well
-    relCoords[4 * i + 1] = vFrame
-
-    positions[3 * i + 1] = 0
-    positions[3 * i + 2] = 0
-    axis[3 * i + 1] = 1
-    normal[3 * i + 2] = 1
+    ends.push(wingEnds)
   }
 
-  geometry.setAttribute('aWaveBias', new THREE.BufferAttribute(bias, 4))
-  geometry.setAttribute('aWaveCos', new THREE.BufferAttribute(cos, 4))
-  geometry.setAttribute('aWaveSin', new THREE.BufferAttribute(sin, 4))
-  geometry.setAttribute('aDepthMotion', new THREE.BufferAttribute(depthMotion, 2))
-  geometry.setAttribute('aPocketFrame', new THREE.BufferAttribute(frame, 3))
-  geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
-  geometry.setAttribute('aFlowNormal', new THREE.BufferAttribute(normal, 3))
+  const texture = new THREE.DataTexture(data, N_HERO, 16, THREE.RGBAFormat, THREE.FloatType)
+  texture.needsUpdate = true
+  return { texture, ends }
+}
+
+/** Preserve longitudinal order while distributing the seeds over the full wrap. */
+function distributeTravelSeeds(nodes, seeds) {
+  nodes.sort((a, b) => a.u - b.u)
+  for (let rank = 0; rank < nodes.length; rank++) {
+    seeds[nodes[rank].idx] = (rank + 0.5) / nodes.length
+  }
 }
 
 /**
@@ -1333,7 +1284,7 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
 /**
  * Generates the refined volumetric neural field BufferGeometries (linesGeo, pointsGeo, hazeGeo).
  * Area-proportional stratified sampling across full wave arches with organic hub clustering,
- * triangulated indexed spiderweb, and velvety localized interior pocket nebula.
+ * triangulated spiderweb, and velvety localized interior pocket nebula.
  *
  * @param {'left' | 'right'} side
  * @param {number} [H=H_VAL]
@@ -1355,63 +1306,51 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
   const maxEnvIsoH = lut.maxEnvHeight * isoYScale
   const envScale = THREE.MathUtils.clamp(maxEnvIsoH / baselineMaxIsoH, 0.38, 1.30)
 
-  // 1. Stratified organic constellation sampling + indexed triangulated spiderweb
+  // 1. Stratified organic constellation sampling + triangulated spiderweb
   const { rawNodes, webGrid } = sampleStratifiedNodes(sign, safeXScale, isoYScale, lut, prng, envScale)
   const edges = connectNeuralNodes(rawNodes, webGrid, lut, safeXScale, isoYScale, envScale)
 
   // Keep connected web nodes + background micro-dust sparkles
   const visibleNodes = rawNodes.filter(n => !n.isWeb || n.connectedCount > 0)
 
-  // 2. Build Indexed Lines BufferGeometry (Zero dangling wall stubs, shared endpoints via index buffer)
-  const connectedWebNodes = []
-  const nodeToLineVert = new Int32Array(rawNodes.length).fill(-1)
-  for (let i = 0; i < rawNodes.length; i++) {
-    const n = rawNodes[i]
-    if (n.isWeb && n.connectedCount > 0) {
-      nodeToLineVert[i] = connectedWebNodes.length
-      connectedWebNodes.push(n)
-    }
-  }
+  // Build the original graph first, then assign a shared travel coordinate to each vertex.
+  const connectedWebNodes = visibleNodes.filter(n => n.isWeb)
+  const travelSeeds = new Float32Array(rawNodes.length)
+  distributeTravelSeeds(connectedWebNodes, travelSeeds)
+  distributeTravelSeeds(visibleNodes.filter(n => !n.isWeb), travelSeeds)
 
-  const lineVertCount = connectedWebNodes.length
+  // A line vertex carries its partner's seed so both ends agree on seam visibility.
+  const lineVertCount = edges.length * 2
   const linePositions = new Float32Array(lineVertCount * 3)
   const lineStyles = new Float32Array(lineVertCount * 2)
   const lineRelativeCoords = new Float32Array(lineVertCount * 4)
+  const partnerSeeds = new Float32Array(lineVertCount)
 
-  for (let vIdx = 0; vIdx < lineVertCount; vIdx++) {
-    const n = connectedWebNodes[vIdx]
-    const depthScale = 0.62 + 0.38 * (0.5 + 0.5 * n.w_depth)
-    linePositions[vIdx * 3] = n.pos.x
-    linePositions[vIdx * 3 + 1] = n.pos.y
-    linePositions[vIdx * 3 + 2] = n.pos.z
-    lineStyles[vIdx * 2] = n.lineAlpha * depthScale
-    lineStyles[vIdx * 2 + 1] = n.hubAccent
-    lineRelativeCoords[vIdx * 4] = n.relativeCoord[0]
-    lineRelativeCoords[vIdx * 4 + 1] = n.relativeCoord[1]
-    lineRelativeCoords[vIdx * 4 + 2] = n.relativeCoord[2]
-    lineRelativeCoords[vIdx * 4 + 3] = n.relativeCoord[3]
-  }
-
-  const validEdgeIndices = []
-  for (let eIdx = 0; eIdx < edges.length; eIdx++) {
-    const vA = nodeToLineVert[edges.i[eIdx]]
-    const vB = nodeToLineVert[edges.j[eIdx]]
-    if (vA >= 0 && vB >= 0 && vA !== vB) {
-      validEdgeIndices.push(vA, vB)
+  for (let edge = 0; edge < edges.length; edge++) {
+    const nodeA = rawNodes[edges.i[edge]]
+    const nodeB = rawNodes[edges.j[edge]]
+    for (let end = 0; end < 2; end++) {
+      const n = end === 0 ? nodeA : nodeB
+      const partner = end === 0 ? nodeB : nodeA
+      const i = edge * 2 + end
+      const u = travelSeeds[n.idx]
+      const depthScale = 0.62 + 0.38 * (0.5 + 0.5 * n.w_depth)
+      linePositions[i * 3] = sign * 10.0 * u
+      linePositions[i * 3 + 1] = n.pos.y
+      linePositions[i * 3 + 2] = n.pos.z
+      lineStyles[i * 2] = n.lineAlpha * depthScale
+      lineStyles[i * 2 + 1] = n.hubAccent
+      lineRelativeCoords.set(n.relativeCoord, i * 4)
+      lineRelativeCoords[i * 4] = u
+      partnerSeeds[i] = travelSeeds[partner.idx]
     }
   }
-  const IndexArray = lineVertCount > 65535 ? Uint32Array : Uint16Array
-  const lineIndexArray = new IndexArray(validEdgeIndices)
 
   const linesGeo = new THREE.BufferGeometry()
   linesGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
   linesGeo.setAttribute('aLineStyle', new THREE.BufferAttribute(lineStyles, 2))
   linesGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(lineRelativeCoords, 4))
-  linesGeo.setIndex(new THREE.BufferAttribute(lineIndexArray, 1))
-  if (lineVertCount > 0) {
-    linesGeo.computeBoundingBox()
-    linesGeo.computeBoundingSphere()
-  }
+  linesGeo.setAttribute('aPartnerU', new THREE.BufferAttribute(partnerSeeds, 1))
 
   // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation)
   const pointCount = visibleNodes.length
@@ -1421,13 +1360,13 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
 
   for (let nIdx = 0; nIdx < pointCount; nIdx++) {
     const n = visibleNodes[nIdx]
-    pointPositions[nIdx * 3] = n.pos.x
+    pointPositions[nIdx * 3] = sign * 10.0 * travelSeeds[n.idx]
     pointPositions[nIdx * 3 + 1] = n.pos.y
     pointPositions[nIdx * 3 + 2] = n.pos.z
     pointStyles[nIdx * 3] = n.size
     pointStyles[nIdx * 3 + 1] = n.alpha
     pointStyles[nIdx * 3 + 2] = n.tier
-    pointRelativeCoords[nIdx * 4] = n.relativeCoord[0]
+    pointRelativeCoords[nIdx * 4] = travelSeeds[n.idx]
     pointRelativeCoords[nIdx * 4 + 1] = n.relativeCoord[1]
     pointRelativeCoords[nIdx * 4 + 2] = n.relativeCoord[2]
     pointRelativeCoords[nIdx * 4 + 3] = n.relativeCoord[3]
@@ -1504,11 +1443,10 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
         const v_frame = Math.max(-0.78, Math.min(0.78, (y - hazePhaseBuf.center) / hazePhaseBuf.radius))
         const r_norm = Math.min(1.0, Math.hypot(v_frame, w_depth))
 
-        const innerTipFade = THREE.MathUtils.smoothstep(u, 0.105, 0.22)
         const vRatio = v_frame / Math.max(0.25, vMaxLoc)
         const vTaper = 1.0 - 0.14 * vRatio * vRatio
         const baseAlpha = 0.038 + prng() * 0.020
-        const alpha = baseAlpha * innerTipFade * vTaper
+        const alpha = baseAlpha * vTaper
         const sizeJitter = 0.90 + prng() * 0.26
 
         if (hazeCount >= hazeCap) {
@@ -1543,6 +1481,13 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     }
   }
 
+  // Haze was sampled in ascending longitudinal strips.
+  for (let i = 0; i < hazeCount; i++) {
+    const u = (i + 0.5) / hazeCount
+    hazePositions[i * 3] = sign * 10.0 * u
+    hazeRelativeCoords[i * 4] = u
+  }
+
   const hazeGeo = new THREE.BufferGeometry()
   hazeGeo.setAttribute('position', new THREE.BufferAttribute(hazePositions.slice(0, hazeCount * 3), 3))
   hazeGeo.setAttribute('aHazeStyle', new THREE.BufferAttribute(hazeStyles.slice(0, hazeCount * 2), 2))
@@ -1551,11 +1496,6 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     hazeGeo.computeBoundingBox()
     hazeGeo.computeBoundingSphere()
   }
-
-  const travelProfiles = new Map()
-  addPocketTravelAttributes(linesGeo, H, config, travelProfiles, 0.88)
-  addPocketTravelAttributes(pointsGeo, H, config, travelProfiles, 0.88)
-  addPocketTravelAttributes(hazeGeo, H, config, travelProfiles, 0.78)
 
   return {
     linesGeo,

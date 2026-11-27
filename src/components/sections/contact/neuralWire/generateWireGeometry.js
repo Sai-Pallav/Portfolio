@@ -140,6 +140,10 @@ const HERO_FLARE_SIGNS = [0.85, -0.85, -0.45, 0.45]
 const BEAD_PARENTS = [0, 0, 1, 1, 2]
 const heroProfileScratch = new Float64Array(5)
 
+export function getHeroSpatialWaveNumber(config) {
+  return 2.5 * Math.PI * (config.frequency ?? 1.0)
+}
+
 /** Build-time analytic profile: [biasY, biasZ, amplitudeY, amplitudeZ, phase]. */
 export function getHeroWaveProfile(index, u, H, config, out) {
   const rAmp = config[`ribbon${index + 1}Amp`] ?? 1.0
@@ -160,7 +164,7 @@ export function getHeroWaveProfile(index, u, H, config, out) {
   out[1] = THREE.MathUtils.smootherstep(u, 0.30, 1.0) * (config.outerZOffset ?? 0)
   out[2] = e * (config.amplitude ?? 1.0) * HERO_Y_SCALES[index] * rAmp
   out[3] = e * (config.zAmplitude ?? 1.0) * 0.22 * Math.min(1.2, rAmp)
-  out[4] = 2.5 * Math.PI * (config.frequency ?? 1.0) * u + HERO_PHASES[index]
+  out[4] = getHeroSpatialWaveNumber(config) * u + HERO_PHASES[index]
   return out
 }
 
@@ -1653,6 +1657,7 @@ export function generateSideWireData(side, config = {}) {
   return {
     primaryCoreGeo,
     primaryHaloGeo,
+    heroWaveNumber: getHeroSpatialWaveNumber(config),
     primaryFgGeo: primaryCoreGeo,
     secondaryGeo,
     secondaryFgGeo: secondaryGeo,
