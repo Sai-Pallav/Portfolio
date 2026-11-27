@@ -37,6 +37,7 @@ const LineFeatherShader = {
     uniform float uInvFadeDist;
     uniform float uInvEDist;
     uniform float uInvTipEnergy;
+    uniform float uMaxAlpha;
     varying float vAlpha;
     varying float vU;
     varying vec3 vColor;
@@ -48,7 +49,7 @@ const LineFeatherShader = {
       float esRaw = clamp(vU * uInvEDist, 0.0, 1.0);
       float es = esRaw * esRaw * (3.0 - 2.0 * esRaw);
       float invEnergy = mix(uInvTipEnergy, 1.0, es * es * mix(1.0, es, 0.35));
-      gl_FragColor = vec4(vColor, clamp(vAlpha * feather * invEnergy, 0.0, 1.0));
+      gl_FragColor = vec4(vColor, clamp(vAlpha * feather * invEnergy, 0.0, uMaxAlpha));
     }
   `,
 }
@@ -208,6 +209,8 @@ export const WirePaths = memo(function WirePaths({
   const flowTrigUniform = useContext(FlowTrigContext)
   const glow = themeConfig.glowIntensity || 1.0
   const opacity = themeConfig.wireOpacity || 0.94
+  const auraScale = themeConfig.ribbonAuraScale ?? 1.0
+  const maxAlpha = themeConfig.ribbonMaxAlpha ?? 1.0
 
   const pCoreGeo = primaryCoreGeo || primaryFgGeo
   const pHaloGeo = primaryHaloGeo
@@ -249,16 +252,16 @@ export const WirePaths = memo(function WirePaths({
     return mergeWirePathLayers([
       // 1. 44 Companion Silk Strands (alpha mult: 1.0 * glow)
       { geo: sfGeo, defaultColor: sfColor, alphaMultiplier: 1.0 * glow, silkPalette },
-      // 2. Hero 0, 1, 3: 6-Pass Primary Aura (alpha mult: 0.32 * glow)
-      { geo: pHaloGeo, defaultColor: haloColor, alphaMultiplier: 0.32 * glow },
-      // 3. Hero 2: 6-Pass Primary Aura (alpha mult: 0.42 * glow)
-      { geo: dGeo, defaultColor: haloColor, alphaMultiplier: 0.42 * glow },
+      // 2. Hero 0, 1, 3: 6-Pass Primary Aura (alpha mult: 0.32 * glow * auraScale)
+      { geo: pHaloGeo, defaultColor: haloColor, alphaMultiplier: 0.32 * glow * auraScale },
+      // 3. Hero 2: 6-Pass Primary Aura (alpha mult: 0.42 * glow * auraScale)
+      { geo: dGeo, defaultColor: haloColor, alphaMultiplier: 0.42 * glow * auraScale },
       // 4. Hero 2: Primary Energy Core (alpha mult: 0.95)
       { geo: sGeo, defaultColor: coreColor, alphaMultiplier: 0.95 },
       // 5. Hero 0, 1, 3: Crisp Energy Core (alpha mult: 0.95)
       { geo: pCoreGeo, defaultColor: coreColor, alphaMultiplier: 0.95 },
     ])
-  }, [sfGeo, pHaloGeo, dGeo, sGeo, pCoreGeo, glow, sfColor, haloColor, coreColor, silkPalette])
+  }, [sfGeo, pHaloGeo, dGeo, sGeo, pCoreGeo, glow, auraScale, sfColor, haloColor, coreColor, silkPalette])
 
   // Single unified ShaderMaterial for all 5 line layers (uniforms updated in-place)
   const mergedMat = useMemo(() => {
@@ -269,6 +272,7 @@ export const WirePaths = memo(function WirePaths({
         uInvFadeDist: { value: 1.0 / 0.06 },
         uInvEDist: { value: 1.0 / 0.17 },
         uInvTipEnergy: { value: 1.0 },
+        uMaxAlpha: { value: 1.0 },
         uTime: timeUniform,
         uFlowTrig: flowTrigUniform,
         uDepthDimMin: { value: DEPTH_DIM_MIN },
@@ -293,7 +297,8 @@ export const WirePaths = memo(function WirePaths({
     mergedMat.uniforms.uInvFadeDist.value = 1.0 / fadeDist
     mergedMat.uniforms.uInvEDist.value = 1.0 / eDist
     mergedMat.uniforms.uInvTipEnergy.value = 1.0 / Math.max(1.0, tipEnergy)
-  }, [mergedMat, opacity, innerFade, mergedLineGeo, haloColor])
+    mergedMat.uniforms.uMaxAlpha.value = maxAlpha
+  }, [mergedMat, opacity, maxAlpha, innerFade, mergedLineGeo, haloColor])
 
   useEffect(() => {
     return () => {

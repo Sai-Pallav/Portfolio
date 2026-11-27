@@ -16,7 +16,7 @@ import {
   heroZ,
   H_VAL,
   computeConstraintWeight,
-  getHeroMotion,
+  getHeroWaveProfile,
 } from './generateWireGeometry.js'
 import { segmentsIntersect2D } from './neuralGraphModel.js'
 
@@ -220,8 +220,11 @@ function safeMax(a, b) {
   return 0.5 * (a + b + Math.sqrt(diff * diff + 1e-8) - 1e-4)
 }
 
-/** Bake all four live wall harmonics and a normalized vertical coordinate. */
-function addPocketTravelAttributes(geometry, H, config, profiles, maxVClamp = 0.88, useCache = true) {
+/**
+ * Bake stationary 4-strand wave harmonics and static funnel radius for GPU live-pocket masking.
+ * Preserves fixed 3D vertex positions (zero vertical accordion compression or horizontal slide).
+ */
+function addStaticPocketMaskAttributes(geometry, H, config, profiles, isLineSegments = false, useCache = true) {
   const positions = geometry.getAttribute('position').array
   const relCoords = geometry.getAttribute('aRelativeCoord').array
   const count = relCoords.length / 4
@@ -230,36 +233,29 @@ function addPocketTravelAttributes(geometry, H, config, profiles, maxVClamp = 0.
   const sin = new Float32Array(count * 4)
   const frame = new Float32Array(count * 3)
   const axis = new Float32Array(count * 3)
-  const normal = new Float32Array(count * 3)
-  const depthMotion = new Float32Array(count * 2)
-  const heroes = [heroY0, heroY1, heroY2, heroY3]
-  const c = new Float64Array(3), s = new Float64Array(3)
-  const scratchProfile = new Float64Array(26)
+  const prof = new Float64Array(5)
+  const scratchProfile = new Float64Array(13)
 
   for (let i = 0; i < count; i++) {
     const u = relCoords[4 * i]
     let p = useCache ? profiles.get(u) : null
     if (!p) {
-      p = useCache ? new Float64Array(26) : scratchProfile
+      p = useCache ? new Float64Array(13) : scratchProfile
+      let fMinY = Infinity
+      let fMaxY = -Infinity
       for (let j = 0; j < 4; j++) {
-        const y = heroes[j](u, H, config)
-        getHeroMotion(j, u, H, config, c, s)
-        p[j] = y - c[1]        // 0..3: bias
-        p[4 + j] = c[1]        // 4..7: cos
-        p[8 + j] = s[1]        // 8..11: sin
-        p[12 + j] = y          // 12..15: restY
-        p[16 + j] = c[2]       // 16..19: depthCos
-        p[20 + j] = s[2]       // 20..23: depthSin
+        getHeroWaveProfile(j, u, H, config, prof)
+        const biasY = prof[0]
+        const ampY = prof[2]
+        const absAmpY = Math.abs(ampY)
+        const phase = prof[4]
+        p[j] = biasY
+        p[4 + j] = ampY * Math.sin(phase)
+        p[8 + j] = -ampY * Math.cos(phase)
+        if (biasY - absAmpY < fMinY) fMinY = biasY - absAmpY
+        if (biasY + absAmpY > fMaxY) fMaxY = biasY + absAmpY
       }
-      // Match safeMax envelope used in GLSL
-      p[24] = -safeMax(
-        safeMax(-p[12], -p[13]),
-        safeMax(-p[14], -p[15])
-      )
-      p[25] = safeMax(
-        safeMax(p[12], p[13]),
-        safeMax(p[14], p[15])
-      )
+      p[12] = Math.max(0.5 * (fMaxY - fMinY), 1e-5)
       if (useCache) profiles.set(u, p)
     }
 
@@ -270,43 +266,40 @@ function addPocketTravelAttributes(geometry, H, config, profiles, maxVClamp = 0.
 
     const yRest = positions[3 * i + 1]
     const zRest = positions[3 * i + 2]
-
-    // Inverse vertical proximity weighting across all 4 strands prevents phase cancellation
-    const w0 = 1.0 / (Math.abs(yRest - p[12]) + 0.05)
-    const w1 = 1.0 / (Math.abs(yRest - p[13]) + 0.05)
-    const w2 = 1.0 / (Math.abs(yRest - p[14]) + 0.05)
-    const w3 = 1.0 / (Math.abs(yRest - p[15]) + 0.05)
-    const sumW = w0 + w1 + w2 + w3
-    const invSumW = sumW > 1e-6 ? 1.0 / sumW : 0.25
-    depthMotion[2 * i] = (w0 * p[16] + w1 * p[17] + w2 * p[18] + w3 * p[19]) * invSumW * 0.25
-    depthMotion[2 * i + 1] = (w0 * p[20] + w1 * p[21] + w2 * p[22] + w3 * p[23]) * invSumW * 0.25
-
-    const low = p[24]
-    const high = p[25]
-    const center = (low + high) * 0.5
-    const radius = Math.max((high - low) * 0.5, 1e-5)
-    const vFrame = Math.max(-maxVClamp, Math.min(maxVClamp, (yRest - center) / radius))
-
-    frame[3 * i] = vFrame
+    frame[3 * i] = yRest
     frame[3 * i + 1] = zRest
-    frame[3 * i + 2] = radius
-
-    // Keep synced v_frame in aRelativeCoord.y as well
-    relCoords[i4 + 1] = vFrame
-
-    positions[3 * i + 1] = 0
-    positions[3 * i + 2] = 0
+    frame[3 * i + 2] = p[12]
     axis[3 * i + 1] = 1
-    normal[3 * i + 2] = 1
   }
 
   geometry.setAttribute('aWaveBias', new THREE.BufferAttribute(bias, 4))
   geometry.setAttribute('aWaveCos', new THREE.BufferAttribute(cos, 4))
   geometry.setAttribute('aWaveSin', new THREE.BufferAttribute(sin, 4))
-  geometry.setAttribute('aDepthMotion', new THREE.BufferAttribute(depthMotion, 2))
   geometry.setAttribute('aPocketFrame', new THREE.BufferAttribute(frame, 3))
   geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
-  geometry.setAttribute('aFlowNormal', new THREE.BufferAttribute(normal, 3))
+
+  if (isLineSegments) {
+    const partnerBias = new Float32Array(count * 4)
+    const partnerCos = new Float32Array(count * 4)
+    const partnerSin = new Float32Array(count * 4)
+    for (let k = 0; k + 1 < count; k += 2) {
+      const a4 = k * 4
+      const b4 = (k + 1) * 4
+      for (let c = 0; c < 4; c++) {
+        partnerBias[a4 + c] = bias[b4 + c]
+        partnerCos[a4 + c] = cos[b4 + c]
+        partnerSin[a4 + c] = sin[b4 + c]
+        partnerBias[b4 + c] = bias[a4 + c]
+        partnerCos[b4 + c] = cos[a4 + c]
+        partnerSin[b4 + c] = sin[a4 + c]
+      }
+      frame[k * 3 + 1] = positions[(k + 1) * 3 + 1]
+      frame[(k + 1) * 3 + 1] = positions[k * 3 + 1]
+    }
+    geometry.setAttribute('aPartnerBias', new THREE.BufferAttribute(partnerBias, 4))
+    geometry.setAttribute('aPartnerCos', new THREE.BufferAttribute(partnerCos, 4))
+    geometry.setAttribute('aPartnerSin', new THREE.BufferAttribute(partnerSin, 4))
+  }
 }
 
 /**
@@ -379,9 +372,11 @@ export class RibbonBoundsLUT {
     this.config = config
     // Float64 preserves the original double-precision interpolation decisions.
     this.data = new Float64Array((samples + 1) * 17)
+    this.funnelData = new Float64Array((samples + 1) * 8)
     this.phaseMinY = new Float64Array((samples + 1) * phases)
     this.phaseMaxY = new Float64Array((samples + 1) * phases)
     this.maxEnvHeight = 0.0
+    this.maxFunnelHeight = 0.0
 
     const phaseCos = new Float64Array(phases)
     const phaseSin = new Float64Array(phases)
@@ -391,8 +386,7 @@ export class RibbonBoundsLUT {
       phaseSin[p] = Math.sin(theta)
     }
 
-    const c = new Float64Array(3)
-    const s = new Float64Array(3)
+    const prof = new Float64Array(5)
     const bias = new Float64Array(4)
     const cosY = new Float64Array(4)
     const sinY = new Float64Array(4)
@@ -424,12 +418,43 @@ export class RibbonBoundsLUT {
         this.maxEnvHeight = sample.envHeight
       }
 
+      let fMinY = Infinity
+      let fMaxY = -Infinity
+      let fMinZ = Infinity
+      let fMaxZ = -Infinity
       for (let j = 0; j < 4; j++) {
-        const y0 = j === 0 ? sample.y0 : j === 1 ? sample.y1 : j === 2 ? sample.y2 : sample.y3
-        getHeroMotion(j, u, H, config, c, s, 0)
-        bias[j] = y0 - c[1]
-        cosY[j] = c[1]
-        sinY[j] = s[1]
+        getHeroWaveProfile(j, u, H, config, prof)
+        const bY = prof[0]
+        const bZ = prof[1]
+        const aY = prof[2]
+        const aZ = prof[3]
+        const absAY = Math.abs(aY)
+        const absAZ = Math.abs(aZ)
+        const ph = prof[4]
+        bias[j] = bY
+        cosY[j] = aY * Math.sin(ph)
+        sinY[j] = -aY * Math.cos(ph)
+        if (bY - absAY < fMinY) fMinY = bY - absAY
+        if (bY + absAY > fMaxY) fMaxY = bY + absAY
+        if (bZ - absAZ < fMinZ) fMinZ = bZ - absAZ
+        if (bZ + absAZ > fMaxZ) fMaxZ = bZ + absAZ
+      }
+
+      const fHeight = Math.max(0.0, fMaxY - fMinY)
+      const fCenterY = 0.5 * (fMinY + fMaxY)
+      const fCenterZ = 0.5 * (fMinZ + fMaxZ)
+      const fRz = Math.max(0.015, 0.5 * (fMaxZ - fMinZ) + 0.025)
+      const fOffset = i * 8
+      this.funnelData[fOffset + 0] = fMinY
+      this.funnelData[fOffset + 1] = fMaxY
+      this.funnelData[fOffset + 2] = fHeight
+      this.funnelData[fOffset + 3] = fCenterY
+      this.funnelData[fOffset + 4] = fMinZ
+      this.funnelData[fOffset + 5] = fMaxZ
+      this.funnelData[fOffset + 6] = fCenterZ
+      this.funnelData[fOffset + 7] = fRz
+      if (u >= 0.08 && u <= 0.99 && fHeight > this.maxFunnelHeight) {
+        this.maxFunnelHeight = fHeight
       }
 
       const pBase = i * phases
@@ -443,6 +468,17 @@ export class RibbonBoundsLUT {
         this.phaseMinY[pBase + p] = -safeMax(safeMax(-yA, -yB), safeMax(-yC, -yD))
         this.phaseMaxY[pBase + p] = safeMax(safeMax(yA, yB), safeMax(yC, yD))
       }
+    }
+    this._reusableFunnel = {
+      u: 0,
+      funnelMinY: 0,
+      funnelMaxY: 0,
+      funnelHeight: 0,
+      funnelCenterY: 0,
+      funnelMinZ: 0,
+      funnelMaxZ: 0,
+      funnelCenterZ: 0,
+      funnelRz: 0.015,
     }
     this._reusableBounds = {
       u: -0,
@@ -465,6 +501,38 @@ export class RibbonBoundsLUT {
     } else {
       for (let p = 0; p < phases; p++) this._phaseOrder[p] = p
     }
+  }
+
+  getFunnelBounds(u, out = this._reusableFunnel) {
+    const su = Math.max(0, Math.min(1, u)) * this.samples
+    const i = Math.floor(su)
+    const f = su - i
+    const fd = this.funnelData
+    if (i >= this.samples) {
+      const off = this.samples * 8
+      out.u = u
+      out.funnelMinY = fd[off + 0]
+      out.funnelMaxY = fd[off + 1]
+      out.funnelHeight = fd[off + 2]
+      out.funnelCenterY = fd[off + 3]
+      out.funnelMinZ = fd[off + 4]
+      out.funnelMaxZ = fd[off + 5]
+      out.funnelCenterZ = fd[off + 6]
+      out.funnelRz = fd[off + 7]
+      return out
+    }
+    const off = i * 8
+    const next = off + 8
+    out.u = u
+    out.funnelMinY = fd[off + 0] + f * (fd[next + 0] - fd[off + 0])
+    out.funnelMaxY = fd[off + 1] + f * (fd[next + 1] - fd[off + 1])
+    out.funnelHeight = fd[off + 2] + f * (fd[next + 2] - fd[off + 2])
+    out.funnelCenterY = fd[off + 3] + f * (fd[next + 3] - fd[off + 3])
+    out.funnelMinZ = fd[off + 4] + f * (fd[next + 4] - fd[off + 4])
+    out.funnelMaxZ = fd[off + 5] + f * (fd[next + 5] - fd[off + 5])
+    out.funnelCenterZ = fd[off + 6] + f * (fd[next + 6] - fd[off + 6])
+    out.funnelRz = fd[off + 7] + f * (fd[next + 7] - fd[off + 7])
+    return out
   }
 
   getPhaseBounds(u, phaseIdx, out = this._reusablePhase) {
@@ -904,81 +972,18 @@ class EdgeGrid2D {
 }
 
 /**
- * Validates that a candidate line segment (A -> B) stays strictly inside the live
- * 4-strand outer envelope across all 16 animation cycle phases at midpoints 0.25, 0.50, 0.75.
+ * Validates that a stationary candidate line segment (A -> B) stays strictly inside the
+ * swept full-funnel outer envelope at midpoints 0.25, 0.50, 0.75.
  */
-function segmentInside8PhaseEnvelope(uA, vA, uB, vB, lut, marginFraction = 0.024) {
-  const phases = lut.phases || 16
-  const samples = lut.samples
-  const phaseMinY = lut.phaseMinY
-  const phaseMaxY = lut.phaseMaxY
-  const phaseOrder = lut._phaseOrder
-
-  const suA = Math.max(0, Math.min(1, uA)) * samples
-  const iA = Math.min(samples - 1, Math.floor(suA))
-  const fA = suA - iA
-  const baseA = iA * phases
-
-  const suB = Math.max(0, Math.min(1, uB)) * samples
-  const iB = Math.min(samples - 1, Math.floor(suB))
-  const fB = suB - iB
-  const baseB = iB * phases
-
+function segmentInsideFunnel(uA, yA, uB, yB, lut, marginFraction = 0.004) {
   const du = uB - uA
-  const ut0 = uA + 0.5 * du
-  const su0 = Math.max(0, Math.min(1, ut0)) * samples
-  const i0 = Math.min(samples - 1, Math.floor(su0))
-  const f0 = su0 - i0
-  const base0 = i0 * phases
-
-  const ut1 = uA + 0.25 * du
-  const su1 = Math.max(0, Math.min(1, ut1)) * samples
-  const i1 = Math.min(samples - 1, Math.floor(su1))
-  const f1 = su1 - i1
-  const base1 = i1 * phases
-
-  const ut2 = uA + 0.75 * du
-  const su2 = Math.max(0, Math.min(1, ut2)) * samples
-  const i2 = Math.min(samples - 1, Math.floor(su2))
-  const f2 = su2 - i2
-  const base2 = i2 * phases
-
-  for (let pi = 0; pi < phases; pi++) {
-    const p = phaseOrder ? phaseOrder[pi] : pi
-
-    const loA = phaseMinY[baseA + p] + fA * (phaseMinY[baseA + phases + p] - phaseMinY[baseA + p])
-    const hiA = phaseMaxY[baseA + p] + fA * (phaseMaxY[baseA + phases + p] - phaseMaxY[baseA + p])
-    const yA = 0.5 * (loA + hiA) + Math.max(0.5 * (hiA - loA), 1e-5) * vA
-
-    const loB = phaseMinY[baseB + p] + fB * (phaseMinY[baseB + phases + p] - phaseMinY[baseB + p])
-    const hiB = phaseMaxY[baseB + p] + fB * (phaseMaxY[baseB + phases + p] - phaseMaxY[baseB + p])
-    const yB = 0.5 * (loB + hiB) + Math.max(0.5 * (hiB - loB), 1e-5) * vB
-
-    const dy = yB - yA
-
-    // Check t = 0.5 first (most likely midpoint bulge)
-    const lo0 = phaseMinY[base0 + p] + f0 * (phaseMinY[base0 + phases + p] - phaseMinY[base0 + p])
-    const hi0 = phaseMaxY[base0 + p] + f0 * (phaseMaxY[base0 + phases + p] - phaseMaxY[base0 + p])
-    const h0 = hi0 > lo0 ? hi0 - lo0 : 0.0
-    const m0 = marginFraction * h0 > 0.0035 ? marginFraction * h0 : 0.0035
-    const yt0 = yA + 0.5 * dy
-    if (yt0 > hi0 - m0 || yt0 < lo0 + m0) return false
-
-    // Check t = 0.25
-    const lo1 = phaseMinY[base1 + p] + f1 * (phaseMinY[base1 + phases + p] - phaseMinY[base1 + p])
-    const hi1 = phaseMaxY[base1 + p] + f1 * (phaseMaxY[base1 + phases + p] - phaseMaxY[base1 + p])
-    const h1 = hi1 > lo1 ? hi1 - lo1 : 0.0
-    const m1 = marginFraction * h1 > 0.0035 ? marginFraction * h1 : 0.0035
-    const yt1 = yA + 0.25 * dy
-    if (yt1 > hi1 - m1 || yt1 < lo1 + m1) return false
-
-    // Check t = 0.75
-    const lo2 = phaseMinY[base2 + p] + f2 * (phaseMinY[base2 + phases + p] - phaseMinY[base2 + p])
-    const hi2 = phaseMaxY[base2 + p] + f2 * (phaseMaxY[base2 + phases + p] - phaseMaxY[base2 + p])
-    const h2 = hi2 > lo2 ? hi2 - lo2 : 0.0
-    const m2 = marginFraction * h2 > 0.0035 ? marginFraction * h2 : 0.0035
-    const yt2 = yA + 0.75 * dy
-    if (yt2 > hi2 - m2 || yt2 < lo2 + m2) return false
+  const dy = yB - yA
+  for (let s = 1; s <= 3; s++) {
+    const frac = s * 0.25
+    const b = lut.getFunnelBounds(uA + frac * du)
+    const m = Math.max(0.001, marginFraction * b.funnelHeight)
+    const yt = yA + frac * dy
+    if (yt > b.funnelMaxY - m || yt < b.funnelMinY + m) return false
   }
   return true
 }
@@ -993,7 +998,6 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
   const rawNodes = []
   const gridCell = Math.max(0.08, 0.20 * envScale)
   const grid = new IsotropicGrid2D(gridCell)
-  const phaseBuf = { lo: 0, hi: 0, center: 0, radius: 1e-5 }
 
   function runTierPass({
     uStart,
@@ -1020,13 +1024,13 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
       const stripDu = u1 - u0
       if (stripDu < 0.002) continue
       const uMid = 0.5 * (u0 + u1)
-      const bMid = lut.getBounds(uMid)
-      const midIsoH = bMid.envHeight * isoYScale
+      const bMid = lut.getFunnelBounds(uMid)
+      const midIsoH = bMid.funnelHeight * isoYScale
       if (midIsoH < minIsoHeight) continue
 
-      const vMax = computeVMax(bMid.envHeight, isoYScale, maxVFrac, minIsoMargin)
+      const vMax = computeVMax(bMid.funnelHeight, isoYScale, maxVFrac, minIsoMargin)
       if (vMax <= 0.05) continue
-      const activeIsoH = isoYScale * bMid.envHeight * vMax
+      const activeIsoH = isoYScale * bMid.funnelHeight * vMax
       let densityMod = 1.0
       let localHubMin = minDistHub
       let effCellIso = cellIso
@@ -1049,16 +1053,16 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           const u = u0 + (0.06 + 0.88 * prng()) * stripDu
           const vRaw = vLo + (0.06 + 0.88 * prng()) * (vHi - vLo)
-          const bLoc = lut.getBounds(u)
-          if (bLoc.envHeight * isoYScale < minIsoHeight * 0.82) continue
+          const bLoc = lut.getFunnelBounds(u)
+          if (bLoc.funnelHeight * isoYScale < minIsoHeight * 0.82) continue
 
-          const vMaxLoc = computeVMax(bLoc.envHeight, isoYScale, maxVFrac, minIsoMargin)
+          const vMaxLoc = computeVMax(bLoc.funnelHeight, isoYScale, maxVFrac, minIsoMargin)
           if (vMaxLoc <= 0.05) continue
           const v = vMax > 1e-4 ? vRaw * (vMaxLoc / vMax) : vRaw
           if (Math.abs(v) > vMaxLoc) continue
 
           const x = sign * 10.0 * u
-          const y = bLoc.envCenterY + v * 0.5 * bLoc.envHeight
+          const y = bLoc.funnelCenterY + v * 0.5 * bLoc.funnelHeight
           const isoX = x * isoXScale
           const isoY = y * isoYScale
 
@@ -1066,23 +1070,20 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
           if (grid.hasNeighborWithin(isoX, isoY, minDistExisting, rawNodes, effSearch, localHubMin)) continue
 
           const w_depth = wDepthMin + prng() * (wDepthMax - wDepthMin)
-          const envMinZ = Math.min(bLoc.z0, bLoc.z1, bLoc.z2, bLoc.z3)
-          const envMaxZ = Math.max(bLoc.z0, bLoc.z1, bLoc.z2, bLoc.z3)
-          const envRz = Math.max(0.015, 0.5 * (envMaxZ - envMinZ) + 0.025)
-          const z = bLoc.envCenterZ + w_depth * envRz
+          const z = bLoc.funnelCenterZ + w_depth * bLoc.funnelRz
 
-          lut.getPhaseBounds(u, 0, phaseBuf)
-          const v_frame = Math.max(-0.945, Math.min(0.945, (y - phaseBuf.center) / phaseBuf.radius))
-          const r_norm = Math.min(1.0, Math.hypot(v_frame, w_depth))
+          const v_funnel = Math.max(-0.995, Math.min(0.995, v))
+          const r_norm = Math.min(1.0, Math.hypot(v_funnel, w_depth))
           const depthTier = w_depth > 0.25 ? 'fg' : (w_depth < -0.25 ? 'bg' : 'mid')
           const layer = w_depth > 0.25 ? 1.0 : (w_depth < -0.25 ? -1.0 : 0.0)
           const id = rawNodes.length
           const pos = { x, y, z }
+          const twinklePhase = prng() * Math.PI * 2.0
 
           let size, alpha, lineAlpha, hubAccent, maxDeg
           if (tier === 2) {
             const locHScale = THREE.MathUtils.clamp(
-              Math.sqrt((bLoc.envHeight * isoYScale) / Math.max(0.25, 0.72 * envScale)),
+              Math.sqrt((bLoc.funnelHeight * isoYScale) / Math.max(0.25, 0.72 * envScale)),
               0.68,
               1.04
             )
@@ -1112,8 +1113,8 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
             isoY,
             isoPos: { x: isoX, y: isoY },
             u,
-            hu: Math.max(0.020, bLoc.envHeight),
-            v_frame,
+            hu: Math.max(0.020, bLoc.funnelHeight),
+            v_funnel,
             w_depth,
             r_norm,
             isWeb,
@@ -1126,7 +1127,8 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
             lineAlpha,
             hubAccent,
             size,
-            relativeCoord: [u, v_frame, w_depth, r_norm],
+            twinklePhase,
+            relativeCoord: [u, v_funnel, w_depth, r_norm],
           })
           grid.insert(isoX, isoY, id)
           break
@@ -1137,14 +1139,14 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
 
   const cellScale = Math.sqrt(envScale)
 
-  // Pass 1: Tier-1 Hero Starburst Hubs (~3-5 well-spaced focal anchors across pocket height)
+  // Pass 1: Tier-1 Hero Starburst Hubs (reach ~89% outer crest zone without cores exiting outer ribbon edge)
   runTierPass({
     uStart: 0.170,
     uEnd: 0.955,
     cellIso: 0.60 * cellScale,
     minIsoHeight: 0.140 * envScale,
-    maxVFrac: 0.78,
-    minIsoMargin: 0.048 * envScale,
+    maxVFrac: 0.89,
+    minIsoMargin: 0.028 * envScale,
     minDistExisting: 0.34 * cellScale,
     minDistHub: 0.46 * cellScale,
     searchRadius: 0.62 * cellScale,
@@ -1156,14 +1158,14 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
     organicCluster: true,
   })
 
-  // Pass 2: Tier-2 Mid Constellation Vertices (spread across center belly & upper/lower arches)
+  // Pass 2: Tier-2 Mid Constellation Vertices (flush to ~98.5% outer ribbon envelope)
   runTierPass({
     uStart: 0.090,
     uEnd: 0.985,
     cellIso: 0.230 * cellScale,
     minIsoHeight: 0.055 * envScale,
-    maxVFrac: 0.92,
-    minIsoMargin: 0.022 * envScale,
+    maxVFrac: 0.985,
+    minIsoMargin: 0.008 * envScale,
     minDistExisting: 0.148 * cellScale,
     minDistHub: 0.175 * cellScale,
     searchRadius: 0.20 * cellScale,
@@ -1174,14 +1176,14 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
     wDepthMax: 0.88,
   })
 
-  // Pass 3A: Tier-3 Delicate Web Connectors (tighter outer arch hugging without cage clutter)
+  // Pass 3A: Tier-3 Delicate Web Connectors (tuck flush up to 99.5% outer arch border)
   runTierPass({
     uStart: 0.088,
     uEnd: 0.986,
     cellIso: 0.250 * cellScale,
     minIsoHeight: 0.036 * envScale,
-    maxVFrac: 0.945,
-    minIsoMargin: 0.016 * envScale,
+    maxVFrac: 0.995,
+    minIsoMargin: 0.004 * envScale,
     minDistExisting: 0.128 * cellScale,
     minDistHub: 0.142 * cellScale,
     searchRadius: 0.158 * cellScale,
@@ -1192,14 +1194,14 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
     wDepthMax: 0.72,
   })
 
-  // Pass 3B: Tier-3 Volumetric Micro-Dust (rich colored arch-hugging sparkles & deep background dust)
+  // Pass 3B: Tier-3 Volumetric Micro-Dust (tuck flush up to 99.5% outer arch border)
   runTierPass({
     uStart: 0.085,
     uEnd: 0.988,
     cellIso: 0.140 * cellScale,
     minIsoHeight: 0.034 * envScale,
-    maxVFrac: 0.945,
-    minIsoMargin: 0.015 * envScale,
+    maxVFrac: 0.995,
+    minIsoMargin: 0.004 * envScale,
     minDistExisting: 0.074 * cellScale,
     minDistHub: 0.095 * cellScale,
     searchRadius: 0.108 * cellScale,
@@ -1271,7 +1273,7 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
     if (a.connectedCount >= capA || b.connectedCount >= capB) return false
     if (cosLimit < 1.0 && (hasTightAngle(i, j, cosLimit) || hasTightAngle(j, i, cosLimit))) return false
     if (!allowCrossing && edgeGrid.hasCrossing(a.isoPos, b.isoPos, i, j, edges, rawNodes, false)) return false
-    if (!segmentInside8PhaseEnvelope(a.u, a.v_frame, b.u, b.v_frame, lut, 0.024)) {
+    if (!segmentInsideFunnel(a.u, a.pos.y, b.u, b.pos.y, lut, 0.004)) {
       if (envMemo) envMemo[memoIdx] = 1
       return false
     }
@@ -1447,6 +1449,241 @@ function getCachedRibbonBoundsLUT(H, config) {
 }
 
 /**
+ * Traces 6-8 outward-moving connected synaptic routes from inner tip (u ≈ 0) to outer edge (u ≈ 1),
+ * preferring unvisited edges/nodes so signals fan naturally across upper, middle, and lower pockets.
+ */
+function traceOutwardSignalPaths(rawNodes, validEdgeIndices, edges, prng, isLeft) {
+  const nCount = rawNodes.length
+  const eCount = validEdgeIndices.length
+  const adj = Array.from({ length: nCount }, () => [])
+
+  for (let k = 0; k < eCount; k++) {
+    const eIdx = validEdgeIndices[k]
+    const i = edges.i[eIdx]
+    const j = edges.j[eIdx]
+    adj[i].push({ edgePos: k, other: j })
+    adj[j].push({ edgePos: k, other: i })
+  }
+
+  const edgeUsed = new Uint8Array(eCount)
+  const nodeUsed = new Uint8Array(nCount)
+  const edgeSignal = new Array(eCount).fill(null)
+  const nodeSignal = new Array(nCount).fill(null)
+
+  const innerSeeds = rawNodes
+    .filter((n) => n.isWeb && n.connectedCount > 0 && n.u >= 0.08 && n.u <= 0.32)
+    .sort((a, b) => a.u - b.u)
+
+  const targetLanes = [-0.74, -0.48, -0.22, 0.02, 0.24, 0.48, 0.74]
+  const speedOptions = [3.0, 4.0, 5.0]
+  const laneFilled = new Uint8Array(targetLanes.length)
+  let tracedCount = 0
+
+  const dist = new Float64Array(nCount)
+  const parentNode = new Int32Array(nCount)
+  const parentEdge = new Int32Array(nCount)
+  const closed = new Uint8Array(nCount)
+  const heapNodes = []
+  const heapCosts = []
+
+  function heapPush(nodeIdx, cost) {
+    let idx = heapNodes.length
+    heapNodes.push(nodeIdx)
+    heapCosts.push(cost)
+    while (idx > 0) {
+      const p = (idx - 1) >> 1
+      if (heapCosts[p] <= cost) break
+      heapNodes[idx] = heapNodes[p]
+      heapCosts[idx] = heapCosts[p]
+      idx = p
+    }
+    heapNodes[idx] = nodeIdx
+    heapCosts[idx] = cost
+  }
+
+  function heapPop() {
+    const topNode = heapNodes[0]
+    const lastNode = heapNodes.pop()
+    const lastCost = heapCosts.pop()
+    if (heapNodes.length > 0) {
+      let idx = 0
+      const half = heapNodes.length >> 1
+      while (idx < half) {
+        let child = (idx << 1) + 1
+        const right = child + 1
+        if (right < heapNodes.length && heapCosts[right] < heapCosts[child]) {
+          child = right
+        }
+        if (lastCost <= heapCosts[child]) break
+        heapNodes[idx] = heapNodes[child]
+        heapCosts[idx] = heapCosts[child]
+        idx = child
+      }
+      heapNodes[idx] = lastNode
+      heapCosts[idx] = lastCost
+    }
+    return topNode
+  }
+
+  function findOutwardPath(seedIdx, targetV, allowEdgeReuse) {
+    dist.fill(Infinity)
+    parentNode.fill(-1)
+    parentEdge.fill(-1)
+    closed.fill(0)
+    heapNodes.length = 0
+    heapCosts.length = 0
+
+    dist[seedIdx] = 0
+    heapPush(seedIdx, 0)
+
+    let bestGoal = -1
+    let bestGoalScore = Infinity
+
+    while (heapNodes.length > 0) {
+      const currIdx = heapPop()
+      if (closed[currIdx]) continue
+      closed[currIdx] = 1
+
+      const curr = rawNodes[currIdx]
+      if (curr.u >= 0.86) {
+        bestGoal = currIdx
+        break
+      }
+      if (curr.u >= 0.76) {
+        const goalScore = dist[currIdx] + (0.92 - curr.u) * 4.0 + Math.abs(curr.v_funnel - targetV) * 2.0
+        if (goalScore < bestGoalScore) {
+          bestGoalScore = goalScore
+          bestGoal = currIdx
+        }
+      }
+
+      const neighbors = adj[currIdx]
+      for (let m = 0; m < neighbors.length; m++) {
+        const nb = neighbors[m]
+        if (closed[nb.other]) continue
+        const isEdgeReused = edgeUsed[nb.edgePos] === 1
+        if (isEdgeReused && !allowEdgeReuse) continue
+
+        const other = rawNodes[nb.other]
+        const du = other.u - curr.u
+        if (du < -0.015) continue
+
+        const stepLen = Math.max(0.02, Math.hypot(other.isoX - curr.isoX, other.isoY - curr.isoY))
+        const lanePenalty = 2.6 * Math.abs(other.v_funnel - targetV)
+        const reuseNodePenalty = nodeUsed[other.idx] ? 3.2 : 0.0
+        const reuseEdgePenalty = isEdgeReused ? 12.0 : 0.0
+        const backPenalty = du <= 0.001 ? 2.5 : 0.0
+        const hubBonus = other.tier === 2 ? -0.15 : 0.0
+
+        const edgeCost = Math.max(
+          0.005,
+          stepLen * (1.0 + lanePenalty + reuseNodePenalty + backPenalty + hubBonus) + reuseEdgePenalty
+        )
+        const nextDist = dist[currIdx] + edgeCost
+        if (nextDist < dist[other.idx]) {
+          dist[other.idx] = nextDist
+          parentNode[other.idx] = currIdx
+          parentEdge[other.idx] = nb.edgePos
+          heapPush(other.idx, nextDist)
+        }
+      }
+    }
+
+    if (bestGoal === -1) return null
+
+    const revNodes = []
+    const revEdges = []
+    let walk = bestGoal
+    while (walk !== -1) {
+      revNodes.push(walk)
+      if (parentEdge[walk] !== -1) {
+        revEdges.push({ edgePos: parentEdge[walk], from: parentNode[walk], to: walk })
+      }
+      walk = parentNode[walk]
+    }
+    if (revEdges.length < 4) return null
+
+    revNodes.reverse()
+    revEdges.reverse()
+    return { pathNodes: revNodes, pathEdges: revEdges }
+  }
+
+  for (let pass = 0; pass < 2 && tracedCount < targetLanes.length; pass++) {
+    const allowEdgeReuse = pass === 1
+    for (let laneIdx = 0; laneIdx < targetLanes.length; laneIdx++) {
+      if (laneFilled[laneIdx]) continue
+      const targetV = targetLanes[laneIdx]
+
+      // Rank top inner seed candidates near target lane
+      const rankedSeeds = []
+      for (let s = 0; s < innerSeeds.length; s++) {
+        const cand = innerSeeds[s]
+        if (pass === 0 && nodeUsed[cand.idx]) continue
+        const hasOut = adj[cand.idx].some((e) => (!edgeUsed[e.edgePos] || allowEdgeReuse) && rawNodes[e.other].u > cand.u)
+        if (!hasOut) continue
+        const score = -Math.abs(cand.v_funnel - targetV * 0.65) - 2.0 * cand.u - (nodeUsed[cand.idx] ? 3.0 : 0.0)
+        rankedSeeds.push({ idx: cand.idx, score })
+      }
+      rankedSeeds.sort((a, b) => b.score - a.score)
+
+      let found = null
+      for (let c = 0; c < Math.min(3, rankedSeeds.length); c++) {
+        found = findOutwardPath(rankedSeeds[c].idx, targetV, allowEdgeReuse)
+        if (found) break
+      }
+      if (!found) continue
+
+      const { pathNodes, pathEdges } = found
+      const cumDist = new Float64Array(pathNodes.length)
+      for (let s = 0; s < pathEdges.length; s++) {
+        const nA = rawNodes[pathEdges[s].from]
+        const nB = rawNodes[pathEdges[s].to]
+        cumDist[s + 1] = cumDist[s] + Math.max(1e-4, Math.hypot(nB.isoX - nA.isoX, nB.isoY - nA.isoY))
+      }
+      const totalDist = Math.max(1e-4, cumDist[pathNodes.length - 1])
+
+      const speedCycles = speedOptions[(tracedCount + (isLeft ? 0 : 1)) % speedOptions.length]
+      const phaseOffset = ((tracedCount + (isLeft ? 0.14 : 0.61) + 0.22 * prng()) / targetLanes.length) % 1.0
+
+      let assignedEdges = 0
+      for (let s = 0; s < pathEdges.length; s++) {
+        const step = pathEdges[s]
+        if (edgeSignal[step.edgePos]) continue
+        edgeUsed[step.edgePos] = 1
+        edgeSignal[step.edgePos] = {
+          from: step.from,
+          to: step.to,
+          progFrom: cumDist[s] / totalDist,
+          progTo: cumDist[s + 1] / totalDist,
+          phaseOffset,
+          speedCycles,
+        }
+        assignedEdges++
+      }
+
+      if (assignedEdges < 3) continue
+
+      for (let s = 0; s < pathNodes.length; s++) {
+        const nodeIdx = pathNodes[s]
+        nodeUsed[nodeIdx] = 1
+        if (!nodeSignal[nodeIdx]) {
+          nodeSignal[nodeIdx] = {
+            prog: cumDist[s] / totalDist,
+            phaseOffset,
+            speedCycles,
+          }
+        }
+      }
+
+      laneFilled[laneIdx] = 1
+      tracedCount++
+    }
+  }
+
+  return { edgeSignal, nodeSignal, tracedCount }
+}
+
+/**
  * Generates the refined volumetric neural field BufferGeometries (linesGeo, pointsGeo, hazeGeo).
  * Area-proportional stratified sampling across full wave arches with organic hub clustering,
  * triangulated indexed spiderweb, and velvety localized interior pocket nebula.
@@ -1465,11 +1702,13 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
   const safeAspect = Math.max(0.5, Math.min(8.0, projectionAspect || 1.8))
   const isoYScale = safeAspect * safeXScale
 
-  // 0. Precompute 16-phase LUT of ribbon bounds along u (shared across left/right when wave config matches)
+  // 0. Precompute swept full-funnel LUT of ribbon bounds along u (shared across left/right when wave config matches)
   const lut = getCachedRibbonBoundsLUT(H, config)
   const baselineMaxIsoH = 2.8
-  const maxEnvIsoH = lut.maxEnvHeight * isoYScale
+  const maxEnvIsoH = lut.maxFunnelHeight * isoYScale
   const envScale = THREE.MathUtils.clamp(maxEnvIsoH / baselineMaxIsoH, 0.38, 1.30)
+  const waveFreq = config.frequency ?? 1.0
+  const kWave = 2.5 * Math.PI * waveFreq
 
   // 1. Stratified organic constellation sampling + non-indexed synaptic spiderweb
   const { rawNodes, webGrid } = sampleStratifiedNodes(sign, safeXScale, isoYScale, lut, prng, envScale)
@@ -1490,10 +1729,19 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     }
   }
 
+  const { edgeSignal, nodeSignal, tracedCount } = traceOutwardSignalPaths(
+    rawNodes,
+    validEdgeIndices,
+    edges,
+    prng,
+    isLeft
+  )
+
   const lineVertCount = validEdgeIndices.length * 2
   const linePositions = new Float32Array(lineVertCount * 3)
   const lineStyles = new Float32Array(lineVertCount * 4)
   const lineRelativeCoords = new Float32Array(lineVertCount * 4)
+  const lineSignalPaths = new Float32Array(lineVertCount * 3)
 
   for (let k = 0; k < validEdgeIndices.length; k++) {
     const eIdx = validEdgeIndices[k]
@@ -1533,29 +1781,9 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     const alphaA = nA.lineAlpha * lenFactor * depthWeight * dendriteGainA * fallbackScale
     const alphaB = nB.lineAlpha * lenFactor * depthWeight * dendriteGainB * fallbackScale
 
-    // Coherent traveling energy pulse: radiates smoothly outward from Tier-1 hubs along dendrites,
-    // or ripples continuously outward along u across structural web edges (|deltaPhi| <= 0.95 rad).
-    const basePhiA = 6.28318530718 * (1.15 * nA.u + 0.18 * Math.abs(nA.v_frame))
-    const basePhiB = 6.28318530718 * (1.15 * nB.u + 0.18 * Math.abs(nB.v_frame))
-    let phiA, phiB
-    if (isHubA && !isHubB) {
-      phiA = basePhiA
-      phiB = phiA + THREE.MathUtils.clamp(0.45 + edgeIsoLen * 0.88, 0.45, 0.95)
-    } else if (isHubB && !isHubA) {
-      phiB = basePhiB
-      phiA = phiB + THREE.MathUtils.clamp(0.45 + edgeIsoLen * 0.88, 0.45, 0.95)
-    } else {
-      const flowDir = nA.u <= nB.u ? 1 : -1
-      const rawDelta = flowDir > 0 ? basePhiB - basePhiA : basePhiA - basePhiB
-      const stepPhi = THREE.MathUtils.clamp(rawDelta < 0.38 ? 0.38 : rawDelta, 0.38, 0.95)
-      if (flowDir > 0) {
-        phiA = basePhiA
-        phiB = basePhiA + stepPhi
-      } else {
-        phiB = basePhiB
-        phiA = basePhiB + stepPhi
-      }
-    }
+    // Coherent outward traveling wave pulse synchronized with the exact wavelength and direction of the side waves.
+    const phiA = kWave * nA.u
+    const phiB = kWave * nB.u
 
     const vA = k * 2
     const vB = vA + 1
@@ -1583,47 +1811,71 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     lineRelativeCoords[vB * 4 + 1] = nB.relativeCoord[1]
     lineRelativeCoords[vB * 4 + 2] = nB.relativeCoord[2]
     lineRelativeCoords[vB * 4 + 3] = nB.relativeCoord[3]
+
+    const sig = edgeSignal[k]
+    if (sig) {
+      const aIsFrom = nA.idx === sig.from
+      lineSignalPaths[vA * 3] = aIsFrom ? sig.progFrom : sig.progTo
+      lineSignalPaths[vA * 3 + 1] = sig.phaseOffset
+      lineSignalPaths[vA * 3 + 2] = sig.speedCycles
+
+      lineSignalPaths[vB * 3] = aIsFrom ? sig.progTo : sig.progFrom
+      lineSignalPaths[vB * 3 + 1] = sig.phaseOffset
+      lineSignalPaths[vB * 3 + 2] = sig.speedCycles
+    }
   }
 
   const linesGeo = new THREE.BufferGeometry()
   linesGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
   linesGeo.setAttribute('aLineStyle', new THREE.BufferAttribute(lineStyles, 4))
   linesGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(lineRelativeCoords, 4))
+  linesGeo.setAttribute('aSignalPath', new THREE.BufferAttribute(lineSignalPaths, 3))
+  linesGeo.userData.signalPathCount = tracedCount
   if (lineVertCount > 0) {
     linesGeo.computeBoundingBox()
     linesGeo.computeBoundingSphere()
   }
 
-  // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation)
+  // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation with Synchronized Node Relay)
   const pointCount = visibleNodes.length
   const pointPositions = new Float32Array(pointCount * 3)
-  const pointStyles = new Float32Array(pointCount * 3)
+  const pointStyles = new Float32Array(pointCount * 4)
   const pointRelativeCoords = new Float32Array(pointCount * 4)
+  const pointSignalPaths = new Float32Array(pointCount * 3)
 
   for (let nIdx = 0; nIdx < pointCount; nIdx++) {
     const n = visibleNodes[nIdx]
     pointPositions[nIdx * 3] = n.pos.x
     pointPositions[nIdx * 3 + 1] = n.pos.y
     pointPositions[nIdx * 3 + 2] = n.pos.z
-    pointStyles[nIdx * 3] = n.size
-    pointStyles[nIdx * 3 + 1] = n.alpha
-    pointStyles[nIdx * 3 + 2] = n.tier
+    pointStyles[nIdx * 4] = n.size
+    pointStyles[nIdx * 4 + 1] = n.alpha
+    pointStyles[nIdx * 4 + 2] = n.tier
+    pointStyles[nIdx * 4 + 3] = n.twinklePhase
     pointRelativeCoords[nIdx * 4] = n.relativeCoord[0]
     pointRelativeCoords[nIdx * 4 + 1] = n.relativeCoord[1]
     pointRelativeCoords[nIdx * 4 + 2] = n.relativeCoord[2]
     pointRelativeCoords[nIdx * 4 + 3] = n.relativeCoord[3]
+
+    const nSig = nodeSignal[n.idx]
+    if (nSig) {
+      pointSignalPaths[nIdx * 3] = nSig.prog
+      pointSignalPaths[nIdx * 3 + 1] = nSig.phaseOffset
+      pointSignalPaths[nIdx * 3 + 2] = nSig.speedCycles
+    }
   }
 
   const pointsGeo = new THREE.BufferGeometry()
   pointsGeo.setAttribute('position', new THREE.BufferAttribute(pointPositions, 3))
-  pointsGeo.setAttribute('aPointStyle', new THREE.BufferAttribute(pointStyles, 3))
+  pointsGeo.setAttribute('aPointStyle', new THREE.BufferAttribute(pointStyles, 4))
   pointsGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(pointRelativeCoords, 4))
+  pointsGeo.setAttribute('aSignalPath', new THREE.BufferAttribute(pointSignalPaths, 3))
   if (pointCount > 0) {
     pointsGeo.computeBoundingBox()
     pointsGeo.computeBoundingSphere()
   }
 
-  // 4. Smooth Non-Blotchy Interior Atmospheric Mist (distributed evenly across open pockets, zero stacked neon blobs)
+  // 4. Smooth Non-Blotchy Interior Atmospheric Mist (distributed evenly across full swept funnel, zero stacked neon blobs)
   const cellScale = Math.sqrt(envScale)
   const hazeSpanScale = Math.max(1.0, Math.sqrt(safeXScale / 1.55))
   const hazeCellIso = 0.160 * cellScale * hazeSpanScale
@@ -1634,7 +1886,6 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
   let hazePositions = new Float32Array(hazeCap * 3)
   let hazeStyles = new Float32Array(hazeCap * 2)
   let hazeRelativeCoords = new Float32Array(hazeCap * 4)
-  const hazePhaseBuf = { lo: 0, hi: 0, center: 0, radius: 1e-5 }
   let hazeCount = 0
 
   for (let u0 = 0.105; u0 < 0.982; u0 += hazeDu) {
@@ -1642,12 +1893,12 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     const stripDu = u1 - u0
     if (stripDu < 0.002) continue
     const uMid = 0.5 * (u0 + u1)
-    const bMid = lut.getBounds(uMid)
-    if (bMid.envHeight * isoYScale < 0.062 * envScale) continue
+    const bMid = lut.getFunnelBounds(uMid)
+    if (bMid.funnelHeight * isoYScale < 0.062 * envScale) continue
 
-    const vMaxHaze = computeVMax(bMid.envHeight, isoYScale, 0.84, 0.042 * envScale)
+    const vMaxHaze = computeVMax(bMid.funnelHeight, isoYScale, 0.985, 0.006 * envScale)
     if (vMaxHaze <= 0.05) continue
-    const activeIsoH = isoYScale * bMid.envHeight * vMaxHaze
+    const activeIsoH = isoYScale * bMid.funnelHeight * vMaxHaze
     const lambda = (10.0 * safeXScale * stripDu * activeIsoH) / (hazeCellIso * hazeCellIso)
     const baseCount = Math.floor(lambda)
     const count = baseCount + (prng() < (lambda - baseCount) ? 1 : 0)
@@ -1660,34 +1911,30 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
       for (let attempt = 0; attempt < 4; attempt++) {
         const u = u0 + (0.08 + 0.84 * prng()) * stripDu
         const vRaw = vLo + (0.08 + 0.84 * prng()) * (vHi - vLo)
-        const bLoc = lut.getBounds(u)
-        if (bLoc.envHeight * isoYScale < 0.055 * envScale) continue
+        const bLoc = lut.getFunnelBounds(u)
+        if (bLoc.funnelHeight * isoYScale < 0.055 * envScale) continue
 
-        const vMaxLoc = computeVMax(bLoc.envHeight, isoYScale, 0.84, 0.042 * envScale)
+        const vMaxLoc = computeVMax(bLoc.funnelHeight, isoYScale, 0.985, 0.006 * envScale)
         if (vMaxLoc <= 0.05) continue
         const v_rel = vMaxHaze > 1e-4 ? vRaw * (vMaxLoc / vMaxHaze) : vRaw
         if (Math.abs(v_rel) > vMaxLoc) continue
 
         const x = sign * 10.0 * u
-        const y = bLoc.envCenterY + v_rel * 0.5 * bLoc.envHeight
+        const y = bLoc.funnelCenterY + v_rel * 0.5 * bLoc.funnelHeight
         const isoX = x * safeXScale
         const isoY = y * isoYScale
         const minHazeDist = 0.088 * cellScale * hazeSpanScale
         if (hazeGrid.hasNeighborWithin(isoX, isoY, minHazeDist, hazeNodes, minHazeDist * 1.18)) continue
 
         const w_depth = -0.18 - prng() * 0.54
-        const envMinZ = Math.min(bLoc.z0, bLoc.z1, bLoc.z2, bLoc.z3)
-        const envMaxZ = Math.max(bLoc.z0, bLoc.z1, bLoc.z2, bLoc.z3)
-        const envRz = Math.max(0.015, 0.5 * (envMaxZ - envMinZ) + 0.025)
-        const z = bLoc.envCenterZ + w_depth * envRz
+        const z = bLoc.funnelCenterZ + w_depth * bLoc.funnelRz
 
-        lut.getPhaseBounds(u, 0, hazePhaseBuf)
-        const v_frame = Math.max(-0.84, Math.min(0.84, (y - hazePhaseBuf.center) / hazePhaseBuf.radius))
-        const r_norm = Math.min(1.0, Math.hypot(v_frame, w_depth))
+        const v_funnel = Math.max(-0.985, Math.min(0.985, v_rel))
+        const r_norm = Math.min(1.0, Math.hypot(v_funnel, w_depth))
 
         const innerTipFade = THREE.MathUtils.smoothstep(u, 0.105, 0.22)
-        const vRatio = v_frame / Math.max(0.25, vMaxLoc)
-        const vTaper = 1.0 - 0.30 * vRatio * vRatio
+        const vRatio = v_funnel / Math.max(0.25, vMaxLoc)
+        const vTaper = 1.0 - 0.16 * vRatio * vRatio
         const baseAlpha = 0.044 + prng() * 0.020
         const alpha = baseAlpha * innerTipFade * vTaper
         const sizeJitter = 0.94 + prng() * 0.24
@@ -1715,7 +1962,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
         hazeStyles[hazeCount * 2] = sizeJitter
         hazeStyles[hazeCount * 2 + 1] = alpha
         hazeRelativeCoords[hazeCount * 4] = u
-        hazeRelativeCoords[hazeCount * 4 + 1] = v_frame
+        hazeRelativeCoords[hazeCount * 4 + 1] = v_funnel
         hazeRelativeCoords[hazeCount * 4 + 2] = w_depth
         hazeRelativeCoords[hazeCount * 4 + 3] = r_norm
         hazeCount++
@@ -1734,9 +1981,9 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
   }
 
   const travelProfiles = new Map()
-  addPocketTravelAttributes(pointsGeo, H, config, travelProfiles, 0.945, true)
-  addPocketTravelAttributes(linesGeo, H, config, travelProfiles, 0.945, true)
-  addPocketTravelAttributes(hazeGeo, H, config, travelProfiles, 0.84, false)
+  addStaticPocketMaskAttributes(pointsGeo, H, config, travelProfiles, false, true)
+  addStaticPocketMaskAttributes(linesGeo, H, config, travelProfiles, true, true)
+  addStaticPocketMaskAttributes(hazeGeo, H, config, travelProfiles, false, false)
 
   return {
     linesGeo,

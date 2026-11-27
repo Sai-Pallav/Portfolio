@@ -76,7 +76,9 @@ const computeThemeLuminanceComp = (hex) => {
 }
 
 // --- Global Theme Ref for Imperative Material Updates (No React Re-renders) ---
+const initialThemeKey = getInitialThemeKey()
 const globalTheme = {
+  key: initialThemeKey,
   primary: initialPalette.primary,
   secondary: initialPalette.secondary,
   hover: initialPalette.hover,
@@ -88,10 +90,12 @@ function applyThemeColors(themeKey) {
   const palette = THEME_PALETTES[themeKey]
   if (palette) {
     if (
+      globalTheme.key !== themeKey ||
       globalTheme.primary !== palette.primary ||
       globalTheme.secondary !== palette.secondary ||
       globalTheme.hover !== palette.hover
     ) {
+      globalTheme.key = themeKey
       globalTheme.primary = palette.primary
       globalTheme.secondary = palette.secondary
       globalTheme.hover = palette.hover
@@ -108,7 +112,8 @@ function applyThemeColors(themeKey) {
       const accent = styles.getPropertyValue('--accent').trim()
       const secondary = styles.getPropertyValue('--accent-secondary').trim() || styles.getPropertyValue('--accent-hover').trim() || accent
       const hover = styles.getPropertyValue('--accent-hover').trim() || accent
-      if (accent && (accent !== globalTheme.primary || secondary !== globalTheme.secondary || hover !== globalTheme.hover)) {
+      if (accent && (globalTheme.key !== themeKey || accent !== globalTheme.primary || secondary !== globalTheme.secondary || hover !== globalTheme.hover)) {
+        globalTheme.key = themeKey
         globalTheme.primary = accent
         globalTheme.secondary = secondary
         globalTheme.hover = hover
@@ -1471,6 +1476,7 @@ function Scene({ theme, distanceFactor, hoveredCountRef, hoveredOrbitRef, contac
     if (lastColorVersion.current !== globalTheme.version) {
       const primaryCol = new THREE.Color(globalTheme.primary)
       const secondaryCol = new THREE.Color(globalTheme.secondary)
+      const isViolet = globalTheme.key === 'midnight-violet'
 
       // 1. Cosmic Obsidian Glass Core - theme undertone on dark obsidian with luminance compensation
       staticMatGlassCore.color
@@ -1484,23 +1490,36 @@ function Scene({ theme, distanceFactor, hoveredCountRef, hoveredOrbitRef, contac
         .copy(secondaryCol)
         .multiplyScalar(0.70)
         .lerp(primaryCol, 0.30)
+      if (isViolet) {
+        staticMatInnerWire.color.lerp(new THREE.Color('#a5b4fc'), 0.18)
+      }
 
-      // 3. Primary Outer Geodesic Network
+      // 3. Primary Outer Geodesic Network (crisp cool-lavender lift on violet only)
       staticMatOuterWire.color.copy(primaryCol)
-      staticMatOuterWire.opacity = SCENE_CONFIG.globe.wireframeOpacity * Math.min(1.2, Math.max(0.85, globalTheme.lumComp))
+      if (isViolet) {
+        staticMatOuterWire.color.lerp(new THREE.Color('#ddd6fe'), 0.28)
+      }
+      staticMatOuterWire.opacity = isViolet
+        ? SCENE_CONFIG.globe.wireframeOpacity * 1.15
+        : SCENE_CONFIG.globe.wireframeOpacity * Math.min(1.2, Math.max(0.85, globalTheme.lumComp))
 
       // 4. Constellation Stars (delicate nodes with restrained luminous theme tint)
       staticMatOuterPoints.color
         .copy(primaryCol)
-        .lerp(new THREE.Color('#ffffff'), 0.22)
-      staticMatOuterPoints.opacity = SCENE_CONFIG.globe.pointsOpacity * Math.min(1.15, Math.max(0.88, globalTheme.lumComp))
+        .lerp(new THREE.Color(isViolet ? '#eef2ff' : '#ffffff'), isViolet ? 0.38 : 0.22)
+      staticMatOuterPoints.opacity = isViolet
+        ? SCENE_CONFIG.globe.pointsOpacity * 1.06
+        : SCENE_CONFIG.globe.pointsOpacity * Math.min(1.15, Math.max(0.88, globalTheme.lumComp))
 
-      // 5. Atmospheric Rim Halo
-      staticMatAtmosphericHalo.uniforms.color.value.copy(primaryCol)
+      // 5. Atmospheric Rim Halo (prevent muddy suppression on violet only)
+      const haloCol = isViolet ? primaryCol.clone().lerp(new THREE.Color('#c7d2fe'), 0.22) : primaryCol
+      staticMatAtmosphericHalo.uniforms.color.value.copy(haloCol)
       if (staticMatAtmosphericHalo.color) {
-        staticMatAtmosphericHalo.color.copy(primaryCol)
+        staticMatAtmosphericHalo.color.copy(haloCol)
       }
-      staticMatAtmosphericHalo.uniforms.glowIntensity.value = SCENE_CONFIG.globe.glowIntensity * globalTheme.lumComp
+      staticMatAtmosphericHalo.uniforms.glowIntensity.value = isViolet
+        ? SCENE_CONFIG.globe.glowIntensity * 1.04
+        : SCENE_CONFIG.globe.glowIntensity * globalTheme.lumComp
 
       // 6. Orbital Rings (100% consistent theme accent across all 3 rings in both depth passes)
       sharedRingMaterialBg.uniforms.color.value.copy(primaryCol)
