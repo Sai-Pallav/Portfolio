@@ -1129,6 +1129,12 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
             size,
             twinklePhase,
             relativeCoord: [u, v_funnel, w_depth, r_norm],
+            driftParams: [
+              prng() * 2 * Math.PI,
+              prng() * 2 * Math.PI,
+              0.80 + 0.40 * prng(),
+              0.75 + 0.50 * prng(),
+            ],
           })
           grid.insert(isoX, isoY, id)
           break
@@ -1448,9 +1454,6 @@ function getCachedRibbonBoundsLUT(H, config) {
   return lut
 }
 
-const MAX_ROUTES_PER_ELEMENT = 4
-const TARGET_ROUTE_COUNT = 21
-
 /**
  * Adds a lightweight converged inner-tip trunk stem (u <= 0.06 -> earliest constellation nodes)
  * strictly inside the swept funnel so every synaptic route originates uniformly from the inner tip
@@ -1511,6 +1514,7 @@ function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut
       twinklePhase: s * 0.7,
       relativeCoord: [spec.u, vClamped, 0.0, Math.abs(vClamped)],
       isInnerTrunk: true,
+      driftParams: [s * 0.8, s * 1.1, 1.0, 0.8],
     })
     feederIndices.push(id)
   }
@@ -1673,295 +1677,6 @@ function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut
 }
 
 /**
- * Traces 16–24 distinct outward-flowing full-span synaptic routes per wing:
- * - Every route starts strictly at u <= 0.06 and advances monotonically outward to u >= 0.94.
- * - Balanced coverage across upper (lane 0), central (lane 1), and lower (lane 2) wing arches.
- * - Parameterized by cumulative isotropic arc-length [0.0 -> 1.0] for uniform physical speed.
- * - Packs up to 4 route memberships per wire and per star vertex with zero extra geometry.
- */
-function traceOutwardSignalPaths(rawNodes, validEdgeIndices, edges, prng) {
-  const nCount = rawNodes.length
-  const eCount = validEdgeIndices.length
-  const forwardAdj = Array.from({ length: nCount }, () => [])
-
-  for (let k = 0; k < eCount; k++) {
-    const eIdx = validEdgeIndices[k]
-    const i = edges.i[eIdx]
-    const j = edges.j[eIdx]
-    const uI = rawNodes[i].u
-    const uJ = rawNodes[j].u
-    if (uJ > uI + 0.001) {
-      forwardAdj[i].push({ edgePos: k, other: j })
-    } else if (uI > uJ + 0.001) {
-      forwardAdj[j].push({ edgePos: k, other: i })
-    }
-  }
-
-  const edgeRouteIds = Array.from({ length: eCount }, () => [])
-  const edgeSlotData = Array.from({ length: eCount }, () => [])
-  const nodeSlotData = Array.from({ length: nCount }, () => [])
-  const edgeBodySets = []
-  const routes = []
-
-  const startSeeds = rawNodes
-    .filter((n) => n.isWeb && n.connectedCount > 0 && n.u <= 0.06 && forwardAdj[n.idx].length > 0)
-    .sort((a, b) => a.u - b.u || a.v_funnel - b.v_funnel)
-
-  // Interleaved lane schedule (7 upper, 7 mid, 7 lower = 21 target routes)
-  const laneSpecs = []
-  const upperTargets = [0.76, 0.42, 0.62, 0.32, 0.84, 0.50, 0.68]
-  const midTargets = [0.0, -0.16, 0.16, -0.08, 0.08, -0.22, 0.22]
-  const lowerTargets = [-0.76, -0.42, -0.62, -0.32, -0.84, -0.50, -0.68]
-  for (let b = 0; b < 7; b++) {
-    laneSpecs.push({ lane: 0, targetV: upperTargets[b], swayAmp: (b % 2 === 0 ? 0.14 : -0.12), swayPhase: b * 1.1 })
-    laneSpecs.push({ lane: 1, targetV: midTargets[b], swayAmp: (b % 2 === 0 ? 0.16 : -0.16), swayPhase: b * 1.3 + 0.5 })
-    laneSpecs.push({ lane: 2, targetV: lowerTargets[b], swayAmp: (b % 2 === 0 ? -0.14 : 0.12), swayPhase: b * 1.1 + 0.9 })
-  }
-
-  const dist = new Float64Array(nCount)
-  const parentNode = new Int32Array(nCount)
-  const parentEdge = new Int32Array(nCount)
-  const closed = new Uint8Array(nCount)
-  const heapCap = Math.max(256, nCount * 4)
-  const heapNodes = new Int32Array(heapCap)
-  const heapCosts = new Float64Array(heapCap)
-  let heapLen = 0
-
-  function heapPush(nodeIdx, cost) {
-    if (heapLen >= heapCap) return
-    let idx = heapLen++
-    while (idx > 0) {
-      const p = (idx - 1) >> 1
-      if (heapCosts[p] <= cost) break
-      heapNodes[idx] = heapNodes[p]
-      heapCosts[idx] = heapCosts[p]
-      idx = p
-    }
-    heapNodes[idx] = nodeIdx
-    heapCosts[idx] = cost
-  }
-
-  function heapPop() {
-    const topNode = heapNodes[0]
-    const lastIdx = --heapLen
-    if (lastIdx > 0) {
-      const lastNode = heapNodes[lastIdx]
-      const lastCost = heapCosts[lastIdx]
-      let idx = 0
-      const half = lastIdx >> 1
-      while (idx < half) {
-        let child = (idx << 1) + 1
-        const right = child + 1
-        if (right < lastIdx && heapCosts[right] < heapCosts[child]) {
-          child = right
-        }
-        if (lastCost <= heapCosts[child]) break
-        heapNodes[idx] = heapNodes[child]
-        heapCosts[idx] = heapCosts[child]
-        idx = child
-      }
-      heapNodes[idx] = lastNode
-      heapCosts[idx] = lastCost
-    }
-    return topNode
-  }
-
-  function findFullSpanPath(seedIdx, targetV, swayAmp, swayPhase, bodyReuseScale) {
-    dist.fill(Infinity)
-    parentNode.fill(-1)
-    parentEdge.fill(-1)
-    closed.fill(0)
-    heapLen = 0
-
-    dist[seedIdx] = 0
-    heapPush(seedIdx, 0)
-
-    let bestGoal = -1
-    let bestGoalScore = Infinity
-
-    while (heapLen > 0) {
-      if (heapCosts[0] >= bestGoalScore) break
-      const currIdx = heapPop()
-      if (closed[currIdx]) continue
-      closed[currIdx] = 1
-
-      const curr = rawNodes[currIdx]
-      if (curr.u >= 0.94) {
-        const goalPenalty =
-          nodeSlotData[currIdx].length * 3.0 +
-          Math.abs(curr.v_funnel - targetV) * 2.4 +
-          Math.max(0.0, 0.965 - curr.u) * 2.0
-        const goalScore = dist[currIdx] + goalPenalty
-        if (goalScore < bestGoalScore) {
-          bestGoalScore = goalScore
-          bestGoal = currIdx
-        }
-        continue
-      }
-
-      const neighbors = forwardAdj[currIdx]
-      for (let m = 0; m < neighbors.length; m++) {
-        const nb = neighbors[m]
-        const otherIdx = nb.other
-        if (closed[otherIdx]) continue
-        const edgeUse = edgeRouteIds[nb.edgePos].length
-        if (edgeUse >= MAX_ROUTES_PER_ELEMENT) continue
-        const nodeUse = nodeSlotData[otherIdx].length
-
-        const other = rawNodes[otherIdx]
-        const stepLen = Math.max(0.012, Math.hypot(other.isoX - curr.isoX, other.isoY - curr.isoY))
-        const uMid = 0.5 * (curr.u + other.u)
-        const ramp = THREE.MathUtils.smoothstep(other.u, 0.055, 0.28)
-        const guideV = THREE.MathUtils.clamp(
-          targetV * ramp + swayAmp * Math.sin(swayPhase + other.u * Math.PI * 2.0) * Math.sin(other.u * Math.PI),
-          -0.95,
-          0.95
-        )
-        const lanePenalty = 1.9 * Math.abs(other.v_funnel - guideV)
-        const bodyWeight = uMid > 0.14 ? bodyReuseScale : 0.04
-        const reuseEdgePenalty = edgeUse * (4.4 * bodyWeight + 0.14)
-        const reuseNodePenalty = nodeUse * nodeUse * (2.6 * bodyWeight + 0.08)
-        const hubBonus = other.tier === 2 ? -0.10 : 0.0
-
-        const edgeCost = Math.max(
-          0.004,
-          stepLen * (1.0 + lanePenalty + hubBonus) + reuseEdgePenalty + reuseNodePenalty
-        )
-        const nextDist = dist[currIdx] + edgeCost
-        if (nextDist < dist[otherIdx]) {
-          dist[otherIdx] = nextDist
-          parentNode[otherIdx] = currIdx
-          parentEdge[otherIdx] = nb.edgePos
-          heapPush(otherIdx, nextDist)
-        }
-      }
-    }
-
-    if (bestGoal === -1) return null
-
-    const revNodes = []
-    const revEdges = []
-    let walk = bestGoal
-    while (walk !== -1) {
-      revNodes.push(walk)
-      if (parentEdge[walk] !== -1) {
-        revEdges.push({ edgePos: parentEdge[walk], from: parentNode[walk], to: walk })
-      }
-      walk = parentNode[walk]
-    }
-    if (revEdges.length < 4) return null
-
-    revNodes.reverse()
-    revEdges.reverse()
-
-    const firstNode = rawNodes[revNodes[0]]
-    const lastNode = rawNodes[revNodes[revNodes.length - 1]]
-    if (firstNode.u > 0.06 || lastNode.u < 0.94) return null
-
-    return { pathNodes: revNodes, pathEdges: revEdges }
-  }
-
-  function isRouteDistinct(pathEdges, threshold = 0.78) {
-    const bodyEdges = []
-    for (let s = 0; s < pathEdges.length; s++) {
-      const e = pathEdges[s]
-      const uMid = 0.5 * (rawNodes[e.from].u + rawNodes[e.to].u)
-      if (uMid > 0.24) bodyEdges.push(e.edgePos)
-    }
-    if (bodyEdges.length === 0) return false
-    for (let r = 0; r < edgeBodySets.length; r++) {
-      const existing = edgeBodySets[r]
-      let shared = 0
-      for (let b = 0; b < bodyEdges.length; b++) {
-        if (existing.has(bodyEdges[b])) shared++
-      }
-      if (shared / bodyEdges.length > threshold) return false
-    }
-    return true
-  }
-
-  function commitRoute(found, laneSpec) {
-    const { pathNodes, pathEdges } = found
-    const cumDist = new Float64Array(pathNodes.length)
-    for (let s = 0; s < pathEdges.length; s++) {
-      const nA = rawNodes[pathEdges[s].from]
-      const nB = rawNodes[pathEdges[s].to]
-      cumDist[s + 1] = cumDist[s] + Math.max(1e-4, Math.hypot(nB.isoX - nA.isoX, nB.isoY - nA.isoY))
-    }
-    const totalDist = Math.max(1e-4, cumDist[pathNodes.length - 1])
-    const routeId = routes.length
-
-    const bodySet = new Set()
-    for (let s = 0; s < pathEdges.length; s++) {
-      const step = pathEdges[s]
-      const uMid = 0.5 * (rawNodes[step.from].u + rawNodes[step.to].u)
-      if (uMid > 0.24) bodySet.add(step.edgePos)
-      edgeRouteIds[step.edgePos].push(routeId)
-      edgeSlotData[step.edgePos].push({
-        routeId,
-        from: step.from,
-        to: step.to,
-        progFrom: cumDist[s] / totalDist,
-        progTo: cumDist[s + 1] / totalDist,
-      })
-    }
-
-    for (let s = 0; s < pathNodes.length; s++) {
-      const nSlots = nodeSlotData[pathNodes[s]]
-      if (nSlots.length < MAX_ROUTES_PER_ELEMENT) {
-        nSlots.push({
-          routeId,
-          prog: cumDist[s] / totalDist,
-        })
-      }
-    }
-
-    edgeBodySets.push(bodySet)
-    routes.push({
-      id: routeId,
-      lane: laneSpec.lane,
-      startU: rawNodes[pathNodes[0]].u,
-      endU: rawNodes[pathNodes[pathNodes.length - 1]].u,
-      totalDist,
-      nodeCount: pathNodes.length,
-    })
-  }
-
-  // Pass 1 & Pass 2: Trace diverse routes across all 21 lane targets
-  const filledSpec = new Uint8Array(laneSpecs.length)
-  for (let pass = 0; pass < 2 && routes.length < TARGET_ROUTE_COUNT; pass++) {
-    const reuseScale = pass === 0 ? 1.0 : 0.35
-    const distinctThresh = pass === 0 ? 0.78 : 0.90
-    const maxSeedTries = pass === 0 ? 2 : 4
-    for (let idx = 0; idx < laneSpecs.length && routes.length < TARGET_ROUTE_COUNT; idx++) {
-      if (filledSpec[idx]) continue
-      const spec = laneSpecs[idx]
-      const seedOrder = startSeeds
-        .slice()
-        .sort((a, b) => {
-          const scoreA = nodeSlotData[a.idx].length * 2.5 + Math.abs(a.v_funnel - spec.targetV * 0.55) + prng() * 0.25
-          const scoreB = nodeSlotData[b.idx].length * 2.5 + Math.abs(b.v_funnel - spec.targetV * 0.55) + prng() * 0.25
-          return scoreA - scoreB
-        })
-
-      let chosen = null
-      for (let s = 0; s < Math.min(maxSeedTries, seedOrder.length); s++) {
-        const candidate = findFullSpanPath(seedOrder[s].idx, spec.targetV, spec.swayAmp, spec.swayPhase, reuseScale)
-        if (candidate && isRouteDistinct(candidate.pathEdges, distinctThresh)) {
-          chosen = candidate
-          break
-        }
-      }
-      if (!chosen) continue
-      commitRoute(chosen, spec)
-      filledSpec[idx] = 1
-    }
-  }
-
-  return { edgeSlotData, nodeSlotData, routes }
-}
-
-/**
  * Generates the refined volumetric neural field BufferGeometries (linesGeo, pointsGeo, hazeGeo).
  * Area-proportional stratified sampling across full wave arches with organic hub clustering,
  * triangulated indexed spiderweb, and velvety localized interior pocket nebula.
@@ -1996,7 +1711,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
   // Keep connected web nodes + background micro-dust sparkles
   const visibleNodes = rawNodes.filter(n => !n.isWeb || n.connectedCount > 0)
 
-  // 2. Build Non-Indexed Lines BufferGeometry (Per-edge length/depth/dendrite hierarchy & multi-route packing)
+  // 2. Build Non-Indexed Lines BufferGeometry (Per-edge length/depth/dendrite hierarchy with locked drift params)
   const validEdgeIndices = []
   for (let eIdx = 0; eIdx < edges.length; eIdx++) {
     const iA = edges.i[eIdx]
@@ -2008,20 +1723,11 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     }
   }
 
-  const { edgeSlotData, nodeSlotData, routes } = traceOutwardSignalPaths(
-    rawNodes,
-    validEdgeIndices,
-    edges,
-    prng
-  )
-
   const lineVertCount = validEdgeIndices.length * 2
   const linePositions = new Float32Array(lineVertCount * 3)
   const lineStyles = new Float32Array(lineVertCount * 4)
   const lineRelativeCoords = new Float32Array(lineVertCount * 4)
-  const lineRouteIds = new Float32Array(lineVertCount * 4)
-  lineRouteIds.fill(-1.0)
-  const lineRouteProgress = new Float32Array(lineVertCount * 4)
+  const lineDriftParams = new Float32Array(lineVertCount * 4)
 
   for (let k = 0; k < validEdgeIndices.length; k++) {
     const eIdx = validEdgeIndices[k]
@@ -2079,6 +1785,10 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     lineRelativeCoords[vA * 4 + 1] = nA.relativeCoord[1]
     lineRelativeCoords[vA * 4 + 2] = nA.relativeCoord[2]
     lineRelativeCoords[vA * 4 + 3] = nA.relativeCoord[3]
+    lineDriftParams[vA * 4] = nA.driftParams[0]
+    lineDriftParams[vA * 4 + 1] = nA.driftParams[1]
+    lineDriftParams[vA * 4 + 2] = nA.driftParams[2]
+    lineDriftParams[vA * 4 + 3] = nA.driftParams[3]
 
     linePositions[vB * 3] = nB.pos.x
     linePositions[vB * 3 + 1] = nB.pos.y
@@ -2091,40 +1801,30 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     lineRelativeCoords[vB * 4 + 1] = nB.relativeCoord[1]
     lineRelativeCoords[vB * 4 + 2] = nB.relativeCoord[2]
     lineRelativeCoords[vB * 4 + 3] = nB.relativeCoord[3]
-
-    const eRoutes = edgeSlotData[k]
-    const slotCount = Math.min(MAX_ROUTES_PER_ELEMENT, eRoutes.length)
-    for (let s = 0; s < slotCount; s++) {
-      const sig = eRoutes[s]
-      const aIsFrom = nA.idx === sig.from
-      lineRouteIds[vA * 4 + s] = sig.routeId
-      lineRouteProgress[vA * 4 + s] = aIsFrom ? sig.progFrom : sig.progTo
-      lineRouteIds[vB * 4 + s] = sig.routeId
-      lineRouteProgress[vB * 4 + s] = aIsFrom ? sig.progTo : sig.progFrom
-    }
+    lineDriftParams[vB * 4] = nB.driftParams[0]
+    lineDriftParams[vB * 4 + 1] = nB.driftParams[1]
+    lineDriftParams[vB * 4 + 2] = nB.driftParams[2]
+    lineDriftParams[vB * 4 + 3] = nB.driftParams[3]
   }
 
   const linesGeo = new THREE.BufferGeometry()
   linesGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
   linesGeo.setAttribute('aLineStyle', new THREE.BufferAttribute(lineStyles, 4))
   linesGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(lineRelativeCoords, 4))
-  linesGeo.setAttribute('aRouteIds', new THREE.BufferAttribute(lineRouteIds, 4))
-  linesGeo.setAttribute('aRouteProgress', new THREE.BufferAttribute(lineRouteProgress, 4))
-  linesGeo.userData.signalPathCount = routes.length
-  linesGeo.userData.routes = routes
+  linesGeo.setAttribute('aDriftParams', new THREE.BufferAttribute(lineDriftParams, 4))
+  linesGeo.userData.signalPathCount = 0
+  linesGeo.userData.routes = []
   if (lineVertCount > 0) {
     linesGeo.computeBoundingBox()
     linesGeo.computeBoundingSphere()
   }
 
-  // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation with Multi-Route Node Relay)
+  // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation with Locked Drift Params)
   const pointCount = visibleNodes.length
   const pointPositions = new Float32Array(pointCount * 3)
   const pointStyles = new Float32Array(pointCount * 4)
   const pointRelativeCoords = new Float32Array(pointCount * 4)
-  const pointRouteIds = new Float32Array(pointCount * 4)
-  pointRouteIds.fill(-1.0)
-  const pointRouteProgress = new Float32Array(pointCount * 4)
+  const pointDriftParams = new Float32Array(pointCount * 4)
 
   for (let nIdx = 0; nIdx < pointCount; nIdx++) {
     const n = visibleNodes[nIdx]
@@ -2139,21 +1839,17 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     pointRelativeCoords[nIdx * 4 + 1] = n.relativeCoord[1]
     pointRelativeCoords[nIdx * 4 + 2] = n.relativeCoord[2]
     pointRelativeCoords[nIdx * 4 + 3] = n.relativeCoord[3]
-
-    const nRoutes = nodeSlotData[n.idx]
-    const slotCount = Math.min(MAX_ROUTES_PER_ELEMENT, nRoutes.length)
-    for (let s = 0; s < slotCount; s++) {
-      pointRouteIds[nIdx * 4 + s] = nRoutes[s].routeId
-      pointRouteProgress[nIdx * 4 + s] = nRoutes[s].prog
-    }
+    pointDriftParams[nIdx * 4] = n.driftParams[0]
+    pointDriftParams[nIdx * 4 + 1] = n.driftParams[1]
+    pointDriftParams[nIdx * 4 + 2] = n.driftParams[2]
+    pointDriftParams[nIdx * 4 + 3] = n.driftParams[3]
   }
 
   const pointsGeo = new THREE.BufferGeometry()
   pointsGeo.setAttribute('position', new THREE.BufferAttribute(pointPositions, 3))
   pointsGeo.setAttribute('aPointStyle', new THREE.BufferAttribute(pointStyles, 4))
   pointsGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(pointRelativeCoords, 4))
-  pointsGeo.setAttribute('aRouteIds', new THREE.BufferAttribute(pointRouteIds, 4))
-  pointsGeo.setAttribute('aRouteProgress', new THREE.BufferAttribute(pointRouteProgress, 4))
+  pointsGeo.setAttribute('aDriftParams', new THREE.BufferAttribute(pointDriftParams, 4))
   if (pointCount > 0) {
     pointsGeo.computeBoundingBox()
     pointsGeo.computeBoundingSphere()

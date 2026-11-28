@@ -1,6 +1,6 @@
-import { memo, useMemo, useEffect, useLayoutEffect, useContext, useRef, useSyncExternalStore } from 'react'
+import { memo, useMemo, useEffect, useLayoutEffect, useContext, useSyncExternalStore } from 'react'
 import * as THREE from 'three'
-import { useThree, useFrame, createPortal } from '@react-three/fiber'
+import { useThree, createPortal } from '@react-three/fiber'
 import { H_VAL } from './generateWireGeometry'
 import { generateRefinedNeuralField } from './neuralPocketBounds'
 import { useWireframeConfig } from './WireframeConfigContext'
@@ -331,19 +331,74 @@ const POCKET_MASK_GLSL = `
   }
 `
 
+
+const HARMONIC_DRIFT_GLSL = `
+  vec3 computeHarmonicDrift(
+    vec3 restPos,
+    vec4 driftParams,
+    vec4 relCoord,
+    float distInsidePx,
+    float halfHeightPx,
+    float viewZ,
+    float proj11,
+    float vpHeight,
+    float timeVal,
+    float driftScale
+  ) {
+    if (driftScale <= 0.001) return vec3(0.0);
+
+    // Tip damping: taper smoothly to 0 near inner tip only for u < 0.08
+    float tipDamp = smoothstep(0.04, 0.09, relCoord.x);
+
+    // Outer envelope damping: taper smoothly only at the far outer edge (u > 0.94)
+    float outerDamp = 1.0 - smoothstep(0.94, 0.985, relCoord.x);
+
+    // Margin-localized wall damping: full 100% drift across inner ~70% of pocket,
+    // tapering smoothly to 0.0 only within the outer ~30% margin near the ribbon wall
+    float safeWallMargin = max(0.28 * halfHeightPx, 5.0);
+    float normWallDist = clamp(distInsidePx / safeWallMargin, 0.0, 1.0);
+    float wallDamp = smoothstep(0.0, 1.0, normWallDist);
+
+    float driftDamp = tipDamp * outerDamp * wallDamp;
+    if (driftDamp <= 0.001) return vec3(0.0);
+
+    // Cleanly wrapped time to prevent long-session float precision degradation
+    float t = mod(timeVal, 240.0);
+
+    // Out-of-phase Lissajous orbital harmonics in 4.5-7.5 second periods:
+    float f = driftParams.z;
+    float thetaX = t * (0.96 * f) + driftParams.x; // Period ~5.7s to 7.7s
+    float thetaY = t * (1.22 * f) + driftParams.y; // Period ~4.5s to 6.1s
+    float thetaZ = t * (1.08 * f) + (driftParams.x + driftParams.y); // Period ~5.1s to 6.9s
+
+    float dispX = sin(thetaX) * 0.72 + cos(thetaY * 0.6) * 0.28;
+    float dispY = cos(thetaY) * 0.78 + sin(thetaX * 0.5) * 0.22;
+    float dispZ = sin(thetaZ) * 0.50;
+
+    // View-depth perspective conversion: exact CSS px -> world units
+    float viewDepth = max(-viewZ, 1e-4);
+    float worldPerPx = viewDepth / (proj11 * 0.5 * max(vpHeight, 1.0));
+
+    // Calibrated peak drift radius: ~4.0 - 5.8 CSS px in screen space
+    float ampNorm = clamp((driftParams.w - 0.75) / 0.50, 0.0, 1.0);
+    float baseRadiusPx = mix(4.0, 5.8, ampNorm);
+    float rWorld = baseRadiusPx * worldPerPx * driftDamp * driftScale;
+
+    return vec3(dispX, dispY, dispZ) * rWorld;
+  }
+`;
+
 const NeuralLineShader = {
   vertexShader: `
     attribute vec4 aLineStyle;
     attribute vec4 aPartnerBias;
     attribute vec4 aPartnerCos;
     attribute vec4 aPartnerSin;
-    attribute vec4 aRouteIds;
-    attribute vec4 aRouteProgress;
+    attribute vec4 aDriftParams;
     uniform vec2 uLineOpacityPair;
-    uniform float uSignalActive;
-    uniform vec4 uPulseRouteIds[2];
+    uniform float uTime;
+    uniform float uDriftScale;
     varying float vAlpha;
-    varying float vImpulseMask;
     varying float vHubAccent;
     varying vec2 vPulseTrig;
     varying vec4 vStrandY;
@@ -351,20 +406,15 @@ const NeuralLineShader = {
     varying float vPxPerLocalY;
     varying float vWallPadPx;
     varying float vFeatherPx;
-    varying float vImpulseFeatherPx;
-    varying vec4 vEdgeProg;
+    varying float vLineBreath;
     varying float vWingSide;
     ${POCKET_MASK_GLSL}
+    ${HARMONIC_DRIFT_GLSL}
 
     float evalLineWallMask(float distPx, float halfHPx, out float outPad, out float outFeather) {
       outPad = -min(2.0, 0.020 * halfHPx);
       outFeather = clamp(0.075 * halfHPx, 4.5, 11.0);
       return smoothstep(outPad, outPad + outFeather, distPx);
-    }
-
-    float evalImpulseWallMask(float distPx, float halfHPx, float padPx, float restFeather, out float outImpFeather) {
-      outImpFeather = min(restFeather, max(0.35, 0.85 * halfHPx));
-      return smoothstep(padPx, padPx + outImpFeather, distPx);
     }
 
     void main() {
@@ -381,39 +431,18 @@ const NeuralLineShader = {
       float padPartner, featherPartner;
       float maskPartner = evalLineWallMask(distInPartnerPx, halfHP, padPartner, featherPartner);
 
-      float impFeatherSelf, impFeatherPartner;
-      float impMaskSelf = evalImpulseWallMask(p.distInsidePx, p.halfHeightPx, padSelf, featherSelf, impFeatherSelf);
-      float impMaskPartner = evalImpulseWallMask(distInPartnerPx, halfHP, padPartner, featherPartner, impFeatherPartner);
-
       // Fade both endpoints smoothly together near moving boundaries so zero floating stub edges linger
       float jointMask = min(maskSelf, maskPartner);
-      float impJointMask = min(impMaskSelf, impMaskPartner);
       float lineOpacity = mix(uLineOpacityPair.x, uLineOpacityPair.y, aWingSide);
       float strandYield = mix(0.68, 1.0, smoothstep(0.0, 0.052 * p.radius + 0.010, p.minStrandDist));
       float pocketMask = lineOpacity * flowPocketVisibility() * jointMask * strandYield;
 
-      // Vertex-matched active slot progress (constant route ID across edge endpoints, interpolated progress along edge)
-      vec4 edgeProg = vec4(-2.0);
-      if (uSignalActive > 0.5) {
-        vec4 activeIds = aWingSide < 0.5 ? uPulseRouteIds[0] : uPulseRouteIds[1];
-        for (int s = 0; s < 4; s++) {
-          float targetId = s == 0 ? activeIds.x : (s == 1 ? activeIds.y : (s == 2 ? activeIds.z : activeIds.w));
-          if (targetId >= -0.5) {
-            float matchedProg = -2.0;
-            if (aRouteIds.x >= -0.5 && abs(aRouteIds.x - targetId) < 0.25) matchedProg = aRouteProgress.x;
-            else if (aRouteIds.y >= -0.5 && abs(aRouteIds.y - targetId) < 0.25) matchedProg = aRouteProgress.y;
-            else if (aRouteIds.z >= -0.5 && abs(aRouteIds.z - targetId) < 0.25) matchedProg = aRouteProgress.z;
-            else if (aRouteIds.w >= -0.5 && abs(aRouteIds.w - targetId) < 0.25) matchedProg = aRouteProgress.w;
-            if (s == 0) edgeProg.x = matchedProg;
-            else if (s == 1) edgeProg.y = matchedProg;
-            else if (s == 2) edgeProg.z = matchedProg;
-            else edgeProg.w = matchedProg;
-          }
-        }
-      }
+      // Soft luminance breath (~8-12%) synchronized with endpoint twinkle (3.5-6.5s cycles)
+      float tLineTwinkle = mod(uTime, 240.0) * (1.257 * aDriftParams.z) + aDriftParams.x;
+      float lineBreath = 0.5 + 0.5 * cos(tLineTwinkle);
+      float vBreath = uDriftScale > 0.5 ? mix(0.89, 1.11, lineBreath) : 1.0;
 
       vAlpha = aLineStyle.x * pocketMask;
-      vImpulseMask = lineOpacity * impJointMask * strandYield;
       vHubAccent = aLineStyle.y;
       vPulseTrig = aLineStyle.zw;
       vStrandY = p.strandY;
@@ -421,24 +450,34 @@ const NeuralLineShader = {
       vPxPerLocalY = p.pxPerLocalY;
       vWallPadPx = padSelf;
       vFeatherPx = featherSelf;
-      vImpulseFeatherPx = impFeatherSelf;
-      vEdgeProg = edgeProg;
+      vLineBreath = vBreath;
       vWingSide = aWingSide;
-      gl_Position = projectionMatrix * p.view;
+
+      // 100% Endpoint-Locked Harmonic Micro-Drift: identical displacement formula
+      vec3 driftOffset = computeHarmonicDrift(
+        position,
+        aDriftParams,
+        aRelativeCoord,
+        p.distInsidePx,
+        p.halfHeightPx,
+        p.view.z,
+        projectionMatrix[1][1],
+        uViewportHeight,
+        uTime,
+        uDriftScale
+      );
+
+      vec4 driftedView = modelViewMatrix * vec4(position + driftOffset, 1.0);
+      gl_Position = projectionMatrix * driftedView;
     }
   `,
   fragmentShader: `
     uniform vec2 uFlowTrig;
-    uniform float uSignalActive;
-    uniform vec4 uPulseProgress[2];
-    uniform vec4 uPulseIntensity[2];
     uniform float uRestingLineScale;
-    uniform float uSignalGain;
     uniform vec3 uBaseColor;
     uniform vec3 uMidColor;
     uniform vec3 uHotColor;
     varying float vAlpha;
-    varying float vImpulseMask;
     varying float vHubAccent;
     varying vec2 vPulseTrig;
     varying vec4 vStrandY;
@@ -446,39 +485,19 @@ const NeuralLineShader = {
     varying float vPxPerLocalY;
     varying float vWallPadPx;
     varying float vFeatherPx;
-    varying float vImpulseFeatherPx;
-    varying vec4 vEdgeProg;
+    varying float vLineBreath;
     varying float vWingSide;
     ${SAFE_MAX_GLSL}
 
-    void evalSlotPacket(float segProg, float headPos, float slotInt, inout float totalPacket, inout float totalHead) {
-      if (segProg < -0.5 || slotInt <= 0.001) return;
-      float delta = headPos - segProg;
-      if (delta >= -0.014 && delta <= 0.115) {
-        float headCore = delta < 0.0 ? smoothstep(-0.014, 0.0, delta) : exp(-92.0 * delta);
-        float silkyTail = delta < 0.0
-          ? smoothstep(-0.014, 0.0, delta)
-          : exp(-27.0 * delta) * (1.0 - smoothstep(0.075, 0.115, delta));
-        float shape = delta < 0.0 ? headCore : (0.42 * headCore + 0.58 * silkyTail);
-        float tipIgnite = smoothstep(0.0, 0.07, segProg);
-        float outerExit = 1.0 - smoothstep(0.90, 1.0, segProg);
-        float gate = tipIgnite * outerExit * slotInt;
-        totalPacket += shape * gate;
-        totalHead += headCore * gate;
-      }
-    }
-
     void main() {
-      float maxEdgeProg = max(max(vEdgeProg.x, vEdgeProg.y), max(vEdgeProg.z, vEdgeProg.w));
-      bool hasActivePulse = uSignalActive > 0.5 && maxEdgeProg >= -0.5;
-      if (vAlpha <= 0.001 && !hasActivePulse) discard;
+      if (vAlpha <= 0.001) discard;
 
       float lo = -safeMax(safeMax(-vStrandY.x, -vStrandY.y), safeMax(-vStrandY.z, -vStrandY.w));
       float hi =  safeMax(safeMax( vStrandY.x,  vStrandY.y), safeMax( vStrandY.z,  vStrandY.w));
       float fragDistInPx = min(vLocalY - lo, hi - vLocalY) * vPxPerLocalY;
       float fragWallMask = smoothstep(vWallPadPx, vWallPadPx + max(vFeatherPx, 1.0), fragDistInPx);
       float alphaMask = vAlpha * fragWallMask * uRestingLineScale;
-      if (alphaMask <= 0.001 && !hasActivePulse) discard;
+      if (alphaMask <= 0.001) discard;
 
       vec2 pDir = vPulseTrig * inversesqrt(max(dot(vPulseTrig, vPulseTrig), 1e-4));
       float pulse = 0.5 + 0.5 * dot(pDir, uFlowTrig);
@@ -487,49 +506,28 @@ const NeuralLineShader = {
       vec3 webTint = mix(uBaseColor, uMidColor, 0.62 + 0.18 * pulse);
       vec3 lineCol = mix(webTint, uHotColor, clamp((0.12 + 0.10 * pulse) * accent, 0.0, 0.25));
 
-      float packet = 0.0;
-      float headWeight = 0.0;
-      if (hasActivePulse) {
-        vec4 activeProg = vWingSide < 0.5 ? uPulseProgress[0] : uPulseProgress[1];
-        vec4 activeInt = vWingSide < 0.5 ? uPulseIntensity[0] : uPulseIntensity[1];
-        evalSlotPacket(vEdgeProg.x, activeProg.x, activeInt.x, packet, headWeight);
-        evalSlotPacket(vEdgeProg.y, activeProg.y, activeInt.y, packet, headWeight);
-        evalSlotPacket(vEdgeProg.z, activeProg.z, activeInt.z, packet, headWeight);
-        evalSlotPacket(vEdgeProg.w, activeProg.w, activeInt.w, packet, headWeight);
-        packet = clamp(packet, 0.0, 1.25);
-        headWeight = clamp(headWeight, 0.0, 1.0);
-      }
-
-      float fragImpulseWall = smoothstep(vWallPadPx, vWallPadPx + max(vImpulseFeatherPx, 0.35), fragDistInPx);
-      vec3 trailTint = mix(uMidColor, uHotColor, 0.68);
-      vec3 headTint = mix(uMidColor, uHotColor, 0.90);
-      vec3 signalTint = mix(trailTint, headTint, headWeight);
-      vec3 outCol = mix(lineCol, signalTint, clamp(packet * 0.92, 0.0, 1.0));
-      float impulseGlow = packet * vImpulseMask * fragImpulseWall * 0.38 * uSignalGain;
-      float outAlpha = clamp(alphaMask * pulseBoost + impulseGlow, 0.0, 0.58);
+      // Calm, softly breathing synaptic filaments (~8-12% soft luminance breath)
+      float outAlpha = clamp(alphaMask * pulseBoost * vLineBreath, 0.0, 0.58);
       if (outAlpha <= 0.001) discard;
-      gl_FragColor = vec4(outCol, outAlpha);
+      gl_FragColor = vec4(lineCol, outAlpha);
     }
   `,
-}
+};
 
 const NeuralPointShader = {
   vertexShader: `
     attribute vec4 aPointStyle;
-    attribute vec4 aRouteIds;
-    attribute vec4 aRouteProgress;
+    attribute vec4 aDriftParams;
     uniform vec2 uGlowIntensityPair;
     uniform vec2 uNodeScalePair;
     uniform float uTime;
-    uniform float uSignalActive;
-    uniform vec4 uPulseRouteIds[2];
-    uniform vec4 uPulseProgress[2];
-    uniform vec4 uPulseIntensity[2];
+    uniform float uDriftScale;
     varying float vAlpha;
     varying float vTier;
     varying float vTwinkle;
-    varying float vRelay;
     ${POCKET_MASK_GLSL}
+    ${HARMONIC_DRIFT_GLSL}
+
     void main() {
       PocketMaskEval p = evalStaticPocketMask(position, aPocketFrame.x);
       vTier = aPointStyle.z;
@@ -562,50 +560,43 @@ const NeuralPointShader = {
         ? mix(0.80, 1.0, smoothstep(0.0, 0.055 * p.radius + 0.012, p.minStrandDist))
         : mix(0.72, 1.0, smoothstep(0.0, 0.058 * p.radius + 0.012, p.minStrandDist));
 
-      float relay = 0.0;
-      if (uSignalActive > 0.5) {
-        vec4 activeIds = aWingSide < 0.5 ? uPulseRouteIds[0] : uPulseRouteIds[1];
-        vec4 activeProg = aWingSide < 0.5 ? uPulseProgress[0] : uPulseProgress[1];
-        vec4 activeInt = aWingSide < 0.5 ? uPulseIntensity[0] : uPulseIntensity[1];
-        for (int s = 0; s < 4; s++) {
-          float targetId = s == 0 ? activeIds.x : (s == 1 ? activeIds.y : (s == 2 ? activeIds.z : activeIds.w));
-          float slotInt = s == 0 ? activeInt.x : (s == 1 ? activeInt.y : (s == 2 ? activeInt.z : activeInt.w));
-          if (targetId >= -0.5 && slotInt > 0.001) {
-            float nodeProg = -2.0;
-            if (aRouteIds.x >= -0.5 && abs(aRouteIds.x - targetId) < 0.25) nodeProg = aRouteProgress.x;
-            else if (aRouteIds.y >= -0.5 && abs(aRouteIds.y - targetId) < 0.25) nodeProg = aRouteProgress.y;
-            else if (aRouteIds.z >= -0.5 && abs(aRouteIds.z - targetId) < 0.25) nodeProg = aRouteProgress.z;
-            else if (aRouteIds.w >= -0.5 && abs(aRouteIds.w - targetId) < 0.25) nodeProg = aRouteProgress.w;
-            if (nodeProg >= -0.5) {
-              float headPos = s == 0 ? activeProg.x : (s == 1 ? activeProg.y : (s == 2 ? activeProg.z : activeProg.w));
-              float delta = headPos - nodeProg;
-              if (delta >= -0.016 && delta <= 0.095) {
-                float hitUp = smoothstep(-0.016, 0.004, delta);
-                float hitDown = delta > 0.004
-                  ? exp(-34.0 * (delta - 0.004)) * (1.0 - smoothstep(0.055, 0.095, delta))
-                  : 1.0;
-                float endFade = smoothstep(0.0, 0.07, nodeProg) * (1.0 - smoothstep(0.90, 1.0, nodeProg));
-                relay = max(relay, hitUp * hitDown * endFade * slotInt);
-              }
-            }
-          }
-        }
-      }
-      vRelay = clamp(relay, 0.0, 1.0);
+      // Bioluminescent Twinkle: calm, staggered star breathing across 3.5-6.5 second cycles
+      float tTwinkle = mod(uTime, 240.0) * (1.257 * aDriftParams.z) + aPointStyle.w;
+      float breath = 0.5 + 0.5 * cos(tTwinkle);
+      float subBreath = 0.5 + 0.5 * cos(tTwinkle * 0.62 + aDriftParams.y);
+      float organicBreath = mix(breath, subBreath, 0.25);
+      // Clearly readable ~0.55x to 1.25x brightness modulation
+      float twinkleMod = uDriftScale > 0.5 ? mix(0.55, 1.25, organicBreath) : 1.0;
+      vTwinkle = twinkleMod;
 
-      vAlpha = aPointStyle.y * glowIntensity * depthCue * flowPocketVisibility() * pocketMask * strandYield * (1.0 + 0.30 * vRelay);
-      vTwinkle = vTier > 1.5
-        ? (1.0 + 0.10 * sin(mod(uTime, 12.0) * 0.52359878 + aPointStyle.w))
-        : 1.0;
+      vAlpha = aPointStyle.y * glowIntensity * depthCue * flowPocketVisibility() * pocketMask * strandYield;
 
       float safeDpr = clamp(uPixelRatio, 1.0, 2.5);
       if (pointCss <= 0.05 || vAlpha <= 0.001) {
         gl_PointSize = 0.0;
         vAlpha = 0.0;
       } else {
-        gl_PointSize = min(pointCss * (1.0 + 0.08 * vRelay) * safeDpr, 40.0);
+        // Organic size breathing from 0.92x to 1.12x for immediately readable depth
+        float sizeBreath = uDriftScale > 0.5 ? mix(0.92, 1.12, organicBreath) : 1.0;
+        gl_PointSize = min(pointCss * sizeBreath * safeDpr, 40.0);
       }
-      gl_Position = projectionMatrix * p.view;
+
+      // 100% Endpoint-Locked Harmonic Micro-Drift: identical displacement formula
+      vec3 driftOffset = computeHarmonicDrift(
+        position,
+        aDriftParams,
+        aRelativeCoord,
+        p.distInsidePx,
+        p.halfHeightPx,
+        p.view.z,
+        projectionMatrix[1][1],
+        uViewportHeight,
+        uTime,
+        uDriftScale
+      );
+
+      vec4 driftedView = modelViewMatrix * vec4(position + driftOffset, 1.0);
+      gl_Position = projectionMatrix * driftedView;
     }
   `,
   fragmentShader: `
@@ -615,7 +606,7 @@ const NeuralPointShader = {
     varying float vAlpha;
     varying float vTier;
     varying float vTwinkle;
-    varying float vRelay;
+
     void main() {
       if (vAlpha <= 0.001) discard;
       vec2 p = gl_PointCoord - 0.5;
@@ -631,28 +622,28 @@ const NeuralPointShader = {
         float glint = (exp(-960.0 * p.x * p.x - 48.0 * p.y * p.y)
           + exp(-960.0 * p.y * p.y - 48.0 * p.x * p.x)) * 0.30 * cutoff;
         vec3 col = mix(uBaseColor, uMidColor, clamp(bloom * 1.32 + halo * 0.70 + 0.42, 0.0, 1.0));
-        col = mix(col, uHotColor, clamp(core * 1.40 + glint * 0.72 + 0.16 * vRelay, 0.0, 1.0));
-        float light = (core + bloom + halo + glint) * vTwinkle;
-        gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 1.0));
+        col = mix(col, uHotColor, clamp(core * 1.40 + glint * 0.72, 0.0, 1.0));
+        // Scale full light by vTwinkle with headroom so it breathes from 0.55x to 1.25x without saturation clipping
+        float light = (core * 0.85 + bloom * 0.65 + halo * 1.10 + glint * 0.75) * vTwinkle;
+        gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 0.96));
       } else if (vTier > 0.5) {
         // Tier 2: Mid Constellation Vertex (richly theme-colored with subtle crisp center)
         float core = exp(-32.0 * r2) * 0.96;
-        float bloom = exp(-11.0 * r2) * 0.30 * cutoff;
+        float bloom = exp(-11.0 * r2) * 0.35 * cutoff;
         vec3 col = mix(uBaseColor, uMidColor, clamp(0.55 + core * 0.45, 0.0, 1.0));
-        col = mix(col, uHotColor, clamp(core * 0.20 + 0.28 * vRelay, 0.0, 0.48));
-        float light = (core + bloom) * cutoff;
-        gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 0.94));
+        col = mix(col, uHotColor, clamp(core * 0.20, 0.0, 0.48));
+        float light = (core * 0.88 + bloom * 1.15) * vTwinkle;
+        gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 0.92));
       } else {
         // Tier 3: Volumetric Micro-Dust (rich theme-colored arch & pocket sparkles, zero white wash)
         float core = exp(-12.0 * r2) * 0.95 * cutoff;
         vec3 col = mix(uBaseColor, uMidColor, clamp(0.48 + core * 0.52, 0.0, 1.0));
-        col = mix(col, uHotColor, clamp(0.30 * vRelay, 0.0, 0.35));
-        gl_FragColor = vec4(col, clamp(vAlpha * core, 0.0, 0.74));
+        float light = core * mix(0.65, 1.20, (vTwinkle - 0.55) / 0.70);
+        gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 0.74));
       }
     }
   `,
-}
-
+};
 const NeuralHazeShader = {
   vertexShader: `
     attribute vec2 aHazeStyle;
@@ -760,195 +751,6 @@ function buildGeometryKey(config) {
   )
 }
 
-const PULSE_SLOT_COUNT = 4
-const PULSE_TAIL_LENGTH = 0.105
-const PULSE_RECENT_HISTORY = 6
-const LEFT_INITIAL_PHASES = [0.06, 0.36, 0.68, -0.42]
-const RIGHT_INITIAL_PHASES = [0.22, 0.52, 0.82, -0.24]
-
-function nextSchedulerRand(wingState) {
-  const next = (wingState.prngState * 16807) % 2147483647
-  wingState.prngState = next
-  return (next - 1) / 2147483646
-}
-
-function createWingScheduler(seed) {
-  const slots = []
-  for (let i = 0; i < PULSE_SLOT_COUNT; i++) {
-    slots.push({
-      routeId: -1,
-      lane: -1,
-      progress: 0.0,
-      speed: 0.18,
-      intensity: 0.0,
-      cooldown: 0.0,
-    })
-  }
-  return {
-    seed,
-    prngState: seed,
-    slots,
-    recentIds: new Int32Array(PULSE_RECENT_HISTORY).fill(-1),
-    recentPtr: 0,
-    laneScratch: [0, 0, 0],
-    candidatesScratch: [],
-  }
-}
-
-function recordRecentRoute(wingState, routeId) {
-  wingState.recentIds[wingState.recentPtr] = routeId
-  wingState.recentPtr = (wingState.recentPtr + 1) % PULSE_RECENT_HISTORY
-}
-
-function isRouteActiveOrRecent(wingState, routeId, excludeSlotIdx, checkRecent) {
-  const slots = wingState.slots
-  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
-    if (s !== excludeSlotIdx && slots[s].routeId === routeId) return true
-  }
-  if (checkRecent) {
-    const rec = wingState.recentIds
-    for (let r = 0; r < rec.length; r++) {
-      if (rec[r] === routeId) return true
-    }
-  }
-  return false
-}
-
-function pickNextRouteForSlot(wingState, routes, slotIdx, preferredLane = -1) {
-  if (!routes || routes.length === 0) return
-  const slots = wingState.slots
-  const laneCounts = wingState.laneScratch
-  laneCounts[0] = 0
-  laneCounts[1] = 0
-  laneCounts[2] = 0
-  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
-    if (s !== slotIdx && slots[s].routeId >= 0) {
-      const ln = slots[s].lane
-      if (ln >= 0 && ln <= 2) laneCounts[ln]++
-    }
-  }
-
-  let targetLane = preferredLane
-  if (targetLane < 0 || targetLane > 2) {
-    let minCount = Math.min(laneCounts[0], laneCounts[1], laneCounts[2])
-    const tiedLanes = []
-    for (let l = 0; l < 3; l++) {
-      if (laneCounts[l] === minCount) tiedLanes.push(l)
-    }
-    targetLane = tiedLanes[Math.floor(nextSchedulerRand(wingState) * tiedLanes.length) % tiedLanes.length]
-  }
-
-  const cands = wingState.candidatesScratch
-  // Tier 1: matching target lane + not active + not recently used
-  cands.length = 0
-  for (let i = 0; i < routes.length; i++) {
-    const rt = routes[i]
-    if (rt.lane === targetLane && !isRouteActiveOrRecent(wingState, rt.id, slotIdx, true)) {
-      cands.push(rt)
-    }
-  }
-  // Tier 2: any lane + not active + not recently used
-  if (cands.length === 0) {
-    for (let i = 0; i < routes.length; i++) {
-      const rt = routes[i]
-      if (!isRouteActiveOrRecent(wingState, rt.id, slotIdx, true)) {
-        cands.push(rt)
-      }
-    }
-  }
-  // Tier 3: matching target lane + not active
-  if (cands.length === 0) {
-    for (let i = 0; i < routes.length; i++) {
-      const rt = routes[i]
-      if (rt.lane === targetLane && !isRouteActiveOrRecent(wingState, rt.id, slotIdx, false)) {
-        cands.push(rt)
-      }
-    }
-  }
-  // Tier 4: any route not active on another slot, or any route
-  if (cands.length === 0) {
-    for (let i = 0; i < routes.length; i++) {
-      if (!isRouteActiveOrRecent(wingState, routes[i].id, slotIdx, false)) cands.push(routes[i])
-    }
-  }
-  if (cands.length === 0) {
-    for (let i = 0; i < routes.length; i++) cands.push(routes[i])
-  }
-
-  const chosen = cands[Math.floor(nextSchedulerRand(wingState) * cands.length) % cands.length]
-  const duration = 4.6 + 1.8 * nextSchedulerRand(wingState)
-  const slot = slots[slotIdx]
-  slot.routeId = chosen.id
-  slot.lane = chosen.lane
-  slot.progress = 0.0
-  slot.speed = 1.0 / duration
-  slot.intensity = 0.90 + 0.22 * nextSchedulerRand(wingState)
-  slot.cooldown = 0.0
-  recordRecentRoute(wingState, chosen.id)
-}
-
-function seedWingScheduler(wingState, routes, initialPhases) {
-  wingState.prngState = wingState.seed
-  wingState.recentIds.fill(-1)
-  wingState.recentPtr = 0
-  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
-    const slot = wingState.slots[s]
-    slot.routeId = -1
-    slot.lane = -1
-    slot.progress = 0.0
-    slot.intensity = 0.0
-    slot.cooldown = 0.0
-  }
-  if (!routes || routes.length === 0) return
-
-  const initialLanes = [0, 1, 2, wingState.seed % 2 === 0 ? 0 : 2]
-  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
-    const phase = initialPhases[s]
-    if (phase < 0) {
-      wingState.slots[s].cooldown = Math.abs(phase)
-    } else {
-      pickNextRouteForSlot(wingState, routes, s, initialLanes[s])
-      wingState.slots[s].progress = phase
-    }
-  }
-}
-
-function stepWingScheduler(wingState, routes, dt) {
-  if (!routes || routes.length === 0 || dt <= 0) return
-  const slots = wingState.slots
-  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
-    const slot = slots[s]
-    if (slot.routeId < 0) {
-      slot.cooldown -= dt
-      if (slot.cooldown <= 0.0) {
-        pickNextRouteForSlot(wingState, routes, s, -1)
-      }
-    } else {
-      slot.progress += slot.speed * dt
-      if (slot.progress >= 1.0 + PULSE_TAIL_LENGTH) {
-        slot.routeId = -1
-        slot.lane = -1
-        slot.progress = 0.0
-        slot.intensity = 0.0
-        slot.cooldown = 0.32 + 0.86 * nextSchedulerRand(wingState)
-      }
-    }
-  }
-}
-
-function syncSchedulerUniforms(wingState, idx, routeIdsUniform, progressUniform, intensityUniform, signalActive) {
-  if (!signalActive) {
-    routeIdsUniform.value[idx].set(-1, -1, -1, -1)
-    progressUniform.value[idx].set(0, 0, 0, 0)
-    intensityUniform.value[idx].set(0, 0, 0, 0)
-    return
-  }
-  const s = wingState.slots
-  routeIdsUniform.value[idx].set(s[0].routeId, s[1].routeId, s[2].routeId, s[3].routeId)
-  progressUniform.value[idx].set(s[0].progress, s[1].progress, s[2].progress, s[3].progress)
-  intensityUniform.value[idx].set(s[0].intensity, s[1].intensity, s[2].intensity, s[3].intensity)
-}
-
 const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
   themeConfig = {},
   nodeScale = 1.0,
@@ -975,7 +777,6 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
   const neuralHazeScale = themeConfig.neuralHazeScale ?? 1.0
   const neuralHazeAlphaCap = themeConfig.neuralHazeAlphaCap ?? 0.088
   const neuralLineScale = themeConfig.neuralLineScale ?? 1.0
-  const neuralSignalGain = themeConfig.neuralSignalGain ?? 1.0
   const neuralPointScale = themeConfig.neuralPointScale ?? 1.0
 
   useEffect(() => {
@@ -1048,14 +849,6 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       linesGeo: mergedLinesGeo,
       pointsGeo: mergedPointsGeo,
       hazeGeo: mergedHazeGeo,
-      routes: {
-        left: leftField.linesGeo?.userData?.routes ?? [],
-        right: rightField.linesGeo?.userData?.routes ?? [],
-      },
-      signalPathCounts: {
-        left: leftField.linesGeo?.userData?.signalPathCount ?? 0,
-        right: rightField.linesGeo?.userData?.signalPathCount ?? 0,
-      },
       timings: {
         left: leftFieldData.dt,
         right: rightFieldData.dt,
@@ -1072,54 +865,9 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     if (typeof window !== 'undefined') {
       window.__neuralBuildTimes = {
         ...mergedGeometries.timings,
-        signalPathCounts: mergedGeometries.signalPathCounts,
       }
     }
   }, [mergedGeometries])
-
-  // Shared GPU uniform arrays for active dynamic impulse slots (index 0 = left wing, index 1 = right wing)
-  const pulseRouteIdsUniform = useMemo(
-    () => ({ value: [new THREE.Vector4(-1, -1, -1, -1), new THREE.Vector4(-1, -1, -1, -1)] }),
-    []
-  )
-  const pulseProgressUniform = useMemo(
-    () => ({ value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] }),
-    []
-  )
-  const pulseIntensityUniform = useMemo(
-    () => ({ value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] }),
-    []
-  )
-
-  const schedulerRef = useRef(null)
-  if (!schedulerRef.current) {
-    schedulerRef.current = {
-      left: createWingScheduler(7919),
-      right: createWingScheduler(104729),
-      lastTime: 0,
-      seededRoutesRef: null,
-    }
-  }
-
-  useLayoutEffect(() => {
-    const sched = schedulerRef.current
-    if (sched.seededRoutesRef !== mergedGeometries.routes) {
-      seedWingScheduler(sched.left, mergedGeometries.routes.left, LEFT_INITIAL_PHASES)
-      seedWingScheduler(sched.right, mergedGeometries.routes.right, RIGHT_INITIAL_PHASES)
-      sched.seededRoutesRef = mergedGeometries.routes
-      sched.lastTime = timeUniform.value
-    }
-    const active = !prefersReducedMotion
-    syncSchedulerUniforms(sched.left, 0, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, active)
-    syncSchedulerUniforms(sched.right, 1, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, active)
-  }, [
-    mergedGeometries,
-    prefersReducedMotion,
-    timeUniform,
-    pulseRouteIdsUniform,
-    pulseProgressUniform,
-    pulseIntensityUniform,
-  ])
 
   // 4. Create the 3 ShaderMaterials once per mount (uniforms updated in-place via useLayoutEffect)
   const lineMat = useMemo(() => {
@@ -1128,12 +876,9 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
         uLineOpacityPair: { value: new THREE.Vector2(0.9, 0.9) },
         uInnerFadePair: { value: new THREE.Vector2(0.04, 0.04) },
         uFlowTrig: flowTrigUniform,
-        uSignalActive: { value: 1 },
-        uPulseRouteIds: pulseRouteIdsUniform,
-        uPulseProgress: pulseProgressUniform,
-        uPulseIntensity: pulseIntensityUniform,
+        uTime: timeUniform,
+        uDriftScale: { value: 1.0 },
         uRestingLineScale: { value: 1 },
-        uSignalGain: { value: 1 },
         uBaseColor: { value: new THREE.Color() },
         uMidColor: { value: new THREE.Color() },
         uHotColor: { value: new THREE.Color() },
@@ -1147,7 +892,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       depthTest: false,
       depthWrite: false,
     })
-  }, [flowTrigUniform, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform])
+  }, [flowTrigUniform, timeUniform])
 
   const pointMat = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -1157,12 +902,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
         uInnerFadePair: { value: new THREE.Vector2(0.04, 0.04) },
         uFlowTrig: flowTrigUniform,
         uTime: timeUniform,
-        uSignalActive: { value: 1 },
-        uPulseRouteIds: pulseRouteIdsUniform,
-        uPulseProgress: pulseProgressUniform,
-        uPulseIntensity: pulseIntensityUniform,
-        uRestingLineScale: { value: 1 },
-        uSignalGain: { value: 1 },
+        uDriftScale: { value: 1.0 },
         uBaseColor: { value: new THREE.Color() },
         uMidColor: { value: new THREE.Color() },
         uHotColor: { value: new THREE.Color() },
@@ -1176,33 +916,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       depthTest: false,
       depthWrite: false,
     })
-  }, [flowTrigUniform, timeUniform, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform])
-
-  useFrame(() => {
-    const sched = schedulerRef.current
-    const t = timeUniform.value
-    if (prefersReducedMotion) {
-      sched.lastTime = t
-      syncSchedulerUniforms(sched.left, 0, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, false)
-      syncSchedulerUniforms(sched.right, 1, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, false)
-      return
-    }
-    let dt = t - sched.lastTime
-    if (dt < 0) {
-      seedWingScheduler(sched.left, mergedGeometries.routes.left, LEFT_INITIAL_PHASES)
-      seedWingScheduler(sched.right, mergedGeometries.routes.right, RIGHT_INITIAL_PHASES)
-      dt = Math.min(t, 0.05)
-    } else if (dt > 0.25) {
-      dt = 0.05
-    }
-    sched.lastTime = t
-    if (dt > 0) {
-      stepWingScheduler(sched.left, mergedGeometries.routes.left, dt)
-      stepWingScheduler(sched.right, mergedGeometries.routes.right, dt)
-    }
-    syncSchedulerUniforms(sched.left, 0, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, true)
-    syncSchedulerUniforms(sched.right, 1, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, true)
-  })
+  }, [flowTrigUniform, timeUniform])
 
   const hazeMat = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -1300,16 +1014,24 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       Math.min(1.12, leftGlow * 0.80),
       Math.min(1.12, rightGlow * 0.80)
     )
-    const signalActive = prefersReducedMotion ? 0.0 : 1.0
-    lineMat.uniforms.uSignalActive.value = signalActive
+    const driftActive = prefersReducedMotion ? 0.0 : 1.0
+    lineMat.uniforms.uDriftScale.value = driftActive
     lineMat.uniforms.uRestingLineScale.value = neuralLineScale
-    lineMat.uniforms.uSignalGain.value = neuralSignalGain
     pointMat.uniforms.uGlowIntensityPair.value.set(
       Math.min(1.32, leftGlow * 0.96 * neuralPointScale),
       Math.min(1.32, rightGlow * 0.96 * neuralPointScale)
     )
     pointMat.uniforms.uNodeScalePair.value.set(leftNS, rightNS)
-    pointMat.uniforms.uSignalActive.value = signalActive
+    pointMat.uniforms.uDriftScale.value = driftActive
+    if (typeof window !== 'undefined') {
+      window.__neuralMotionState = {
+        driftActive,
+        peakDriftRadiusPx: 5.8,
+        timeUniform,
+        pointMat,
+        lineMat,
+      }
+    }
     hazeMat.uniforms.uHazeGlowPair.value.set(
       Math.min(1.06, leftGlow * 0.76 * neuralHazeScale),
       Math.min(1.06, rightGlow * 0.76 * neuralHazeScale)
@@ -1356,7 +1078,6 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     neuralHazeScale,
     neuralHazeAlphaCap,
     neuralLineScale,
-    neuralSignalGain,
     neuralPointScale,
     viewport.dpr,
     canvasSize.height,
