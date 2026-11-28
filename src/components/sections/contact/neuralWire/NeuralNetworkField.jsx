@@ -7,7 +7,7 @@ import { useWireframeConfig } from './WireframeConfigContext'
 import { FlowTimeContext, FlowTrigContext } from './animationContract'
 import { getWireThemeConfig } from './wireThemeConfig'
 
-const ROLL_PERIOD_SECONDS = 56.0
+const ROLL_PERIOD_SECONDS = 74.67
 const TWO_PI = Math.PI * 2.0
 
 function computeWrappedRollAngle(timeVal) {
@@ -523,7 +523,7 @@ const NeuralLineShader = {
     varying vec4 vStrandY;
     varying float vLocalY;
     varying float vPxPerLocalY;
-    varying float vWallPadPx;
+    varying float vEndpointWallMask;
     varying float vFeatherPx;
     varying float vLineBreath;
     varying float vWingSide;
@@ -531,10 +531,8 @@ const NeuralLineShader = {
     ${POCKET_MASK_GLSL}
     ${NEURAL_3D_TRANSFORM_GLSL}
 
-    float evalLineWallMask(float distPx, float halfHPx, out float outPad, out float outFeather) {
-      outPad = -min(2.0, 0.020 * halfHPx);
-      outFeather = clamp(0.075 * halfHPx, 4.5, 11.0);
-      return smoothstep(outPad, outPad + outFeather, distPx);
+    float lineWallFeatherPx(float halfHPx) {
+      return clamp(0.036 * halfHPx, 1e-4, 5.85);
     }
 
     void main() {
@@ -593,16 +591,14 @@ const NeuralLineShader = {
         uDriftScale
       );
 
-      float padSelf, featherSelf;
-      float maskSelf = evalLineWallMask(resA.pocket.distInsidePx, resA.pocket.halfHeightPx, padSelf, featherSelf);
-      float padPartner, featherPartner;
-      float maskPartner = evalLineWallMask(resB.pocket.distInsidePx, resB.pocket.halfHeightPx, padPartner, featherPartner);
+      float featherSelf = lineWallFeatherPx(resA.pocket.halfHeightPx);
+      float featherPartner = lineWallFeatherPx(resB.pocket.halfHeightPx);
+      float maskSelf = smoothstep(0.0, featherSelf, resA.pocket.distInsidePx);
+      float maskPartner = smoothstep(0.0, featherPartner, resB.pocket.distInsidePx);
 
-      // Fade both endpoints smoothly together near moving boundaries so zero floating stub edges linger
-      float jointMask = min(maskSelf, maskPartner);
       float lineOpacity = mix(uLineOpacityPair.x, uLineOpacityPair.y, wingSide);
       float strandYield = mix(0.68, 1.0, smoothstep(0.0, 0.052 * resA.pocket.radius + 0.010, resA.pocket.minStrandDist));
-      float pocketMask = lineOpacity * flowPocketVisibility() * jointMask * strandYield;
+      float pocketMask = lineOpacity * flowPocketVisibility() * strandYield;
 
       // Soft luminance breath (~8-12%) + trailing inner-strand wake shimmer (~13% boost)
       float tLineTwinkle = mod(uTime, 240.0) * (1.257 * aDriftParams.z) + aDriftParams.x;
@@ -619,7 +615,7 @@ const NeuralLineShader = {
       vStrandY = resA.pocket.strandY;
       vLocalY = resA.liveY;
       vPxPerLocalY = resA.pocket.pxPerLocalY;
-      vWallPadPx = padSelf;
+      vEndpointWallMask = min(maskSelf, maskPartner);
       vFeatherPx = featherSelf;
       vLineBreath = vBreath;
       vWingSide = wingSide;
@@ -640,7 +636,7 @@ const NeuralLineShader = {
     varying vec4 vStrandY;
     varying float vLocalY;
     varying float vPxPerLocalY;
-    varying float vWallPadPx;
+    varying float vEndpointWallMask;
     varying float vFeatherPx;
     varying float vLineBreath;
     varying float vWingSide;
@@ -652,14 +648,15 @@ const NeuralLineShader = {
 
       float lo = -safeMax(safeMax(-vStrandY.x, -vStrandY.y), safeMax(-vStrandY.z, -vStrandY.w));
       float hi =  safeMax(safeMax( vStrandY.x,  vStrandY.y), safeMax( vStrandY.z,  vStrandY.w));
+      if (vLocalY <= lo || vLocalY >= hi) discard;
       float fragDistInPx = min(vLocalY - lo, hi - vLocalY) * vPxPerLocalY;
-      float fragWallMask = smoothstep(vWallPadPx, vWallPadPx + max(vFeatherPx, 1.0), fragDistInPx);
-      float alphaMask = vAlpha * fragWallMask * uRestingLineScale;
+      float fragWallMask = smoothstep(0.0, max(vFeatherPx, 1e-4), fragDistInPx);
+      float alphaMask = vAlpha * min(vEndpointWallMask, fragWallMask) * uRestingLineScale;
       if (alphaMask <= 0.001) discard;
 
       float depth01 = clamp(vDepth01, 0.0, 1.0);
-      // Protected connector visibility: front hemisphere crisply legible (1.20x), back recedes softly (0.42x)
-      float depthOpacity = mix(0.42, 1.20, depth01);
+      float frontLift = smoothstep(0.50, 1.0, depth01);
+      float depthOpacity = mix(0.50, 1.30, depth01) * (1.0 + 0.27 * frontLift);
 
       vec2 pDir = vPulseTrig * inversesqrt(max(dot(vPulseTrig, vPulseTrig), 1e-4));
       float pulse = 0.5 + 0.5 * dot(pDir, uFlowTrig);
@@ -667,9 +664,12 @@ const NeuralLineShader = {
       float pulseBoost = mix(0.76, 1.24, pulse) * (1.0 + 0.12 * accent * pulse);
       vec3 webTint = mix(uBaseColor, uMidColor, mix(0.40, 0.72, depth01) + 0.16 * pulse);
       vec3 lineCol = mix(webTint, uHotColor, clamp((0.06 + 0.10 * depth01 + 0.10 * pulse) * accent, 0.0, 0.28));
+      vec3 frontTint = mix(uHotColor, vec3(0.62, 0.58, 0.78), 0.5);
+      lineCol = mix(lineCol, frontTint, 0.20 * smoothstep(0.55, 1.0, depth01));
 
       // Calm, softly breathing synaptic filaments with protected Z-depth legibility
-      float outAlpha = clamp(alphaMask * depthOpacity * pulseBoost * vLineBreath, 0.0, 0.62);
+      float alphaCap = mix(0.62, 0.52, frontLift);
+      float outAlpha = clamp(alphaMask * depthOpacity * pulseBoost * vLineBreath, 0.0, alphaCap);
       if (outAlpha <= 0.001) discard;
       gl_FragColor = vec4(lineCol, outAlpha);
     }
@@ -722,8 +722,8 @@ const NeuralPointShader = {
       float nodeScale = mix(uNodeScalePair.x, uNodeScalePair.y, wingSide);
       float depth01 = res.depth01;
       float depthCue = vTier > 1.5
-        ? mix(0.45, 1.08, depth01)
-        : mix(0.36, 1.06, depth01);
+        ? mix(0.47, 1.08, depth01)
+        : mix(0.44, 1.06, depth01);
       float depthSize = vTier > 1.5
         ? mix(0.78, 1.12, depth01)
         : mix(0.72, 1.12, depth01);

@@ -1060,7 +1060,7 @@ function computeVMax(envHeight, isoYScale, maxFrac, minIsoMargin) {
   return Math.max(0.0, Math.min(maxFrac, 1.0 - Math.max(1.0 - maxFrac, minIsoMargin / halfIso)))
 }
 
-function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) {
+function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, samplePrng, envScale) {
   const rawNodes = []
   const gridCell = Math.max(0.22, 0.36 * envScale)
   const grid = new SpatialGrid3D(gridCell, true)
@@ -1080,10 +1080,10 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
     maxAttempts,
     shellBias = true,
     organicCluster = false,
-  }) {
+  }, prng = samplePrng, outer) {
     const xSpanMod = organicCluster ? Math.pow(Math.max(1.0, isoXScale / 1.15), 0.25) : 1.0
     const refIsoH = 1.15 * envScale
-    const du = cellIso / (10.0 * isoXScale)
+    const du = outer ? uEnd - uStart : cellIso / (10.0 * isoXScale)
     for (let u0 = uStart; u0 < uEnd; u0 += du) {
       const u1 = Math.min(uEnd, u0 + du)
       const stripDu = u1 - u0
@@ -1091,10 +1091,8 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
       const uMid = 0.5 * (u0 + u1)
       const bMid = lut.getFunnelBounds(uMid)
       const midIsoH = bMid.funnelHeight * isoYScale
-      if (midIsoH < minIsoHeight) continue
-
       const rMaxMid = computeVMax(bMid.funnelHeight, isoYScale, maxRFrac, minIsoMargin)
-      if (rMaxMid <= 0.05) continue
+      if (!outer && (midIsoH < minIsoHeight || rMaxMid <= 0.05)) continue
       const activeIsoH = isoYScale * bMid.funnelHeight * rMaxMid
       let densityMod = 1.0
       let localHubMin = minDistHub
@@ -1110,7 +1108,7 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
       const volumeScale = tier === 2 ? 1.18 : (isWeb ? 1.15 : 1.08)
       const lambda = ((10.0 * isoXScale * stripDu * activeIsoH) / (effCellIso * effCellIso)) * densityMod * volumeScale
       const baseCount = Math.floor(lambda)
-      const count = baseCount + (prng() < (lambda - baseCount) ? 1 : 0)
+      const count = outer?.count ?? (baseCount + (prng() < (lambda - baseCount) ? 1 : 0))
       if (count <= 0) continue
 
       const thetaShift = prng() * Math.PI * 2.0
@@ -1118,7 +1116,7 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
         const thetaSlice = (Math.PI * 2.0) / count
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          const u = u0 + (0.06 + 0.88 * prng()) * stripDu
+          const u = outer ? outer.sample((k + prng()) / count) : u0 + (0.06 + 0.88 * prng()) * stripDu
           const bLoc = lut.getFunnelBounds(u)
           if (bLoc.funnelHeight * isoYScale < minIsoHeight * 0.82) continue
 
@@ -1206,6 +1204,7 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
             v_funnel,
             w_depth,
             r_norm,
+            rMaxLoc,
             isWeb,
             connectedCount: 0,
             layer,
@@ -1270,7 +1269,7 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
   })
 
   // Pass 3A: Tier-3 Delicate Web Connectors (tuck flush up to 99% outer cylinder border)
-  runTierPass({
+  const connectorPass = {
     uStart: 0.088,
     uEnd: 0.986,
     cellIso: 0.265 * cellScale,
@@ -1284,7 +1283,8 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
     isWeb: true,
     maxAttempts: 5,
     shellBias: true,
-  })
+  }
+  runTierPass(connectorPass)
 
   // Pass 3B: Tier-3 Volumetric Micro-Dust (scattered across hollow cylinder shell & sparse core)
   runTierPass({
@@ -1303,41 +1303,142 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
     shellBias: false,
   })
 
-  // Build dedicated 3D isotropic spatial grid over web nodes for true 3D Euclidean edge queries
+  // Add outer-arch connectors with a separate stream to preserve the existing samples and haze.
+  const outerStart = 0.55, outerEnd = 0.98
+  const cdf = new Float64Array(33)
+  const step = (outerEnd - outerStart) / (cdf.length - 1)
+  for (let i = 1; i < cdf.length; i++) {
+    const radius = 0.5 * lut.getFunnelBounds(outerStart + (i - 0.5) * step).funnelHeight
+    cdf[i] = cdf[i - 1] + Math.pow(Math.max(radius, 0.02), 0.75)
+  }
+  runTierPass({ ...connectorPass, uStart: outerStart, uEnd: outerEnd, maxAttempts: 24 }, createPrng(sign < 0 ? 104729 : 130363), {
+    count: Math.round(0.14 * rawNodes.filter(n => n.isWeb).length),
+    sample(draw) {
+      const target = draw * cdf[cdf.length - 1]
+      const i = cdf.findIndex(sum => sum > target)
+      return outerStart + (i - 1 + (target - cdf[i - 1]) / (cdf[i] - cdf[i - 1])) * step
+    },
+  })
+
+  // Reshape accepted samples before edge queries to preserve the node count and haze PRNG stream.
   const webGridCell = Math.max(0.28, 0.42 * envScale)
   const webGrid = new SpatialGrid3D(webGridCell, true)
+  const hubCandidates = []
   for (let i = 0; i < rawNodes.length; i++) {
-    if (rawNodes[i].isWeb) {
-      webGrid.insert(rawNodes[i].isoX, rawNodes[i].isoY, rawNodes[i].isoZ, i)
+    const n = rawNodes[i]
+    const split = Math.min(n.isWeb ? 0.49 : 0.46, 0.65 * n.rMaxLoc)
+    let rho
+    if (n.tier === 2) {
+      const hubMin = Math.min(0.65, 0.88 * n.rMaxLoc)
+      rho = hubMin + (n.rMaxLoc - hubMin) * n.r_norm / n.rMaxLoc
+      hubCandidates.push(n)
+    } else if (n.r_norm < split) {
+      rho = Math.min(0.52, n.rMaxLoc, Math.max(0.15, n.r_norm))
+    } else {
+      const shellMin = Math.min(0.62, n.rMaxLoc)
+      const shellT = (n.r_norm - split) / (n.rMaxLoc - split)
+      rho = shellMin + (n.rMaxLoc - shellMin) * Math.pow(shellT, 0.85)
     }
+
+    const radialScale = rho / n.r_norm
+    const dy = n.y0 * (radialScale - 1)
+    const dz = n.z0 * (radialScale - 1)
+    n.y0 += dy
+    n.z0 += dz
+    n.pos.y += dy
+    n.pos.z += dz
+    n.isoPos.y = n.isoY = n.pos.y * isoYScale
+    n.isoZ = n.z0 * isoYScale
+    n.v_funnel = n.y0 / n.R_u
+    n.w_depth = n.z0 / n.R_u
+    n.r_norm = rho
+    n.relativeCoord[1] = n.v_funnel
+    n.relativeCoord[2] = n.w_depth
+    n.relativeCoord[3] = rho
+    n.layer = n.w_depth > 0.25 ? 1.0 : (n.w_depth < -0.25 ? -1.0 : 0.0)
+    n.depthTier = n.layer > 0 ? 'fg' : (n.layer < 0 ? 'bg' : 'mid')
+    if (n.isWeb) webGrid.insert(n.isoX, n.isoY, n.isoZ, i)
+  }
+
+  hubCandidates.sort((a, b) => Math.abs(a.r_norm - 0.76) - Math.abs(b.r_norm - 0.76))
+  const hubs = []
+  const hubSpacing = (n) => cellScale * (0.46 + 0.09 * Math.min(1, n.R_u * isoYScale / envScale))
+  for (const n of hubCandidates) {
+    const spacing = hubSpacing(n)
+    const tooClose = hubs.some(hub => {
+      const distance = Math.hypot(n.isoX - hub.isoX, n.isoY - hub.isoY, n.isoZ - hub.isoZ)
+      return distance < Math.max(spacing, hubSpacing(hub))
+    })
+    if (!tooClose) {
+      hubs.push(n)
+      continue
+    }
+    // Use Tier-2 styling and retain the candidate's existing edge eligibility.
+    n.tier = 1
+    n.size = 4.5 + 2.4 * n.twinklePhase / (2 * Math.PI)
+    n.alpha = 0.64 + 0.24 * ((n.alpha - 0.95) / 0.05)
+    n.lineAlpha = 0.20 + 0.07 * ((n.lineAlpha - 0.36) / 0.08)
+    n.hubAccent = 0.24
+  }
+
+  // Seed fine anchors after shell shaping, starting farther out in tighter funnels.
+  const tipStart = lut.getFunnelBounds(0.04).funnelHeight >= 0.002 ? 0.038 : 0.047
+  const tipCount = 12
+  for (let i = 0; i < tipCount; i++) {
+    const u = tipStart + (0.158 - tipStart) * i / (tipCount - 1) + 0.0018 * Math.sin(1.7 * i + sign)
+    const bounds = lut.getFunnelBounds(u)
+    const radius = 0.5 * bounds.funnelHeight
+    if (radius <= 0) continue
+    const R_u = Math.max(radius, 0.002)
+    const theta = i * 2.399963 + sign * 0.73
+    const r = radius * (0.22 + 0.28 * (0.5 + 0.5 * Math.cos(i * 1.9 + sign)))
+    const y0 = r * Math.sin(theta), z0 = r * Math.cos(theta)
+    const x = sign * 10 * u, y = bounds.funnelCenterY + y0, z = bounds.funnelCenterZ + z0
+    const isoX = x * isoXScale, isoY = y * isoYScale, isoZ = z0 * isoYScale
+    const v_funnel = y0 / R_u, w_depth = z0 / R_u, r_norm = r / R_u
+    const layer = w_depth > 0.25 ? 1 : (w_depth < -0.25 ? -1 : 0)
+    const idx = rawNodes.length
+    rawNodes.push({
+      idx, pos: { x, y, z }, y0, z0, R_u, isoX, isoY, isoZ, isoPos: { x: isoX, y: isoY },
+      u, hu: Math.max(0.02, bounds.funnelHeight), v_funnel, w_depth, r_norm, layer,
+      depthTier: layer > 0 ? 'fg' : (layer < 0 ? 'bg' : 'mid'),
+      isWeb: true, connectedCount: 0, tier: 0, maxDeg: 3,
+      size: 2.1, alpha: 0.26, lineAlpha: 0.12, hubAccent: 0, twinklePhase: theta,
+      relativeCoord: [u, v_funnel, w_depth, r_norm], driftParams: [theta, i * 1.1, 1.0, 0.8],
+    })
+    webGrid.insert(isoX, isoY, isoZ, idx)
   }
 
   return { rawNodes, webGrid }
 }
 
-function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envScale) {
+const MAX_WEB_DEGREE = 5
+const MAX_FACET_DEGREE = 6
+const FACET_EDGE_BUDGET = 0.24
+
+function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envScale, sign) {
   const nCount = rawNodes.length
-  const maxDegreeCap = 6
-  const edgeCapacity = Math.max(64, Math.ceil(nCount * maxDegreeCap / 2))
-  const edges = {
+  const edgeCapacity = Math.max(64, Math.ceil(nCount * MAX_FACET_DEGREE / 2))
+  let edges = {
     length: 0,
     i: new Int32Array(edgeCapacity),
     j: new Int32Array(edgeCapacity),
     fallback: new Uint8Array(edgeCapacity),
   }
-  const adjacency = new Int32Array(nCount * maxDegreeCap)
+  let adjacency = new Int32Array(nCount * MAX_FACET_DEGREE)
   const edgeGrid = new EdgeGrid2D(Math.max(0.08, 0.24 * envScale), edgeCapacity)
   const sameSurfaceZBand = 0.44 * envScale
+  const hairpinCos = 0.94
 
   function hasEdge(i, j) {
     for (let k = 0; k < rawNodes[i].connectedCount; k++) {
-      if (adjacency[i * maxDegreeCap + k] === j) return true
+      if (adjacency[i * MAX_FACET_DEGREE + k] === j) return true
     }
     return false
   }
 
   // True 3D angular separation check prevents skinny acute triangles on the cylinder surface
-  function hasTightAngle3D(i, j, cosLimit = 0.88) {
+  function hasTightAngle3D(i, j) {
     const a = rawNodes[i]
     const b = rawNodes[j]
     const dx = b.isoX - a.isoX
@@ -1346,12 +1447,12 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
     const l2 = dx * dx + dy * dy + dz * dz
     if (l2 < 1e-8) return true
     for (let slot = 0; slot < a.connectedCount; slot++) {
-      const n = rawNodes[adjacency[i * maxDegreeCap + slot]]
+      const n = rawNodes[adjacency[i * MAX_FACET_DEGREE + slot]]
       const nx = n.isoX - a.isoX
       const ny = n.isoY - a.isoY
       const nz = n.isoZ - a.isoZ
       const dot = dx * nx + dy * ny + dz * nz
-      if (dot > 0 && dot * dot > cosLimit * cosLimit * l2 * (nx * nx + ny * ny + nz * nz)) {
+      if (dot > 0 && dot * dot > hairpinCos * hairpinCos * l2 * (nx * nx + ny * ny + nz * nz)) {
         return true
       }
     }
@@ -1369,21 +1470,23 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
     return midRNorm < 0.42 * avgEndR
   }
 
-  function tryAddEdge(i, j, allowCrossing = false, cosLimit = 0.88, isFallback = false, capOverride = maxDegreeCap, envMemo = null, memoIdx = -1) {
+  function tryAddEdge(i, j, allowCrossing = false, isFallback = false, capOverride = MAX_WEB_DEGREE, envMemo = null, memoIdx = -1) {
     if (i === j || hasEdge(i, j)) return false
     if (envMemo && envMemo[memoIdx] === 1) return false
     const a = rawNodes[i]
     const b = rawNodes[j]
     if (!a.isWeb || !b.isWeb) return false
-    const capA = Math.min(capOverride, a.maxDeg)
-    const capB = Math.min(capOverride, b.maxDeg)
+    const isFacet = capOverride === MAX_FACET_DEGREE
+    const capA = isFacet ? MAX_FACET_DEGREE : Math.min(capOverride, a.maxDeg)
+    const capB = isFacet ? MAX_FACET_DEGREE : Math.min(capOverride, b.maxDeg)
     if (a.connectedCount >= capA || b.connectedCount >= capB) return false
     if (isDiameterChord(a, b)) {
       if (envMemo) envMemo[memoIdx] = 1
       return false
     }
-    if (cosLimit < 1.0 && (hasTightAngle3D(i, j, cosLimit) || hasTightAngle3D(j, i, cosLimit))) return false
-    if (!allowCrossing && edgeGrid.hasCrossing(a.isoPos, b.isoPos, i, j, edges, rawNodes, false, null, sameSurfaceZBand)) return false
+    if ((isFacet || (a.connectedCount >= 2 && b.connectedCount >= 2)) && (hasTightAngle3D(i, j) || hasTightAngle3D(j, i))) return false
+    const crossingZBand = isFacet ? 0.18 * envScale : sameSurfaceZBand
+    if (!allowCrossing && edgeGrid.hasCrossing(a.isoPos, b.isoPos, i, j, edges, rawNodes, false, null, crossingZBand)) return false
     if (!segmentInsideFunnel(a, b, lut, 0.004)) {
       if (envMemo) envMemo[memoIdx] = 1
       return false
@@ -1394,8 +1497,8 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
     edges.j[edgeIdx] = j
     edges.fallback[edgeIdx] = isFallback ? 1 : 0
     edges.length++
-    adjacency[i * maxDegreeCap + rawNodes[i].connectedCount++] = j
-    adjacency[j * maxDegreeCap + rawNodes[j].connectedCount++] = i
+    adjacency[i * MAX_FACET_DEGREE + a.connectedCount++] = j
+    adjacency[j * MAX_FACET_DEGREE + b.connectedCount++] = i
     edgeGrid.insert(edgeIdx, a.isoPos, b.isoPos)
     return true
   }
@@ -1407,6 +1510,10 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
   let pairScore = new Float32Array(pairCapacity)
   let pairCount = 0
   const maxDu = 0.105 / Math.max(0.75, isoXScale)
+  const maxEdgeDistance = (a, b) => {
+    const avgHIso = 0.5 * (a.hu + b.hu) * isoYScale
+    return Math.min(0.68 * envScale, Math.max(0.20 * envScale, 0.52 * avgHIso))
+  }
 
   for (let i = 0; i < nCount; i++) {
     const nA = rawNodes[i]
@@ -1423,9 +1530,7 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
       const nB = rawNodes[j]
       if (!nB.isWeb || Math.abs(nA.u - nB.u) > maxDu) continue
 
-      const avgHIso = 0.5 * (nA.hu + nB.hu) * isoYScale
-      const maxEdgeDist = Math.min(0.68 * envScale, Math.max(0.20 * envScale, 0.52 * avgHIso))
-      if (dist3D > maxEdgeDist) continue
+      if (dist3D > maxEdgeDistance(nA, nB)) continue
 
       if (pairCount === pairA.length) {
         const nextLen = pairA.length * 2
@@ -1450,20 +1555,22 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
   // Pass A: Shortest-first 3D cylindrical surface backbone up to degree 4
   for (let p = 0; p < pairCount; p++) {
     const idx = order[p]
-    tryAddEdge(pairA[idx], pairB[idx], false, 0.88, false, 4, pairEnvRejected, idx)
+    tryAddEdge(pairA[idx], pairB[idx], false, false, 4, pairEnvRejected, idx)
   }
 
   // Pass B: Repair under-connected 3D vertices (< 2 edges) before triangulation closure
   let candIds = new Int32Array(128)
   let candDists = new Float64Array(128)
   function repairUnderConnected() {
-    const repairDu = 0.12 / Math.max(0.75, isoXScale)
     for (let pass = 0; pass < 3; pass++) {
+      // Widen the search only after both local repair passes fail.
+      const allowCross = pass === 2
+      const repairDu = (allowCross ? 0.24 : 0.12) / Math.max(0.75, isoXScale)
       for (let i = 0; i < nCount; i++) {
         const nA = rawNodes[i]
         if (!nA.isWeb || nA.connectedCount >= 2) continue
         const hIso = nA.hu * isoYScale
-        const searchR = Math.min(1.05 * envScale, Math.max(0.32 * envScale, 0.82 * hIso))
+        const searchR = allowCross ? 2.0 * envScale : Math.min(1.05 * envScale, Math.max(0.32 * envScale, 0.82 * hIso))
         const qCount = webGrid.queryRadius(nA.isoX, nA.isoY, nA.isoZ, searchR, rawNodes)
 
         let candCount = 0
@@ -1471,7 +1578,7 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
           const j = webGrid.queryIds[q]
           if (j === i || hasEdge(i, j)) continue
           const nB = rawNodes[j]
-          if (!nB.isWeb || nB.connectedCount >= nB.maxDeg || Math.abs(nA.u - nB.u) > repairDu) continue
+          if (!nB.isWeb || nB.connectedCount >= Math.min(nB.maxDeg, MAX_WEB_DEGREE) || Math.abs(nA.u - nB.u) > repairDu) continue
           const d = webGrid.queryDistances[q]
           if (candCount === candIds.length) {
             const nextIds = new Int32Array(candIds.length * 2)
@@ -1492,10 +1599,8 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
           candCount++
         }
 
-        const allowCross = pass >= 2
-        const cosLim = pass === 0 ? 0.92 : 0.97
         for (let c = 0; c < candCount && nA.connectedCount < 2; c++) {
-          tryAddEdge(i, candIds[c], allowCross, cosLim, pass > 0, maxDegreeCap)
+          tryAddEdge(i, candIds[c], allowCross, pass > 0)
         }
       }
     }
@@ -1506,12 +1611,51 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
   for (let p = 0; p < pairCount; p++) {
     const idx = order[p]
     if (!pairEnvRejected[idx]) {
-      tryAddEdge(pairA[idx], pairB[idx], false, 0.90, false, maxDegreeCap, pairEnvRejected, idx)
+      tryAddEdge(pairA[idx], pairB[idx], false, false, MAX_WEB_DEGREE, pairEnvRejected, idx)
     }
   }
 
   // Pass D: Final repair ensuring every web node has >= 2 edges
   repairUnderConnected()
+
+  // Include feeder links in the adjacency and crossing checks before adding facets.
+  const baseLength = edges.length
+  edges = addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut)
+  const finalAdjacency = new Int32Array(rawNodes.length * MAX_FACET_DEGREE)
+  finalAdjacency.set(adjacency)
+  adjacency = finalAdjacency
+  const degreeTail = rawNodes.map(n => n.connectedCount)
+  for (let e = edges.length - 1; e >= baseLength; e--) {
+    const a = edges.i[e], b = edges.j[e]
+    adjacency[a * MAX_FACET_DEGREE + --degreeTail[a]] = b
+    adjacency[b * MAX_FACET_DEGREE + --degreeTail[b]] = a
+    edgeGrid.insert(e, rawNodes[a].isoPos, rawNodes[b].isoPos)
+  }
+
+  const edgeLimit = edges.length + Math.floor(FACET_EDGE_BUDGET * edges.length)
+  const distance = (a, b) => Math.hypot(a.isoX - b.isoX, a.isoY - b.isoY, a.isoZ - b.isoZ)
+  const candidates = new Map()
+  for (const center of rawNodes) {
+    const offset = center.idx * MAX_FACET_DEGREE
+    for (let p = 0; p < center.connectedCount; p++) {
+      for (let q = p + 1; q < center.connectedCount; q++) {
+        const a = Math.min(adjacency[offset + p], adjacency[offset + q])
+        const b = Math.max(adjacency[offset + p], adjacency[offset + q])
+        const key = a * rawNodes.length + b
+        if (candidates.has(key) || hasEdge(a, b)) continue
+        const from = rawNodes[a], to = rawNodes[b]
+        if (Math.abs(from.r_norm - to.r_norm) > 0.50 || from.y0 * to.y0 + from.z0 * to.z0 < 0) continue
+        const d = distance(from, to)
+        if (d <= maxEdgeDistance(from, to) && d <= 1.25 * Math.max(distance(center, from), distance(center, to))) {
+          candidates.set(key, { a, b, d })
+        }
+      }
+    }
+  }
+  for (const { a, b } of [...candidates.values()].sort((a, b) => a.d - b.d)) {
+    if (edges.length >= edgeLimit) break
+    tryAddEdge(a, b, false, false, MAX_FACET_DEGREE)
+  }
 
   return edges
 }
@@ -1642,6 +1786,7 @@ function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut
     if (edgeKeys.has(key)) return false
     const a = rawNodes[i]
     const b = rawNodes[j]
+    if (a.connectedCount >= MAX_WEB_DEGREE || b.connectedCount >= MAX_WEB_DEGREE) return false
     if (!segmentInsideFunnel(a, b, lut, 0.001)) return false
     edgeKeys.add(key)
     extraEdges.push({ i, j })
@@ -1677,6 +1822,18 @@ function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut
   pushTrunkEdge(feederIndices[5], feederIndices[10])
   pushTrunkEdge(feederIndices[5], feederIndices[11])
   pushTrunkEdge(feederIndices[5], feederIndices[12])
+
+  // Repair sparse feeder knots before the relay fan-out fills their neighbors.
+  for (const i of feederIndices) {
+    const a = rawNodes[i]
+    if (a.connectedCount >= 2) continue
+    const distance = (j) => Math.hypot(a.isoX - rawNodes[j].isoX, a.isoY - rawNodes[j].isoY, a.isoZ - rawNodes[j].isoZ)
+    const candidates = feederIndices.slice().sort((j, k) => distance(j) - distance(k))
+    for (const j of candidates) {
+      if (a.connectedCount >= 2) break
+      pushTrunkEdge(i, j)
+    }
+  }
 
   // Stage 3: Ensure every web node in the narrow inner neck (u in [0.08, 0.40]) has >= 2 distinct forward
   // links so routes never dead-end or choke through 3-4 bottleneck nodes before fanning into the wide pocket.
@@ -1766,9 +1923,10 @@ function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut
   if (extraEdges.length === 0) return edges
 
   const totalEdges = edges.length + extraEdges.length
-  const nextI = new Int32Array(totalEdges)
-  const nextJ = new Int32Array(totalEdges)
-  const nextFallback = new Uint8Array(totalEdges)
+  const capacity = totalEdges + Math.floor(FACET_EDGE_BUDGET * totalEdges)
+  const nextI = new Int32Array(capacity)
+  const nextJ = new Int32Array(capacity)
+  const nextFallback = new Uint8Array(capacity)
   nextI.set(edges.i.subarray(0, edges.length))
   nextJ.set(edges.j.subarray(0, edges.length))
   nextFallback.set(edges.fallback.subarray(0, edges.length))
@@ -1812,8 +1970,7 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
 
   // 1. Stratified organic constellation sampling + non-indexed synaptic spiderweb
   const { rawNodes, webGrid } = sampleStratifiedNodes(sign, safeXScale, isoYScale, lut, prng, envScale)
-  const baseEdges = connectNeuralNodes(rawNodes, webGrid, lut, safeXScale, isoYScale, envScale)
-  const edges = addInnerTipFeederTrunk(rawNodes, baseEdges, sign, safeXScale, isoYScale, lut)
+  const edges = connectNeuralNodes(rawNodes, webGrid, lut, safeXScale, isoYScale, envScale, sign)
 
   // Keep connected web nodes + background micro-dust sparkles
   const visibleNodes = rawNodes.filter(n => !n.isWeb || n.connectedCount > 0)
