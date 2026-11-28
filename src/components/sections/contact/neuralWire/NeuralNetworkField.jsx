@@ -1,4 +1,4 @@
-import { memo, useMemo, useEffect, useLayoutEffect, useContext, useSyncExternalStore } from 'react'
+import { memo, useMemo, useEffect, useLayoutEffect, useContext, useRef, useSyncExternalStore } from 'react'
 import * as THREE from 'three'
 import { useThree, useFrame, createPortal } from '@react-three/fiber'
 import { H_VAL } from './generateWireGeometry'
@@ -337,10 +337,13 @@ const NeuralLineShader = {
     attribute vec4 aPartnerBias;
     attribute vec4 aPartnerCos;
     attribute vec4 aPartnerSin;
-    attribute vec3 aSignalPath;
+    attribute vec4 aRouteIds;
+    attribute vec4 aRouteProgress;
     uniform vec2 uLineOpacityPair;
+    uniform float uSignalActive;
+    uniform vec4 uPulseRouteIds[2];
     varying float vAlpha;
-    varying float vPocketMask;
+    varying float vImpulseMask;
     varying float vHubAccent;
     varying vec2 vPulseTrig;
     varying vec4 vStrandY;
@@ -348,13 +351,20 @@ const NeuralLineShader = {
     varying float vPxPerLocalY;
     varying float vWallPadPx;
     varying float vFeatherPx;
-    varying vec3 vSignalPath;
+    varying float vImpulseFeatherPx;
+    varying vec4 vEdgeProg;
+    varying float vWingSide;
     ${POCKET_MASK_GLSL}
 
     float evalLineWallMask(float distPx, float halfHPx, out float outPad, out float outFeather) {
       outPad = -min(2.0, 0.020 * halfHPx);
       outFeather = clamp(0.075 * halfHPx, 4.5, 11.0);
       return smoothstep(outPad, outPad + outFeather, distPx);
+    }
+
+    float evalImpulseWallMask(float distPx, float halfHPx, float padPx, float restFeather, out float outImpFeather) {
+      outImpFeather = min(restFeather, max(0.35, 0.85 * halfHPx));
+      return smoothstep(padPx, padPx + outImpFeather, distPx);
     }
 
     void main() {
@@ -371,14 +381,39 @@ const NeuralLineShader = {
       float padPartner, featherPartner;
       float maskPartner = evalLineWallMask(distInPartnerPx, halfHP, padPartner, featherPartner);
 
+      float impFeatherSelf, impFeatherPartner;
+      float impMaskSelf = evalImpulseWallMask(p.distInsidePx, p.halfHeightPx, padSelf, featherSelf, impFeatherSelf);
+      float impMaskPartner = evalImpulseWallMask(distInPartnerPx, halfHP, padPartner, featherPartner, impFeatherPartner);
+
       // Fade both endpoints smoothly together near moving boundaries so zero floating stub edges linger
       float jointMask = min(maskSelf, maskPartner);
+      float impJointMask = min(impMaskSelf, impMaskPartner);
       float lineOpacity = mix(uLineOpacityPair.x, uLineOpacityPair.y, aWingSide);
       float strandYield = mix(0.68, 1.0, smoothstep(0.0, 0.052 * p.radius + 0.010, p.minStrandDist));
       float pocketMask = lineOpacity * flowPocketVisibility() * jointMask * strandYield;
 
+      // Vertex-matched active slot progress (constant route ID across edge endpoints, interpolated progress along edge)
+      vec4 edgeProg = vec4(-2.0);
+      if (uSignalActive > 0.5) {
+        vec4 activeIds = aWingSide < 0.5 ? uPulseRouteIds[0] : uPulseRouteIds[1];
+        for (int s = 0; s < 4; s++) {
+          float targetId = s == 0 ? activeIds.x : (s == 1 ? activeIds.y : (s == 2 ? activeIds.z : activeIds.w));
+          if (targetId >= -0.5) {
+            float matchedProg = -2.0;
+            if (aRouteIds.x >= -0.5 && abs(aRouteIds.x - targetId) < 0.25) matchedProg = aRouteProgress.x;
+            else if (aRouteIds.y >= -0.5 && abs(aRouteIds.y - targetId) < 0.25) matchedProg = aRouteProgress.y;
+            else if (aRouteIds.z >= -0.5 && abs(aRouteIds.z - targetId) < 0.25) matchedProg = aRouteProgress.z;
+            else if (aRouteIds.w >= -0.5 && abs(aRouteIds.w - targetId) < 0.25) matchedProg = aRouteProgress.w;
+            if (s == 0) edgeProg.x = matchedProg;
+            else if (s == 1) edgeProg.y = matchedProg;
+            else if (s == 2) edgeProg.z = matchedProg;
+            else edgeProg.w = matchedProg;
+          }
+        }
+      }
+
       vAlpha = aLineStyle.x * pocketMask;
-      vPocketMask = pocketMask;
+      vImpulseMask = lineOpacity * impJointMask * strandYield;
       vHubAccent = aLineStyle.y;
       vPulseTrig = aLineStyle.zw;
       vStrandY = p.strandY;
@@ -386,21 +421,24 @@ const NeuralLineShader = {
       vPxPerLocalY = p.pxPerLocalY;
       vWallPadPx = padSelf;
       vFeatherPx = featherSelf;
-      vSignalPath = aSignalPath;
+      vImpulseFeatherPx = impFeatherSelf;
+      vEdgeProg = edgeProg;
+      vWingSide = aWingSide;
       gl_Position = projectionMatrix * p.view;
     }
   `,
   fragmentShader: `
     uniform vec2 uFlowTrig;
-    uniform float uSignalPhase;
     uniform float uSignalActive;
+    uniform vec4 uPulseProgress[2];
+    uniform vec4 uPulseIntensity[2];
     uniform float uRestingLineScale;
     uniform float uSignalGain;
     uniform vec3 uBaseColor;
     uniform vec3 uMidColor;
     uniform vec3 uHotColor;
     varying float vAlpha;
-    varying float vPocketMask;
+    varying float vImpulseMask;
     varying float vHubAccent;
     varying vec2 vPulseTrig;
     varying vec4 vStrandY;
@@ -408,16 +446,39 @@ const NeuralLineShader = {
     varying float vPxPerLocalY;
     varying float vWallPadPx;
     varying float vFeatherPx;
-    varying vec3 vSignalPath;
+    varying float vImpulseFeatherPx;
+    varying vec4 vEdgeProg;
+    varying float vWingSide;
     ${SAFE_MAX_GLSL}
+
+    void evalSlotPacket(float segProg, float headPos, float slotInt, inout float totalPacket, inout float totalHead) {
+      if (segProg < -0.5 || slotInt <= 0.001) return;
+      float delta = headPos - segProg;
+      if (delta >= -0.014 && delta <= 0.115) {
+        float headCore = delta < 0.0 ? smoothstep(-0.014, 0.0, delta) : exp(-92.0 * delta);
+        float silkyTail = delta < 0.0
+          ? smoothstep(-0.014, 0.0, delta)
+          : exp(-27.0 * delta) * (1.0 - smoothstep(0.075, 0.115, delta));
+        float shape = delta < 0.0 ? headCore : (0.42 * headCore + 0.58 * silkyTail);
+        float tipIgnite = smoothstep(0.0, 0.07, segProg);
+        float outerExit = 1.0 - smoothstep(0.90, 1.0, segProg);
+        float gate = tipIgnite * outerExit * slotInt;
+        totalPacket += shape * gate;
+        totalHead += headCore * gate;
+      }
+    }
+
     void main() {
-      if (vAlpha <= 0.001) discard;
+      float maxEdgeProg = max(max(vEdgeProg.x, vEdgeProg.y), max(vEdgeProg.z, vEdgeProg.w));
+      bool hasActivePulse = uSignalActive > 0.5 && maxEdgeProg >= -0.5;
+      if (vAlpha <= 0.001 && !hasActivePulse) discard;
+
       float lo = -safeMax(safeMax(-vStrandY.x, -vStrandY.y), safeMax(-vStrandY.z, -vStrandY.w));
       float hi =  safeMax(safeMax( vStrandY.x,  vStrandY.y), safeMax( vStrandY.z,  vStrandY.w));
       float fragDistInPx = min(vLocalY - lo, hi - vLocalY) * vPxPerLocalY;
       float fragWallMask = smoothstep(vWallPadPx, vWallPadPx + max(vFeatherPx, 1.0), fragDistInPx);
       float alphaMask = vAlpha * fragWallMask * uRestingLineScale;
-      if (alphaMask <= 0.001 && uSignalActive <= 0.5) discard;
+      if (alphaMask <= 0.001 && !hasActivePulse) discard;
 
       vec2 pDir = vPulseTrig * inversesqrt(max(dot(vPulseTrig, vPulseTrig), 1e-4));
       float pulse = 0.5 + 0.5 * dot(pDir, uFlowTrig);
@@ -427,22 +488,24 @@ const NeuralLineShader = {
       vec3 lineCol = mix(webTint, uHotColor, clamp((0.12 + 0.10 * pulse) * accent, 0.0, 0.25));
 
       float packet = 0.0;
-      if (uSignalActive > 0.5 && vSignalPath.z > 0.001) {
-        float cycle = fract(vSignalPath.y + vSignalPath.z * uSignalPhase);
-        float headPos = cycle / 0.62;
-        float delta = headPos - vSignalPath.x;
-        if (delta >= -0.018 && delta <= 0.115) {
-          float shape = delta < 0.0
-            ? smoothstep(-0.018, 0.0, delta)
-            : exp(-34.0 * delta) * (1.0 - smoothstep(0.075, 0.115, delta));
-          float endFade = smoothstep(0.0, 0.07, vSignalPath.x) * (1.0 - smoothstep(0.91, 1.0, vSignalPath.x));
-          packet = shape * endFade;
-        }
+      float headWeight = 0.0;
+      if (hasActivePulse) {
+        vec4 activeProg = vWingSide < 0.5 ? uPulseProgress[0] : uPulseProgress[1];
+        vec4 activeInt = vWingSide < 0.5 ? uPulseIntensity[0] : uPulseIntensity[1];
+        evalSlotPacket(vEdgeProg.x, activeProg.x, activeInt.x, packet, headWeight);
+        evalSlotPacket(vEdgeProg.y, activeProg.y, activeInt.y, packet, headWeight);
+        evalSlotPacket(vEdgeProg.z, activeProg.z, activeInt.z, packet, headWeight);
+        evalSlotPacket(vEdgeProg.w, activeProg.w, activeInt.w, packet, headWeight);
+        packet = clamp(packet, 0.0, 1.25);
+        headWeight = clamp(headWeight, 0.0, 1.0);
       }
 
-      vec3 signalTint = mix(uMidColor, uHotColor, 0.76);
-      vec3 outCol = mix(lineCol, signalTint, clamp(packet * 0.90, 0.0, 1.0));
-      float impulseGlow = packet * vPocketMask * fragWallMask * 0.36 * uSignalGain;
+      float fragImpulseWall = smoothstep(vWallPadPx, vWallPadPx + max(vImpulseFeatherPx, 0.35), fragDistInPx);
+      vec3 trailTint = mix(uMidColor, uHotColor, 0.68);
+      vec3 headTint = mix(uMidColor, uHotColor, 0.90);
+      vec3 signalTint = mix(trailTint, headTint, headWeight);
+      vec3 outCol = mix(lineCol, signalTint, clamp(packet * 0.92, 0.0, 1.0));
+      float impulseGlow = packet * vImpulseMask * fragImpulseWall * 0.38 * uSignalGain;
       float outAlpha = clamp(alphaMask * pulseBoost + impulseGlow, 0.0, 0.58);
       if (outAlpha <= 0.001) discard;
       gl_FragColor = vec4(outCol, outAlpha);
@@ -453,12 +516,15 @@ const NeuralLineShader = {
 const NeuralPointShader = {
   vertexShader: `
     attribute vec4 aPointStyle;
-    attribute vec3 aSignalPath;
+    attribute vec4 aRouteIds;
+    attribute vec4 aRouteProgress;
     uniform vec2 uGlowIntensityPair;
     uniform vec2 uNodeScalePair;
     uniform float uTime;
-    uniform float uSignalPhase;
     uniform float uSignalActive;
+    uniform vec4 uPulseRouteIds[2];
+    uniform vec4 uPulseProgress[2];
+    uniform vec4 uPulseIntensity[2];
     varying float vAlpha;
     varying float vTier;
     varying float vTwinkle;
@@ -497,18 +563,37 @@ const NeuralPointShader = {
         : mix(0.72, 1.0, smoothstep(0.0, 0.058 * p.radius + 0.012, p.minStrandDist));
 
       float relay = 0.0;
-      if (uSignalActive > 0.5 && aSignalPath.z > 0.001) {
-        float cycle = fract(aSignalPath.y + aSignalPath.z * uSignalPhase);
-        float headPos = cycle / 0.62;
-        float delta = headPos - aSignalPath.x;
-        float hitUp = smoothstep(-0.025, 0.002, delta);
-        float hitDown = 1.0 - smoothstep(0.002, 0.060, delta);
-        float endFade = smoothstep(0.0, 0.06, aSignalPath.x) * (1.0 - smoothstep(0.92, 1.0, aSignalPath.x));
-        relay = hitUp * hitDown * endFade;
+      if (uSignalActive > 0.5) {
+        vec4 activeIds = aWingSide < 0.5 ? uPulseRouteIds[0] : uPulseRouteIds[1];
+        vec4 activeProg = aWingSide < 0.5 ? uPulseProgress[0] : uPulseProgress[1];
+        vec4 activeInt = aWingSide < 0.5 ? uPulseIntensity[0] : uPulseIntensity[1];
+        for (int s = 0; s < 4; s++) {
+          float targetId = s == 0 ? activeIds.x : (s == 1 ? activeIds.y : (s == 2 ? activeIds.z : activeIds.w));
+          float slotInt = s == 0 ? activeInt.x : (s == 1 ? activeInt.y : (s == 2 ? activeInt.z : activeInt.w));
+          if (targetId >= -0.5 && slotInt > 0.001) {
+            float nodeProg = -2.0;
+            if (aRouteIds.x >= -0.5 && abs(aRouteIds.x - targetId) < 0.25) nodeProg = aRouteProgress.x;
+            else if (aRouteIds.y >= -0.5 && abs(aRouteIds.y - targetId) < 0.25) nodeProg = aRouteProgress.y;
+            else if (aRouteIds.z >= -0.5 && abs(aRouteIds.z - targetId) < 0.25) nodeProg = aRouteProgress.z;
+            else if (aRouteIds.w >= -0.5 && abs(aRouteIds.w - targetId) < 0.25) nodeProg = aRouteProgress.w;
+            if (nodeProg >= -0.5) {
+              float headPos = s == 0 ? activeProg.x : (s == 1 ? activeProg.y : (s == 2 ? activeProg.z : activeProg.w));
+              float delta = headPos - nodeProg;
+              if (delta >= -0.016 && delta <= 0.095) {
+                float hitUp = smoothstep(-0.016, 0.004, delta);
+                float hitDown = delta > 0.004
+                  ? exp(-34.0 * (delta - 0.004)) * (1.0 - smoothstep(0.055, 0.095, delta))
+                  : 1.0;
+                float endFade = smoothstep(0.0, 0.07, nodeProg) * (1.0 - smoothstep(0.90, 1.0, nodeProg));
+                relay = max(relay, hitUp * hitDown * endFade * slotInt);
+              }
+            }
+          }
+        }
       }
-      vRelay = relay;
+      vRelay = clamp(relay, 0.0, 1.0);
 
-      vAlpha = aPointStyle.y * glowIntensity * depthCue * flowPocketVisibility() * pocketMask * strandYield * (1.0 + 0.28 * relay);
+      vAlpha = aPointStyle.y * glowIntensity * depthCue * flowPocketVisibility() * pocketMask * strandYield * (1.0 + 0.30 * vRelay);
       vTwinkle = vTier > 1.5
         ? (1.0 + 0.10 * sin(mod(uTime, 12.0) * 0.52359878 + aPointStyle.w))
         : 1.0;
@@ -518,7 +603,7 @@ const NeuralPointShader = {
         gl_PointSize = 0.0;
         vAlpha = 0.0;
       } else {
-        gl_PointSize = min(pointCss * (1.0 + 0.08 * relay) * safeDpr, 40.0);
+        gl_PointSize = min(pointCss * (1.0 + 0.08 * vRelay) * safeDpr, 40.0);
       }
       gl_Position = projectionMatrix * p.view;
     }
@@ -675,6 +760,195 @@ function buildGeometryKey(config) {
   )
 }
 
+const PULSE_SLOT_COUNT = 4
+const PULSE_TAIL_LENGTH = 0.105
+const PULSE_RECENT_HISTORY = 6
+const LEFT_INITIAL_PHASES = [0.06, 0.36, 0.68, -0.42]
+const RIGHT_INITIAL_PHASES = [0.22, 0.52, 0.82, -0.24]
+
+function nextSchedulerRand(wingState) {
+  const next = (wingState.prngState * 16807) % 2147483647
+  wingState.prngState = next
+  return (next - 1) / 2147483646
+}
+
+function createWingScheduler(seed) {
+  const slots = []
+  for (let i = 0; i < PULSE_SLOT_COUNT; i++) {
+    slots.push({
+      routeId: -1,
+      lane: -1,
+      progress: 0.0,
+      speed: 0.18,
+      intensity: 0.0,
+      cooldown: 0.0,
+    })
+  }
+  return {
+    seed,
+    prngState: seed,
+    slots,
+    recentIds: new Int32Array(PULSE_RECENT_HISTORY).fill(-1),
+    recentPtr: 0,
+    laneScratch: [0, 0, 0],
+    candidatesScratch: [],
+  }
+}
+
+function recordRecentRoute(wingState, routeId) {
+  wingState.recentIds[wingState.recentPtr] = routeId
+  wingState.recentPtr = (wingState.recentPtr + 1) % PULSE_RECENT_HISTORY
+}
+
+function isRouteActiveOrRecent(wingState, routeId, excludeSlotIdx, checkRecent) {
+  const slots = wingState.slots
+  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
+    if (s !== excludeSlotIdx && slots[s].routeId === routeId) return true
+  }
+  if (checkRecent) {
+    const rec = wingState.recentIds
+    for (let r = 0; r < rec.length; r++) {
+      if (rec[r] === routeId) return true
+    }
+  }
+  return false
+}
+
+function pickNextRouteForSlot(wingState, routes, slotIdx, preferredLane = -1) {
+  if (!routes || routes.length === 0) return
+  const slots = wingState.slots
+  const laneCounts = wingState.laneScratch
+  laneCounts[0] = 0
+  laneCounts[1] = 0
+  laneCounts[2] = 0
+  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
+    if (s !== slotIdx && slots[s].routeId >= 0) {
+      const ln = slots[s].lane
+      if (ln >= 0 && ln <= 2) laneCounts[ln]++
+    }
+  }
+
+  let targetLane = preferredLane
+  if (targetLane < 0 || targetLane > 2) {
+    let minCount = Math.min(laneCounts[0], laneCounts[1], laneCounts[2])
+    const tiedLanes = []
+    for (let l = 0; l < 3; l++) {
+      if (laneCounts[l] === minCount) tiedLanes.push(l)
+    }
+    targetLane = tiedLanes[Math.floor(nextSchedulerRand(wingState) * tiedLanes.length) % tiedLanes.length]
+  }
+
+  const cands = wingState.candidatesScratch
+  // Tier 1: matching target lane + not active + not recently used
+  cands.length = 0
+  for (let i = 0; i < routes.length; i++) {
+    const rt = routes[i]
+    if (rt.lane === targetLane && !isRouteActiveOrRecent(wingState, rt.id, slotIdx, true)) {
+      cands.push(rt)
+    }
+  }
+  // Tier 2: any lane + not active + not recently used
+  if (cands.length === 0) {
+    for (let i = 0; i < routes.length; i++) {
+      const rt = routes[i]
+      if (!isRouteActiveOrRecent(wingState, rt.id, slotIdx, true)) {
+        cands.push(rt)
+      }
+    }
+  }
+  // Tier 3: matching target lane + not active
+  if (cands.length === 0) {
+    for (let i = 0; i < routes.length; i++) {
+      const rt = routes[i]
+      if (rt.lane === targetLane && !isRouteActiveOrRecent(wingState, rt.id, slotIdx, false)) {
+        cands.push(rt)
+      }
+    }
+  }
+  // Tier 4: any route not active on another slot, or any route
+  if (cands.length === 0) {
+    for (let i = 0; i < routes.length; i++) {
+      if (!isRouteActiveOrRecent(wingState, routes[i].id, slotIdx, false)) cands.push(routes[i])
+    }
+  }
+  if (cands.length === 0) {
+    for (let i = 0; i < routes.length; i++) cands.push(routes[i])
+  }
+
+  const chosen = cands[Math.floor(nextSchedulerRand(wingState) * cands.length) % cands.length]
+  const duration = 4.6 + 1.8 * nextSchedulerRand(wingState)
+  const slot = slots[slotIdx]
+  slot.routeId = chosen.id
+  slot.lane = chosen.lane
+  slot.progress = 0.0
+  slot.speed = 1.0 / duration
+  slot.intensity = 0.90 + 0.22 * nextSchedulerRand(wingState)
+  slot.cooldown = 0.0
+  recordRecentRoute(wingState, chosen.id)
+}
+
+function seedWingScheduler(wingState, routes, initialPhases) {
+  wingState.prngState = wingState.seed
+  wingState.recentIds.fill(-1)
+  wingState.recentPtr = 0
+  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
+    const slot = wingState.slots[s]
+    slot.routeId = -1
+    slot.lane = -1
+    slot.progress = 0.0
+    slot.intensity = 0.0
+    slot.cooldown = 0.0
+  }
+  if (!routes || routes.length === 0) return
+
+  const initialLanes = [0, 1, 2, wingState.seed % 2 === 0 ? 0 : 2]
+  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
+    const phase = initialPhases[s]
+    if (phase < 0) {
+      wingState.slots[s].cooldown = Math.abs(phase)
+    } else {
+      pickNextRouteForSlot(wingState, routes, s, initialLanes[s])
+      wingState.slots[s].progress = phase
+    }
+  }
+}
+
+function stepWingScheduler(wingState, routes, dt) {
+  if (!routes || routes.length === 0 || dt <= 0) return
+  const slots = wingState.slots
+  for (let s = 0; s < PULSE_SLOT_COUNT; s++) {
+    const slot = slots[s]
+    if (slot.routeId < 0) {
+      slot.cooldown -= dt
+      if (slot.cooldown <= 0.0) {
+        pickNextRouteForSlot(wingState, routes, s, -1)
+      }
+    } else {
+      slot.progress += slot.speed * dt
+      if (slot.progress >= 1.0 + PULSE_TAIL_LENGTH) {
+        slot.routeId = -1
+        slot.lane = -1
+        slot.progress = 0.0
+        slot.intensity = 0.0
+        slot.cooldown = 0.32 + 0.86 * nextSchedulerRand(wingState)
+      }
+    }
+  }
+}
+
+function syncSchedulerUniforms(wingState, idx, routeIdsUniform, progressUniform, intensityUniform, signalActive) {
+  if (!signalActive) {
+    routeIdsUniform.value[idx].set(-1, -1, -1, -1)
+    progressUniform.value[idx].set(0, 0, 0, 0)
+    intensityUniform.value[idx].set(0, 0, 0, 0)
+    return
+  }
+  const s = wingState.slots
+  routeIdsUniform.value[idx].set(s[0].routeId, s[1].routeId, s[2].routeId, s[3].routeId)
+  progressUniform.value[idx].set(s[0].progress, s[1].progress, s[2].progress, s[3].progress)
+  intensityUniform.value[idx].set(s[0].intensity, s[1].intensity, s[2].intensity, s[3].intensity)
+}
+
 const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
   themeConfig = {},
   nodeScale = 1.0,
@@ -774,6 +1048,10 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       linesGeo: mergedLinesGeo,
       pointsGeo: mergedPointsGeo,
       hazeGeo: mergedHazeGeo,
+      routes: {
+        left: leftField.linesGeo?.userData?.routes ?? [],
+        right: rightField.linesGeo?.userData?.routes ?? [],
+      },
       signalPathCounts: {
         left: leftField.linesGeo?.userData?.signalPathCount ?? 0,
         right: rightField.linesGeo?.userData?.signalPathCount ?? 0,
@@ -799,6 +1077,50 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     }
   }, [mergedGeometries])
 
+  // Shared GPU uniform arrays for active dynamic impulse slots (index 0 = left wing, index 1 = right wing)
+  const pulseRouteIdsUniform = useMemo(
+    () => ({ value: [new THREE.Vector4(-1, -1, -1, -1), new THREE.Vector4(-1, -1, -1, -1)] }),
+    []
+  )
+  const pulseProgressUniform = useMemo(
+    () => ({ value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] }),
+    []
+  )
+  const pulseIntensityUniform = useMemo(
+    () => ({ value: [new THREE.Vector4(0, 0, 0, 0), new THREE.Vector4(0, 0, 0, 0)] }),
+    []
+  )
+
+  const schedulerRef = useRef(null)
+  if (!schedulerRef.current) {
+    schedulerRef.current = {
+      left: createWingScheduler(7919),
+      right: createWingScheduler(104729),
+      lastTime: 0,
+      seededRoutesRef: null,
+    }
+  }
+
+  useLayoutEffect(() => {
+    const sched = schedulerRef.current
+    if (sched.seededRoutesRef !== mergedGeometries.routes) {
+      seedWingScheduler(sched.left, mergedGeometries.routes.left, LEFT_INITIAL_PHASES)
+      seedWingScheduler(sched.right, mergedGeometries.routes.right, RIGHT_INITIAL_PHASES)
+      sched.seededRoutesRef = mergedGeometries.routes
+      sched.lastTime = timeUniform.value
+    }
+    const active = !prefersReducedMotion
+    syncSchedulerUniforms(sched.left, 0, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, active)
+    syncSchedulerUniforms(sched.right, 1, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, active)
+  }, [
+    mergedGeometries,
+    prefersReducedMotion,
+    timeUniform,
+    pulseRouteIdsUniform,
+    pulseProgressUniform,
+    pulseIntensityUniform,
+  ])
+
   // 4. Create the 3 ShaderMaterials once per mount (uniforms updated in-place via useLayoutEffect)
   const lineMat = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -806,8 +1128,10 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
         uLineOpacityPair: { value: new THREE.Vector2(0.9, 0.9) },
         uInnerFadePair: { value: new THREE.Vector2(0.04, 0.04) },
         uFlowTrig: flowTrigUniform,
-        uSignalPhase: { value: 0 },
         uSignalActive: { value: 1 },
+        uPulseRouteIds: pulseRouteIdsUniform,
+        uPulseProgress: pulseProgressUniform,
+        uPulseIntensity: pulseIntensityUniform,
         uRestingLineScale: { value: 1 },
         uSignalGain: { value: 1 },
         uBaseColor: { value: new THREE.Color() },
@@ -823,7 +1147,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       depthTest: false,
       depthWrite: false,
     })
-  }, [flowTrigUniform])
+  }, [flowTrigUniform, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform])
 
   const pointMat = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -833,8 +1157,10 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
         uInnerFadePair: { value: new THREE.Vector2(0.04, 0.04) },
         uFlowTrig: flowTrigUniform,
         uTime: timeUniform,
-        uSignalPhase: { value: 0 },
         uSignalActive: { value: 1 },
+        uPulseRouteIds: pulseRouteIdsUniform,
+        uPulseProgress: pulseProgressUniform,
+        uPulseIntensity: pulseIntensityUniform,
         uRestingLineScale: { value: 1 },
         uSignalGain: { value: 1 },
         uBaseColor: { value: new THREE.Color() },
@@ -850,13 +1176,32 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       depthTest: false,
       depthWrite: false,
     })
-  }, [flowTrigUniform, timeUniform])
+  }, [flowTrigUniform, timeUniform, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform])
 
   useFrame(() => {
+    const sched = schedulerRef.current
     const t = timeUniform.value
-    const wrapped = (((t % 36.0) + 36.0) % 36.0) / 36.0
-    lineMat.uniforms.uSignalPhase.value = wrapped
-    pointMat.uniforms.uSignalPhase.value = wrapped
+    if (prefersReducedMotion) {
+      sched.lastTime = t
+      syncSchedulerUniforms(sched.left, 0, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, false)
+      syncSchedulerUniforms(sched.right, 1, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, false)
+      return
+    }
+    let dt = t - sched.lastTime
+    if (dt < 0) {
+      seedWingScheduler(sched.left, mergedGeometries.routes.left, LEFT_INITIAL_PHASES)
+      seedWingScheduler(sched.right, mergedGeometries.routes.right, RIGHT_INITIAL_PHASES)
+      dt = Math.min(t, 0.05)
+    } else if (dt > 0.25) {
+      dt = 0.05
+    }
+    sched.lastTime = t
+    if (dt > 0) {
+      stepWingScheduler(sched.left, mergedGeometries.routes.left, dt)
+      stepWingScheduler(sched.right, mergedGeometries.routes.right, dt)
+    }
+    syncSchedulerUniforms(sched.left, 0, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, true)
+    syncSchedulerUniforms(sched.right, 1, pulseRouteIdsUniform, pulseProgressUniform, pulseIntensityUniform, true)
   })
 
   const hazeMat = useMemo(() => {
@@ -955,10 +1300,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       Math.min(1.12, leftGlow * 0.80),
       Math.min(1.12, rightGlow * 0.80)
     )
-    const initT = timeUniform.value
-    const initWrapped = (((initT % 36.0) + 36.0) % 36.0) / 36.0
     const signalActive = prefersReducedMotion ? 0.0 : 1.0
-    lineMat.uniforms.uSignalPhase.value = initWrapped
     lineMat.uniforms.uSignalActive.value = signalActive
     lineMat.uniforms.uRestingLineScale.value = neuralLineScale
     lineMat.uniforms.uSignalGain.value = neuralSignalGain
@@ -967,7 +1309,6 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       Math.min(1.32, rightGlow * 0.96 * neuralPointScale)
     )
     pointMat.uniforms.uNodeScalePair.value.set(leftNS, rightNS)
-    pointMat.uniforms.uSignalPhase.value = initWrapped
     pointMat.uniforms.uSignalActive.value = signalActive
     hazeMat.uniforms.uHazeGlowPair.value.set(
       Math.min(1.06, leftGlow * 0.76 * neuralHazeScale),

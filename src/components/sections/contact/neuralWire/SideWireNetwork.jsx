@@ -27,7 +27,7 @@ const CANVAS_CAMERA_CONFIG = { position: [0, 0, 8], fov: 45 }
 const CANVAS_STYLE = { pointerEvents: 'none', width: '100%', height: '100%' }
 
 function subscribeDocumentVisibility(callback) {
-  if (typeof document === 'undefined') return () => {}
+  if (typeof document === 'undefined') return () => { }
   document.addEventListener('visibilitychange', callback)
   return () => document.removeEventListener('visibilitychange', callback)
 }
@@ -38,6 +38,24 @@ function getDocumentHidden() {
 
 function getServerDocumentHidden() {
   return false
+}
+
+function subscribeDataTheme(callback) {
+  if (typeof document === 'undefined') return () => { }
+  const observer = new MutationObserver(callback)
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  })
+  return () => observer.disconnect()
+}
+
+function getDomTheme() {
+  return typeof document !== 'undefined' ? document.documentElement.getAttribute('data-theme') : null
+}
+
+function getServerDomTheme() {
+  return null
 }
 
 // Framer Motion's installed hook snapshots this preference only at mount.
@@ -371,30 +389,13 @@ export default memo(function SideWireNetwork({ isInView = true }) {
     }
   }, [isInView, isDocumentHidden])
 
-  const [domTheme, setDomTheme] = useState(() => {
-    if (typeof document !== 'undefined') {
-      return document.documentElement.getAttribute('data-theme') || null
-    }
-    return null
-  })
+  const domTheme = useSyncExternalStore(
+    subscribeDataTheme,
+    getDomTheme,
+    getServerDomTheme
+  )
 
-  // Listen to <html> data-theme attribute mutations
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    const observer = new MutationObserver(() => {
-      const docTheme = document.documentElement.getAttribute('data-theme')
-      if (docTheme) {
-        setDomTheme(docTheme)
-      }
-    })
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme'],
-    })
-    return () => observer.disconnect()
-  }, [])
-
-  const activeTheme = domTheme || themeCtx?.theme || 'obsidian'
+  const activeTheme = themeCtx?.theme || domTheme || 'obsidian'
 
   if (!webglSupported) return null
 

@@ -133,7 +133,7 @@ function mergeWirePathLayers(layers) {
         if (silkPalette) {
           const r = col[i3]
           const g = col[i3 + 1]
-          const mapped = (r > 0.35 && g < 0.35)
+          const mapped = (r > 0.25 && g < 0.35)
             ? silkPalette.secondary
             : (g > 0.6 ? silkPalette.bright : silkPalette.primary)
           outR = mapped.r
@@ -223,6 +223,10 @@ export const WirePaths = memo(function WirePaths({
     () => new THREE.Color(themeConfig.primaryWire || '#0048ff'),
     [themeConfig.primaryWire]
   )
+  const secondaryColor = useMemo(
+    () => new THREE.Color(themeConfig.secondaryWire || themeConfig.primaryWire || '#6366f1'),
+    [themeConfig.secondaryWire, themeConfig.primaryWire]
+  )
   const connectionColor = useMemo(
     () => new THREE.Color(themeConfig.connectionNode || themeConfig.primaryWire || '#30d5ff'),
     [themeConfig.connectionNode, themeConfig.primaryWire]
@@ -238,13 +242,21 @@ export const WirePaths = memo(function WirePaths({
     () => highlightColor.clone().lerp(primaryColor, 0.35),
     [highlightColor, primaryColor]
   )
+  const secondaryAuraColor = useMemo(
+    () => secondaryColor.clone().lerp(primaryColor, 0.25).multiplyScalar(0.55),
+    [secondaryColor, primaryColor]
+  )
+  const secondaryCoreColor = useMemo(
+    () => highlightColor.clone().lerp(secondaryColor.clone().lerp(primaryColor, 0.25), 0.35),
+    [highlightColor, secondaryColor, primaryColor]
+  )
   const silkPalette = useMemo(
     () => ({
       primary: sfColor,
       bright: connectionColor.clone().multiplyScalar(0.88),
-      secondary: sfColor,
+      secondary: secondaryColor.clone().multiplyScalar(0.84),
     }),
-    [sfColor, connectionColor]
+    [sfColor, connectionColor, secondaryColor]
   )
 
   // Merge the 5 static additive line layers into 1 single LineSegments BufferGeometry per wing
@@ -254,14 +266,14 @@ export const WirePaths = memo(function WirePaths({
       { geo: sfGeo, defaultColor: sfColor, alphaMultiplier: 1.0 * glow, silkPalette },
       // 2. Hero 0, 1, 3: 6-Pass Primary Aura (alpha mult: 0.32 * glow * auraScale)
       { geo: pHaloGeo, defaultColor: haloColor, alphaMultiplier: 0.32 * glow * auraScale },
-      // 3. Hero 2: 6-Pass Primary Aura (alpha mult: 0.42 * glow * auraScale)
-      { geo: dGeo, defaultColor: haloColor, alphaMultiplier: 0.42 * glow * auraScale },
-      // 4. Hero 2: Primary Energy Core (alpha mult: 0.95)
-      { geo: sGeo, defaultColor: coreColor, alphaMultiplier: 0.95 },
+      // 3. Hero 2: 6-Pass Secondary Accent Aura (alpha mult: 0.42 * glow * auraScale)
+      { geo: dGeo, defaultColor: secondaryAuraColor, alphaMultiplier: 0.42 * glow * auraScale },
+      // 4. Hero 2: Secondary Accent Energy Core (alpha mult: 0.95)
+      { geo: sGeo, defaultColor: secondaryCoreColor, alphaMultiplier: 0.95 },
       // 5. Hero 0, 1, 3: Crisp Energy Core (alpha mult: 0.95)
       { geo: pCoreGeo, defaultColor: coreColor, alphaMultiplier: 0.95 },
     ])
-  }, [sfGeo, pHaloGeo, dGeo, sGeo, pCoreGeo, glow, auraScale, sfColor, haloColor, coreColor, silkPalette])
+  }, [sfGeo, pHaloGeo, dGeo, sGeo, pCoreGeo, glow, auraScale, sfColor, haloColor, coreColor, secondaryAuraColor, secondaryCoreColor, silkPalette])
 
   // Single unified ShaderMaterial for all 5 line layers (uniforms updated in-place)
   const mergedMat = useMemo(() => {

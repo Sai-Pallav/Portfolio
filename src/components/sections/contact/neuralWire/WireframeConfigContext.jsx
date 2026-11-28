@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo, s
 export const DEFAULT_SIDE_CONFIG = {
   // ── Dimensions ──
   lengthMultiplier: 1,       // Total wireframe length multiplier
-  breadthMultiplier: 1.35,   // Vertical ribbon breadth / height multiplier
+  breadthMultiplier: 1.4,    // Vertical ribbon breadth / height multiplier
   depthMultiplier: 0.3,      // Depth thickness multiplier
   strandSpread: 1.8,         // Companion silk strands width/spread multiplier (refined balance)
   stringCount: 14,           // Number of strings/strands per hero wave
@@ -18,7 +18,7 @@ export const DEFAULT_SIDE_CONFIG = {
   outerFade: 0.13,           // Soft feather fade distance at outer tips
 
   // ── Waves & Amplitude ──
-  amplitude: 1.9,            // Wave oscillation amplitude multiplier
+  amplitude: 2,              // Wave oscillation amplitude multiplier
   frequency: 0.85,           // Wave frequency / cycles multiplier
   zAmplitude: 1.5,           // Z-depth wave oscillation multiplier
   wingSweep: 0,              // Wing sweep curvature (outer parabolic lift)

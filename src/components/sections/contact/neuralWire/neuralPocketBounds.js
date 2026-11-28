@@ -1448,48 +1448,288 @@ function getCachedRibbonBoundsLUT(H, config) {
   return lut
 }
 
+const MAX_ROUTES_PER_ELEMENT = 4
+const TARGET_ROUTE_COUNT = 21
+
 /**
- * Traces 6-8 outward-moving connected synaptic routes from inner tip (u ≈ 0) to outer edge (u ≈ 1),
- * preferring unvisited edges/nodes so signals fan naturally across upper, middle, and lower pockets.
+ * Adds a lightweight converged inner-tip trunk stem (u <= 0.06 -> earliest constellation nodes)
+ * strictly inside the swept funnel so every synaptic route originates uniformly from the inner tip
+ * without altering the resting interior web (masked below u ≈ 0.07 by flowPocketVisibility).
  */
-function traceOutwardSignalPaths(rawNodes, validEdgeIndices, edges, prng, isLeft) {
+function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut) {
+  const tipSpecs = [
+    // 6 Converged inner-tip root origins (strictly u <= 0.06, 6 * 4 = 24 route capacity)
+    { u: 0.038, v: 0.40 },
+    { u: 0.040, v: 0.0 },
+    { u: 0.042, v: -0.40 },
+    { u: 0.054, v: 0.58 },
+    { u: 0.056, v: 0.0 },
+    { u: 0.058, v: -0.58 },
+    // 7 Transitional inner-funnel relay knots bridging across upper, mid, and lower lanes (7 * 4 = 28 capacity)
+    { u: 0.073, v: 0.70 },
+    { u: 0.075, v: 0.40 },
+    { u: 0.077, v: 0.16 },
+    { u: 0.076, v: 0.0 },
+    { u: 0.078, v: -0.16 },
+    { u: 0.075, v: -0.40 },
+    { u: 0.073, v: -0.70 },
+  ]
+
+  const baseNodeCount = rawNodes.length
+  const feederIndices = []
+  for (let s = 0; s < tipSpecs.length; s++) {
+    const spec = tipSpecs[s]
+    const bLoc = lut.getFunnelBounds(spec.u)
+    const vClamped = THREE.MathUtils.clamp(spec.v, -0.78, 0.78)
+    const x = sign * 10.0 * spec.u
+    const y = bLoc.funnelCenterY + vClamped * 0.5 * bLoc.funnelHeight
+    const z = bLoc.funnelCenterZ
+    const isoX = x * isoXScale
+    const isoY = y * isoYScale
+    const id = rawNodes.length
+    rawNodes.push({
+      idx: id,
+      pos: { x, y, z },
+      isoX,
+      isoY,
+      isoPos: { x: isoX, y: isoY },
+      u: spec.u,
+      hu: Math.max(0.002, bLoc.funnelHeight),
+      v_funnel: vClamped,
+      w_depth: 0.0,
+      r_norm: Math.abs(vClamped),
+      isWeb: true,
+      connectedCount: 0,
+      layer: 0.0,
+      depthTier: 'mid',
+      tier: 0,
+      maxDeg: 8,
+      alpha: 0.28,
+      lineAlpha: 0.13,
+      hubAccent: 0.0,
+      size: 2.1,
+      twinklePhase: s * 0.7,
+      relativeCoord: [spec.u, vClamped, 0.0, Math.abs(vClamped)],
+      isInnerTrunk: true,
+    })
+    feederIndices.push(id)
+  }
+
+  const extraEdges = []
+  const edgeKeys = new Set()
+  for (let k = 0; k < edges.length; k++) {
+    const a = edges.i[k]
+    const b = edges.j[k]
+    edgeKeys.add(a < b ? `${a}:${b}` : `${b}:${a}`)
+  }
+
+  function pushTrunkEdge(i, j) {
+    if (i === j) return false
+    const key = i < j ? `${i}:${j}` : `${j}:${i}`
+    if (edgeKeys.has(key)) return false
+    const a = rawNodes[i]
+    const b = rawNodes[j]
+    if (!segmentInsideFunnel(a.u, a.pos.y, b.u, b.pos.y, lut, 0.001)) return false
+    edgeKeys.add(key)
+    extraEdges.push({ i, j })
+    a.connectedCount++
+    b.connectedCount++
+    return true
+  }
+
+  // Stage 1: Connect u ~ 0.04 origins -> u ~ 0.056 origins and directly to u ~ 0.075 relay knots
+  // so 0..2 never bottleneck on 3..5's 4-route node cap.
+  pushTrunkEdge(feederIndices[0], feederIndices[3])
+  pushTrunkEdge(feederIndices[0], feederIndices[4])
+  pushTrunkEdge(feederIndices[0], feederIndices[6])
+  pushTrunkEdge(feederIndices[0], feederIndices[7])
+  pushTrunkEdge(feederIndices[1], feederIndices[4])
+  pushTrunkEdge(feederIndices[1], feederIndices[8])
+  pushTrunkEdge(feederIndices[1], feederIndices[9])
+  pushTrunkEdge(feederIndices[1], feederIndices[10])
+  pushTrunkEdge(feederIndices[2], feederIndices[4])
+  pushTrunkEdge(feederIndices[2], feederIndices[5])
+  pushTrunkEdge(feederIndices[2], feederIndices[11])
+  pushTrunkEdge(feederIndices[2], feederIndices[12])
+
+  // Stage 2: Connect u ~ 0.056 origins -> u ~ 0.075 relay knots
+  pushTrunkEdge(feederIndices[3], feederIndices[6])
+  pushTrunkEdge(feederIndices[3], feederIndices[7])
+  pushTrunkEdge(feederIndices[3], feederIndices[8])
+  pushTrunkEdge(feederIndices[4], feederIndices[7])
+  pushTrunkEdge(feederIndices[4], feederIndices[8])
+  pushTrunkEdge(feederIndices[4], feederIndices[9])
+  pushTrunkEdge(feederIndices[4], feederIndices[10])
+  pushTrunkEdge(feederIndices[4], feederIndices[11])
+  pushTrunkEdge(feederIndices[5], feederIndices[10])
+  pushTrunkEdge(feederIndices[5], feederIndices[11])
+  pushTrunkEdge(feederIndices[5], feederIndices[12])
+
+  // Stage 3: Ensure every web node in the narrow inner neck (u in [0.08, 0.40]) has >= 2 distinct forward
+  // links so routes never dead-end or choke through 3-4 bottleneck nodes before fanning into the wide pocket.
+  const neckNodes = []
+  const neckOutDeg = new Int32Array(baseNodeCount)
+  const neckInDeg = new Int32Array(baseNodeCount)
+  for (let k = 0; k < edges.length; k++) {
+    const a = edges.i[k]
+    const b = edges.j[k]
+    if (a < baseNodeCount && b < baseNodeCount) {
+      if (rawNodes[b].u > rawNodes[a].u + 0.001) {
+        neckOutDeg[a]++
+        neckInDeg[b]++
+      } else if (rawNodes[a].u > rawNodes[b].u + 0.001) {
+        neckOutDeg[b]++
+        neckInDeg[a]++
+      }
+    }
+  }
+  for (let i = 0; i < baseNodeCount; i++) {
+    const n = rawNodes[i]
+    if (n.isWeb && n.connectedCount > 0 && n.u >= 0.082 && n.u <= 0.40) {
+      neckNodes.push(n)
+    }
+  }
+  neckNodes.sort((a, b) => a.u - b.u)
+  for (let i = 0; i < neckNodes.length; i++) {
+    const src = neckNodes[i]
+    if (neckOutDeg[src.idx] >= 2) continue
+    const cands = []
+    for (let j = i + 1; j < neckNodes.length; j++) {
+      const dst = neckNodes[j]
+      const du = dst.u - src.u
+      if (du <= 0.006 || du > 0.11) continue
+      const d = Math.hypot(dst.isoX - src.isoX, dst.isoY - src.isoY)
+      if (d > 0.72) continue
+      cands.push({ idx: dst.idx, score: d + 0.28 * Math.abs(dst.v_funnel - src.v_funnel) + 0.30 * neckInDeg[dst.idx] })
+    }
+    cands.sort((a, b) => a.score - b.score)
+    for (let c = 0; c < cands.length && neckOutDeg[src.idx] < 2; c++) {
+      const dstIdx = cands[c].idx
+      if (pushTrunkEdge(src.idx, dstIdx)) {
+        neckOutDeg[src.idx]++
+        neckInDeg[dstIdx]++
+      }
+    }
+  }
+
+  // Stage 4: Distribute u ~ 0.075 relay knots across distinct early constellation web nodes (u in [0.082, 0.28])
+  const earlyTargets = []
+  for (let i = 0; i < baseNodeCount; i++) {
+    const n = rawNodes[i]
+    if (n.isWeb && n.connectedCount > 0 && neckOutDeg[i] > 0 && n.u >= 0.082 && n.u <= 0.28) {
+      earlyTargets.push(n)
+    }
+  }
+  const targetFanIn = new Int32Array(baseNodeCount)
+
+  for (let f = 6; f < feederIndices.length; f++) {
+    const src = rawNodes[feederIndices[f]]
+    const candidates = []
+    for (let t = 0; t < earlyTargets.length; t++) {
+      const dst = earlyTargets[t]
+      if (dst.u <= src.u + 0.008) continue
+      const d = Math.hypot(dst.isoX - src.isoX, dst.isoY - src.isoY)
+      const dv = Math.abs(dst.v_funnel - src.v_funnel)
+      candidates.push({ idx: dst.idx, d, dv })
+    }
+    let linked = 0
+    for (let pass = 0; pass < 2 && linked < 5; pass++) {
+      candidates.sort((a, b) => {
+        const sA = a.d + 0.45 * a.dv + targetFanIn[a.idx] * 1.15
+        const sB = b.d + 0.45 * b.dv + targetFanIn[b.idx] * 1.15
+        return sA - sB
+      })
+      for (let c = 0; c < candidates.length && linked < 5; c++) {
+        const dstIdx = candidates[c].idx
+        if (pass === 0 && targetFanIn[dstIdx] > 0) continue
+        if (pushTrunkEdge(src.idx, dstIdx)) {
+          targetFanIn[dstIdx]++
+          linked++
+        }
+      }
+    }
+  }
+
+  if (extraEdges.length === 0) return edges
+
+  const totalEdges = edges.length + extraEdges.length
+  const nextI = new Int32Array(totalEdges)
+  const nextJ = new Int32Array(totalEdges)
+  const nextFallback = new Uint8Array(totalEdges)
+  nextI.set(edges.i.subarray(0, edges.length))
+  nextJ.set(edges.j.subarray(0, edges.length))
+  nextFallback.set(edges.fallback.subarray(0, edges.length))
+  for (let k = 0; k < extraEdges.length; k++) {
+    nextI[edges.length + k] = extraEdges[k].i
+    nextJ[edges.length + k] = extraEdges[k].j
+    nextFallback[edges.length + k] = 0
+  }
+  return {
+    length: totalEdges,
+    i: nextI,
+    j: nextJ,
+    fallback: nextFallback,
+  }
+}
+
+/**
+ * Traces 16–24 distinct outward-flowing full-span synaptic routes per wing:
+ * - Every route starts strictly at u <= 0.06 and advances monotonically outward to u >= 0.94.
+ * - Balanced coverage across upper (lane 0), central (lane 1), and lower (lane 2) wing arches.
+ * - Parameterized by cumulative isotropic arc-length [0.0 -> 1.0] for uniform physical speed.
+ * - Packs up to 4 route memberships per wire and per star vertex with zero extra geometry.
+ */
+function traceOutwardSignalPaths(rawNodes, validEdgeIndices, edges, prng) {
   const nCount = rawNodes.length
   const eCount = validEdgeIndices.length
-  const adj = Array.from({ length: nCount }, () => [])
+  const forwardAdj = Array.from({ length: nCount }, () => [])
 
   for (let k = 0; k < eCount; k++) {
     const eIdx = validEdgeIndices[k]
     const i = edges.i[eIdx]
     const j = edges.j[eIdx]
-    adj[i].push({ edgePos: k, other: j })
-    adj[j].push({ edgePos: k, other: i })
+    const uI = rawNodes[i].u
+    const uJ = rawNodes[j].u
+    if (uJ > uI + 0.001) {
+      forwardAdj[i].push({ edgePos: k, other: j })
+    } else if (uI > uJ + 0.001) {
+      forwardAdj[j].push({ edgePos: k, other: i })
+    }
   }
 
-  const edgeUsed = new Uint8Array(eCount)
-  const nodeUsed = new Uint8Array(nCount)
-  const edgeSignal = new Array(eCount).fill(null)
-  const nodeSignal = new Array(nCount).fill(null)
+  const edgeRouteIds = Array.from({ length: eCount }, () => [])
+  const edgeSlotData = Array.from({ length: eCount }, () => [])
+  const nodeSlotData = Array.from({ length: nCount }, () => [])
+  const edgeBodySets = []
+  const routes = []
 
-  const innerSeeds = rawNodes
-    .filter((n) => n.isWeb && n.connectedCount > 0 && n.u >= 0.08 && n.u <= 0.32)
-    .sort((a, b) => a.u - b.u)
+  const startSeeds = rawNodes
+    .filter((n) => n.isWeb && n.connectedCount > 0 && n.u <= 0.06 && forwardAdj[n.idx].length > 0)
+    .sort((a, b) => a.u - b.u || a.v_funnel - b.v_funnel)
 
-  const targetLanes = [-0.74, -0.48, -0.22, 0.02, 0.24, 0.48, 0.74]
-  const speedOptions = [3.0, 4.0, 5.0]
-  const laneFilled = new Uint8Array(targetLanes.length)
-  let tracedCount = 0
+  // Interleaved lane schedule (7 upper, 7 mid, 7 lower = 21 target routes)
+  const laneSpecs = []
+  const upperTargets = [0.76, 0.42, 0.62, 0.32, 0.84, 0.50, 0.68]
+  const midTargets = [0.0, -0.16, 0.16, -0.08, 0.08, -0.22, 0.22]
+  const lowerTargets = [-0.76, -0.42, -0.62, -0.32, -0.84, -0.50, -0.68]
+  for (let b = 0; b < 7; b++) {
+    laneSpecs.push({ lane: 0, targetV: upperTargets[b], swayAmp: (b % 2 === 0 ? 0.14 : -0.12), swayPhase: b * 1.1 })
+    laneSpecs.push({ lane: 1, targetV: midTargets[b], swayAmp: (b % 2 === 0 ? 0.16 : -0.16), swayPhase: b * 1.3 + 0.5 })
+    laneSpecs.push({ lane: 2, targetV: lowerTargets[b], swayAmp: (b % 2 === 0 ? -0.14 : 0.12), swayPhase: b * 1.1 + 0.9 })
+  }
 
   const dist = new Float64Array(nCount)
   const parentNode = new Int32Array(nCount)
   const parentEdge = new Int32Array(nCount)
   const closed = new Uint8Array(nCount)
-  const heapNodes = []
-  const heapCosts = []
+  const heapCap = Math.max(256, nCount * 4)
+  const heapNodes = new Int32Array(heapCap)
+  const heapCosts = new Float64Array(heapCap)
+  let heapLen = 0
 
   function heapPush(nodeIdx, cost) {
-    let idx = heapNodes.length
-    heapNodes.push(nodeIdx)
-    heapCosts.push(cost)
+    if (heapLen >= heapCap) return
+    let idx = heapLen++
     while (idx > 0) {
       const p = (idx - 1) >> 1
       if (heapCosts[p] <= cost) break
@@ -1503,15 +1743,16 @@ function traceOutwardSignalPaths(rawNodes, validEdgeIndices, edges, prng, isLeft
 
   function heapPop() {
     const topNode = heapNodes[0]
-    const lastNode = heapNodes.pop()
-    const lastCost = heapCosts.pop()
-    if (heapNodes.length > 0) {
+    const lastIdx = --heapLen
+    if (lastIdx > 0) {
+      const lastNode = heapNodes[lastIdx]
+      const lastCost = heapCosts[lastIdx]
       let idx = 0
-      const half = heapNodes.length >> 1
+      const half = lastIdx >> 1
       while (idx < half) {
         let child = (idx << 1) + 1
         const right = child + 1
-        if (right < heapNodes.length && heapCosts[right] < heapCosts[child]) {
+        if (right < lastIdx && heapCosts[right] < heapCosts[child]) {
           child = right
         }
         if (lastCost <= heapCosts[child]) break
@@ -1525,13 +1766,12 @@ function traceOutwardSignalPaths(rawNodes, validEdgeIndices, edges, prng, isLeft
     return topNode
   }
 
-  function findOutwardPath(seedIdx, targetV, allowEdgeReuse) {
+  function findFullSpanPath(seedIdx, targetV, swayAmp, swayPhase, bodyReuseScale) {
     dist.fill(Infinity)
     parentNode.fill(-1)
     parentEdge.fill(-1)
     closed.fill(0)
-    heapNodes.length = 0
-    heapCosts.length = 0
+    heapLen = 0
 
     dist[seedIdx] = 0
     heapPush(seedIdx, 0)
@@ -1539,52 +1779,60 @@ function traceOutwardSignalPaths(rawNodes, validEdgeIndices, edges, prng, isLeft
     let bestGoal = -1
     let bestGoalScore = Infinity
 
-    while (heapNodes.length > 0) {
+    while (heapLen > 0) {
+      if (heapCosts[0] >= bestGoalScore) break
       const currIdx = heapPop()
       if (closed[currIdx]) continue
       closed[currIdx] = 1
 
       const curr = rawNodes[currIdx]
-      if (curr.u >= 0.86) {
-        bestGoal = currIdx
-        break
-      }
-      if (curr.u >= 0.76) {
-        const goalScore = dist[currIdx] + (0.92 - curr.u) * 4.0 + Math.abs(curr.v_funnel - targetV) * 2.0
+      if (curr.u >= 0.94) {
+        const goalPenalty =
+          nodeSlotData[currIdx].length * 3.0 +
+          Math.abs(curr.v_funnel - targetV) * 2.4 +
+          Math.max(0.0, 0.965 - curr.u) * 2.0
+        const goalScore = dist[currIdx] + goalPenalty
         if (goalScore < bestGoalScore) {
           bestGoalScore = goalScore
           bestGoal = currIdx
         }
+        continue
       }
 
-      const neighbors = adj[currIdx]
+      const neighbors = forwardAdj[currIdx]
       for (let m = 0; m < neighbors.length; m++) {
         const nb = neighbors[m]
-        if (closed[nb.other]) continue
-        const isEdgeReused = edgeUsed[nb.edgePos] === 1
-        if (isEdgeReused && !allowEdgeReuse) continue
+        const otherIdx = nb.other
+        if (closed[otherIdx]) continue
+        const edgeUse = edgeRouteIds[nb.edgePos].length
+        if (edgeUse >= MAX_ROUTES_PER_ELEMENT) continue
+        const nodeUse = nodeSlotData[otherIdx].length
 
-        const other = rawNodes[nb.other]
-        const du = other.u - curr.u
-        if (du < -0.015) continue
-
-        const stepLen = Math.max(0.02, Math.hypot(other.isoX - curr.isoX, other.isoY - curr.isoY))
-        const lanePenalty = 2.6 * Math.abs(other.v_funnel - targetV)
-        const reuseNodePenalty = nodeUsed[other.idx] ? 3.2 : 0.0
-        const reuseEdgePenalty = isEdgeReused ? 12.0 : 0.0
-        const backPenalty = du <= 0.001 ? 2.5 : 0.0
-        const hubBonus = other.tier === 2 ? -0.15 : 0.0
+        const other = rawNodes[otherIdx]
+        const stepLen = Math.max(0.012, Math.hypot(other.isoX - curr.isoX, other.isoY - curr.isoY))
+        const uMid = 0.5 * (curr.u + other.u)
+        const ramp = THREE.MathUtils.smoothstep(other.u, 0.055, 0.28)
+        const guideV = THREE.MathUtils.clamp(
+          targetV * ramp + swayAmp * Math.sin(swayPhase + other.u * Math.PI * 2.0) * Math.sin(other.u * Math.PI),
+          -0.95,
+          0.95
+        )
+        const lanePenalty = 1.9 * Math.abs(other.v_funnel - guideV)
+        const bodyWeight = uMid > 0.14 ? bodyReuseScale : 0.04
+        const reuseEdgePenalty = edgeUse * (4.4 * bodyWeight + 0.14)
+        const reuseNodePenalty = nodeUse * nodeUse * (2.6 * bodyWeight + 0.08)
+        const hubBonus = other.tier === 2 ? -0.10 : 0.0
 
         const edgeCost = Math.max(
-          0.005,
-          stepLen * (1.0 + lanePenalty + reuseNodePenalty + backPenalty + hubBonus) + reuseEdgePenalty
+          0.004,
+          stepLen * (1.0 + lanePenalty + hubBonus) + reuseEdgePenalty + reuseNodePenalty
         )
         const nextDist = dist[currIdx] + edgeCost
-        if (nextDist < dist[other.idx]) {
-          dist[other.idx] = nextDist
-          parentNode[other.idx] = currIdx
-          parentEdge[other.idx] = nb.edgePos
-          heapPush(other.idx, nextDist)
+        if (nextDist < dist[otherIdx]) {
+          dist[otherIdx] = nextDist
+          parentNode[otherIdx] = currIdx
+          parentEdge[otherIdx] = nb.edgePos
+          heapPush(otherIdx, nextDist)
         }
       }
     }
@@ -1605,82 +1853,112 @@ function traceOutwardSignalPaths(rawNodes, validEdgeIndices, edges, prng, isLeft
 
     revNodes.reverse()
     revEdges.reverse()
+
+    const firstNode = rawNodes[revNodes[0]]
+    const lastNode = rawNodes[revNodes[revNodes.length - 1]]
+    if (firstNode.u > 0.06 || lastNode.u < 0.94) return null
+
     return { pathNodes: revNodes, pathEdges: revEdges }
   }
 
-  for (let pass = 0; pass < 2 && tracedCount < targetLanes.length; pass++) {
-    const allowEdgeReuse = pass === 1
-    for (let laneIdx = 0; laneIdx < targetLanes.length; laneIdx++) {
-      if (laneFilled[laneIdx]) continue
-      const targetV = targetLanes[laneIdx]
-
-      // Rank top inner seed candidates near target lane
-      const rankedSeeds = []
-      for (let s = 0; s < innerSeeds.length; s++) {
-        const cand = innerSeeds[s]
-        if (pass === 0 && nodeUsed[cand.idx]) continue
-        const hasOut = adj[cand.idx].some((e) => (!edgeUsed[e.edgePos] || allowEdgeReuse) && rawNodes[e.other].u > cand.u)
-        if (!hasOut) continue
-        const score = -Math.abs(cand.v_funnel - targetV * 0.65) - 2.0 * cand.u - (nodeUsed[cand.idx] ? 3.0 : 0.0)
-        rankedSeeds.push({ idx: cand.idx, score })
+  function isRouteDistinct(pathEdges, threshold = 0.78) {
+    const bodyEdges = []
+    for (let s = 0; s < pathEdges.length; s++) {
+      const e = pathEdges[s]
+      const uMid = 0.5 * (rawNodes[e.from].u + rawNodes[e.to].u)
+      if (uMid > 0.24) bodyEdges.push(e.edgePos)
+    }
+    if (bodyEdges.length === 0) return false
+    for (let r = 0; r < edgeBodySets.length; r++) {
+      const existing = edgeBodySets[r]
+      let shared = 0
+      for (let b = 0; b < bodyEdges.length; b++) {
+        if (existing.has(bodyEdges[b])) shared++
       }
-      rankedSeeds.sort((a, b) => b.score - a.score)
+      if (shared / bodyEdges.length > threshold) return false
+    }
+    return true
+  }
 
-      let found = null
-      for (let c = 0; c < Math.min(3, rankedSeeds.length); c++) {
-        found = findOutwardPath(rankedSeeds[c].idx, targetV, allowEdgeReuse)
-        if (found) break
+  function commitRoute(found, laneSpec) {
+    const { pathNodes, pathEdges } = found
+    const cumDist = new Float64Array(pathNodes.length)
+    for (let s = 0; s < pathEdges.length; s++) {
+      const nA = rawNodes[pathEdges[s].from]
+      const nB = rawNodes[pathEdges[s].to]
+      cumDist[s + 1] = cumDist[s] + Math.max(1e-4, Math.hypot(nB.isoX - nA.isoX, nB.isoY - nA.isoY))
+    }
+    const totalDist = Math.max(1e-4, cumDist[pathNodes.length - 1])
+    const routeId = routes.length
+
+    const bodySet = new Set()
+    for (let s = 0; s < pathEdges.length; s++) {
+      const step = pathEdges[s]
+      const uMid = 0.5 * (rawNodes[step.from].u + rawNodes[step.to].u)
+      if (uMid > 0.24) bodySet.add(step.edgePos)
+      edgeRouteIds[step.edgePos].push(routeId)
+      edgeSlotData[step.edgePos].push({
+        routeId,
+        from: step.from,
+        to: step.to,
+        progFrom: cumDist[s] / totalDist,
+        progTo: cumDist[s + 1] / totalDist,
+      })
+    }
+
+    for (let s = 0; s < pathNodes.length; s++) {
+      const nSlots = nodeSlotData[pathNodes[s]]
+      if (nSlots.length < MAX_ROUTES_PER_ELEMENT) {
+        nSlots.push({
+          routeId,
+          prog: cumDist[s] / totalDist,
+        })
       }
-      if (!found) continue
+    }
 
-      const { pathNodes, pathEdges } = found
-      const cumDist = new Float64Array(pathNodes.length)
-      for (let s = 0; s < pathEdges.length; s++) {
-        const nA = rawNodes[pathEdges[s].from]
-        const nB = rawNodes[pathEdges[s].to]
-        cumDist[s + 1] = cumDist[s] + Math.max(1e-4, Math.hypot(nB.isoX - nA.isoX, nB.isoY - nA.isoY))
-      }
-      const totalDist = Math.max(1e-4, cumDist[pathNodes.length - 1])
+    edgeBodySets.push(bodySet)
+    routes.push({
+      id: routeId,
+      lane: laneSpec.lane,
+      startU: rawNodes[pathNodes[0]].u,
+      endU: rawNodes[pathNodes[pathNodes.length - 1]].u,
+      totalDist,
+      nodeCount: pathNodes.length,
+    })
+  }
 
-      const speedCycles = speedOptions[(tracedCount + (isLeft ? 0 : 1)) % speedOptions.length]
-      const phaseOffset = ((tracedCount + (isLeft ? 0.14 : 0.61) + 0.22 * prng()) / targetLanes.length) % 1.0
+  // Pass 1 & Pass 2: Trace diverse routes across all 21 lane targets
+  const filledSpec = new Uint8Array(laneSpecs.length)
+  for (let pass = 0; pass < 2 && routes.length < TARGET_ROUTE_COUNT; pass++) {
+    const reuseScale = pass === 0 ? 1.0 : 0.35
+    const distinctThresh = pass === 0 ? 0.78 : 0.90
+    const maxSeedTries = pass === 0 ? 2 : 4
+    for (let idx = 0; idx < laneSpecs.length && routes.length < TARGET_ROUTE_COUNT; idx++) {
+      if (filledSpec[idx]) continue
+      const spec = laneSpecs[idx]
+      const seedOrder = startSeeds
+        .slice()
+        .sort((a, b) => {
+          const scoreA = nodeSlotData[a.idx].length * 2.5 + Math.abs(a.v_funnel - spec.targetV * 0.55) + prng() * 0.25
+          const scoreB = nodeSlotData[b.idx].length * 2.5 + Math.abs(b.v_funnel - spec.targetV * 0.55) + prng() * 0.25
+          return scoreA - scoreB
+        })
 
-      let assignedEdges = 0
-      for (let s = 0; s < pathEdges.length; s++) {
-        const step = pathEdges[s]
-        if (edgeSignal[step.edgePos]) continue
-        edgeUsed[step.edgePos] = 1
-        edgeSignal[step.edgePos] = {
-          from: step.from,
-          to: step.to,
-          progFrom: cumDist[s] / totalDist,
-          progTo: cumDist[s + 1] / totalDist,
-          phaseOffset,
-          speedCycles,
+      let chosen = null
+      for (let s = 0; s < Math.min(maxSeedTries, seedOrder.length); s++) {
+        const candidate = findFullSpanPath(seedOrder[s].idx, spec.targetV, spec.swayAmp, spec.swayPhase, reuseScale)
+        if (candidate && isRouteDistinct(candidate.pathEdges, distinctThresh)) {
+          chosen = candidate
+          break
         }
-        assignedEdges++
       }
-
-      if (assignedEdges < 3) continue
-
-      for (let s = 0; s < pathNodes.length; s++) {
-        const nodeIdx = pathNodes[s]
-        nodeUsed[nodeIdx] = 1
-        if (!nodeSignal[nodeIdx]) {
-          nodeSignal[nodeIdx] = {
-            prog: cumDist[s] / totalDist,
-            phaseOffset,
-            speedCycles,
-          }
-        }
-      }
-
-      laneFilled[laneIdx] = 1
-      tracedCount++
+      if (!chosen) continue
+      commitRoute(chosen, spec)
+      filledSpec[idx] = 1
     }
   }
 
-  return { edgeSignal, nodeSignal, tracedCount }
+  return { edgeSlotData, nodeSlotData, routes }
 }
 
 /**
@@ -1712,12 +1990,13 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
 
   // 1. Stratified organic constellation sampling + non-indexed synaptic spiderweb
   const { rawNodes, webGrid } = sampleStratifiedNodes(sign, safeXScale, isoYScale, lut, prng, envScale)
-  const edges = connectNeuralNodes(rawNodes, webGrid, lut, safeXScale, isoYScale, envScale)
+  const baseEdges = connectNeuralNodes(rawNodes, webGrid, lut, safeXScale, isoYScale, envScale)
+  const edges = addInnerTipFeederTrunk(rawNodes, baseEdges, sign, safeXScale, isoYScale, lut)
 
   // Keep connected web nodes + background micro-dust sparkles
   const visibleNodes = rawNodes.filter(n => !n.isWeb || n.connectedCount > 0)
 
-  // 2. Build Non-Indexed Lines BufferGeometry (Per-edge length/depth/dendrite hierarchy & traveling pulse phase)
+  // 2. Build Non-Indexed Lines BufferGeometry (Per-edge length/depth/dendrite hierarchy & multi-route packing)
   const validEdgeIndices = []
   for (let eIdx = 0; eIdx < edges.length; eIdx++) {
     const iA = edges.i[eIdx]
@@ -1729,19 +2008,20 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     }
   }
 
-  const { edgeSignal, nodeSignal, tracedCount } = traceOutwardSignalPaths(
+  const { edgeSlotData, nodeSlotData, routes } = traceOutwardSignalPaths(
     rawNodes,
     validEdgeIndices,
     edges,
-    prng,
-    isLeft
+    prng
   )
 
   const lineVertCount = validEdgeIndices.length * 2
   const linePositions = new Float32Array(lineVertCount * 3)
   const lineStyles = new Float32Array(lineVertCount * 4)
   const lineRelativeCoords = new Float32Array(lineVertCount * 4)
-  const lineSignalPaths = new Float32Array(lineVertCount * 3)
+  const lineRouteIds = new Float32Array(lineVertCount * 4)
+  lineRouteIds.fill(-1.0)
+  const lineRouteProgress = new Float32Array(lineVertCount * 4)
 
   for (let k = 0; k < validEdgeIndices.length; k++) {
     const eIdx = validEdgeIndices[k]
@@ -1812,16 +2092,15 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     lineRelativeCoords[vB * 4 + 2] = nB.relativeCoord[2]
     lineRelativeCoords[vB * 4 + 3] = nB.relativeCoord[3]
 
-    const sig = edgeSignal[k]
-    if (sig) {
+    const eRoutes = edgeSlotData[k]
+    const slotCount = Math.min(MAX_ROUTES_PER_ELEMENT, eRoutes.length)
+    for (let s = 0; s < slotCount; s++) {
+      const sig = eRoutes[s]
       const aIsFrom = nA.idx === sig.from
-      lineSignalPaths[vA * 3] = aIsFrom ? sig.progFrom : sig.progTo
-      lineSignalPaths[vA * 3 + 1] = sig.phaseOffset
-      lineSignalPaths[vA * 3 + 2] = sig.speedCycles
-
-      lineSignalPaths[vB * 3] = aIsFrom ? sig.progTo : sig.progFrom
-      lineSignalPaths[vB * 3 + 1] = sig.phaseOffset
-      lineSignalPaths[vB * 3 + 2] = sig.speedCycles
+      lineRouteIds[vA * 4 + s] = sig.routeId
+      lineRouteProgress[vA * 4 + s] = aIsFrom ? sig.progFrom : sig.progTo
+      lineRouteIds[vB * 4 + s] = sig.routeId
+      lineRouteProgress[vB * 4 + s] = aIsFrom ? sig.progTo : sig.progFrom
     }
   }
 
@@ -1829,19 +2108,23 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
   linesGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
   linesGeo.setAttribute('aLineStyle', new THREE.BufferAttribute(lineStyles, 4))
   linesGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(lineRelativeCoords, 4))
-  linesGeo.setAttribute('aSignalPath', new THREE.BufferAttribute(lineSignalPaths, 3))
-  linesGeo.userData.signalPathCount = tracedCount
+  linesGeo.setAttribute('aRouteIds', new THREE.BufferAttribute(lineRouteIds, 4))
+  linesGeo.setAttribute('aRouteProgress', new THREE.BufferAttribute(lineRouteProgress, 4))
+  linesGeo.userData.signalPathCount = routes.length
+  linesGeo.userData.routes = routes
   if (lineVertCount > 0) {
     linesGeo.computeBoundingBox()
     linesGeo.computeBoundingSphere()
   }
 
-  // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation with Synchronized Node Relay)
+  // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation with Multi-Route Node Relay)
   const pointCount = visibleNodes.length
   const pointPositions = new Float32Array(pointCount * 3)
   const pointStyles = new Float32Array(pointCount * 4)
   const pointRelativeCoords = new Float32Array(pointCount * 4)
-  const pointSignalPaths = new Float32Array(pointCount * 3)
+  const pointRouteIds = new Float32Array(pointCount * 4)
+  pointRouteIds.fill(-1.0)
+  const pointRouteProgress = new Float32Array(pointCount * 4)
 
   for (let nIdx = 0; nIdx < pointCount; nIdx++) {
     const n = visibleNodes[nIdx]
@@ -1857,11 +2140,11 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     pointRelativeCoords[nIdx * 4 + 2] = n.relativeCoord[2]
     pointRelativeCoords[nIdx * 4 + 3] = n.relativeCoord[3]
 
-    const nSig = nodeSignal[n.idx]
-    if (nSig) {
-      pointSignalPaths[nIdx * 3] = nSig.prog
-      pointSignalPaths[nIdx * 3 + 1] = nSig.phaseOffset
-      pointSignalPaths[nIdx * 3 + 2] = nSig.speedCycles
+    const nRoutes = nodeSlotData[n.idx]
+    const slotCount = Math.min(MAX_ROUTES_PER_ELEMENT, nRoutes.length)
+    for (let s = 0; s < slotCount; s++) {
+      pointRouteIds[nIdx * 4 + s] = nRoutes[s].routeId
+      pointRouteProgress[nIdx * 4 + s] = nRoutes[s].prog
     }
   }
 
@@ -1869,7 +2152,8 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
   pointsGeo.setAttribute('position', new THREE.BufferAttribute(pointPositions, 3))
   pointsGeo.setAttribute('aPointStyle', new THREE.BufferAttribute(pointStyles, 4))
   pointsGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(pointRelativeCoords, 4))
-  pointsGeo.setAttribute('aSignalPath', new THREE.BufferAttribute(pointSignalPaths, 3))
+  pointsGeo.setAttribute('aRouteIds', new THREE.BufferAttribute(pointRouteIds, 4))
+  pointsGeo.setAttribute('aRouteProgress', new THREE.BufferAttribute(pointRouteProgress, 4))
   if (pointCount > 0) {
     pointsGeo.computeBoundingBox()
     pointsGeo.computeBoundingSphere()

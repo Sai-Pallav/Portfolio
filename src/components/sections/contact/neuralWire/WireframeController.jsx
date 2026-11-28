@@ -89,7 +89,7 @@ function HorizontalScrollContainer({ children, className = '', containerRef = nu
       window.removeEventListener('resize', updateScrollState)
       mo.disconnect()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ref])
 
   // Mouse wheel listener dedicated to horizontal container
@@ -107,7 +107,7 @@ function HorizontalScrollContainer({ children, className = '', containerRef = nu
 
     el.addEventListener('wheel', handleWheel, { passive: false })
     return () => el.removeEventListener('wheel', handleWheel)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ref])
 
   // Click-and-drag mouse handler
@@ -583,22 +583,32 @@ export default memo(function WireframeController() {
         style={
           panelPos
             ? {
-                left: `${panelPos.x}px`,
-                top: `${panelPos.y}px`,
-                right: 'auto',
-                bottom: 'auto',
-              }
+              left: `${panelPos.x}px`,
+              top: `${panelPos.y}px`,
+              right: 'auto',
+              bottom: 'auto',
+            }
             : undefined
         }
         className="fixed bottom-6 right-6 z-50 pointer-events-auto select-none"
       >
         <button
           onClick={() => setIsOpen(true)}
-          className="group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-neutral-950/85 backdrop-blur-xl border border-cyan-500/30 text-white shadow-[0_8px_32px_rgba(0,180,255,0.22)] hover:border-cyan-400 hover:shadow-[0_8px_36px_rgba(0,210,255,0.35)] transition-all duration-300"
+          style={{
+            borderColor: 'var(--border-glow)',
+            boxShadow: '0 8px 32px var(--accent-glow)',
+          }}
+          className="group flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-neutral-950/85 backdrop-blur-xl border text-white hover:brightness-110 transition-all duration-300"
         >
           <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500" />
+            <span
+              className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+              style={{ backgroundColor: 'var(--accent-hover)' }}
+            />
+            <span
+              className="relative inline-flex rounded-full h-2.5 w-2.5"
+              style={{ backgroundColor: 'var(--accent)' }}
+            />
           </span>
           <span className="text-xs font-medium tracking-wide text-neutral-200 group-hover:text-white">
             🎛️ Wireframe Ribbon Controls
@@ -616,28 +626,26 @@ export default memo(function WireframeController() {
       style={
         panelPos
           ? {
-              left: `${panelPos.x}px`,
-              top: `${panelPos.y}px`,
-              right: 'auto',
-              bottom: 'auto',
-              width: `${panelWidth}px`,
-              ...(panelHeight ? { height: `${panelHeight}px` } : {}),
-            }
+            left: `${panelPos.x}px`,
+            top: `${panelPos.y}px`,
+            right: 'auto',
+            bottom: 'auto',
+            width: `${panelWidth}px`,
+            ...(panelHeight ? { height: `${panelHeight}px` } : {}),
+          }
           : {
-              width: `${panelWidth}px`,
-              ...(panelHeight ? { height: `${panelHeight}px` } : {}),
-            }
+            width: `${panelWidth}px`,
+            ...(panelHeight ? { height: `${panelHeight}px` } : {}),
+          }
       }
-      className={`fixed ${!panelPos ? 'bottom-4 right-4 md:bottom-6 md:right-6' : ''} z-50 max-w-[90vw] flex flex-col bg-neutral-950/92 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_12px_48px_rgba(0,0,0,0.85)] text-white overflow-hidden pointer-events-auto select-none font-sans transition-shadow ${
-        isDraggingPanel ? 'shadow-[0_20px_60px_rgba(0,200,255,0.25)] border-cyan-500/40' : ''
-      }`}
+      className={`fixed ${!panelPos ? 'bottom-4 right-4 md:bottom-6 md:right-6' : ''} z-50 max-w-[90vw] flex flex-col bg-neutral-950/92 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_12px_48px_rgba(0,0,0,0.85)] text-white overflow-hidden pointer-events-auto select-none font-sans transition-shadow ${isDraggingPanel ? 'shadow-[0_20px_60px_rgba(0,200,255,0.25)] border-cyan-500/40' : ''
+        }`}
     >
       {/* ── DRAGGABLE HEADER ── */}
       <div
         onPointerDown={handleHeaderPointerDown}
-        className={`flex items-center justify-between px-3.5 py-2.5 border-b border-white/10 bg-white/[0.03] cursor-grab active:cursor-grabbing select-none ${
-          isDraggingPanel ? 'bg-cyan-500/10' : ''
-        }`}
+        className={`flex items-center justify-between px-3.5 py-2.5 border-b border-white/10 bg-white/[0.03] cursor-grab active:cursor-grabbing select-none ${isDraggingPanel ? 'bg-cyan-500/10' : ''
+          }`}
         title="Click and drag anywhere on this header to move the window"
       >
         <div className="flex items-center gap-2">
@@ -660,11 +668,10 @@ export default memo(function WireframeController() {
         <div className="flex items-center gap-1">
           <button
             onClick={togglePause}
-            className={`text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-all border ${
-              isPaused
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.3)] animate-pulse'
-                : 'bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border-white/10'
-            }`}
+            className={`text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1 transition-all border ${isPaused
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.3)] animate-pulse'
+              : 'bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border-white/10'
+              }`}
             title={isPaused ? 'Resume wave animation' : 'Pause wave animation to adjust parameters'}
           >
             <span>{isPaused ? '▶' : '⏸'}</span>
@@ -797,11 +804,10 @@ export default memo(function WireframeController() {
               key={tab.id}
               data-tab-id={tab.id}
               onClick={() => setActiveCategory(tab.id)}
-              className={`shrink-0 px-3 py-2 text-center whitespace-nowrap border-b-2 text-xs font-medium transition-all duration-200 ${
-                activeCategory === tab.id
-                  ? 'border-cyan-400 text-cyan-300 font-semibold bg-white/[0.04]'
-                  : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.02]'
-              }`}
+              className={`shrink-0 px-3 py-2 text-center whitespace-nowrap border-b-2 text-xs font-medium transition-all duration-200 ${activeCategory === tab.id
+                ? 'border-cyan-400 text-cyan-300 font-semibold bg-white/[0.04]'
+                : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.02]'
+                }`}
             >
               {tab.label}
             </button>
@@ -1632,7 +1638,7 @@ export default memo(function WireframeController() {
         style={{ touchAction: 'none' }}
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path d="M9 1L1 9M9 5L5 9M9 9" stroke="rgb(0,210,255)" strokeWidth="1.5" strokeLinecap="round"/>
+          <path d="M9 1L1 9M9 5L5 9M9 9" stroke="rgb(0,210,255)" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       </div>
     </div>
