@@ -52,7 +52,7 @@ export const WIRE_THEME_PALETTES = {
     neuralHotColor: '#f6f2ff',
     neuralHazeScale: 0.78,
     neuralHazeAlphaCap: 0.056,
-    neuralLineScale: 1.05,
+    neuralLineScale: 1.50,
     neuralSignalGain: 1.04,
     neuralPointScale: 0.80,
   },

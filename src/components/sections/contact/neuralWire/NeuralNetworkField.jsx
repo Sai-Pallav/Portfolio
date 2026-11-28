@@ -1,11 +1,19 @@
 import { memo, useMemo, useEffect, useLayoutEffect, useContext, useSyncExternalStore } from 'react'
 import * as THREE from 'three'
-import { useThree, createPortal } from '@react-three/fiber'
+import { useThree, useFrame, createPortal } from '@react-three/fiber'
 import { H_VAL } from './generateWireGeometry'
 import { generateRefinedNeuralField } from './neuralPocketBounds'
 import { useWireframeConfig } from './WireframeConfigContext'
 import { FlowTimeContext, FlowTrigContext } from './animationContract'
 import { getWireThemeConfig } from './wireThemeConfig'
+
+const ROLL_PERIOD_SECONDS = 56.0
+const TWO_PI = Math.PI * 2.0
+
+function computeWrappedRollAngle(timeVal) {
+  const wrapped = ((timeVal % ROLL_PERIOD_SECONDS) + ROLL_PERIOD_SECONDS) % ROLL_PERIOD_SECONDS
+  return (wrapped / ROLL_PERIOD_SECONDS) * TWO_PI
+}
 
 function subscribeReducedMotion(callback) {
   if (typeof window === 'undefined') return () => { }
@@ -114,7 +122,7 @@ function mergeTransformedGeometries(geoA, matA, geoB, matB) {
     const itemSize = sampleAttr.itemSize
     const arr = new sampleAttr.array.constructor(total * itemSize)
 
-    if (attrName === 'position' || attrName === 'aFlowAxis' || attrName === 'aFlowNormal') {
+    if (attrName === 'position' || attrName === 'aPeerPos' || attrName === 'aFlowAxis' || attrName === 'aFlowNormal') {
       const isDirection = attrName === 'aFlowAxis' || attrName === 'aFlowNormal'
       if (attrA) {
         const srcA = attrA.array
@@ -138,16 +146,14 @@ function mergeTransformedGeometries(geoA, matA, geoB, matB) {
     } else {
       if (attrA) arr.set(attrA.array, 0)
       if (attrB) arr.set(attrB.array, vA * itemSize)
+      if (attrName === 'aPocketFrame' && itemSize === 4) {
+        for (let i = 0; i < vA; i++) arr[i * 4 + 3] = 0.0
+        for (let i = 0; i < vB; i++) arr[(vA + i) * 4 + 3] = 1.0
+      }
     }
 
     merged.setAttribute(attrName, new THREE.BufferAttribute(arr, itemSize))
   }
-
-  // Track wing ownership (0.0 = left, 1.0 = right) so asymmetric left/right
-  // nodeScale, innerFade, and glowIntensity work inside the merged 3-draw pipeline.
-  const wingSide = new Float32Array(total)
-  if (vB > 0) wingSide.fill(1.0, vA, total)
-  merged.setAttribute('aWingSide', new THREE.BufferAttribute(wingSide, 1))
 
   if (geoA?.index || geoB?.index) {
     const idxA = geoA?.index ? geoA.index.array : []
@@ -244,8 +250,8 @@ function computeThemeRamp(themeConfig, outBase, outMid, outHot) {
   outHot.copy(_cHighlight).lerp(_cWhite, 0.76)
 }
 
-// Compact stationary attribute interface (<= 12 vertex attributes, strictly below WebGL's 16-attribute limit).
-// ZERO per-vertex sin/cos in GLSL; driven purely by uFlowTrig = (cos(omega*t), sin(omega*t)) & uTime.
+// Compact attribute interface (12 custom + 3 Three.js built-ins = 15 <= 16 WebGL limit).
+// ZERO per-vertex sin/cos in GLSL; driven purely by uFlowTrig, uRollAnglePair & uTime.
 const SAFE_MAX_GLSL = `
   float safeMax(float a, float b) {
     float diff = a - b;
@@ -258,13 +264,15 @@ const POCKET_MASK_GLSL = `
   attribute vec4 aWaveBias;
   attribute vec4 aWaveCos;
   attribute vec4 aWaveSin;
-  attribute vec3 aPocketFrame;
-  attribute vec3 aFlowAxis;
-  attribute float aWingSide;
+  attribute vec4 aPocketFrame;
   uniform vec2 uFlowTrig;
   uniform vec2 uInnerFadePair;
   uniform float uPixelRatio;
   uniform float uViewportHeight;
+  uniform vec3 uFlowAxisLeft;
+  uniform vec3 uFlowAxisRight;
+  uniform vec3 uDepthAxisLeft;
+  uniform vec3 uDepthAxisRight;
 
   ${SAFE_MAX_GLSL}
 
@@ -274,7 +282,7 @@ const POCKET_MASK_GLSL = `
   }
 
   float flowPocketVisibility() {
-    float innerFade = mix(uInnerFadePair.x, uInnerFadePair.y, aWingSide);
+    float innerFade = mix(uInnerFadePair.x, uInnerFadePair.y, aPocketFrame.w);
     float innerStart = clamp(innerFade * 0.28, 0.035, 0.09);
     float innerSpan = max(0.11, innerFade * 0.52);
     float innerMask = pocketEase((aRelativeCoord.x - innerStart) / innerSpan);
@@ -295,8 +303,15 @@ const POCKET_MASK_GLSL = `
     vec2 axisScreenDir;
   };
 
-  PocketMaskEval evalStaticPocketMask(vec3 fixedPos, float yLocal) {
-    vec4 strandY = aWaveBias + aWaveCos * uFlowTrig.x + aWaveSin * uFlowTrig.y;
+  PocketMaskEval evalPocketMaskWaves(
+    vec3 worldPos,
+    float yLocal,
+    vec4 waveBias,
+    vec4 waveCos,
+    vec4 waveSin,
+    float wingSide
+  ) {
+    vec4 strandY = waveBias + waveCos * uFlowTrig.x + waveSin * uFlowTrig.y;
     float lo = -safeMax(safeMax(-strandY.x, -strandY.y), safeMax(-strandY.z, -strandY.w));
     float hi =  safeMax(safeMax( strandY.x,  strandY.y), safeMax( strandY.z,  strandY.w));
     float radius = max(0.5 * (hi - lo), 1e-5);
@@ -306,9 +321,10 @@ const POCKET_MASK_GLSL = `
       min(abs(yLocal - strandY.z), abs(yLocal - strandY.w))
     );
 
-    vec4 view = modelViewMatrix * vec4(fixedPos, 1.0);
+    vec3 flowAxis = mix(uFlowAxisLeft, uFlowAxisRight, wingSide);
+    vec4 view = modelViewMatrix * vec4(worldPos, 1.0);
     float viewDepth = max(-view.z, 1e-4);
-    vec2 axisViewXY = (modelViewMatrix * vec4(aFlowAxis, 0.0)).xy;
+    vec2 axisViewXY = (modelViewMatrix * vec4(flowAxis, 0.0)).xy;
     float axisLen = length(axisViewXY);
     float safeAxisLen = max(axisLen, 1e-5);
     vec2 axisScreenDir = axisLen > 1e-5 ? (axisViewXY / axisLen) : vec2(0.0, 1.0);
@@ -329,14 +345,36 @@ const POCKET_MASK_GLSL = `
     res.axisScreenDir = axisScreenDir;
     return res;
   }
+
+  PocketMaskEval evalStaticPocketMask(vec3 fixedPos, float yLocal) {
+    return evalPocketMaskWaves(fixedPos, yLocal, aWaveBias, aWaveCos, aWaveSin, aPocketFrame.w);
+  }
+
+  float evalStrandWake(PocketMaskEval p, float yLocal) {
+    // Instantaneous vertical travel rate of each of the 4 wave strands (dY/dTheta)
+    vec4 vel = aWaveSin * uFlowTrig.x - aWaveCos * uFlowTrig.y;
+    vec4 absVel = abs(vel);
+    // Restrict wake to actively sweeping inner crossing strands inside [lo, hi]
+    vec4 speedMask = smoothstep(0.08 * p.radius, 0.35 * p.radius, absVel);
+    vec4 marginIn = min(p.strandY - p.lo, p.hi - p.strandY);
+    vec4 innerMask = smoothstep(0.03 * p.radius, 0.22 * p.radius, marginIn);
+    // Signed distance strictly BEHIND each strand along its travel direction
+    vec4 dir = mix(vec4(-1.0), vec4(1.0), step(vec4(0.0), vel));
+    vec4 distBehindNorm = ((p.strandY - yLocal) * dir) / p.radius;
+    // Narrow trailing shimmer behind the crossing strand (zero at crossing so dip stays intact)
+    vec4 wakeRise = smoothstep(0.035, 0.125, distBehindNorm);
+    vec4 wakeFall = 1.0 - smoothstep(0.125, 0.38, distBehindNorm);
+    vec4 wake4 = wakeRise * wakeFall * speedMask * innerMask;
+    return clamp(max(max(wake4.x, wake4.y), max(wake4.z, wake4.w)), 0.0, 1.0);
+  }
 `
 
 
-const HARMONIC_DRIFT_GLSL = `
+const NEURAL_3D_TRANSFORM_GLSL = `
   vec3 computeHarmonicDrift(
     vec3 restPos,
     vec4 driftParams,
-    vec4 relCoord,
+    float uCoord,
     float distInsidePx,
     float halfHeightPx,
     float viewZ,
@@ -347,14 +385,13 @@ const HARMONIC_DRIFT_GLSL = `
   ) {
     if (driftScale <= 0.001) return vec3(0.0);
 
-    // Tip damping: taper smoothly to 0 near inner tip only for u < 0.08
-    float tipDamp = smoothstep(0.04, 0.09, relCoord.x);
+    // Tip damping: strictly 0 near inner tip for u < 0.08
+    float tipDamp = smoothstep(0.08, 0.14, uCoord);
 
     // Outer envelope damping: taper smoothly only at the far outer edge (u > 0.94)
-    float outerDamp = 1.0 - smoothstep(0.94, 0.985, relCoord.x);
+    float outerDamp = 1.0 - smoothstep(0.94, 0.985, uCoord);
 
-    // Margin-localized wall damping: full 100% drift across inner ~70% of pocket,
-    // tapering smoothly to 0.0 only within the outer ~30% margin near the ribbon wall
+    // Margin-localized wall damping: taper smoothly to 0.0 near the live ribbon wall
     float safeWallMargin = max(0.28 * halfHeightPx, 5.0);
     float normWallDist = clamp(distInsidePx / safeWallMargin, 0.0, 1.0);
     float wallDamp = smoothstep(0.0, 1.0, normWallDist);
@@ -367,9 +404,9 @@ const HARMONIC_DRIFT_GLSL = `
 
     // Out-of-phase Lissajous orbital harmonics in 4.5-7.5 second periods:
     float f = driftParams.z;
-    float thetaX = t * (0.96 * f) + driftParams.x; // Period ~5.7s to 7.7s
-    float thetaY = t * (1.22 * f) + driftParams.y; // Period ~4.5s to 6.1s
-    float thetaZ = t * (1.08 * f) + (driftParams.x + driftParams.y); // Period ~5.1s to 6.9s
+    float thetaX = t * (0.96 * f) + driftParams.x;
+    float thetaY = t * (1.22 * f) + driftParams.y;
+    float thetaZ = t * (1.08 * f) + (driftParams.x + driftParams.y);
 
     float dispX = sin(thetaX) * 0.72 + cos(thetaY * 0.6) * 0.28;
     float dispY = cos(thetaY) * 0.78 + sin(thetaX * 0.5) * 0.22;
@@ -379,23 +416,105 @@ const HARMONIC_DRIFT_GLSL = `
     float viewDepth = max(-viewZ, 1e-4);
     float worldPerPx = viewDepth / (proj11 * 0.5 * max(vpHeight, 1.0));
 
-    // Calibrated peak drift radius: ~4.0 - 5.8 CSS px in screen space
+    // Calibrated subtle peak drift radius (~1.5 - 2.5 CSS px) layered onto 3D axial roll
     float ampNorm = clamp((driftParams.w - 0.75) / 0.50, 0.0, 1.0);
-    float baseRadiusPx = mix(4.0, 5.8, ampNorm);
+    float baseRadiusPx = mix(1.5, 2.5, ampNorm);
     float rWorld = baseRadiusPx * worldPerPx * driftDamp * driftScale;
 
     return vec3(dispX, dispY, dispZ) * rWorld;
+  }
+
+  struct NeuralTransformResult {
+    vec3 worldPos;
+    float liveY;
+    float liveZ;
+    float depth01;
+    PocketMaskEval pocket;
+  };
+
+  // Single shared 3D cylinder barrel-roll + endpoint-locked micro-drift transform
+  // injected verbatim into both NeuralPointShader and NeuralLineShader.
+  NeuralTransformResult applyNeural3DTransform(
+    vec3 baseWorldPos,
+    float yRestLocal,
+    float y0,
+    float z0,
+    float localRadius,
+    float uCoord,
+    vec4 driftParams,
+    vec4 waveBias,
+    vec4 waveCos,
+    vec4 waveSin,
+    float wingSide,
+    float rollAngle,
+    float timeVal,
+    float driftScale
+  ) {
+    float activeRoll = driftScale > 0.5 ? mod(rollAngle, 6.28318530718) : 0.0;
+    float cRoll = cos(activeRoll);
+    float sRoll = sin(activeRoll);
+    float y0Rot = y0 * cRoll - z0 * sRoll;
+    float z0Rot = y0 * sRoll + z0 * cRoll;
+    float dYLocal = y0Rot - y0;
+    float dZLocal = z0Rot - z0;
+    float yRotLocal = yRestLocal + dYLocal;
+
+    vec3 flowAxis = mix(uFlowAxisLeft, uFlowAxisRight, wingSide);
+    vec3 depthAxis = mix(uDepthAxisLeft, uDepthAxisRight, wingSide);
+    vec3 rotatedWorldPos = baseWorldPos + dYLocal * flowAxis + dZLocal * depthAxis;
+
+    PocketMaskEval p = evalPocketMaskWaves(rotatedWorldPos, yRotLocal, waveBias, waveCos, waveSin, wingSide);
+
+    vec3 driftOffset = computeHarmonicDrift(
+      rotatedWorldPos,
+      driftParams,
+      uCoord,
+      p.distInsidePx,
+      p.halfHeightPx,
+      p.view.z,
+      projectionMatrix[1][1],
+      uViewportHeight,
+      timeVal,
+      driftScale
+    );
+
+    vec3 finalWorldPos = rotatedWorldPos + driftOffset;
+    float flowLen2 = max(dot(flowAxis, flowAxis), 1e-6);
+    float liveY = yRotLocal + dot(driftOffset, flowAxis) / flowLen2;
+    p.view = modelViewMatrix * vec4(finalWorldPos, 1.0);
+    p.distInsidePx = min(liveY - p.lo, p.hi - liveY) * p.pxPerLocalY;
+    p.minStrandDist = min(
+      min(abs(liveY - p.strandY.x), abs(liveY - p.strandY.y)),
+      min(abs(liveY - p.strandY.z), abs(liveY - p.strandY.w))
+    );
+
+    float safeR = max(localRadius, 0.002);
+    float depth01 = smoothstep(-safeR, safeR, z0Rot);
+
+    NeuralTransformResult res;
+    res.worldPos = finalWorldPos;
+    res.liveY = liveY;
+    res.liveZ = z0Rot;
+    res.depth01 = depth01;
+    res.pocket = p;
+    return res;
   }
 `;
 
 const NeuralLineShader = {
   vertexShader: `
+    attribute vec3 aPeerPos;
     attribute vec4 aLineStyle;
     attribute vec4 aPartnerBias;
     attribute vec4 aPartnerCos;
     attribute vec4 aPartnerSin;
     attribute vec4 aDriftParams;
+    attribute vec4 aPeerDriftParams;
     uniform vec2 uLineOpacityPair;
+    uniform vec2 uRollAnglePair;
+    uniform vec2 uKWavePair;
+    uniform vec3 uXAxisLeft;
+    uniform vec3 uXAxisRight;
     uniform float uTime;
     uniform float uDriftScale;
     varying float vAlpha;
@@ -408,8 +527,9 @@ const NeuralLineShader = {
     varying float vFeatherPx;
     varying float vLineBreath;
     varying float vWingSide;
+    varying float vDepth01;
     ${POCKET_MASK_GLSL}
-    ${HARMONIC_DRIFT_GLSL}
+    ${NEURAL_3D_TRANSFORM_GLSL}
 
     float evalLineWallMask(float distPx, float halfHPx, out float outPad, out float outFeather) {
       outPad = -min(2.0, 0.020 * halfHPx);
@@ -418,57 +538,94 @@ const NeuralLineShader = {
     }
 
     void main() {
-      PocketMaskEval p = evalStaticPocketMask(position, aPocketFrame.x);
-      vec4 partnerY = aPartnerBias + aPartnerCos * uFlowTrig.x + aPartnerSin * uFlowTrig.y;
-      float loP = -safeMax(safeMax(-partnerY.x, -partnerY.y), safeMax(-partnerY.z, -partnerY.w));
-      float hiP =  safeMax(safeMax( partnerY.x,  partnerY.y), safeMax( partnerY.z,  partnerY.w));
-      float radP = max(0.5 * (hiP - loP), 1e-5);
-      float distInPartnerPx = min(aPocketFrame.y - loP, hiP - aPocketFrame.y) * p.pxPerLocalY;
-      float halfHP = radP * p.pxPerLocalY;
+      float wingSide = aPocketFrame.w;
+      float rollAngle = mix(uRollAnglePair.x, uRollAnglePair.y, wingSide);
+      float y0A = aRelativeCoord.y * aPocketFrame.z;
+      float z0A = aRelativeCoord.z * aPocketFrame.z;
 
-      float padSelf, featherSelf;
-      float maskSelf = evalLineWallMask(p.distInsidePx, p.halfHeightPx, padSelf, featherSelf);
-      float padPartner, featherPartner;
-      float maskPartner = evalLineWallMask(distInPartnerPx, halfHP, padPartner, featherPartner);
-
-      // Fade both endpoints smoothly together near moving boundaries so zero floating stub edges linger
-      float jointMask = min(maskSelf, maskPartner);
-      float lineOpacity = mix(uLineOpacityPair.x, uLineOpacityPair.y, aWingSide);
-      float strandYield = mix(0.68, 1.0, smoothstep(0.0, 0.052 * p.radius + 0.010, p.minStrandDist));
-      float pocketMask = lineOpacity * flowPocketVisibility() * jointMask * strandYield;
-
-      // Soft luminance breath (~8-12%) synchronized with endpoint twinkle (3.5-6.5s cycles)
-      float tLineTwinkle = mod(uTime, 240.0) * (1.257 * aDriftParams.z) + aDriftParams.x;
-      float lineBreath = 0.5 + 0.5 * cos(tLineTwinkle);
-      float vBreath = uDriftScale > 0.5 ? mix(0.89, 1.11, lineBreath) : 1.0;
-
-      vAlpha = aLineStyle.x * pocketMask;
-      vHubAccent = aLineStyle.y;
-      vPulseTrig = aLineStyle.zw;
-      vStrandY = p.strandY;
-      vLocalY = aPocketFrame.x;
-      vPxPerLocalY = p.pxPerLocalY;
-      vWallPadPx = padSelf;
-      vFeatherPx = featherSelf;
-      vLineBreath = vBreath;
-      vWingSide = aWingSide;
-
-      // 100% Endpoint-Locked Harmonic Micro-Drift: identical displacement formula
-      vec3 driftOffset = computeHarmonicDrift(
+      NeuralTransformResult resA = applyNeural3DTransform(
         position,
+        aPocketFrame.x,
+        y0A,
+        z0A,
+        aPocketFrame.z,
+        aRelativeCoord.x,
         aDriftParams,
-        aRelativeCoord,
-        p.distInsidePx,
-        p.halfHeightPx,
-        p.view.z,
-        projectionMatrix[1][1],
-        uViewportHeight,
+        aWaveBias,
+        aWaveCos,
+        aWaveSin,
+        wingSide,
+        rollAngle,
         uTime,
         uDriftScale
       );
 
-      vec4 driftedView = modelViewMatrix * vec4(position + driftOffset, 1.0);
-      gl_Position = projectionMatrix * driftedView;
+      vec3 xAxis = mix(uXAxisLeft, uXAxisRight, wingSide);
+      float signWing = mix(-1.0, 1.0, wingSide);
+      float xLen2 = max(dot(xAxis, xAxis), 1e-6);
+      float uB = clamp(aRelativeCoord.x + signWing * 0.1 * dot(aPeerPos - position, xAxis) / xLen2, 0.0, 1.0);
+
+      vec4 absAmpB = sqrt(aPartnerCos * aPartnerCos + aPartnerSin * aPartnerSin);
+      float fMinB = min(
+        min(aPartnerBias.x - absAmpB.x, aPartnerBias.y - absAmpB.y),
+        min(aPartnerBias.z - absAmpB.z, aPartnerBias.w - absAmpB.w)
+      );
+      float fMaxB = max(
+        max(aPartnerBias.x + absAmpB.x, aPartnerBias.y + absAmpB.y),
+        max(aPartnerBias.z + absAmpB.z, aPartnerBias.w + absAmpB.w)
+      );
+      float rB = max(0.5 * (fMaxB - fMinB), 1e-5);
+
+      NeuralTransformResult resB = applyNeural3DTransform(
+        aPeerPos,
+        aPocketFrame.y,
+        aLineStyle.z,
+        aLineStyle.w,
+        rB,
+        uB,
+        aPeerDriftParams,
+        aPartnerBias,
+        aPartnerCos,
+        aPartnerSin,
+        wingSide,
+        rollAngle,
+        uTime,
+        uDriftScale
+      );
+
+      float padSelf, featherSelf;
+      float maskSelf = evalLineWallMask(resA.pocket.distInsidePx, resA.pocket.halfHeightPx, padSelf, featherSelf);
+      float padPartner, featherPartner;
+      float maskPartner = evalLineWallMask(resB.pocket.distInsidePx, resB.pocket.halfHeightPx, padPartner, featherPartner);
+
+      // Fade both endpoints smoothly together near moving boundaries so zero floating stub edges linger
+      float jointMask = min(maskSelf, maskPartner);
+      float lineOpacity = mix(uLineOpacityPair.x, uLineOpacityPair.y, wingSide);
+      float strandYield = mix(0.68, 1.0, smoothstep(0.0, 0.052 * resA.pocket.radius + 0.010, resA.pocket.minStrandDist));
+      float pocketMask = lineOpacity * flowPocketVisibility() * jointMask * strandYield;
+
+      // Soft luminance breath (~8-12%) + trailing inner-strand wake shimmer (~13% boost)
+      float tLineTwinkle = mod(uTime, 240.0) * (1.257 * aDriftParams.z) + aDriftParams.x;
+      float lineBreath = 0.5 + 0.5 * cos(tLineTwinkle);
+      float lineWake = uDriftScale > 0.5 ? evalStrandWake(resA.pocket, resA.liveY) : 0.0;
+      float vBreath = uDriftScale > 0.5 ? mix(0.89, 1.11, lineBreath) * (1.0 + 0.13 * lineWake) : 1.0;
+
+      float kWave = mix(uKWavePair.x, uKWavePair.y, wingSide);
+      float phiA = kWave * aRelativeCoord.x;
+
+      vAlpha = aLineStyle.x * pocketMask;
+      vHubAccent = aLineStyle.y;
+      vPulseTrig = vec2(cos(phiA), sin(phiA));
+      vStrandY = resA.pocket.strandY;
+      vLocalY = resA.liveY;
+      vPxPerLocalY = resA.pocket.pxPerLocalY;
+      vWallPadPx = padSelf;
+      vFeatherPx = featherSelf;
+      vLineBreath = vBreath;
+      vWingSide = wingSide;
+      vDepth01 = resA.depth01;
+
+      gl_Position = projectionMatrix * resA.pocket.view;
     }
   `,
   fragmentShader: `
@@ -487,6 +644,7 @@ const NeuralLineShader = {
     varying float vFeatherPx;
     varying float vLineBreath;
     varying float vWingSide;
+    varying float vDepth01;
     ${SAFE_MAX_GLSL}
 
     void main() {
@@ -499,15 +657,19 @@ const NeuralLineShader = {
       float alphaMask = vAlpha * fragWallMask * uRestingLineScale;
       if (alphaMask <= 0.001) discard;
 
+      float depth01 = clamp(vDepth01, 0.0, 1.0);
+      // Protected connector visibility: front hemisphere crisply legible (1.20x), back recedes softly (0.42x)
+      float depthOpacity = mix(0.42, 1.20, depth01);
+
       vec2 pDir = vPulseTrig * inversesqrt(max(dot(vPulseTrig, vPulseTrig), 1e-4));
       float pulse = 0.5 + 0.5 * dot(pDir, uFlowTrig);
       float accent = clamp(vHubAccent, 0.0, 1.0);
       float pulseBoost = mix(0.76, 1.24, pulse) * (1.0 + 0.12 * accent * pulse);
-      vec3 webTint = mix(uBaseColor, uMidColor, 0.62 + 0.18 * pulse);
-      vec3 lineCol = mix(webTint, uHotColor, clamp((0.12 + 0.10 * pulse) * accent, 0.0, 0.25));
+      vec3 webTint = mix(uBaseColor, uMidColor, mix(0.40, 0.72, depth01) + 0.16 * pulse);
+      vec3 lineCol = mix(webTint, uHotColor, clamp((0.06 + 0.10 * depth01 + 0.10 * pulse) * accent, 0.0, 0.28));
 
-      // Calm, softly breathing synaptic filaments (~8-12% soft luminance breath)
-      float outAlpha = clamp(alphaMask * pulseBoost * vLineBreath, 0.0, 0.58);
+      // Calm, softly breathing synaptic filaments with protected Z-depth legibility
+      float outAlpha = clamp(alphaMask * depthOpacity * pulseBoost * vLineBreath, 0.0, 0.62);
       if (outAlpha <= 0.001) discard;
       gl_FragColor = vec4(lineCol, outAlpha);
     }
@@ -520,30 +682,55 @@ const NeuralPointShader = {
     attribute vec4 aDriftParams;
     uniform vec2 uGlowIntensityPair;
     uniform vec2 uNodeScalePair;
+    uniform vec2 uRollAnglePair;
     uniform float uTime;
     uniform float uDriftScale;
     varying float vAlpha;
     varying float vTier;
     varying float vTwinkle;
+    varying float vBreath;
+    varying float vWake;
+    varying float vDepth01;
     ${POCKET_MASK_GLSL}
-    ${HARMONIC_DRIFT_GLSL}
+    ${NEURAL_3D_TRANSFORM_GLSL}
 
     void main() {
-      PocketMaskEval p = evalStaticPocketMask(position, aPocketFrame.x);
+      float wingSide = aPocketFrame.w;
+      float rollAngle = mix(uRollAnglePair.x, uRollAnglePair.y, wingSide);
+      float y0 = aRelativeCoord.y * aPocketFrame.z;
+      float z0 = aRelativeCoord.z * aPocketFrame.z;
+
+      NeuralTransformResult res = applyNeural3DTransform(
+        position,
+        aPocketFrame.x,
+        y0,
+        z0,
+        aPocketFrame.z,
+        aRelativeCoord.x,
+        aDriftParams,
+        aWaveBias,
+        aWaveCos,
+        aWaveSin,
+        wingSide,
+        rollAngle,
+        uTime,
+        uDriftScale
+      );
+
       vTier = aPointStyle.z;
-      float glowIntensity = mix(uGlowIntensityPair.x, uGlowIntensityPair.y, aWingSide);
-      float nodeScale = mix(uNodeScalePair.x, uNodeScalePair.y, aWingSide);
-      float zNorm = clamp(0.5 + 0.5 * aRelativeCoord.z, 0.0, 1.0);
+      float glowIntensity = mix(uGlowIntensityPair.x, uGlowIntensityPair.y, wingSide);
+      float nodeScale = mix(uNodeScalePair.x, uNodeScalePair.y, wingSide);
+      float depth01 = res.depth01;
       float depthCue = vTier > 1.5
-        ? mix(0.82, 1.04, zNorm)
-        : mix(0.32, 1.06, zNorm);
+        ? mix(0.45, 1.08, depth01)
+        : mix(0.36, 1.06, depth01);
       float depthSize = vTier > 1.5
-        ? mix(0.92, 1.06, zNorm)
-        : mix(0.64, 1.14, zNorm);
+        ? mix(0.78, 1.12, depth01)
+        : mix(0.72, 1.12, depth01);
       float funnel = vTier > 1.5
         ? mix(0.58, 1.0, pocketEase((aRelativeCoord.x - 0.14) / 0.24))
         : mix(0.76, 1.0, pocketEase((aRelativeCoord.x - 0.06) / 0.20));
-      float persp = clamp(8.0 / max(-p.view.z, 1e-4), 0.75, 1.25);
+      float persp = clamp(8.0 / max(-res.pocket.view.z, 1e-4), 0.75, 1.25);
       float minFloor = vTier < 1.5 ? 1.45 : 0.0;
       float targetCss = max(minFloor, aPointStyle.x * nodeScale * funnel * persp * depthSize);
       float maxTierCss = vTier > 1.5 ? 16.5 : 10.5;
@@ -551,23 +738,28 @@ const NeuralPointShader = {
 
       float wallEdgePx = vTier > 1.5
         ? (0.24 * pointCss + 0.8)
-        : (0.14 * pointCss - min(1.2, 0.015 * p.halfHeightPx));
+        : (0.14 * pointCss - min(1.2, 0.015 * res.pocket.halfHeightPx));
       float featherPx = vTier > 1.5
-        ? clamp(0.08 * p.halfHeightPx, 5.0, 11.0)
-        : clamp(0.065 * p.halfHeightPx, 4.0, 9.5);
-      float pocketMask = smoothstep(wallEdgePx, wallEdgePx + featherPx, p.distInsidePx);
+        ? clamp(0.08 * res.pocket.halfHeightPx, 5.0, 11.0)
+        : clamp(0.065 * res.pocket.halfHeightPx, 4.0, 9.5);
+      float pocketMask = smoothstep(wallEdgePx, wallEdgePx + featherPx, res.pocket.distInsidePx);
       float strandYield = vTier > 1.5
-        ? mix(0.80, 1.0, smoothstep(0.0, 0.055 * p.radius + 0.012, p.minStrandDist))
-        : mix(0.72, 1.0, smoothstep(0.0, 0.058 * p.radius + 0.012, p.minStrandDist));
+        ? mix(0.80, 1.0, smoothstep(0.0, 0.055 * res.pocket.radius + 0.012, res.pocket.minStrandDist))
+        : mix(0.72, 1.0, smoothstep(0.0, 0.058 * res.pocket.radius + 0.012, res.pocket.minStrandDist));
 
-      // Bioluminescent Twinkle: calm, staggered star breathing across 3.5-6.5 second cycles
-      float tTwinkle = mod(uTime, 240.0) * (1.257 * aDriftParams.z) + aPointStyle.w;
-      float breath = 0.5 + 0.5 * cos(tTwinkle);
-      float subBreath = 0.5 + 0.5 * cos(tTwinkle * 0.62 + aDriftParams.y);
-      float organicBreath = mix(breath, subBreath, 0.25);
+      // Dual-harmonic non-repeating star breathing (blending slow cosine & sine cycles)
+      float freqNorm = aDriftParams.z;
+      float tWrapped = mod(uTime, 240.0);
+      float cyc1 = 0.5 + 0.5 * cos(tWrapped * (1.18 * freqNorm) + aPointStyle.w);
+      float cyc2 = 0.5 + 0.5 * sin(tWrapped * (0.73 * freqNorm) + aDriftParams.y * 1.37 + aDriftParams.x * 0.5);
+      float organicBreath = smoothstep(0.04, 0.96, mix(cyc1, cyc2, 0.42));
       // Clearly readable ~0.55x to 1.25x brightness modulation
       float twinkleMod = uDriftScale > 0.5 ? mix(0.55, 1.25, organicBreath) : 1.0;
+      float pointWake = uDriftScale > 0.5 ? evalStrandWake(res.pocket, res.liveY) : 0.0;
       vTwinkle = twinkleMod;
+      vBreath = uDriftScale > 0.5 ? organicBreath : 0.5;
+      vWake = pointWake;
+      vDepth01 = depth01;
 
       vAlpha = aPointStyle.y * glowIntensity * depthCue * flowPocketVisibility() * pocketMask * strandYield;
 
@@ -581,22 +773,7 @@ const NeuralPointShader = {
         gl_PointSize = min(pointCss * sizeBreath * safeDpr, 40.0);
       }
 
-      // 100% Endpoint-Locked Harmonic Micro-Drift: identical displacement formula
-      vec3 driftOffset = computeHarmonicDrift(
-        position,
-        aDriftParams,
-        aRelativeCoord,
-        p.distInsidePx,
-        p.halfHeightPx,
-        p.view.z,
-        projectionMatrix[1][1],
-        uViewportHeight,
-        uTime,
-        uDriftScale
-      );
-
-      vec4 driftedView = modelViewMatrix * vec4(position + driftOffset, 1.0);
-      gl_Position = projectionMatrix * driftedView;
+      gl_Position = projectionMatrix * res.pocket.view;
     }
   `,
   fragmentShader: `
@@ -606,6 +783,9 @@ const NeuralPointShader = {
     varying float vAlpha;
     varying float vTier;
     varying float vTwinkle;
+    varying float vBreath;
+    varying float vWake;
+    varying float vDepth01;
 
     void main() {
       if (vAlpha <= 0.001) discard;
@@ -613,32 +793,48 @@ const NeuralPointShader = {
       float r2 = dot(p, p);
       if (r2 >= 0.25) discard;
       float cutoff = 1.0 - smoothstep(0.11, 0.25, r2);
+      float breath = clamp(vBreath, 0.0, 1.0);
+      float peakCool = smoothstep(0.50, 1.0, breath);
+      float troughDeep = 1.0 - smoothstep(0.0, 0.50, breath);
+      float wakeClamp = clamp(vWake, 0.0, 1.0);
+      float wakeLift = 1.0 + 0.14 * wakeClamp;
+      float wakeTint = wakeClamp * 0.14;
+      float depth01 = clamp(vDepth01, 0.0, 1.0);
+      float frontFocus = smoothstep(0.25, 0.92, depth01);
+      float backDeep = 1.0 - smoothstep(0.05, 0.65, depth01);
+      float depthHotScale = mix(0.45, 1.10, frontFocus);
 
       if (vTier > 1.5) {
-        // Tier 1: Razor-sharp pinpoint core + luminous tight inner bloom + restrained aura + crisp 4-point glint
+        // Tier 1: Razor-sharp front silver-lavender core; deeper indigo back hemisphere
         float core = exp(-215.0 * r2);
         float bloom = exp(-34.0 * r2) * 0.72;
         float halo = exp(-12.0 * r2) * 0.24 * cutoff;
         float glint = (exp(-960.0 * p.x * p.x - 48.0 * p.y * p.y)
           + exp(-960.0 * p.y * p.y - 48.0 * p.x * p.x)) * 0.30 * cutoff;
-        vec3 col = mix(uBaseColor, uMidColor, clamp(bloom * 1.32 + halo * 0.70 + 0.42, 0.0, 1.0));
-        col = mix(col, uHotColor, clamp(core * 1.40 + glint * 0.72, 0.0, 1.0));
-        // Scale full light by vTwinkle with headroom so it breathes from 0.55x to 1.25x without saturation clipping
-        float light = (core * 0.85 + bloom * 0.65 + halo * 1.10 + glint * 0.75) * vTwinkle;
+        float midMix = clamp(bloom * 1.32 + halo * 0.70 + 0.42 - 0.18 * troughDeep - 0.24 * backDeep, 0.0, 1.0);
+        vec3 col = mix(uBaseColor, uMidColor, midMix);
+        float hotWeight = clamp(
+          ((core * 1.40 + glint * 0.72) * (1.0 - 0.30 * troughDeep) + (core * 0.42 + bloom * 0.20) * peakCool + core * wakeTint) * depthHotScale,
+          0.0,
+          0.95
+        );
+        col = mix(col, uHotColor, hotWeight);
+        float light = (core * 0.85 + bloom * 0.65 + halo * 1.10 + glint * 0.75) * vTwinkle * wakeLift;
         gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 0.96));
       } else if (vTier > 0.5) {
-        // Tier 2: Mid Constellation Vertex (richly theme-colored with subtle crisp center)
+        // Tier 2: Mid Constellation Vertex (silver-lavender front focus, deeper indigo back)
         float core = exp(-32.0 * r2) * 0.96;
         float bloom = exp(-11.0 * r2) * 0.35 * cutoff;
-        vec3 col = mix(uBaseColor, uMidColor, clamp(0.55 + core * 0.45, 0.0, 1.0));
-        col = mix(col, uHotColor, clamp(core * 0.20, 0.0, 0.48));
-        float light = (core * 0.88 + bloom * 1.15) * vTwinkle;
+        vec3 col = mix(uBaseColor, uMidColor, clamp(0.55 + core * 0.45 - 0.22 * troughDeep - 0.28 * backDeep, 0.0, 1.0));
+        col = mix(col, uHotColor, clamp((core * (0.20 + 0.24 * peakCool - 0.10 * troughDeep) + core * wakeTint) * depthHotScale, 0.0, 0.48));
+        float light = (core * 0.88 + bloom * 1.15) * vTwinkle * wakeLift;
         gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 0.92));
       } else {
-        // Tier 3: Volumetric Micro-Dust (rich theme-colored arch & pocket sparkles, zero white wash)
+        // Tier 3: Volumetric Micro-Dust (rich theme-colored sparkles, deeper indigo in back)
         float core = exp(-12.0 * r2) * 0.95 * cutoff;
-        vec3 col = mix(uBaseColor, uMidColor, clamp(0.48 + core * 0.52, 0.0, 1.0));
-        float light = core * mix(0.65, 1.20, (vTwinkle - 0.55) / 0.70);
+        vec3 col = mix(uBaseColor, uMidColor, clamp(0.48 + core * 0.52 - 0.18 * troughDeep - 0.26 * backDeep, 0.0, 1.0));
+        col = mix(col, uHotColor, clamp(core * (0.16 * peakCool + wakeTint) * depthHotScale, 0.0, 0.26));
+        float light = core * mix(0.65, 1.20, (vTwinkle - 0.55) / 0.70) * wakeLift;
         gl_FragColor = vec4(col, clamp(vAlpha * light, 0.0, 0.74));
       }
     }
@@ -649,6 +845,8 @@ const NeuralHazeShader = {
     attribute vec2 aHazeStyle;
     uniform vec2 uHazeGlowPair;
     uniform vec2 uNodeScalePair;
+    uniform float uTime;
+    uniform float uDriftScale;
     varying float vAlpha;
     varying vec2 vLoHiLocal;
     varying float vCenterYLocal;
@@ -659,9 +857,10 @@ const NeuralHazeShader = {
     varying float vFeatherLocal;
     ${POCKET_MASK_GLSL}
     void main() {
+      float wingSide = aPocketFrame.w;
       PocketMaskEval p = evalStaticPocketMask(position, aPocketFrame.x);
-      float hazeGlow = mix(uHazeGlowPair.x, uHazeGlowPair.y, aWingSide);
-      float nodeScale = mix(uNodeScalePair.x, uNodeScalePair.y, aWingSide);
+      float hazeGlow = mix(uHazeGlowPair.x, uHazeGlowPair.y, wingSide);
+      float nodeScale = mix(uNodeScalePair.x, uNodeScalePair.y, wingSide);
       float outerFadeHaze = 1.0 - pocketEase((aRelativeCoord.x - 0.88) / 0.11);
       float persp = clamp(8.0 / max(-p.view.z, 1e-4), 0.75, 1.25);
       float funnelHalfHeightPx = aPocketFrame.z * p.pxPerLocalY;
@@ -671,22 +870,48 @@ const NeuralHazeShader = {
       float tipMask = smoothstep(0.025, 0.11, p.radius);
       vAlpha = aHazeStyle.y * hazeGlow * flowPocketVisibility() * outerFadeHaze * outerArchMask * tipMask;
 
+      // Ultra-slow buoyant mist drift (~2-3 CSS px over 10-14s cycles), strictly bounded by live [lo, hi] wall mask
+      vec2 mistOffsetCss = vec2(0.0);
+      if (uDriftScale > 0.5) {
+        float tipMistDamp = smoothstep(0.08, 0.16, aRelativeCoord.x);
+        float outerMistDamp = 1.0 - smoothstep(0.90, 0.96, aRelativeCoord.x);
+        float mistDamp = tipMistDamp * outerMistDamp;
+        if (mistDamp > 0.001) {
+          float tMist = mod(uTime, 240.0);
+          float phaseX = aRelativeCoord.x * 19.7 + aRelativeCoord.y * 7.3 + wingSide * 2.3;
+          float phaseY = aRelativeCoord.y * 17.1 + aRelativeCoord.z * 11.3 + aHazeStyle.x * 14.2;
+          float freqScale = 0.86 + 0.28 * fract(aRelativeCoord.x * 37.0 + aRelativeCoord.y * 19.0);
+          float thetaX = tMist * (0.49 * freqScale) + phaseX;
+          float thetaY = tMist * (0.56 * freqScale) + phaseY;
+          float dx = sin(thetaX) * 0.72 + cos(thetaY * 0.65) * 0.28;
+          float dy = cos(thetaY) * 0.76 + sin(thetaX * 0.55) * 0.24;
+          mistOffsetCss = vec2(dx, dy) * (2.6 * mistDamp);
+        }
+      }
+
+      float viewDepth = max(-p.view.z, 1e-4);
+      float worldPerPx = viewDepth / (projectionMatrix[1][1] * 0.5 * max(uViewportHeight, 1.0));
+      float localYPerCss = 1.0 / max(p.pxPerLocalY, 1e-4);
+      float driftedCenterY = aPocketFrame.x + dot(mistOffsetCss, p.axisScreenDir) * localYPerCss;
+      float driftedDistInsidePx = min(driftedCenterY - p.lo, p.hi - driftedCenterY) * p.pxPerLocalY;
+
       vLoHiLocal = vec2(p.lo, p.hi);
-      vCenterYLocal = aPocketFrame.x;
+      vCenterYLocal = driftedCenterY;
       vHazeCss = hazeCss;
-      vLocalYPerCss = 1.0 / max(p.pxPerLocalY, 1e-4);
+      vLocalYPerCss = localYPerCss;
       vAxisScreenDir = p.axisScreenDir;
       vWallPadLocal = -min(0.018, 0.032 * p.radius);
       vFeatherLocal = clamp(0.075 * p.radius, 0.014, 0.068);
 
       float safeDpr = clamp(uPixelRatio, 1.0, 2.5);
-      if (hazeCss <= 0.05 || vAlpha <= 0.0005 || p.distInsidePx + 0.5 * hazeCss <= -6.0) {
+      if (hazeCss <= 0.05 || vAlpha <= 0.0005 || driftedDistInsidePx + 0.5 * hazeCss <= -6.0) {
         gl_PointSize = 0.0;
         vAlpha = 0.0;
       } else {
         gl_PointSize = min(hazeCss * safeDpr, 160.0);
       }
-      gl_Position = projectionMatrix * p.view;
+      vec4 mistView = p.view + vec4(mistOffsetCss * worldPerPx, 0.0, 0.0);
+      gl_Position = projectionMatrix * mistView;
     }
   `,
   fragmentShader: `
@@ -840,6 +1065,13 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     const matLeft = getRibbonMatrix({ ...leftConfig, side: 'left' }, layoutLeft)
     const matRight = getRibbonMatrix({ ...rightConfig, side: 'right' }, layoutRight)
 
+    const leftXAxis = new THREE.Vector3().setFromMatrixColumn(matLeft, 0)
+    const leftFlowAxis = new THREE.Vector3().setFromMatrixColumn(matLeft, 1)
+    const leftDepthAxis = new THREE.Vector3().setFromMatrixColumn(matLeft, 2)
+    const rightXAxis = new THREE.Vector3().setFromMatrixColumn(matRight, 0)
+    const rightFlowAxis = new THREE.Vector3().setFromMatrixColumn(matRight, 1)
+    const rightDepthAxis = new THREE.Vector3().setFromMatrixColumn(matRight, 2)
+
     const mergedLinesGeo = mergeTransformedGeometries(leftField.linesGeo, matLeft, rightField.linesGeo, matRight)
     const mergedPointsGeo = mergeTransformedGeometries(leftField.pointsGeo, matLeft, rightField.pointsGeo, matRight)
     const mergedHazeGeo = mergeTransformedGeometries(leftField.hazeGeo, matLeft, rightField.hazeGeo, matRight)
@@ -849,6 +1081,12 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       linesGeo: mergedLinesGeo,
       pointsGeo: mergedPointsGeo,
       hazeGeo: mergedHazeGeo,
+      leftXAxis,
+      leftFlowAxis,
+      leftDepthAxis,
+      rightXAxis,
+      rightFlowAxis,
+      rightDepthAxis,
       timings: {
         left: leftFieldData.dt,
         right: rightFieldData.dt,
@@ -875,6 +1113,14 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       uniforms: {
         uLineOpacityPair: { value: new THREE.Vector2(0.9, 0.9) },
         uInnerFadePair: { value: new THREE.Vector2(0.04, 0.04) },
+        uRollAnglePair: { value: new THREE.Vector2(0.0, 0.0) },
+        uKWavePair: { value: new THREE.Vector2(2.5 * Math.PI, 2.5 * Math.PI) },
+        uXAxisLeft: { value: new THREE.Vector3(1, 0, 0) },
+        uXAxisRight: { value: new THREE.Vector3(1, 0, 0) },
+        uFlowAxisLeft: { value: new THREE.Vector3(0, 1, 0) },
+        uFlowAxisRight: { value: new THREE.Vector3(0, 1, 0) },
+        uDepthAxisLeft: { value: new THREE.Vector3(0, 0, 1) },
+        uDepthAxisRight: { value: new THREE.Vector3(0, 0, 1) },
         uFlowTrig: flowTrigUniform,
         uTime: timeUniform,
         uDriftScale: { value: 1.0 },
@@ -900,6 +1146,11 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
         uGlowIntensityPair: { value: new THREE.Vector2(1, 1) },
         uNodeScalePair: { value: new THREE.Vector2(1, 1) },
         uInnerFadePair: { value: new THREE.Vector2(0.04, 0.04) },
+        uRollAnglePair: { value: new THREE.Vector2(0.0, 0.0) },
+        uFlowAxisLeft: { value: new THREE.Vector3(0, 1, 0) },
+        uFlowAxisRight: { value: new THREE.Vector3(0, 1, 0) },
+        uDepthAxisLeft: { value: new THREE.Vector3(0, 0, 1) },
+        uDepthAxisRight: { value: new THREE.Vector3(0, 0, 1) },
         uFlowTrig: flowTrigUniform,
         uTime: timeUniform,
         uDriftScale: { value: 1.0 },
@@ -924,7 +1175,13 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
         uHazeGlowPair: { value: new THREE.Vector2(1, 1) },
         uNodeScalePair: { value: new THREE.Vector2(1, 1) },
         uInnerFadePair: { value: new THREE.Vector2(0.04, 0.04) },
+        uFlowAxisLeft: { value: new THREE.Vector3(0, 1, 0) },
+        uFlowAxisRight: { value: new THREE.Vector3(0, 1, 0) },
+        uDepthAxisLeft: { value: new THREE.Vector3(0, 0, 1) },
+        uDepthAxisRight: { value: new THREE.Vector3(0, 0, 1) },
         uFlowTrig: flowTrigUniform,
+        uTime: timeUniform,
+        uDriftScale: { value: 1.0 },
         uHazeColor: { value: new THREE.Color() },
         uHazeAlphaCap: { value: 0.088 },
         uBaseColor: { value: new THREE.Color() },
@@ -940,7 +1197,18 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       depthTest: false,
       depthWrite: false,
     })
-  }, [flowTrigUniform])
+  }, [flowTrigUniform, timeUniform])
+
+  useFrame(() => {
+    if (prefersReducedMotion) {
+      lineMat.uniforms.uRollAnglePair.value.set(0.0, 0.0)
+      pointMat.uniforms.uRollAnglePair.value.set(0.0, 0.0)
+      return
+    }
+    const rollAngle = computeWrappedRollAngle(timeUniform.value)
+    lineMat.uniforms.uRollAnglePair.value.set(rollAngle, -rollAngle)
+    pointMat.uniforms.uRollAnglePair.value.set(rollAngle, -rollAngle)
+  })
 
   const rightGlowMult = rightConfig.glowIntensity ?? 1.0
   const leftGlowMult = leftConfig.glowIntensity ?? 1.0
@@ -1008,13 +1276,26 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
       material.uniforms.uPixelRatio.value = viewport.dpr
       material.uniforms.uViewportHeight.value = Math.max(1, canvasSize.height)
       material.uniforms.uInnerFadePair.value.set(leftFade, rightFade)
+      material.uniforms.uFlowAxisLeft.value.copy(mergedGeometries.leftFlowAxis)
+      material.uniforms.uFlowAxisRight.value.copy(mergedGeometries.rightFlowAxis)
+      material.uniforms.uDepthAxisLeft.value.copy(mergedGeometries.leftDepthAxis)
+      material.uniforms.uDepthAxisRight.value.copy(mergedGeometries.rightDepthAxis)
     }
 
     lineMat.uniforms.uLineOpacityPair.value.set(
       Math.min(1.12, leftGlow * 0.80),
       Math.min(1.12, rightGlow * 0.80)
     )
+    lineMat.uniforms.uKWavePair.value.set(
+      2.5 * Math.PI * (leftConfig.frequency ?? 1.0),
+      2.5 * Math.PI * (rightConfig.frequency ?? 1.0)
+    )
+    lineMat.uniforms.uXAxisLeft.value.copy(mergedGeometries.leftXAxis)
+    lineMat.uniforms.uXAxisRight.value.copy(mergedGeometries.rightXAxis)
     const driftActive = prefersReducedMotion ? 0.0 : 1.0
+    const rollAngle = prefersReducedMotion ? 0.0 : computeWrappedRollAngle(timeUniform.value)
+    lineMat.uniforms.uRollAnglePair.value.set(rollAngle, -rollAngle)
+    pointMat.uniforms.uRollAnglePair.value.set(rollAngle, -rollAngle)
     lineMat.uniforms.uDriftScale.value = driftActive
     lineMat.uniforms.uRestingLineScale.value = neuralLineScale
     pointMat.uniforms.uGlowIntensityPair.value.set(
@@ -1023,13 +1304,17 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     )
     pointMat.uniforms.uNodeScalePair.value.set(leftNS, rightNS)
     pointMat.uniforms.uDriftScale.value = driftActive
+    hazeMat.uniforms.uDriftScale.value = driftActive
     if (typeof window !== 'undefined') {
       window.__neuralMotionState = {
         driftActive,
-        peakDriftRadiusPx: 5.8,
+        peakDriftRadiusPx: 2.5,
+        rollPeriodSeconds: ROLL_PERIOD_SECONDS,
+        rollAnglePair: lineMat.uniforms.uRollAnglePair.value,
         timeUniform,
         pointMat,
         lineMat,
+        hazeMat,
       }
     }
     hazeMat.uniforms.uHazeGlowPair.value.set(
@@ -1081,6 +1366,7 @@ const MergedNeuralNetworkField = memo(function MergedNeuralNetworkField({
     neuralPointScale,
     viewport.dpr,
     canvasSize.height,
+    mergedGeometries,
   ])
 
   useEffect(() => () => lineMat.dispose(), [lineMat])

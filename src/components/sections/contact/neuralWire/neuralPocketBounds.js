@@ -224,23 +224,49 @@ function safeMax(a, b) {
  * Bake stationary 4-strand wave harmonics and static funnel radius for GPU live-pocket masking.
  * Preserves fixed 3D vertex positions (zero vertical accordion compression or horizontal slide).
  */
-function addStaticPocketMaskAttributes(geometry, H, config, profiles, isLineSegments = false, useCache = true) {
+function addStaticPocketMaskAttributes(geometry, H, config, nodeIds = null, waveCache = null, isLineSegments = false, rawMeta = null) {
   const positions = geometry.getAttribute('position').array
   const relCoords = geometry.getAttribute('aRelativeCoord').array
   const count = relCoords.length / 4
   const bias = new Float32Array(count * 4)
   const cos = new Float32Array(count * 4)
   const sin = new Float32Array(count * 4)
-  const frame = new Float32Array(count * 3)
-  const axis = new Float32Array(count * 3)
+  // [yRest, zRest_or_yRestB, R_u, wingSide] (wingSide filled during merge)
+  const frame = new Float32Array(count * 4)
   const prof = new Float64Array(5)
   const scratchProfile = new Float64Array(13)
 
+  const flatData = waveCache?.data
+  const flatFlags = waveCache?.computed
+
   for (let i = 0; i < count; i++) {
     const u = relCoords[4 * i]
-    let p = useCache ? profiles.get(u) : null
-    if (!p) {
-      p = useCache ? new Float64Array(13) : scratchProfile
+    const nId = nodeIds ? nodeIds[i] : -1
+    let p = scratchProfile
+    let off = 0
+
+    if (flatData && nId >= 0) {
+      off = nId * 13
+      p = flatData
+      if (!flatFlags[nId]) {
+        let fMinY = Infinity
+        let fMaxY = -Infinity
+        for (let j = 0; j < 4; j++) {
+          getHeroWaveProfile(j, u, H, config, prof)
+          const biasY = prof[0]
+          const ampY = prof[2]
+          const absAmpY = Math.abs(ampY)
+          const phase = prof[4]
+          flatData[off + j] = biasY
+          flatData[off + 4 + j] = ampY * Math.sin(phase)
+          flatData[off + 8 + j] = -ampY * Math.cos(phase)
+          if (biasY - absAmpY < fMinY) fMinY = biasY - absAmpY
+          if (biasY + absAmpY > fMaxY) fMaxY = biasY + absAmpY
+        }
+        flatData[off + 12] = Math.max(0.5 * (fMaxY - fMinY), 1e-5)
+        flatFlags[nId] = 1
+      }
+    } else {
       let fMinY = Infinity
       let fMaxY = -Infinity
       for (let j = 0; j < 4; j++) {
@@ -256,27 +282,23 @@ function addStaticPocketMaskAttributes(geometry, H, config, profiles, isLineSegm
         if (biasY + absAmpY > fMaxY) fMaxY = biasY + absAmpY
       }
       p[12] = Math.max(0.5 * (fMaxY - fMinY), 1e-5)
-      if (useCache) profiles.set(u, p)
     }
 
     const i4 = 4 * i
-    bias[i4] = p[0]; bias[i4 + 1] = p[1]; bias[i4 + 2] = p[2]; bias[i4 + 3] = p[3]
-    cos[i4] = p[4]; cos[i4 + 1] = p[5]; cos[i4 + 2] = p[6]; cos[i4 + 3] = p[7]
-    sin[i4] = p[8]; sin[i4 + 1] = p[9]; sin[i4 + 2] = p[10]; sin[i4 + 3] = p[11]
+    bias[i4] = p[off]; bias[i4 + 1] = p[off + 1]; bias[i4 + 2] = p[off + 2]; bias[i4 + 3] = p[off + 3]
+    cos[i4] = p[off + 4]; cos[i4 + 1] = p[off + 5]; cos[i4 + 2] = p[off + 6]; cos[i4 + 3] = p[off + 7]
+    sin[i4] = p[off + 8]; sin[i4 + 1] = p[off + 9]; sin[i4 + 2] = p[off + 10]; sin[i4 + 3] = p[off + 11]
 
-    const yRest = positions[3 * i + 1]
-    const zRest = positions[3 * i + 2]
-    frame[3 * i] = yRest
-    frame[3 * i + 1] = zRest
-    frame[3 * i + 2] = p[12]
-    axis[3 * i + 1] = 1
+    frame[i4] = positions[3 * i + 1]
+    frame[i4 + 1] = positions[3 * i + 2]
+    frame[i4 + 2] = rawMeta ? rawMeta[i * 3 + 2] : p[off + 12]
+    frame[i4 + 3] = 0.0
   }
 
   geometry.setAttribute('aWaveBias', new THREE.BufferAttribute(bias, 4))
   geometry.setAttribute('aWaveCos', new THREE.BufferAttribute(cos, 4))
   geometry.setAttribute('aWaveSin', new THREE.BufferAttribute(sin, 4))
-  geometry.setAttribute('aPocketFrame', new THREE.BufferAttribute(frame, 3))
-  geometry.setAttribute('aFlowAxis', new THREE.BufferAttribute(axis, 3))
+  geometry.setAttribute('aPocketFrame', new THREE.BufferAttribute(frame, 4))
 
   if (isLineSegments) {
     const partnerBias = new Float32Array(count * 4)
@@ -293,8 +315,8 @@ function addStaticPocketMaskAttributes(geometry, H, config, profiles, isLineSegm
         partnerCos[b4 + c] = cos[a4 + c]
         partnerSin[b4 + c] = sin[a4 + c]
       }
-      frame[k * 3 + 1] = positions[(k + 1) * 3 + 1]
-      frame[(k + 1) * 3 + 1] = positions[k * 3 + 1]
+      frame[a4 + 1] = positions[(k + 1) * 3 + 1]
+      frame[b4 + 1] = positions[k * 3 + 1]
     }
     geometry.setAttribute('aPartnerBias', new THREE.BufferAttribute(partnerBias, 4))
     geometry.setAttribute('aPartnerCos', new THREE.BufferAttribute(partnerCos, 4))
@@ -370,11 +392,12 @@ export class RibbonBoundsLUT {
     this.phases = phases
     this.H = H
     this.config = config
+    const fastFunnelOnly = phases === 0
     // Float64 preserves the original double-precision interpolation decisions.
-    this.data = new Float64Array((samples + 1) * 17)
+    this.data = fastFunnelOnly ? null : new Float64Array((samples + 1) * 17)
     this.funnelData = new Float64Array((samples + 1) * 8)
-    this.phaseMinY = new Float64Array((samples + 1) * phases)
-    this.phaseMaxY = new Float64Array((samples + 1) * phases)
+    this.phaseMinY = fastFunnelOnly ? null : new Float64Array((samples + 1) * phases)
+    this.phaseMaxY = fastFunnelOnly ? null : new Float64Array((samples + 1) * phases)
     this.maxEnvHeight = 0.0
     this.maxFunnelHeight = 0.0
 
@@ -391,31 +414,33 @@ export class RibbonBoundsLUT {
     const cosY = new Float64Array(4)
     const sinY = new Float64Array(4)
 
-    const sample = {}
+    const sample = fastFunnelOnly ? null : {}
     for (let i = 0; i <= samples; i++) {
       const u = i / samples
-      getAlmondPocketBounds(u, H, config, sample)
-      const offset = i * 17
-      this.data[offset + 0] = sample.y0
-      this.data[offset + 1] = sample.y1
-      this.data[offset + 2] = sample.z0
-      this.data[offset + 3] = sample.z1
-      this.data[offset + 4] = sample.y2
-      this.data[offset + 5] = sample.z2
-      this.data[offset + 6] = sample.y3
-      this.data[offset + 7] = sample.z3
-      this.data[offset + 8] = sample.yUpper
-      this.data[offset + 9] = sample.yLower
-      this.data[offset + 10] = sample.envMinY
-      this.data[offset + 11] = sample.envMaxY
-      this.data[offset + 12] = sample.envHeight
-      this.data[offset + 13] = sample.envCenterY
-      this.data[offset + 14] = sample.envCenterZ
-      this.data[offset + 15] = sample.safeMargin
-      this.data[offset + 16] = sample.minGapHeight
+      if (!fastFunnelOnly) {
+        getAlmondPocketBounds(u, H, config, sample)
+        const offset = i * 17
+        this.data[offset + 0] = sample.y0
+        this.data[offset + 1] = sample.y1
+        this.data[offset + 2] = sample.z0
+        this.data[offset + 3] = sample.z1
+        this.data[offset + 4] = sample.y2
+        this.data[offset + 5] = sample.z2
+        this.data[offset + 6] = sample.y3
+        this.data[offset + 7] = sample.z3
+        this.data[offset + 8] = sample.yUpper
+        this.data[offset + 9] = sample.yLower
+        this.data[offset + 10] = sample.envMinY
+        this.data[offset + 11] = sample.envMaxY
+        this.data[offset + 12] = sample.envHeight
+        this.data[offset + 13] = sample.envCenterY
+        this.data[offset + 14] = sample.envCenterZ
+        this.data[offset + 15] = sample.safeMargin
+        this.data[offset + 16] = sample.minGapHeight
 
-      if (u >= 0.08 && u <= 0.99 && sample.envHeight > this.maxEnvHeight) {
-        this.maxEnvHeight = sample.envHeight
+        if (u >= 0.08 && u <= 0.99 && sample.envHeight > this.maxEnvHeight) {
+          this.maxEnvHeight = sample.envHeight
+        }
       }
 
       let fMinY = Infinity
@@ -713,9 +738,10 @@ class IntegerBuckets {
 }
 
 export class SpatialGrid3D {
-  constructor(cellSize = 0.10) {
+  constructor(cellSize = 0.10, useIso = false) {
     this.cellSize = cellSize
     this.invCellSize = 1 / cellSize
+    this.useIso = useIso
     this.cells = new IntegerBuckets()
     this.queryIds = new Int32Array(256)
     this.queryDistances = new Float64Array(256)
@@ -733,6 +759,36 @@ export class SpatialGrid3D {
     this.cells.insert(k, id)
   }
 
+  hasNeighborWithin(x, y, z, minDist, nodes, searchRadius = minDist, minHubDist = minDist) {
+    const minX = Math.floor((x - searchRadius) * this.invCellSize)
+    const maxX = Math.floor((x + searchRadius) * this.invCellSize)
+    const minY = Math.floor((y - searchRadius) * this.invCellSize)
+    const maxY = Math.floor((y + searchRadius) * this.invCellSize)
+    const minZ = Math.floor((z - searchRadius) * this.invCellSize)
+    const maxZ = Math.floor((z + searchRadius) * this.invCellSize)
+    const useIso = this.useIso
+
+    for (let ix = minX; ix <= maxX; ix++) {
+      for (let iy = minY; iy <= maxY; iy++) {
+        for (let iz = minZ; iz <= maxZ; iz++) {
+          const cells = this.cells
+          for (let entry = cells.first(this._key(ix, iy, iz)); entry !== -1; entry = cells.next[entry]) {
+            const other = nodes[cells.ids[entry]]
+            const ox = useIso ? other.isoX : other.pos.x
+            const oy = useIso ? other.isoY : other.pos.y
+            const oz = useIso ? other.isoZ : other.pos.z
+            const dx = ox - x
+            const dy = oy - y
+            const dz = oz - z
+            const req = other.tier === 2 ? minHubDist : minDist
+            if (dx * dx + dy * dy + dz * dz < req * req) return true
+          }
+        }
+      }
+    }
+    return false
+  }
+
   isTooClose(x, y, z, reqRadius, nodes, projected = false, searchRadius = reqRadius) {
     const minX = Math.floor((x - searchRadius) * this.invCellSize)
     const maxX = Math.floor((x + searchRadius) * this.invCellSize)
@@ -740,6 +796,7 @@ export class SpatialGrid3D {
     const maxY = Math.floor((y + searchRadius) * this.invCellSize)
     const minZ = projected ? 0 : Math.floor((z - searchRadius) * this.invCellSize)
     const maxZ = projected ? 0 : Math.floor((z + searchRadius) * this.invCellSize)
+    const useIso = this.useIso
 
     for (let ix = minX; ix <= maxX; ix++) {
       for (let iy = minY; iy <= maxY; iy++) {
@@ -748,9 +805,9 @@ export class SpatialGrid3D {
           {
             for (let entry = cells.first(this._key(ix, iy, iz)); entry !== -1; entry = cells.next[entry]) {
               const other = nodes[cells.ids[entry]]
-              const dx = other.pos.x - x
-              const dy = (projected ? (other.projectedY ?? other.pos.y) : other.pos.y) - y
-              const dz = projected ? 0 : other.pos.z - z
+              const dx = (useIso ? other.isoX : other.pos.x) - x
+              const dy = (projected ? (other.projectedY ?? (useIso ? other.isoY : other.pos.y)) : (useIso ? other.isoY : other.pos.y)) - y
+              const dz = projected ? 0 : ((useIso ? other.isoZ : other.pos.z) - z)
               const radius = Math.max(reqRadius, (projected ? other.projectedRadius : other.radius) || 0)
               const r2 = radius * radius
               if (dx * dx + dy * dy + dz * dz < r2) return true
@@ -797,6 +854,7 @@ export class SpatialGrid3D {
     const maxY = Math.floor((y + radius) * this.invCellSize)
     const minZ = Math.floor((z - radius) * this.invCellSize)
     const maxZ = Math.floor((z + radius) * this.invCellSize)
+    const useIso = this.useIso
 
     for (let ix = minX; ix <= maxX; ix++) {
       for (let iy = minY; iy <= maxY; iy++) {
@@ -806,9 +864,9 @@ export class SpatialGrid3D {
             for (let entry = cells.first(this._key(ix, iy, iz)); entry !== -1; entry = cells.next[entry]) {
               const id = cells.ids[entry]
               const other = nodes[id]
-              const dx = other.pos.x - x
-              const dy = other.pos.y - y
-              const dz = other.pos.z - z
+              const dx = (useIso ? other.isoX : other.pos.x) - x
+              const dy = (useIso ? other.isoY : other.pos.y) - y
+              const dz = (useIso ? other.isoZ : other.pos.z) - z
               const d2 = dx * dx + dy * dy + dz * dz
               if (d2 <= r2) {
                 if (count === this.queryIds.length) {
@@ -941,11 +999,12 @@ class EdgeGrid2D {
     }
   }
 
-  hasCrossing(pA, pB, candI, candJ, edges, rawNodes, sameTierOnly = false, targetTier = null) {
+  hasCrossing(pA, pB, candI, candJ, edges, rawNodes, sameTierOnly = false, targetTier = null, zBandThreshold = Infinity) {
     const minX = Math.floor(Math.min(pA.x, pB.x) * this.invCellSize)
     const maxX = Math.floor(Math.max(pA.x, pB.x) * this.invCellSize)
     const minY = Math.floor(Math.min(pA.y, pB.y) * this.invCellSize)
     const maxY = Math.floor(Math.max(pA.y, pB.y) * this.invCellSize)
+    const candMidZ = 0.5 * (rawNodes[candI].isoZ + rawNodes[candJ].isoZ)
 
     this.stamp++
     const stamp = this.stamp
@@ -961,6 +1020,10 @@ class EdgeGrid2D {
           const eA = rawNodes[i]
           const eB = rawNodes[j]
           if (sameTierOnly && (eA.depthTier !== targetTier || eB.depthTier !== targetTier)) continue
+          if (zBandThreshold < Infinity) {
+            const existMidZ = 0.5 * (eA.isoZ + eB.isoZ)
+            if (Math.abs(candMidZ - existMidZ) > zBandThreshold) continue
+          }
           if (segmentsIntersect2D(pA, pB, eA.isoPos, eB.isoPos)) {
             return true
           }
@@ -972,18 +1035,21 @@ class EdgeGrid2D {
 }
 
 /**
- * Validates that a stationary candidate line segment (A -> B) stays strictly inside the
- * swept full-funnel outer envelope at midpoints 0.25, 0.50, 0.75.
+ * Validates that a 3D cylindrical chord (A -> B) stays strictly inside the circular
+ * tapered funnel volume sqrt(y0^2 + z0^2) <= R(u) at midpoints 0.25, 0.50, 0.75.
  */
-function segmentInsideFunnel(uA, yA, uB, yB, lut, marginFraction = 0.004) {
-  const du = uB - uA
-  const dy = yB - yA
+function segmentInsideFunnel(a, b, lut, marginFraction = 0.004) {
+  const du = b.u - a.u
+  const dy0 = b.y0 - a.y0
+  const dz0 = b.z0 - a.z0
   for (let s = 1; s <= 3; s++) {
     const frac = s * 0.25
-    const b = lut.getFunnelBounds(uA + frac * du)
-    const m = Math.max(0.001, marginFraction * b.funnelHeight)
-    const yt = yA + frac * dy
-    if (yt > b.funnelMaxY - m || yt < b.funnelMinY + m) return false
+    const bLoc = lut.getFunnelBounds(a.u + frac * du)
+    const rad = 0.5 * bLoc.funnelHeight
+    const maxR = Math.max(0.0, rad - Math.max(0.0008, marginFraction * bLoc.funnelHeight))
+    const yt = a.y0 + frac * dy0
+    const zt = a.z0 + frac * dz0
+    if (yt * yt + zt * zt > maxR * maxR) return false
   }
   return true
 }
@@ -996,15 +1062,15 @@ function computeVMax(envHeight, isoYScale, maxFrac, minIsoMargin) {
 
 function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) {
   const rawNodes = []
-  const gridCell = Math.max(0.08, 0.20 * envScale)
-  const grid = new IsotropicGrid2D(gridCell)
+  const gridCell = Math.max(0.22, 0.36 * envScale)
+  const grid = new SpatialGrid3D(gridCell, true)
 
   function runTierPass({
     uStart,
     uEnd,
     cellIso,
     minIsoHeight,
-    maxVFrac,
+    maxRFrac,
     minIsoMargin,
     minDistExisting,
     minDistHub,
@@ -1012,8 +1078,7 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
     tier,
     isWeb,
     maxAttempts,
-    wDepthMin,
-    wDepthMax,
+    shellBias = true,
     organicCluster = false,
   }) {
     const xSpanMod = organicCluster ? Math.pow(Math.max(1.0, isoXScale / 1.15), 0.25) : 1.0
@@ -1028,9 +1093,9 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
       const midIsoH = bMid.funnelHeight * isoYScale
       if (midIsoH < minIsoHeight) continue
 
-      const vMax = computeVMax(bMid.funnelHeight, isoYScale, maxVFrac, minIsoMargin)
-      if (vMax <= 0.05) continue
-      const activeIsoH = isoYScale * bMid.funnelHeight * vMax
+      const rMaxMid = computeVMax(bMid.funnelHeight, isoYScale, maxRFrac, minIsoMargin)
+      if (rMaxMid <= 0.05) continue
+      const activeIsoH = isoYScale * bMid.funnelHeight * rMaxMid
       let densityMod = 1.0
       let localHubMin = minDistHub
       let effCellIso = cellIso
@@ -1041,38 +1106,58 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
         densityMod = 0.72 + 0.54 * (0.5 + 0.5 * Math.sin(uMid * 18.7 + sign * 1.1))
         localHubMin = (0.39 + 0.16 * (0.5 + 0.5 * Math.cos(uMid * 14.3 - sign * 0.7))) * cellScale * Math.pow(hRatio, 0.30) * xSpanMod
       }
-      const lambda = ((10.0 * isoXScale * stripDu * activeIsoH) / (effCellIso * effCellIso)) * densityMod
+      // 3D surface shell + interior density factor balances front & back hemispheres without soup
+      const volumeScale = tier === 2 ? 1.18 : (isWeb ? 1.15 : 1.08)
+      const lambda = ((10.0 * isoXScale * stripDu * activeIsoH) / (effCellIso * effCellIso)) * densityMod * volumeScale
       const baseCount = Math.floor(lambda)
       const count = baseCount + (prng() < (lambda - baseCount) ? 1 : 0)
       if (count <= 0) continue
 
+      const thetaShift = prng() * Math.PI * 2.0
       for (let k = 0; k < count; k++) {
-        const vLo = -vMax + (2.0 * vMax) * (k / count)
-        const vHi = -vMax + (2.0 * vMax) * ((k + 1) / count)
+        const thetaSlice = (Math.PI * 2.0) / count
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           const u = u0 + (0.06 + 0.88 * prng()) * stripDu
-          const vRaw = vLo + (0.06 + 0.88 * prng()) * (vHi - vLo)
           const bLoc = lut.getFunnelBounds(u)
           if (bLoc.funnelHeight * isoYScale < minIsoHeight * 0.82) continue
 
-          const vMaxLoc = computeVMax(bLoc.funnelHeight, isoYScale, maxVFrac, minIsoMargin)
-          if (vMaxLoc <= 0.05) continue
-          const v = vMax > 1e-4 ? vRaw * (vMaxLoc / vMax) : vRaw
-          if (Math.abs(v) > vMaxLoc) continue
+          const rMaxLoc = computeVMax(bLoc.funnelHeight, isoYScale, maxRFrac, minIsoMargin)
+          if (rMaxLoc <= 0.05) continue
 
+          const R_u = Math.max(1e-5, 0.5 * bLoc.funnelHeight)
+          const theta = thetaShift + (k + 0.12 + 0.76 * prng()) * thetaSlice + attempt * 0.37
+
+          // Bias lightly toward a hollow 3D cylinder shell + sparse interior core (echoing the central globe)
+          let rho
+          if (shellBias) {
+            if (prng() < 0.76) {
+              const shellMin = Math.min(rMaxLoc * 0.88, Math.max(0.48, 0.56 * rMaxLoc))
+              rho = shellMin + (rMaxLoc - shellMin) * Math.pow(prng(), 0.72)
+            } else {
+              const coreMax = Math.min(rMaxLoc * 0.65, 0.52 * rMaxLoc)
+              rho = (0.12 * rMaxLoc) + (coreMax - 0.12 * rMaxLoc) * Math.sqrt(prng())
+            }
+          } else {
+            rho = (0.08 * rMaxLoc) + (rMaxLoc - 0.08 * rMaxLoc) * Math.pow(prng(), 0.62)
+          }
+          rho = Math.min(rMaxLoc, Math.max(0.0, rho))
+
+          const rLocal = rho * R_u
+          const y0 = rLocal * Math.sin(theta)
+          const z0 = rLocal * Math.cos(theta)
           const x = sign * 10.0 * u
-          const y = bLoc.funnelCenterY + v * 0.5 * bLoc.funnelHeight
+          const y = bLoc.funnelCenterY + y0
+          const z = bLoc.funnelCenterZ + z0
           const isoX = x * isoXScale
           const isoY = y * isoYScale
+          const isoZ = z0 * isoYScale
 
           const effSearch = Math.max(searchRadius, localHubMin)
-          if (grid.hasNeighborWithin(isoX, isoY, minDistExisting, rawNodes, effSearch, localHubMin)) continue
+          if (grid.hasNeighborWithin(isoX, isoY, isoZ, minDistExisting, rawNodes, effSearch, localHubMin)) continue
 
-          const w_depth = wDepthMin + prng() * (wDepthMax - wDepthMin)
-          const z = bLoc.funnelCenterZ + w_depth * bLoc.funnelRz
-
-          const v_funnel = Math.max(-0.995, Math.min(0.995, v))
+          const v_funnel = THREE.MathUtils.clamp(y0 / R_u, -1.0, 1.0)
+          const w_depth = THREE.MathUtils.clamp(z0 / R_u, -1.0, 1.0)
           const r_norm = Math.min(1.0, Math.hypot(v_funnel, w_depth))
           const depthTier = w_depth > 0.25 ? 'fg' : (w_depth < -0.25 ? 'bg' : 'mid')
           const layer = w_depth > 0.25 ? 1.0 : (w_depth < -0.25 ? -1.0 : 0.0)
@@ -1109,8 +1194,12 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
           rawNodes.push({
             idx: id,
             pos,
+            y0,
+            z0,
+            R_u,
             isoX,
             isoY,
+            isoZ,
             isoPos: { x: isoX, y: isoY },
             u,
             hu: Math.max(0.020, bLoc.funnelHeight),
@@ -1136,7 +1225,7 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
               0.75 + 0.50 * prng(),
             ],
           })
-          grid.insert(isoX, isoY, id)
+          grid.insert(isoX, isoY, isoZ, id)
           break
         }
       }
@@ -1145,13 +1234,13 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
 
   const cellScale = Math.sqrt(envScale)
 
-  // Pass 1: Tier-1 Hero Starburst Hubs (reach ~89% outer crest zone without cores exiting outer ribbon edge)
+  // Pass 1: Tier-1 Hero Starburst Hubs (full 360 cylinder shell so front & back stars roll organically)
   runTierPass({
     uStart: 0.170,
     uEnd: 0.955,
-    cellIso: 0.60 * cellScale,
+    cellIso: 0.62 * cellScale,
     minIsoHeight: 0.140 * envScale,
-    maxVFrac: 0.89,
+    maxRFrac: 0.88,
     minIsoMargin: 0.028 * envScale,
     minDistExisting: 0.34 * cellScale,
     minDistHub: 0.46 * cellScale,
@@ -1159,70 +1248,67 @@ function sampleStratifiedNodes(sign, isoXScale, isoYScale, lut, prng, envScale) 
     tier: 2,
     isWeb: true,
     maxAttempts: 8,
-    wDepthMin: 0.06,
-    wDepthMax: 0.90,
+    shellBias: true,
     organicCluster: true,
   })
 
-  // Pass 2: Tier-2 Mid Constellation Vertices (flush to ~98.5% outer ribbon envelope)
+  // Pass 2: Tier-2 Mid Constellation Vertices (tuck flush up to ~97.5% outer cylinder wall)
   runTierPass({
     uStart: 0.090,
     uEnd: 0.985,
-    cellIso: 0.230 * cellScale,
+    cellIso: 0.245 * cellScale,
     minIsoHeight: 0.055 * envScale,
-    maxVFrac: 0.985,
+    maxRFrac: 0.975,
     minIsoMargin: 0.008 * envScale,
-    minDistExisting: 0.148 * cellScale,
-    minDistHub: 0.175 * cellScale,
-    searchRadius: 0.20 * cellScale,
+    minDistExisting: 0.155 * cellScale,
+    minDistHub: 0.185 * cellScale,
+    searchRadius: 0.21 * cellScale,
     tier: 1,
     isWeb: true,
     maxAttempts: 6,
-    wDepthMin: -0.82,
-    wDepthMax: 0.88,
+    shellBias: true,
   })
 
-  // Pass 3A: Tier-3 Delicate Web Connectors (tuck flush up to 99.5% outer arch border)
+  // Pass 3A: Tier-3 Delicate Web Connectors (tuck flush up to 99% outer cylinder border)
   runTierPass({
     uStart: 0.088,
     uEnd: 0.986,
-    cellIso: 0.250 * cellScale,
+    cellIso: 0.265 * cellScale,
     minIsoHeight: 0.036 * envScale,
-    maxVFrac: 0.995,
+    maxRFrac: 0.99,
     minIsoMargin: 0.004 * envScale,
-    minDistExisting: 0.128 * cellScale,
-    minDistHub: 0.142 * cellScale,
-    searchRadius: 0.158 * cellScale,
+    minDistExisting: 0.135 * cellScale,
+    minDistHub: 0.150 * cellScale,
+    searchRadius: 0.165 * cellScale,
     tier: 0,
     isWeb: true,
     maxAttempts: 5,
-    wDepthMin: -0.84,
-    wDepthMax: 0.72,
+    shellBias: true,
   })
 
-  // Pass 3B: Tier-3 Volumetric Micro-Dust (tuck flush up to 99.5% outer arch border)
+  // Pass 3B: Tier-3 Volumetric Micro-Dust (scattered across hollow cylinder shell & sparse core)
   runTierPass({
     uStart: 0.085,
     uEnd: 0.988,
-    cellIso: 0.140 * cellScale,
+    cellIso: 0.148 * cellScale,
     minIsoHeight: 0.034 * envScale,
-    maxVFrac: 0.995,
+    maxRFrac: 0.99,
     minIsoMargin: 0.004 * envScale,
-    minDistExisting: 0.074 * cellScale,
-    minDistHub: 0.095 * cellScale,
-    searchRadius: 0.108 * cellScale,
+    minDistExisting: 0.080 * cellScale,
+    minDistHub: 0.100 * cellScale,
+    searchRadius: 0.112 * cellScale,
     tier: 0,
     isWeb: false,
     maxAttempts: 4,
-    wDepthMin: -0.88,
-    wDepthMax: 0.65,
+    shellBias: false,
   })
 
-  // Build dedicated spatial grid over web nodes only for fast edge queries
-  const webGrid = new IsotropicGrid2D(gridCell)
+  // Build dedicated 3D isotropic spatial grid over web nodes for true 3D Euclidean edge queries
+  const webGridCell = Math.max(0.28, 0.42 * envScale)
+  const webGrid = new SpatialGrid3D(webGridCell, true)
   for (let i = 0; i < rawNodes.length; i++) {
     if (rawNodes[i].isWeb) {
-      webGrid.insert(rawNodes[i].isoX, rawNodes[i].isoY, i)
+      webGrid.insert(rawNodes[i].isoX, rawNodes[i].isoY, rawNodes[i].isoZ, i)
     }
   }
 
@@ -1241,6 +1327,7 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
   }
   const adjacency = new Int32Array(nCount * maxDegreeCap)
   const edgeGrid = new EdgeGrid2D(Math.max(0.08, 0.24 * envScale), edgeCapacity)
+  const sameSurfaceZBand = 0.44 * envScale
 
   function hasEdge(i, j) {
     for (let k = 0; k < rawNodes[i].connectedCount; k++) {
@@ -1249,26 +1336,40 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
     return false
   }
 
-  function hasTightAngle(i, j, cosLimit = 0.90) {
+  // True 3D angular separation check prevents skinny acute triangles on the cylinder surface
+  function hasTightAngle3D(i, j, cosLimit = 0.88) {
     const a = rawNodes[i]
     const b = rawNodes[j]
     const dx = b.isoX - a.isoX
     const dy = b.isoY - a.isoY
-    const l2 = dx * dx + dy * dy
+    const dz = b.isoZ - a.isoZ
+    const l2 = dx * dx + dy * dy + dz * dz
     if (l2 < 1e-8) return true
     for (let slot = 0; slot < a.connectedCount; slot++) {
       const n = rawNodes[adjacency[i * maxDegreeCap + slot]]
       const nx = n.isoX - a.isoX
       const ny = n.isoY - a.isoY
-      const dot = dx * nx + dy * ny
-      if (dot > 0 && dot * dot > cosLimit * cosLimit * l2 * (nx * nx + ny * ny)) {
+      const nz = n.isoZ - a.isoZ
+      const dot = dx * nx + dy * ny + dz * nz
+      if (dot > 0 && dot * dot > cosLimit * cosLimit * l2 * (nx * nx + ny * ny + nz * nz)) {
         return true
       }
     }
     return false
   }
 
-  function tryAddEdge(i, j, allowCrossing = false, cosLimit = 0.90, isFallback = false, capOverride = maxDegreeCap, envMemo = null, memoIdx = -1) {
+  // Prevent awkward straight chords slicing directly across the cylinder diameter
+  function isDiameterChord(a, b) {
+    const avgEndR = 0.5 * (a.r_norm + b.r_norm)
+    if (avgEndR <= 0.54) return false
+    const avgRu = Math.max(1e-5, 0.5 * (a.R_u + b.R_u))
+    const midY0 = 0.5 * (a.y0 + b.y0)
+    const midZ0 = 0.5 * (a.z0 + b.z0)
+    const midRNorm = Math.hypot(midY0, midZ0) / avgRu
+    return midRNorm < 0.42 * avgEndR
+  }
+
+  function tryAddEdge(i, j, allowCrossing = false, cosLimit = 0.88, isFallback = false, capOverride = maxDegreeCap, envMemo = null, memoIdx = -1) {
     if (i === j || hasEdge(i, j)) return false
     if (envMemo && envMemo[memoIdx] === 1) return false
     const a = rawNodes[i]
@@ -1277,9 +1378,13 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
     const capA = Math.min(capOverride, a.maxDeg)
     const capB = Math.min(capOverride, b.maxDeg)
     if (a.connectedCount >= capA || b.connectedCount >= capB) return false
-    if (cosLimit < 1.0 && (hasTightAngle(i, j, cosLimit) || hasTightAngle(j, i, cosLimit))) return false
-    if (!allowCrossing && edgeGrid.hasCrossing(a.isoPos, b.isoPos, i, j, edges, rawNodes, false)) return false
-    if (!segmentInsideFunnel(a.u, a.pos.y, b.u, b.pos.y, lut, 0.004)) {
+    if (isDiameterChord(a, b)) {
+      if (envMemo) envMemo[memoIdx] = 1
+      return false
+    }
+    if (cosLimit < 1.0 && (hasTightAngle3D(i, j, cosLimit) || hasTightAngle3D(j, i, cosLimit))) return false
+    if (!allowCrossing && edgeGrid.hasCrossing(a.isoPos, b.isoPos, i, j, edges, rawNodes, false, null, sameSurfaceZBand)) return false
+    if (!segmentInsideFunnel(a, b, lut, 0.004)) {
       if (envMemo) envMemo[memoIdx] = 1
       return false
     }
@@ -1295,35 +1400,32 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
     return true
   }
 
-  // Gather short-range isotropic neighbor pairs across web nodes and sort shortest-first
+  // Gather short-range true 3D Euclidean neighbor pairs across web nodes and sort shortest-first
   const pairCapacity = Math.max(256, nCount * 10)
   let pairA = new Int32Array(pairCapacity)
   let pairB = new Int32Array(pairCapacity)
   let pairScore = new Float32Array(pairCapacity)
   let pairCount = 0
-  const maxDu = 0.095 / Math.max(0.75, isoXScale)
+  const maxDu = 0.105 / Math.max(0.75, isoXScale)
 
   for (let i = 0; i < nCount; i++) {
     const nA = rawNodes[i]
     if (!nA.isWeb) continue
     const hIsoA = nA.hu * isoYScale
-    const searchR = Math.min(0.85 * envScale, Math.max(0.24 * envScale, 0.62 * hIsoA))
-    const qCount = webGrid.queryRadius(nA.isoX, nA.isoY, searchR, rawNodes)
+    const searchR = Math.min(0.92 * envScale, Math.max(0.26 * envScale, 0.65 * hIsoA))
+    const qCount = webGrid.queryRadius(nA.isoX, nA.isoY, nA.isoZ, searchR, rawNodes)
 
     for (let q = 0; q < qCount; q++) {
       const j = webGrid.queryIds[q]
       if (j <= i) continue
-      const distIso = webGrid.queryDistances[q]
-      if (distIso < 0.03 * envScale) continue
+      const dist3D = webGrid.queryDistances[q]
+      if (dist3D < 0.03 * envScale) continue
       const nB = rawNodes[j]
       if (!nB.isWeb || Math.abs(nA.u - nB.u) > maxDu) continue
 
       const avgHIso = 0.5 * (nA.hu + nB.hu) * isoYScale
-      const maxEdgeDist = Math.min(0.68 * envScale, Math.max(0.18 * envScale, 0.50 * avgHIso))
-      if (distIso > maxEdgeDist) continue
-
-      const depthPenalty = 1.0 + 0.08 * Math.abs(nA.w_depth - nB.w_depth)
-      const score = distIso * depthPenalty
+      const maxEdgeDist = Math.min(0.68 * envScale, Math.max(0.20 * envScale, 0.52 * avgHIso))
+      if (dist3D > maxEdgeDist) continue
 
       if (pairCount === pairA.length) {
         const nextLen = pairA.length * 2
@@ -1335,7 +1437,7 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
       }
       pairA[pairCount] = i
       pairB[pairCount] = j
-      pairScore[pairCount] = score
+      pairScore[pairCount] = dist3D
       pairCount++
     }
   }
@@ -1345,24 +1447,24 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
   order.sort((a, b) => pairScore[a] - pairScore[b])
   const pairEnvRejected = new Uint8Array(pairCount)
 
-  // Pass A: Shortest-first planar backbone up to degree 4
+  // Pass A: Shortest-first 3D cylindrical surface backbone up to degree 4
   for (let p = 0; p < pairCount; p++) {
     const idx = order[p]
-    tryAddEdge(pairA[idx], pairB[idx], false, 0.90, false, 4, pairEnvRejected, idx)
+    tryAddEdge(pairA[idx], pairB[idx], false, 0.88, false, 4, pairEnvRejected, idx)
   }
 
-  // Pass B: Repair under-connected web vertices (< 2 edges) before triangulation closure
+  // Pass B: Repair under-connected 3D vertices (< 2 edges) before triangulation closure
   let candIds = new Int32Array(128)
   let candDists = new Float64Array(128)
   function repairUnderConnected() {
-    const repairDu = 0.11 / Math.max(0.75, isoXScale)
+    const repairDu = 0.12 / Math.max(0.75, isoXScale)
     for (let pass = 0; pass < 3; pass++) {
       for (let i = 0; i < nCount; i++) {
         const nA = rawNodes[i]
         if (!nA.isWeb || nA.connectedCount >= 2) continue
         const hIso = nA.hu * isoYScale
-        const searchR = Math.min(1.0 * envScale, Math.max(0.30 * envScale, 0.78 * hIso))
-        const qCount = webGrid.queryRadius(nA.isoX, nA.isoY, searchR, rawNodes)
+        const searchR = Math.min(1.05 * envScale, Math.max(0.32 * envScale, 0.82 * hIso))
+        const qCount = webGrid.queryRadius(nA.isoX, nA.isoY, nA.isoZ, searchR, rawNodes)
 
         let candCount = 0
         for (let q = 0; q < qCount; q++) {
@@ -1379,7 +1481,6 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
             candIds = nextIds
             candDists = nextDists
           }
-          // Insertion sort keeps small candidate list ordered with zero heap allocations
           let pos = candCount - 1
           while (pos >= 0 && candDists[pos] > d) {
             candIds[pos + 1] = candIds[pos]
@@ -1392,7 +1493,7 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
         }
 
         const allowCross = pass >= 2
-        const cosLim = pass === 0 ? 0.93 : 0.98
+        const cosLim = pass === 0 ? 0.92 : 0.97
         for (let c = 0; c < candCount && nA.connectedCount < 2; c++) {
           tryAddEdge(i, candIds[c], allowCross, cosLim, pass > 0, maxDegreeCap)
         }
@@ -1401,11 +1502,11 @@ function connectNeuralNodes(rawNodes, webGrid, lut, isoXScale, isoYScale, envSca
   }
   repairUnderConnected()
 
-  // Pass C: Triangulated spiderweb closure up to per-tier maxDegree (6 for Tier-1, 4 for Tier-2, 3 for Tier-3)
+  // Pass C: Triangulated 3D cylindrical mesh closure up to per-tier maxDegree
   for (let p = 0; p < pairCount; p++) {
     const idx = order[p]
     if (!pairEnvRejected[idx]) {
-      tryAddEdge(pairA[idx], pairB[idx], false, 0.92, false, maxDegreeCap, pairEnvRejected, idx)
+      tryAddEdge(pairA[idx], pairB[idx], false, 0.90, false, maxDegreeCap, pairEnvRejected, idx)
     }
   }
 
@@ -1448,7 +1549,7 @@ function getCachedRibbonBoundsLUT(H, config) {
     if (lutCache.size >= 4) {
       lutCache.delete(lutCache.keys().next().value)
     }
-    lut = new RibbonBoundsLUT(H, config, 256, 16)
+    lut = new RibbonBoundsLUT(H, config, 256, 0)
     lutCache.set(key, lut)
   }
   return lut
@@ -1483,18 +1584,26 @@ function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut
   for (let s = 0; s < tipSpecs.length; s++) {
     const spec = tipSpecs[s]
     const bLoc = lut.getFunnelBounds(spec.u)
+    const R_u = Math.max(1e-5, 0.5 * bLoc.funnelHeight)
     const vClamped = THREE.MathUtils.clamp(spec.v, -0.78, 0.78)
+    const y0 = vClamped * R_u
+    const z0 = 0.0
     const x = sign * 10.0 * spec.u
-    const y = bLoc.funnelCenterY + vClamped * 0.5 * bLoc.funnelHeight
-    const z = bLoc.funnelCenterZ
+    const y = bLoc.funnelCenterY + y0
+    const z = bLoc.funnelCenterZ + z0
     const isoX = x * isoXScale
     const isoY = y * isoYScale
+    const isoZ = z0 * isoYScale
     const id = rawNodes.length
     rawNodes.push({
       idx: id,
       pos: { x, y, z },
+      y0,
+      z0,
+      R_u,
       isoX,
       isoY,
+      isoZ,
       isoPos: { x: isoX, y: isoY },
       u: spec.u,
       hu: Math.max(0.002, bLoc.funnelHeight),
@@ -1533,7 +1642,7 @@ function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut
     if (edgeKeys.has(key)) return false
     const a = rawNodes[i]
     const b = rawNodes[j]
-    if (!segmentInsideFunnel(a.u, a.pos.y, b.u, b.pos.y, lut, 0.001)) return false
+    if (!segmentInsideFunnel(a, b, lut, 0.001)) return false
     edgeKeys.add(key)
     extraEdges.push({ i, j })
     a.connectedCount++
@@ -1602,8 +1711,8 @@ function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut
       const dst = neckNodes[j]
       const du = dst.u - src.u
       if (du <= 0.006 || du > 0.11) continue
-      const d = Math.hypot(dst.isoX - src.isoX, dst.isoY - src.isoY)
-      if (d > 0.72) continue
+      const d = Math.hypot(dst.isoX - src.isoX, dst.isoY - src.isoY, dst.isoZ - src.isoZ)
+      if (d > 0.78) continue
       cands.push({ idx: dst.idx, score: d + 0.28 * Math.abs(dst.v_funnel - src.v_funnel) + 0.30 * neckInDeg[dst.idx] })
     }
     cands.sort((a, b) => a.score - b.score)
@@ -1632,7 +1741,7 @@ function addInnerTipFeederTrunk(rawNodes, edges, sign, isoXScale, isoYScale, lut
     for (let t = 0; t < earlyTargets.length; t++) {
       const dst = earlyTargets[t]
       if (dst.u <= src.u + 0.008) continue
-      const d = Math.hypot(dst.isoX - src.isoX, dst.isoY - src.isoY)
+      const d = Math.hypot(dst.isoX - src.isoX, dst.isoY - src.isoY, dst.isoZ - src.isoZ)
       const dv = Math.abs(dst.v_funnel - src.v_funnel)
       candidates.push({ idx: dst.idx, d, dv })
     }
@@ -1700,8 +1809,6 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
   const baselineMaxIsoH = 2.8
   const maxEnvIsoH = lut.maxFunnelHeight * isoYScale
   const envScale = THREE.MathUtils.clamp(maxEnvIsoH / baselineMaxIsoH, 0.38, 1.30)
-  const waveFreq = config.frequency ?? 1.0
-  const kWave = 2.5 * Math.PI * waveFreq
 
   // 1. Stratified organic constellation sampling + non-indexed synaptic spiderweb
   const { rawNodes, webGrid } = sampleStratifiedNodes(sign, safeXScale, isoYScale, lut, prng, envScale)
@@ -1725,9 +1832,13 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
 
   const lineVertCount = validEdgeIndices.length * 2
   const linePositions = new Float32Array(lineVertCount * 3)
+  const linePeerPositions = new Float32Array(lineVertCount * 3)
   const lineStyles = new Float32Array(lineVertCount * 4)
   const lineRelativeCoords = new Float32Array(lineVertCount * 4)
   const lineDriftParams = new Float32Array(lineVertCount * 4)
+  const linePeerDriftParams = new Float32Array(lineVertCount * 4)
+  const lineCylMeta = new Float32Array(lineVertCount * 3)
+  const lineNodeIds = new Int32Array(lineVertCount)
 
   for (let k = 0; k < validEdgeIndices.length; k++) {
     const eIdx = validEdgeIndices[k]
@@ -1735,11 +1846,10 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     const nB = rawNodes[edges.j[eIdx]]
     const isFallback = edges.fallback[eIdx] === 1
 
-    const edgeIsoLen = Math.hypot(nA.isoX - nB.isoX, nA.isoY - nB.isoY)
+    const edgeIsoLen = Math.hypot(nA.isoX - nB.isoX, nA.isoY - nB.isoY, nA.isoZ - nB.isoZ)
     const lenFactor = THREE.MathUtils.clamp(1.18 - edgeIsoLen / (0.68 * envScale), 0.44, 1.15)
-    const avgWDepth = 0.5 * (nA.w_depth + nB.w_depth)
-    const zNormAvg = THREE.MathUtils.clamp(0.5 + 0.5 * avgWDepth, 0.0, 1.0)
-    const depthWeight = 0.48 + 0.56 * zNormAvg
+    // Dynamic 3D depth fading now runs per-fragment in NeuralLineShader via live vDepth01
+    const depthWeight = 0.85
 
     const isHubA = nA.tier === 2
     const isHubB = nB.tier === 2
@@ -1767,20 +1877,23 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     const alphaA = nA.lineAlpha * lenFactor * depthWeight * dendriteGainA * fallbackScale
     const alphaB = nB.lineAlpha * lenFactor * depthWeight * dendriteGainB * fallbackScale
 
-    // Coherent outward traveling wave pulse synchronized with the exact wavelength and direction of the side waves.
-    const phiA = kWave * nA.u
-    const phiB = kWave * nB.u
-
     const vA = k * 2
     const vB = vA + 1
+
+    lineNodeIds[vA] = nA.idx
+    lineNodeIds[vB] = nB.idx
 
     linePositions[vA * 3] = nA.pos.x
     linePositions[vA * 3 + 1] = nA.pos.y
     linePositions[vA * 3 + 2] = nA.pos.z
+    linePeerPositions[vA * 3] = nB.pos.x
+    linePeerPositions[vA * 3 + 1] = nB.pos.y
+    linePeerPositions[vA * 3 + 2] = nB.pos.z
+    // Pack [alpha, hubAccent, peerY0, peerZ0] so lines stay strictly <= 15 vertex attributes
     lineStyles[vA * 4] = alphaA
     lineStyles[vA * 4 + 1] = hubAccentA
-    lineStyles[vA * 4 + 2] = Math.cos(phiA)
-    lineStyles[vA * 4 + 3] = Math.sin(phiA)
+    lineStyles[vA * 4 + 2] = nB.y0
+    lineStyles[vA * 4 + 3] = nB.z0
     lineRelativeCoords[vA * 4] = nA.relativeCoord[0]
     lineRelativeCoords[vA * 4 + 1] = nA.relativeCoord[1]
     lineRelativeCoords[vA * 4 + 2] = nA.relativeCoord[2]
@@ -1789,14 +1902,24 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     lineDriftParams[vA * 4 + 1] = nA.driftParams[1]
     lineDriftParams[vA * 4 + 2] = nA.driftParams[2]
     lineDriftParams[vA * 4 + 3] = nA.driftParams[3]
+    linePeerDriftParams[vA * 4] = nB.driftParams[0]
+    linePeerDriftParams[vA * 4 + 1] = nB.driftParams[1]
+    linePeerDriftParams[vA * 4 + 2] = nB.driftParams[2]
+    linePeerDriftParams[vA * 4 + 3] = nB.driftParams[3]
+    lineCylMeta[vA * 3] = nA.y0
+    lineCylMeta[vA * 3 + 1] = nA.z0
+    lineCylMeta[vA * 3 + 2] = nA.R_u
 
     linePositions[vB * 3] = nB.pos.x
     linePositions[vB * 3 + 1] = nB.pos.y
     linePositions[vB * 3 + 2] = nB.pos.z
+    linePeerPositions[vB * 3] = nA.pos.x
+    linePeerPositions[vB * 3 + 1] = nA.pos.y
+    linePeerPositions[vB * 3 + 2] = nA.pos.z
     lineStyles[vB * 4] = alphaB
     lineStyles[vB * 4 + 1] = hubAccentB
-    lineStyles[vB * 4 + 2] = Math.cos(phiB)
-    lineStyles[vB * 4 + 3] = Math.sin(phiB)
+    lineStyles[vB * 4 + 2] = nA.y0
+    lineStyles[vB * 4 + 3] = nA.z0
     lineRelativeCoords[vB * 4] = nB.relativeCoord[0]
     lineRelativeCoords[vB * 4 + 1] = nB.relativeCoord[1]
     lineRelativeCoords[vB * 4 + 2] = nB.relativeCoord[2]
@@ -1805,13 +1928,22 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     lineDriftParams[vB * 4 + 1] = nB.driftParams[1]
     lineDriftParams[vB * 4 + 2] = nB.driftParams[2]
     lineDriftParams[vB * 4 + 3] = nB.driftParams[3]
+    linePeerDriftParams[vB * 4] = nA.driftParams[0]
+    linePeerDriftParams[vB * 4 + 1] = nA.driftParams[1]
+    linePeerDriftParams[vB * 4 + 2] = nA.driftParams[2]
+    linePeerDriftParams[vB * 4 + 3] = nA.driftParams[3]
+    lineCylMeta[vB * 3] = nB.y0
+    lineCylMeta[vB * 3 + 1] = nB.z0
+    lineCylMeta[vB * 3 + 2] = nB.R_u
   }
 
   const linesGeo = new THREE.BufferGeometry()
   linesGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
+  linesGeo.setAttribute('aPeerPos', new THREE.BufferAttribute(linePeerPositions, 3))
   linesGeo.setAttribute('aLineStyle', new THREE.BufferAttribute(lineStyles, 4))
   linesGeo.setAttribute('aRelativeCoord', new THREE.BufferAttribute(lineRelativeCoords, 4))
   linesGeo.setAttribute('aDriftParams', new THREE.BufferAttribute(lineDriftParams, 4))
+  linesGeo.setAttribute('aPeerDriftParams', new THREE.BufferAttribute(linePeerDriftParams, 4))
   linesGeo.userData.signalPathCount = 0
   linesGeo.userData.routes = []
   if (lineVertCount > 0) {
@@ -1819,15 +1951,18 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     linesGeo.computeBoundingSphere()
   }
 
-  // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation with Locked Drift Params)
+  // 3. Build Points BufferGeometry (3-Tier Glowing Star Constellation with Locked Drift & 3D Cylinder Params)
   const pointCount = visibleNodes.length
   const pointPositions = new Float32Array(pointCount * 3)
   const pointStyles = new Float32Array(pointCount * 4)
   const pointRelativeCoords = new Float32Array(pointCount * 4)
   const pointDriftParams = new Float32Array(pointCount * 4)
+  const pointCylMeta = new Float32Array(pointCount * 3)
+  const pointNodeIds = new Int32Array(pointCount)
 
   for (let nIdx = 0; nIdx < pointCount; nIdx++) {
     const n = visibleNodes[nIdx]
+    pointNodeIds[nIdx] = n.idx
     pointPositions[nIdx * 3] = n.pos.x
     pointPositions[nIdx * 3 + 1] = n.pos.y
     pointPositions[nIdx * 3 + 2] = n.pos.z
@@ -1843,6 +1978,9 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     pointDriftParams[nIdx * 4 + 1] = n.driftParams[1]
     pointDriftParams[nIdx * 4 + 2] = n.driftParams[2]
     pointDriftParams[nIdx * 4 + 3] = n.driftParams[3]
+    pointCylMeta[nIdx * 3] = n.y0
+    pointCylMeta[nIdx * 3 + 1] = n.z0
+    pointCylMeta[nIdx * 3 + 2] = n.R_u
   }
 
   const pointsGeo = new THREE.BufferGeometry()
@@ -1960,10 +2098,13 @@ export function generateRefinedNeuralField(side, H = H_VAL, config = {}, project
     hazeGeo.computeBoundingSphere()
   }
 
-  const travelProfiles = new Map()
-  addStaticPocketMaskAttributes(pointsGeo, H, config, travelProfiles, false, true)
-  addStaticPocketMaskAttributes(linesGeo, H, config, travelProfiles, true, true)
-  addStaticPocketMaskAttributes(hazeGeo, H, config, travelProfiles, false, false)
+  const waveCache = {
+    data: new Float64Array(rawNodes.length * 13),
+    computed: new Uint8Array(rawNodes.length),
+  }
+  addStaticPocketMaskAttributes(pointsGeo, H, config, pointNodeIds, waveCache, false, pointCylMeta)
+  addStaticPocketMaskAttributes(linesGeo, H, config, lineNodeIds, waveCache, true, lineCylMeta)
+  addStaticPocketMaskAttributes(hazeGeo, H, config, null, null, false, null)
 
   return {
     linesGeo,
